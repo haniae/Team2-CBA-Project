@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "benchmarkos-chatbot"
+version = "0.1.0"
+description = "Starter codebase for an institutional-grade finance chatbot"
+readme = "README.md"
+authors = [{ name = "BenchmarkOS" }]
+requires-python = ">=3.10"
+dependencies = [
+    "python-dotenv>=1.0.1",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra"
+testpaths = ["tests"]
+pythonpath = ["src"]
