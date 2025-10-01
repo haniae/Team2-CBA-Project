@@ -1,3 +1,16 @@
+Metadata-Version: 2.4
+Name: benchmarkos-chatbot
+Version: 0.1.0
+Summary: Starter codebase for an institutional-grade finance chatbot
+Author: BenchmarkOS
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: python-dotenv>=1.0.1
+Requires-Dist: numpy>=1.26.0
+Requires-Dist: pandas>=2.1.0
+Requires-Dist: requests>=2.32.0
+Requires-Dist: yfinance>=0.2.50
+
 # BenchmarkOS Chatbot Starter
 
 This repository now ships with an end-to-end reference implementation for an institutional-grade finance analyst chatbot. It ingests a multi-year sample of SEC-style fundamentals, applies accounting normalisations, computes phased KPI packs, and exposes workflow automation (alerts, audit trail, what-if scenarios) through a conversational interface.
@@ -59,49 +72,6 @@ Project/
    export OPENAI_API_KEY="sk-..."          # enables OpenAI responses
    export SEC_API_USER_AGENT="Your Name your@email.com"  # required by SEC
    ```
-
-
-## Web API
-
-You can expose the chatbot and analytics endpoints over HTTP using FastAPI.
-
-1. Install the new dependencies if you have an existing environment:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Ensure the service points at your desired SQLite file (optional if you use the default):
-   ```bash
-   set DATABASE_PATH=C:\Users\Hania\Documents\GitHub\Project\benchmarkos_chatbot.sqlite3
-   ```
-   *(PowerShell equivalent: `$env:DATABASE_PATH="C:\Users\Hania\Documents\GitHub\Project\benchmarkos_chatbot.sqlite3"`)*
-3. Start the API:
-   ```bash
-   uvicorn benchmarkos_chatbot.web:app --reload
-   ```
-4. Visit `http://127.0.0.1:8000/docs` for interactive Swagger documentation. Available endpoints include:
-   - `POST /chat` for conversational replies
-   - `GET /metrics` for KPI tables (supports year filters)
-   - `GET /facts` for raw financial facts
-   - `GET /audit` for audit trail events
-
-The API is stateless per request but retains conversations in SQLite when a `conversation_id` is supplied, letting clients continue prior threads.
-
-## Web UI
-
-A polished browser interface ships with the repository so analysts can work without the terminal.
-
-1. Make sure the backend dependencies are installed and the API points at the correct SQLite database (see **Web API** above).
-2. Launch the server:
-   ```bash
-   uvicorn benchmarkos_chatbot.web:app --reload
-   ```
-3. Open http://127.0.0.1:8000/ to use the interface:
-   - **Chat** pane for free-form questions and follow-up prompts (conversation IDs are handled automatically).
-   - **KPI Explorer** to compare tickers across fiscal-year ranges.
-   - **Financial Facts** viewer for raw normalised data points.
-   - **Audit Trail** panel to review ingestion and scenario events.
-
-   Swagger documentation remains available at http://127.0.0.1:8000/docs when you need to test calls manually.
 
 4. **Run the chatbot**
 
