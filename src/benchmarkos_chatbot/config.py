@@ -45,12 +45,17 @@ class Settings:
         Optional API key to authenticate with OpenAI. If missing, the
         application will raise a clear error as soon as a remote call is
         attempted.
+    sec_api_user_agent:
+        Optional custom user agent used when querying the SEC data APIs. The
+        SEC requests that callers identify themselves with a descriptive
+        string (name, contact email).
     """
 
     database_path: Path
     llm_provider: LLMProvider
     openai_model: str
     openai_api_key: Optional[str]
+    sec_api_user_agent: Optional[str]
 
     @property
     def sqlite_uri(self) -> str:
@@ -82,6 +87,7 @@ def load_settings() -> Settings:
         llm_provider=llm_provider,
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
+        sec_api_user_agent=os.getenv("SEC_API_USER_AGENT"),
     )
 
 
