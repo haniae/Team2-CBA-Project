@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Iterable, List, Mapping
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from . import database
 from .config import Settings

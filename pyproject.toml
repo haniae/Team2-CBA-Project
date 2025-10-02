@@ -11,6 +11,8 @@ authors = [{ name = "BenchmarkOS" }]
 requires-python = ">=3.10"
 dependencies = [
     "python-dotenv>=1.0.1",
+    "requests>=2.32.0",
+    "psycopg2-binary>=2.9.9",
 ]
 
 [tool.pytest.ini_options]
@@ -18,3 +20,13 @@ minversion = "8.0"
 addopts = "-ra"
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+DATABASE_TYPE=postgresql
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DATABASE=secdb
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=hania123
+POSTGRES_SCHEMA=sec      # optional; defaults to “sec” if omitted
+DATABASE_PATH=benchmarkos_chatbot.sqlite3  # still used for local caches
+SEC_API_USER_AGENT=Firstname Lastname email@example.com

@@ -1,7 +1,7 @@
 """Application configuration helpers.
 
 The :mod:`config` module centralises runtime options so the rest of the
-codebase can remain free of hard-coded paths or secrets.  Settings are loaded
+codebase can remain free of hard-coded paths or secrets. Settings are loaded
 once at startup via :func:`load_settings` and then passed into other
 components.
 """
@@ -17,13 +17,13 @@ try:  # pragma: no cover - trivial import guard
 except ImportError:  # pragma: no cover - executed only when dependency missing
     def load_dotenv() -> None:
         """Fallback no-op when python-dotenv is not installed."""
-
         return None
 
 load_dotenv()  # Load variables from a .env file if it exists.
 
 
 LLMProvider = Literal["local", "openai"]
+DatabaseType = Literal["sqlite", "postgresql"]
 
 
 @dataclass(frozen=True)
@@ -32,8 +32,22 @@ class Settings:
 
     Attributes
     ----------
+    database_type:
+        Type of database to use: "sqlite" or "postgresql"
     database_path:
-        Location of the SQLite database file used to persist conversations.
+        Location of the SQLite database file (only used when database_type is "sqlite")
+    postgres_host:
+        PostgreSQL server hostname
+    postgres_port:
+        PostgreSQL server port
+    postgres_database:
+        PostgreSQL database name
+    postgres_user:
+        PostgreSQL username
+    postgres_password:
+        PostgreSQL password
+    postgres_schema:
+        PostgreSQL schema name (default: "sec")
     llm_provider:
         Which language model integration to use. Options: ``"local"`` for a
         lightweight echo model (default) or ``"openai"`` for the
@@ -45,18 +59,91 @@ class Settings:
         Optional API key to authenticate with OpenAI. If missing, the
         application will raise a clear error as soon as a remote call is
         attempted.
+    sec_api_user_agent:
+        SEC requires a descriptive User-Agent string for EDGAR API access.
+    edgar_base_url:
+        Base URL for EDGAR data endpoints.
+    yahoo_quote_url:
+        Base endpoint for Yahoo Finance real-time quotes.
+    yahoo_quote_batch_size:
+        Maximum number of tickers to request per Yahoo Finance batch call.
+    http_request_timeout:
+        Number of seconds to wait before timing out HTTP requests.
+    max_ingestion_workers:
+        Size of the worker pool used for concurrent ingestion tasks.
+    cache_dir:
+        Directory used to persist intermediate ingestion artefacts.
+    enable_bloomberg:
+        Whether Bloomberg real-time quote integration should be attempted.
+    bloomberg_host / bloomberg_port / bloomberg_timeout:
+        Connection details for a Bloomberg Session (if enabled).
     """
 
+    database_type: DatabaseType
     database_path: Path
+    postgres_host: Optional[str]
+    postgres_port: Optional[int]
+    postgres_database: Optional[str]
+    postgres_user: Optional[str]
+    postgres_password: Optional[str]
+    postgres_schema: str
     llm_provider: LLMProvider
     openai_model: str
     openai_api_key: Optional[str]
+    sec_api_user_agent: str
+    edgar_base_url: str
+    yahoo_quote_url: str
+    yahoo_quote_batch_size: int
+    http_request_timeout: float
+    max_ingestion_workers: int
+    cache_dir: Path
+    enable_bloomberg: bool
+    bloomberg_host: Optional[str]
+    bloomberg_port: Optional[int]
+    bloomberg_timeout: float
 
     @property
     def sqlite_uri(self) -> str:
         """Return a URI suitable for :mod:`sqlite3.connect`."""
-
         return f"file:{self.database_path}?cache=shared"
+
+    @property
+    def postgres_dsn(self) -> str:
+        """Return a PostgreSQL connection string."""
+        if self.database_type != "postgresql":
+            raise ValueError("postgres_dsn is only available when database_type is 'postgresql'")
+        
+        if not all([self.postgres_host, self.postgres_database, self.postgres_user]):
+            raise ValueError(
+                "PostgreSQL requires POSTGRES_HOST, POSTGRES_DATABASE, and POSTGRES_USER "
+                "to be set in environment variables"
+            )
+        
+        # Build connection string
+        password_part = f":{self.postgres_password}" if self.postgres_password else ""
+        port_part = f":{self.postgres_port}" if self.postgres_port else ""
+        
+        return (
+            f"postgresql://{self.postgres_user}{password_part}@"
+            f"{self.postgres_host}{port_part}/{self.postgres_database}"
+        )
+
+    @property
+    def database_uri(self) -> str:
+        """Return the appropriate database URI based on database_type."""
+        if self.database_type == "sqlite":
+            return self.sqlite_uri
+        elif self.database_type == "postgresql":
+            return self.postgres_dsn
+        else:
+            raise ValueError(f"Unknown database type: {self.database_type}")
+
+
+def _env_flag(name: str, *, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def load_settings() -> Settings:
@@ -66,10 +153,44 @@ def load_settings() -> Settings:
     make local development easy.
     """
 
+    # Database configuration
+    database_type_env = os.getenv("DATABASE_TYPE", "sqlite").lower()
+    if database_type_env not in ("sqlite", "postgresql"):
+        raise ValueError(
+            "DATABASE_TYPE must be either 'sqlite' or 'postgresql' (received "
+            f"{database_type_env!r})."
+        )
+    database_type: DatabaseType = database_type_env  # type: ignore[assignment]
+
     database_path = Path(
         os.getenv("DATABASE_PATH", Path.cwd() / "benchmarkos_chatbot.sqlite3")
     ).expanduser()
 
+    # PostgreSQL configuration
+    postgres_host = os.getenv("POSTGRES_HOST")
+    postgres_port_env = os.getenv("POSTGRES_PORT", "5432")
+    postgres_port = None
+    if postgres_port_env:
+        try:
+            postgres_port = int(postgres_port_env)
+        except ValueError as exc:
+            raise ValueError("POSTGRES_PORT must be an integer.") from exc
+    
+    postgres_database = os.getenv("POSTGRES_DATABASE")
+    postgres_user = os.getenv("POSTGRES_USER")
+    postgres_password = os.getenv("POSTGRES_PASSWORD")
+    postgres_schema = os.getenv("POSTGRES_SCHEMA", "sec")
+
+    # Validate PostgreSQL settings if using PostgreSQL
+    if database_type == "postgresql":
+        if not postgres_host:
+            raise ValueError("POSTGRES_HOST must be set when DATABASE_TYPE is 'postgresql'")
+        if not postgres_database:
+            raise ValueError("POSTGRES_DATABASE must be set when DATABASE_TYPE is 'postgresql'")
+        if not postgres_user:
+            raise ValueError("POSTGRES_USER must be set when DATABASE_TYPE is 'postgresql'")
+
+    # LLM configuration
     llm_provider: LLMProvider = os.getenv("LLM_PROVIDER", "local").lower()  # type: ignore[assignment]
     if llm_provider not in ("local", "openai"):
         raise ValueError(
@@ -77,15 +198,85 @@ def load_settings() -> Settings:
             f"{llm_provider!r})."
         )
 
+    sec_user_agent = os.getenv("SEC_API_USER_AGENT", 
+        "BenchmarkOSBot/1.0 (support@benchmarkos.com)"
+    ).strip()
+    if not sec_user_agent:
+        raise ValueError("SEC_API_USER_AGENT must not be empty.")
+
+    edgar_base_url = os.getenv("EDGAR_BASE_URL", "https://data.sec.gov").rstrip("/")
+    yahoo_quote_url = os.getenv("YAHOO_QUOTE_URL", 
+        "https://query1.finance.yahoo.com/v7/finance/quote"
+    ).rstrip("/")
+
+    yahoo_batch_env = os.getenv("YAHOO_QUOTE_BATCH_SIZE", "50")
+    try:
+        yahoo_quote_batch_size = int(yahoo_batch_env)
+    except ValueError as exc:
+        raise ValueError("YAHOO_QUOTE_BATCH_SIZE must be an integer.") from exc
+    if yahoo_quote_batch_size <= 0:
+        raise ValueError("YAHOO_QUOTE_BATCH_SIZE must be positive.")
+
+    timeout_env = os.getenv("HTTP_REQUEST_TIMEOUT", "30")
+    try:
+        http_request_timeout = float(timeout_env)
+    except ValueError as exc:
+        raise ValueError("HTTP_REQUEST_TIMEOUT must be numeric.") from exc
+    if http_request_timeout <= 0:
+        raise ValueError("HTTP_REQUEST_TIMEOUT must be positive.")
+
+    worker_env = os.getenv("INGESTION_MAX_WORKERS", "8")
+    try:
+        max_ingestion_workers = max(1, int(worker_env))
+    except ValueError as exc:
+        raise ValueError("INGESTION_MAX_WORKERS must be an integer.") from exc
+
+    cache_dir = Path(os.getenv("DATA_CACHE_DIR", Path.cwd() / "cache")).expanduser()
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    enable_bloomberg = _env_flag("ENABLE_BLOOMBERG", default=False)
+    bloomberg_host = os.getenv("BLOOMBERG_HOST")
+    bloomberg_port_env = os.getenv("BLOOMBERG_PORT")
+    bloomberg_port = None
+    if bloomberg_port_env:
+        try:
+            bloomberg_port = int(bloomberg_port_env)
+        except ValueError as exc:
+            raise ValueError("BLOOMBERG_PORT must be an integer.") from exc
+    bloomberg_timeout_env = os.getenv("BLOOMBERG_TIMEOUT", "30")
+    try:
+        bloomberg_timeout = float(bloomberg_timeout_env)
+    except ValueError as exc:
+        raise ValueError("BLOOMBERG_TIMEOUT must be numeric.") from exc
+    if bloomberg_timeout <= 0:
+        raise ValueError("BLOOMBERG_TIMEOUT must be positive.")
+
     return Settings(
+        database_type=database_type,
         database_path=database_path,
+        postgres_host=postgres_host,
+        postgres_port=postgres_port,
+        postgres_database=postgres_database,
+        postgres_user=postgres_user,
+        postgres_password=postgres_password,
+        postgres_schema=postgres_schema,
         llm_provider=llm_provider,
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
+        sec_api_user_agent=sec_user_agent,
+        edgar_base_url=edgar_base_url,
+        yahoo_quote_url=yahoo_quote_url,
+        yahoo_quote_batch_size=yahoo_quote_batch_size,
+        http_request_timeout=http_request_timeout,
+        max_ingestion_workers=max_ingestion_workers,
+        cache_dir=cache_dir,
+        enable_bloomberg=enable_bloomberg,
+        bloomberg_host=bloomberg_host,
+        bloomberg_port=bloomberg_port,
+        bloomberg_timeout=bloomberg_timeout,
     )
 
 
 # The module-level import of os happens at the bottom to keep the public API
 # obvious when scanning from the top of the file.
 import os  # noqa: E402  (placed at end intentionally)
-
