@@ -1,0 +1,133 @@
+Metadata-Version: 2.4
+Name: benchmarkos-chatbot
+Version: 0.1.0
+Summary: Starter codebase for an institutional-grade finance chatbot
+Author: BenchmarkOS
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: python-dotenv>=1.0.1
+Requires-Dist: numpy>=1.26.0
+Requires-Dist: pandas>=2.1.0
+Requires-Dist: requests>=2.32.0
+Requires-Dist: yfinance>=0.2.50
+
+# BenchmarkOS Chatbot Starter
+
+This repository now ships with an end-to-end reference implementation for an institutional-grade finance analyst chatbot. It ingests a multi-year sample of SEC-style fundamentals, applies accounting normalisations, computes phased KPI packs, and exposes workflow automation (alerts, audit trail, what-if scenarios) through a conversational interface.
+
+## Key Features
+
+- **Automated data ingestion & normalisation** - Loads the bundled `sample_financials.csv`, applies non-recurring adjustments, and persists harmonised facts plus audit notes into SQLite.
+- **Expanded sample universe** - Eight representative tickers (ALP, BRV, CTL, DYN, EVO, FIN, MOB, TEL) spanning technology, consumer, industrials, energy, communications, and financials.
+- **Live market data ingestion** - Use the `ingest <ticker>` command to pull multi-year fundamentals straight from SEC XBRL company facts and Yahoo Finance for any listed company.
+- **Multi-phase KPI engine** - Calculates Phase 1 (foundational), Phase 2 (profitability & valuation), and Phase 3 (capital efficiency & risk) metrics with extensible definitions.
+- **Scenario modelling & governance alerts** - Run revenue/margin/multiple scenarios per ticker, capture results, and surface risk alerts when KPIs breach policy thresholds.
+- **SQLite persistence** - Conversations, financial facts, computed metrics, scenarios, and audit trails are all stored locally for replay or downstream analytics.
+- **Pluggable language model layer** - Keep using the local echo client for offline testing or switch to OpenAI by exporting an `OPENAI_API_KEY`.
+
+## Repository Layout
+
+```
+Project/
+├─ data/
+│  └─ sample_financials.csv
+├─ src/
+│  └─ benchmarkos_chatbot/
+│     ├─ __init__.py
+│     ├─ analytics_engine.py
+│     ├─ chatbot.py
+│     ├─ config.py
+│     ├─ data_ingestion.py
+│     ├─ data_sources.py
+│     ├─ database.py
+│     └─ llm_client.py
+├─ tests/
+│  ├─ test_analytics.py
+│  ├─ test_data_ingestion.py
+│  └─ test_database.py
+├─ main.py
+├─ pyproject.toml
+├─ requirements.txt
+└─ README.md
+```
+
+## Getting Started
+
+1. **Create and activate a virtual environment**
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Provide API credentials (optional but recommended)**
+
+   ```bash
+   export OPENAI_API_KEY="sk-..."          # enables OpenAI responses
+   export SEC_API_USER_AGENT="Your Name your@email.com"  # required by SEC
+   ```
+
+4. **Run the chatbot**
+
+   ```bash
+   python main.py
+   ```
+
+   You will see a summary of the sample ingestion run and can type `help` to view the built-in finance commands. Use `ingest <ticker>` to queue a live data pull; the background worker persists it and metrics become available as soon as the job finishes.
+
+5. **Run tests**
+
+   ```bash
+   pytest
+   ```
+
+## Operational Overview
+
+### Data pipeline
+
+On startup the chatbot:
+
+1. Loads `sample_financials.csv` into pandas.
+2. Applies normalisations (adding back non-recurring expenses, smoothing stock-based compensation, normalising free cash flow).
+3. Persists each fact into SQLite (`financial_facts`, `metric_results`, `audit_events`, `alerts`, `scenario_results`).
+4. Records an audit trail entry describing the ingestion.
+
+At any time you can extend the coverage universe by running:
+
+```
+ingest MSFT years=5
+```
+
+The chatbot will call Yahoo Finance for income, balance sheet and cash-flow statements, enrich them with selected SEC XBRL facts (e.g. restructuring charges), normalise the metrics, and refresh the analytics cache so that `metrics for MSFT phase 1` works immediately.
+
+### KPI phases
+
+| Phase | Focus | Example metrics |
+|-------|-------|-----------------|
+| Phase 1 | Growth & solvency | Revenue CAGR, EPS CAGR, adjusted EBITDA margin, ROE, FCF margin |
+| Phase 2 | Profitability & valuation | ROA, clean operating margin, net margin, cash conversion, TSR, dividend yield, P/E |
+| Phase 3 | Capital efficiency & risk | EV/EBITDA, PEG, net debt / EBITDA, working capital turnover, buyback intensity |
+
+Each metric definition lives in `analytics_engine.py` and stores methodology text alongside the result to support audit readiness.
+
+### Scenario & governance workflows
+
+- Run `scenario <TICKER> revenue +5% margin +1% multiple +0.5%` to create a what-if case. Results are stored and auditable.
+- Use `show alerts` to surface breaches (e.g. negative revenue CAGR, leverage above policy cap).
+- `show audit` exposes the latest ingestion / scenario events for compliance review.
+
+## Extending Further
+
+- Plug alternative data sources into `data_ingestion.ingest_live_tickers` or `data_sources.build_financial_dataset` (EDGAR bulk feeds, Bloomberg, proprietary models).
+- Add KPIs by appending to `METRIC_DEFINITIONS` in `analytics_engine.py`.
+- Swap the CLI for FastAPI/Streamlit while reusing `BenchmarkOSChatbot`.
+- Export metrics to dashboards (Tableau/PowerBI) by reading the SQLite store.
+
+Happy building! The scaffold now demonstrates the full workflow expected by the Desired Business Outcomes specification while remaining easy to customise.
+
