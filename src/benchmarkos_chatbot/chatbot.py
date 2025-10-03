@@ -123,7 +123,6 @@ class BenchmarkOSChatbot:
         llm_client = build_llm_client(
             settings.llm_provider,
             model=settings.openai_model,
-            api_key=settings.openai_api_key,
         )
 
         database.initialise(settings.database_path)

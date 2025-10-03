@@ -16,7 +16,6 @@ def _make_settings(tmp_path: Path) -> Settings:
         database_path=tmp_path / "chat.sqlite3",
         llm_provider="local",
         openai_model="local",
-        openai_api_key=None,
         sec_api_user_agent=None,
     )
 
@@ -63,3 +62,4 @@ def test_ingestion_adjustments_match_source(tmp_path: Path) -> None:
     facts = database.fetch_financial_facts(settings.database_path, ticker="ALP")
     values = {fact.metric: fact.value for fact in facts if fact.fiscal_year == 2023}
     assert values["adjusted_net_income"] == expected_adjusted_net_income
+

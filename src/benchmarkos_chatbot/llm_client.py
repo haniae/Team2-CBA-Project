@@ -7,8 +7,15 @@ retrieval augmentation) without rewriting the core chatbot logic.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Protocol
+
+try:  # pragma: no cover - optional dependency
+    import keyring  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    keyring = None
 
 
 class LLMClient(Protocol):
@@ -38,10 +45,54 @@ class LocalEchoLLM:
         )
 
 
+def _resolve_openai_api_key() -> str:
+    """Return the OpenAI API key from the safest available source.
+
+    Resolution order:
+    1. `OPENAI_API_KEY` environment variable.
+    2. Secret stored in the user's keyring under the "benchmarkos-chatbot" service.
+    3. Plain-text fallback file at ~/.config/benchmarkos-chatbot/openai_api_key.
+
+    Raises
+    ------
+    RuntimeError
+        If no key can be located. This keeps secrets out of source control while
+        still providing clear guidance to the caller.
+    """
+
+    env_value = os.getenv("OPENAI_API_KEY")
+    if env_value:
+        return env_value
+
+    if keyring is not None:
+        try:
+            stored = keyring.get_password("benchmarkos-chatbot", "openai-api-key")
+        except Exception:  # pragma: no cover - defensive fallback
+            stored = None
+        if stored:
+            return stored
+
+    fallback_path = Path.home() / ".config" / "benchmarkos-chatbot" / "openai_api_key"
+    try:
+        fallback_text = fallback_path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        fallback_text = ""
+    except OSError:  # pragma: no cover - e.g. permissions
+        fallback_text = ""
+    if fallback_text:
+        return fallback_text
+
+    raise RuntimeError(
+        "OpenAI API key not found. Set OPENAI_API_KEY, store it in your keyring "
+        "(service 'benchmarkos-chatbot'), or place it in "
+        f"{fallback_path}"
+    )
+
+
 class OpenAILLMClient:
     """Wrapper around the OpenAI Chat Completions API."""
 
-    def __init__(self, model: str, api_key: str) -> None:
+    def __init__(self, model: str) -> None:
         try:
             from openai import OpenAI
         except ImportError as exc:  # pragma: no cover - executed only if missing
@@ -50,7 +101,8 @@ class OpenAILLMClient:
                 "Install it with `pip install openai`."
             ) from exc
 
-        self._client = OpenAI(api_key=api_key)
+        resolved_key = _resolve_openai_api_key()
+        self._client = OpenAI(api_key=resolved_key)
         self._model = model
 
     def generate_reply(self, messages: Iterable[Mapping[str, str]]) -> str:
@@ -61,17 +113,17 @@ class OpenAILLMClient:
         return response.choices[0].message.content or ""
 
 
-def build_llm_client(provider: str, *, model: str, api_key: str | None) -> LLMClient:
+def build_llm_client(
+    provider: str,
+    *,
+    model: str,
+) -> LLMClient:
     """Factory that instantiates the desired language model client."""
 
     if provider == "local":
         return LocalEchoLLM()
 
     if provider == "openai":
-        if not api_key:
-            raise RuntimeError(
-                "OPENAI_API_KEY must be set when using the OpenAI provider."
-            )
-        return OpenAILLMClient(model=model, api_key=api_key)
+        return OpenAILLMClient(model=model)
 
     raise ValueError(f"Unsupported provider: {provider}")

@@ -45,7 +45,6 @@ def _settings(db_path, cache_dir) -> Settings:
         postgres_schema="sec",
         llm_provider="local",
         openai_model="gpt-4o-mini",
-        openai_api_key=None,
         sec_api_user_agent="unit-test/1.0",
         edgar_base_url="https://example.com",
         yahoo_quote_url="https://example.com",
@@ -260,3 +259,4 @@ def test_refresh_metrics_handles_alias_metrics_without_quotes(tmp_path, monkeypa
     assert pytest.approx(latest_derived["cash_conversion"], rel=1e-6) == expected_cash_conversion
     assert pytest.approx(latest_derived["free_cash_flow_margin"], rel=1e-6) == expected_free_cash_flow_margin
     assert pytest.approx(latest_derived["debt_to_equity"], rel=1e-6) == expected_debt_to_equity
+

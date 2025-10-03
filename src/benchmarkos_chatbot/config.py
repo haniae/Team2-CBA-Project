@@ -55,10 +55,6 @@ class Settings:
     openai_model:
         The chat completion model name to request from the OpenAI API when the
         provider is set to ``"openai"``.
-    openai_api_key:
-        Optional API key to authenticate with OpenAI. If missing, the
-        application will raise a clear error as soon as a remote call is
-        attempted.
     sec_api_user_agent:
         SEC requires a descriptive User-Agent string for EDGAR API access.
     edgar_base_url:
@@ -89,7 +85,6 @@ class Settings:
     postgres_schema: str
     llm_provider: LLMProvider
     openai_model: str
-    openai_api_key: Optional[str]
     sec_api_user_agent: str
     edgar_base_url: str
     yahoo_quote_url: str
@@ -262,7 +257,6 @@ def load_settings() -> Settings:
         postgres_schema=postgres_schema,
         llm_provider=llm_provider,
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        openai_api_key=os.getenv("OPENAI_API_KEY"),
         sec_api_user_agent=sec_user_agent,
         edgar_base_url=edgar_base_url,
         yahoo_quote_url=yahoo_quote_url,

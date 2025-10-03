@@ -20,7 +20,6 @@ def prepared_engine(tmp_path: Path) -> AnalyticsEngine:
         database_path=tmp_path / "chat.sqlite3",
         llm_provider="local",
         openai_model="local",
-        openai_api_key=None,
         sec_api_user_agent=None,
     )
     database.initialise(settings.database_path)
@@ -66,7 +65,6 @@ def test_chatbot_metrics_accepts_company_name(tmp_path: Path) -> None:
         database_path=tmp_path / "chat.sqlite3",
         llm_provider="local",
         openai_model="local",
-        openai_api_key=None,
         sec_api_user_agent=None,
     )
     task_module._default_manager = None
@@ -85,7 +83,6 @@ def test_chatbot_compare_accepts_company_names(tmp_path: Path) -> None:
         database_path=tmp_path / "chat.sqlite3",
         llm_provider="local",
         openai_model="local",
-        openai_api_key=None,
         sec_api_user_agent=None,
     )
     task_module._default_manager = None
@@ -128,7 +125,6 @@ def test_chatbot_metrics_suggests_candidates(tmp_path: Path) -> None:
         database_path=tmp_path / "chat.sqlite3",
         llm_provider="local",
         openai_model="local",
-        openai_api_key=None,
         sec_api_user_agent=None,
     )
     task_module._default_manager = None
@@ -146,7 +142,6 @@ def test_chatbot_compare_suggests_when_unresolved(tmp_path: Path) -> None:
         database_path=tmp_path / "chat.sqlite3",
         llm_provider="local",
         openai_model="local",
-        openai_api_key=None,
         sec_api_user_agent=None,
     )
     task_module._default_manager = None
@@ -164,7 +159,6 @@ def test_chatbot_scenario_suggests_candidates(tmp_path: Path) -> None:
         database_path=tmp_path / "chat.sqlite3",
         llm_provider="local",
         openai_model="local",
-        openai_api_key=None,
         sec_api_user_agent=None,
     )
     task_module._default_manager = None
@@ -175,3 +169,5 @@ def test_chatbot_scenario_suggests_candidates(tmp_path: Path) -> None:
         task_module._default_manager = None
     assert "Try one of" in reply
     assert "Alpha" in reply
+
+
