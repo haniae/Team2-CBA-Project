@@ -1,135 +1,111 @@
 # BenchmarkOS Chatbot Platform
 
-A full-stack reference implementation for building institutional finance copilots on top of BenchmarkOS data services. The repository combines a hardened analytics engine, pluggable language models, data-ingestion utilities, and both CLI and web experiences. Everything is written in plain Python so you can run it locally, extend it for class projects, or deploy it to production infrastructure.
+A full-stack reference implementation for building institutional finance copilots. This README is written for classmates, professors, or teammates who may be encountering the codebase for the first time. It walks through every moving part—files, configuration, commands, and workflows—with friendly explanations so you can get productive quickly.
 
-## Table of Contents
-- [Key Capabilities](#key-capabilities)
-- [Architecture](#architecture)
-- [Quick Start](#quick-start)
-- [Configuration & Secrets](#configuration--secrets)
-  - [SQLite vs PostgreSQL](#sqlite-vs-postgresql)
-  - [Managing the OpenAI API Key Securely](#managing-the-openai-api-key-securely)
-- [Running the Chatbot](#running-the-chatbot)
-  - [Command Line](#command-line)
-  - [Web UI](#web-ui)
-  - [Supported Chat Commands](#supported-chat-commands)
-- [Data Ingestion Workflows](#data-ingestion-workflows)
-- [Testing & Quality](#testing--quality)
-- [Extending the Platform](#extending-the-platform)
-- [Troubleshooting](#troubleshooting)
-- [Reference](#reference)
+---
 
-## Key Capabilities
-- **Python-first workflow** – Standard package layout that works out of the box with VS Code, PyCharm, or terminal toolchains.
-- **Robust analytics layer** – `AnalyticsEngine` refreshes fundamentals, computes growth/profitability/valuation metrics, and pulls quotes when available.
-- **Flexible LLM integration** – Swap between the local echo model (offline development) and OpenAI Chat Completions with a single configuration change.
-- **Secure secret handling** – API keys are never stored in code; the client reads from environment variables, OS keyrings, or a user config file.
-- **CLI and web experiences** – `run_chatbot.py` provides a REPL, while `serve_chatbot.py` launches the FastAPI-powered UI in `webui/`.
-- **Ingestion utilities** – Batch scripts populate fundamentals from SEC/Yahoo data, with audit logging and restart-safe progress tracking.
-
-## Architecture
-## File-by-File Overview
-The project is intentionally organised so each module has a single, well-defined responsibility. Use this table as a quick reference when you or a teammate needs to dive into a new area.
-
-| Path | Purpose |
-|------|---------|
-| `pyproject.toml` | Build metadata, dependency list, pytest configuration (sets `pythonpath = ["src", "."]`). |
-| `.env.example` | Template showing recommended environment variables (SQLite defaults, optional PostgreSQL, Bloomberg toggles). Copy to `.env` for local configuration. |
-| `run_chatbot.py` | Minimal CLI runner; instantiates `BenchmarkOSChatbot` and starts the REPL. |
-| `serve_chatbot.py` | Convenience wrapper around `uvicorn` to launch the FastAPI app in `src/benchmarkos_chatbot/web.py`. |
-| `src/benchmarkos_chatbot/__init__.py` | Public API exports: chatbot, analytics engine, settings loader, ingestion hook, ticker utilities. |
-| `src/benchmarkos_chatbot/config.py` | `Settings` dataclass plus `load_settings()`. Validates environment variables, ensures cache directories exist, and normalises types (integers, floats, booleans). |
-| `src/benchmarkos_chatbot/database.py` | SQLite schema management, connection helpers, and CRUD utilities for metrics, facts, messages, audits, and scenario results. Handles WAL mode, UTC timestamps, ticker normalisation, and JSON serialisation. |
-| `src/benchmarkos_chatbot/secdb.py` | Optional PostgreSQL backend for SEC data. Mirrors the SQLite helpers but uses `psycopg2-binary`. Activated when `DATABASE_TYPE=postgresql`. |
-| `src/benchmarkos_chatbot/data_sources.py` | Clients for EDGAR, Yahoo Finance, and (optionally) Bloomberg. Responsible for HTTP requests, retries, and payload normalisation. |
-| `src/benchmarkos_chatbot/data_ingestion.py` | High-level ingestion workflows (bootstrap sample data, streaming updates, live ticker ingestion). Produces `IngestionReport` objects and records audit events. |
-| `src/benchmarkos_chatbot/analytics_engine.py` | Core analytics pipeline. Loads facts, computes base/derived/aggregate metrics, refreshes market quotes, and exposes helpers like `get_metrics`, `run_scenario`, and `fetch_scenario_results`. |
-| `src/benchmarkos_chatbot/table_renderer.py` | Shared ASCII table builder used by CLI commands (`table`/`compare`) and the chatbot. Supports custom layouts, metric abbreviations, year filters, and chunked output. |
-| `src/benchmarkos_chatbot/llm_client.py` | Language model abstraction. Provides `LocalEchoLLM` for offline testing and `OpenAILLMClient` which resolves the API key via environment, OS keyring, or config file. |
-| `src/benchmarkos_chatbot/chatbot.py` | Orchestrates conversation flow: intent parsing, table generation, ingestion commands, audit lookups, LLM grounding, and message logging. `BenchmarkOSChatbot.create()` is the primary entry point. |
-| `src/benchmarkos_chatbot/tasks.py` | Background task definitions (e.g., ingestion queues). Useful when integrating with task runners or async frameworks. |
-| `src/benchmarkos_chatbot/ticker_universe.py` | Loads ticker universes, synonyms, and search utilities used for fuzzy matching of company names. |
-| `src/benchmarkos_chatbot/web.py` | FastAPI application exposing REST endpoints (`/chat`, `/health`, metrics/audit endpoints). Serves the static assets in `webui/`. |
-| `webui/index.html`, `webui/app.js`, `webui/styles.css` | Single-page web client for the chatbot. Handles chat form submission, status indicators, message rendering (including tables), and responsive styling. |
-| `tests/test_*.py` | Pytest suites covering analytics calculations, ingestion flows, database persistence, CLI table rendering, and chatbot interactions. Fixtures use the local echo model so tests run offline. |
-| `ingest_*.py`, `batch_ingest.py` | Command-line utilities for populating the database with SEC fundamentals, frames, and other datasets. Include resume capability and throttling options. |
-
-Feel free to extend this table as the project evolves—keeping it current helps new contributors (and future you) ramp up quickly.
-```
-Project/
-├── README.md                     # This guide
-├── pyproject.toml                # Build metadata + pytest configuration
-├── requirements.txt              # Dependency snapshot (optional)
-├── .env.example                  # Sample environment configuration
-├── cache/                        # Generated ingestion caches
-├── data/                         # Sample CSVs used by tests/ingestion
-├── docs/                         # Extra documentation / design notes
-├── src/
-│   └── benchmarkos_chatbot/
-│       ├── __init__.py              # Public API exports
-│       ├── analytics_engine.py      # Metrics pipeline + quote refresh
-│       ├── chatbot.py               # Conversation orchestrator
-│       ├── config.py                # Settings dataclass & loader
-│       ├── data_ingestion.py        # Batch/bootstrap ingestion helpers
-│       ├── data_sources.py          # External data adapters (SEC, Yahoo, …)
-│       ├── database.py              # SQLite schema + helpers
-│       ├── llm_client.py            # Local echo + OpenAI clients
-│       ├── secdb.py                 # Optional PostgreSQL/SEC store
-│       ├── table_renderer.py        # ASCII renderer for compare/table commands
-│       ├── tasks.py                 # Background task definitions
-│       ├── ticker_universe.py       # Universe and synonym loaders
-│       └── web.py                   # FastAPI application powering the UI
-├── tests/                         # Pytest suites for analytics, CLI, ingestion
-├── webui/                         # Static assets for the web chatbot
-├── run_chatbot.py                 # CLI runner
-├── serve_chatbot.py               # Web server launcher (uvicorn)
-└── ingest_*.py / batch_ingest.py  # Data ingestion entry points
-```
-
-## Quick Start
+## 1. TL;DR Quick Demo
+If you just want to see the bot talk:
 ```bash
-# 1. Clone and enter the project
+# from the project root
+python -m venv .venv
+.\.venv\Scripts\activate          # or `source .venv/bin/activate` on macOS/Linux
+pip install -r requirements.txt
+Copy-Item .env.example .env        # or `cp`
+python run_chatbot.py              # starts the CLI
+```
+Type `help` and follow the menu. When you are ready for the web UI:
+```bash
+python serve_chatbot.py            # defaults to http://127.0.0.1:8000
+```
+Press `Ctrl+C` to stop either process.
+
+---
+
+## 2. What the Repository Contains
+Here is the project at a glance. The table below describes every important file so newcomers know where to look.
+
+| Path | Why it matters |
+|------|----------------|
+| `pyproject.toml` | Python packaging metadata, dependency list, and pytest configuration. `pythonpath = ["src", "."]` allows tests/scripts to import the package. |
+| `.env.example` | Sample environment file listing knobs for SQLite, PostgreSQL, OpenAI, and Bloomberg integration. Copy to `.env` for local runs. |
+| `run_chatbot.py` | Lightweight REPL for experimenting with the bot from the terminal. |
+| `serve_chatbot.py` | Launches the FastAPI web service (defined in `src/benchmarkos_chatbot/web.py`) using `uvicorn`. |
+| `src/benchmarkos_chatbot/config.py` | Loads and validates environment variables into an immutable `Settings` object so the rest of the code does not read from the environment directly. |
+| `src/benchmarkos_chatbot/database.py` | SQLite layer: schema creation, typed record dataclasses, and CRUD helpers for conversations, metrics, facts, audit logs, and scenario results. |
+| `src/benchmarkos_chatbot/secdb.py` | Optional PostgreSQL backend mirroring the SQLite helpers. Activated when `DATABASE_TYPE=postgresql`. |
+| `src/benchmarkos_chatbot/data_sources.py` | HTTP clients for SEC EDGAR, Yahoo Finance, and optional Bloomberg feeds. Responsible for retries and payload normalisation. |
+| `src/benchmarkos_chatbot/data_ingestion.py` | Orchestrates ingestion jobs (bootstrap sample data, live ticker refresh) and records audit events. Returns `IngestionReport` objects. |
+| `src/benchmarkos_chatbot/analytics_engine.py` | Core analytics pipeline. Loads raw fundamentals, computes base/derived/aggregate metrics, refreshes market quotes, and exposes helpers like `get_metrics`, `run_scenario`, and `fetch_scenario_results`. |
+| `src/benchmarkos_chatbot/chatbot.py` | Conversation orchestrator. Parses user intents, calls the analytics engine, runs ingestion commands, and falls back to the configured LLM. `BenchmarkOSChatbot.create()` is the entry point used by CLI/web. |
+| `src/benchmarkos_chatbot/llm_client.py` | Language-model abstraction. Includes the offline echo model plus the OpenAI client. Automatically locates the API key via environment variables, OS keyring, or a fallback file. |
+| `src/benchmarkos_chatbot/table_renderer.py` | Shared ASCII table renderer used by `compare` / `table` commands and tests. Supports year filters and alternate layouts. |
+| `src/benchmarkos_chatbot/web.py` | FastAPI application exposing `/chat`, `/health`, and helper endpoints. Serves static assets from `webui/`. |
+| `webui/index.html`, `webui/app.js`, `webui/styles.css` | Single-page web client. Handles chat submissions, status indicator, scrollable conversation log, and adaptive styling. |
+| `tests/test_*.py` | Pytest suites covering analytics, ingestion, persistence, CLI tables, and chatbot behaviour. Designed to run offline using the local echo LLM. |
+| `ingest_*.py`, `batch_ingest.py` | Command line utilities for pulling SEC fundamentals and related datasets. Include resume and throttling options. |
+| `cache/`, `data/` | Working directories for ingestion artefacts and sample CSVs used by tests. Safe to delete—they are recreated automatically. |
+
+---
+
+## 3. Step-by-Step Setup (beginner friendly)
+Follow these steps even if you have never touched this project before.
+
+### 3.1 Install Python & Git
+- Windows: [Install Python 3.10+](https://www.python.org/downloads/) and Git. Ensure “Add python.exe to PATH” is checked.
+- macOS: `xcode-select --install` for developer tools, then `brew install python git`.
+- Linux: use your package manager (`sudo apt install python3 python3-venv git`).
+
+### 3.2 Clone the repository
+```bash
 git clone https://github.com/haniae/Project.git
 cd Project
+```
 
-# 2. Create a virtual environment
+### 3.3 Create and activate a virtual environment
+```bash
 python -m venv .venv
 # Windows
 .\.venv\Scripts\activate
-# macOS / Linux
+# macOS/Linux
 source .venv/bin/activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Create a working .env from the template
-cp .env.example .env  # or: Copy-Item .env.example .env
 ```
-You now have everything you need to run the chatbot locally.
 
-## Configuration & Secrets
-Configuration is centralised in `config.py` through the `Settings` dataclass. `load_settings()` reads from environment variables (including values in `.env`) and performs validation before any component is initialised.
+### 3.4 Install dependencies
+```bash
+pip install -r requirements.txt
+```
 
-Important variables:
-- `DATABASE_TYPE`: `sqlite` (default) or `postgresql`.
-- `DATABASE_PATH`: location of the SQLite file.
-- `LLM_PROVIDER`: `local` or `openai`.
-- `OPENAI_MODEL`: OpenAI chat model to use (e.g. `gpt-3.5-turbo`, `gpt-4o-mini`).
-- `SEC_API_USER_AGENT`: Required by the SEC for EDGAR access.
-- `YAHOO_QUOTE_BATCH_SIZE`: Number of tickers per quote refresh (adjust to avoid rate limits).
-- `ENABLE_BLOOMBERG`, `BLOOMBERG_*`: Optional real-time quote integration.
+### 3.5 Create your `.env`
+```bash
+Copy-Item .env.example .env   # Windows PowerShell
+# or cp .env.example .env     # macOS/Linux
+```
+Open `.env` and customise values (see the next section for explanations).
 
-### SQLite vs PostgreSQL
-- **SQLite** is the default and works out of the box. `DATABASE_PATH` controls where the `.sqlite3` file lives.
-- **PostgreSQL** support is provided via `secdb.py`. Set `DATABASE_TYPE=postgresql` and supply `POSTGRES_*` variables. The analytics engine will then prefer live data from the SEC store.
+---
 
-### Managing the OpenAI API Key Securely
-`llm_client.py` resolves the key in the following order:
-1. `OPENAI_API_KEY` environment variable (including values in `.env`).
-2. OS keyring entry: service `benchmarkos-chatbot`, username `openai-api-key`.
+## 4. Configuration & Secrets
+All configuration flows through `load_settings()` in `config.py`. Key variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_TYPE` | `sqlite` (local file) or `postgresql` (SEC data warehouse). | `sqlite` |
+| `DATABASE_PATH` | Path to SQLite database file. | `benchmarkos_chatbot.sqlite3` |
+| `LLM_PROVIDER` | `local` (echo) or `openai`. | `local` |
+| `OPENAI_MODEL` | OpenAI chat model id (`gpt-3.5-turbo`, `gpt-4o-mini`, etc.). | `gpt-4o-mini` |
+| `SEC_API_USER_AGENT` | Required by SEC EDGAR (`Org Name Contact`). | `BenchmarkOSBot/1.0 ...` |
+| `YAHOO_QUOTE_BATCH_SIZE` | Yahoo quote batch size. Lower this if you hit HTTP 429. | `50` |
+| `ENABLE_BLOOMBERG` | `0`/`1` toggle. Requires `blpapi`. | `0` |
+| `POSTGRES_*` | Host, port, user, password, schema for SEC PostgreSQL store. | n/a |
+
+### 4.1 Securely storing the OpenAI API key
+The project will never hard-code your key. `_resolve_openai_api_key()` looks in this order:
+1. `OPENAI_API_KEY` environment variable (values in `.env` count).
+2. OS keyring entry `benchmarkos-chatbot` / `openai-api-key` (recommended).
 3. Fallback file `~/.config/benchmarkos-chatbot/openai_api_key` (outside the repo).
 
-Recommended approach (Windows PowerShell example):
+**Store it in the keyring (Windows example):**
 ```powershell
 pip install keyring
 python -c "import keyring; keyring.set_password('benchmarkos-chatbot', 'openai-api-key', 'sk-your-real-key')"
@@ -139,78 +115,100 @@ Then set in `.env`:
 LLM_PROVIDER=openai
 OPENAI_MODEL=gpt-3.5-turbo
 ```
-No API key is committed or stored in plaintext.
+You can omit `OPENAI_API_KEY` from `.env` entirely once the key lives in the keyring.
 
-## Running the Chatbot
-### Command Line
+---
+
+## 5. Running the Chatbot
+### 5.1 Command line interface
 ```bash
 python run_chatbot.py
 ```
-The REPL prints a banner and waits for prompts. Type `help` to see available commands.
-
-### Web UI
-```bash
-python serve_chatbot.py            # defaults to http://127.0.0.1:8000
-python serve_chatbot.py --port 8001  # choose another port if 8000 is busy
+The prompt shows `BenchmarkOS Chatbot quick runner`. Type `help` for the command menu. A typical session might look like:
 ```
-Visit the address in your browser to interact with the single-page UI. The status dot indicates API health; the app formats both free-form chat and rendered tables.
-
-If you receive `WinError 10048` the port is in use. Either stop the process holding it (`taskkill /PID <pid> /F`) or pass `--port` to use a different socket.
-
-### Supported Chat Commands
-The chatbot handles several finance-aware commands before falling back to the language model:
-- `help` – show the reference card.
-- `metrics <TICKER> [YYYY | YYYY-YYYY] [vs <OTHER> ...]` – KPI summary or comparison table.
-- `compare <TICKER_A> <TICKER_B> [MORE] [YEAR]` – quick comparison across tickers.
-- `table <TICKERS...> metrics <METRICS...> [year=YYYY | years=YYYY-YYYY] [layout=metrics]` – fine-grained ASCII tables (used in the test suite).
-- `fact <TICKER> <YEAR> [metric]` – raw financial fact lookups.
-- `audit <TICKER> [YEAR]` – recent audit log entries.
-- `ingest <TICKER> [years]` – pull fresh SEC/Yahoo data and refresh metrics.
-- `scenario <TICKER> <NAME> rev=+5% margin=+1% mult=+0.5%` – run a what-if scenario.
-
-All other prompts are passed to the configured LLM. When tickers are detected in the question, the chatbot assembles a short “financial context” block to ground the model’s response.
-
-## Data Ingestion Workflows
-- `ingest_universe.py` – orchestrates large-scale SEC ingestion (e.g. S&P 500 fundamentals). Progress is tracked so interrupted runs can resume.
-  ```bash
-  python ingest_universe.py --years 10 --chunk-size 25 --sleep 2.0 --resume
-  ```
-- `batch_ingest.py`, `ingest_companyfacts.py`, `ingest_frames.py`, etc. – specialised jobs for different EDGAR datasets.
-- `data_ingestion.py` – the bootstrap hook invoked on startup to seed sample data. Logs are written via `database.record_audit_event`.
-
-## Testing & Quality
-Pytest is already configured in `pyproject.toml`:
-```bash
-pytest
+> help
+Commands:
+  metrics <TICKER> ...
+  compare ...
+  ...
+> metrics AAPL 2023
+Phase1 KPIs for AAPL ...
 ```
-Selected suites:
-- `tests/test_database.py` – schema and query guarantees.
-- `tests/test_analytics_engine.py` – metric computations and quote refresh.
-- `tests/test_cli_tables.py` – ASCII table renderer sanity checks.
-- `tests/test_data_ingestion.py` – ingestion setup and audit trails.
-- `tests/test_analytics.py` – end-to-end chatbot behaviours.
+Press `Ctrl+C` or type `exit` to quit.
 
-Some fixtures rely on the local echo model; no external network access is required.
+### 5.2 Web user interface
+```bash
+python serve_chatbot.py --port 8000
+```
+Open http://127.0.0.1:8000 in your browser. Features include:
+- Status dot that polls `/health` every 30 seconds.
+- Scrollable conversation log showing user/assistant messages and rendered tables.
+- Keyboard shortcut: `Enter` sends, `Shift+Enter` adds a newline.
 
-## Extending the Platform
-- **Analytics**: add derived metrics or alternate time horizons in `analytics_engine.py`, and persist them via `database.py`.
-- **LLM providers**: implement another client (Anthropic, Azure OpenAI, local embedding model) in `llm_client.py` and enhance `build_llm_client`.
-- **Retrieval**: augment `_build_rag_context` in `chatbot.py` with vector search or knowledge graphs.
-- **UI**: customise `webui/` or wrap `BenchmarkOSChatbot` inside a FastAPI/Flask/Streamlit app using `web.py`.
-- **Ops**: containerise with Docker, deploy uvicorn behind Nginx, or integrate with your CI pipeline (pytest already set up).
+If you receive `WinError 10048`, another process is using the port. Either terminate it (`taskkill /PID <pid> /F`) or launch on another port (`--port 8001`).
 
-## Troubleshooting
-| Symptom | Cause | Fix |
-|---|---|---|
-| `gaierror` or `Too Many Requests` on startup | Yahoo refresh hit rate limits | Lower `YAHOO_QUOTE_BATCH_SIZE`, disable refresh temporarily, or rely on cached quotes. |
-| `WinError 10048` when running `serve_chatbot.py` | Port 8000 already bound | Kill the existing process (`taskkill /PID <pid> /F`) or pass `--port 8001`. |
-| `OpenAI API key not found` | No key in env/keyring/fallback file | Add `OPENAI_API_KEY` to `.env`, store it with `keyring`, or create the fallback file. |
-| Tests complain about missing arguments to `Settings` | Ensure fixtures align with the current dataclass signature (see examples in `tests/`). |
+### 5.3 Chatbot command cheat sheet
+| Command | Example | Description |
+|---------|---------|-------------|
+| `help` | `help` | Shows the list of supported commands. |
+| `metrics` | `metrics AAPL 2022-2024 vs MSFT` | KPI summary or comparison table. Optional year filters. |
+| `compare` | `compare NVDA AMD 2023` | Quick cross-ticker comparison (metrics in rows, tickers in columns). |
+| `table` | `table AAPL MSFT metrics revenue net_income layout=metrics years=2021-2023` | Low-level access to the ASCII table renderer; used in tests. |
+| `fact` | `fact TSLA 2022 revenue` | Raw financial fact lookup. |
+| `audit` | `audit AAPL 2021` | Shows recent audit log entries. |
+| `ingest` | `ingest TSLA 5` | Pulls fresh SEC/Yahoo data and refreshes metrics for the ticker. |
+| `scenario` | `scenario MSFT bull rev=+8% margin=+2% mult=+0.5` | Runs a what-if analysis. |
+| anything else | `How is MSFT performing vs AAPL?` | Routed to the configured LLM with grounding context if tickers are detected. |
 
-## Reference
-- **CLI**: `python run_chatbot.py`
-- **Web**: `python serve_chatbot.py --reload`
-- **Ingestion**: `python ingest_universe.py --help`
-- **API surface**: `BenchmarkOSChatbot.create(settings)` returns a chatbot you can embed elsewhere. Use `bot.ask("...")` to generate replies.
+---
 
-Document decisions, metrics, or deployment notes in `docs/` so teammates and reviewers can audit your work. Enjoy building on BenchmarkOS!
+## 6. Data Flow & Ingestion
+1. `ingest_*.py` scripts fetch SEC data (company facts, frames, etc.) and populate SQLite or PostgreSQL tables.
+2. `data_ingestion.py` orchestrates bootstrap ingestion at startup and logs audit events via `database.record_audit_event`.
+3. `analytics_engine.refresh_metrics()` pulls the latest facts, computes derived metrics (margins, ROE, growth rates), and stores them in `metric_snapshots` for fast lookup.
+4. The chatbot, CLI, and web API all query `AnalyticsEngine` for metrics, facts, audit trails, and scenario results.
+
+### 6.1 Running a full ingestion demo
+```bash
+python ingest_universe.py --years 10 --chunk-size 25 --sleep 2 --resume
+```
+This command pulls ten years of fundamentals for the sample universe, pausing 2 seconds between batches to respect SEC rate limits. Progress is stored in `.ingestion_progress.json` so you can restart after interruptions.
+
+---
+
+## 7. Testing & Quality
+Pytest is configured via `pyproject.toml`. Tests use the local echo LLM so they do not require network access.
+```bash
+pytest                 # run everything
+pytest tests/test_cli_tables.py::test_table_command_formats_rows
+```
+Key suites:
+- `test_database.py` – validates schema invariants and helper functions.
+- `test_analytics_engine.py` – checks growth/valuation metrics and quote refresh logic.
+- `test_cli_tables.py` – exercises the ASCII renderer used in CLI commands.
+- `test_data_ingestion.py` – ensures ingestion populates facts and audit logs.
+- `test_analytics.py` – end-to-end chatbot behaviour tests.
+
+---
+
+## 8. Troubleshooting FAQ
+| Issue | Cause | Resolution |
+|-------|-------|------------|
+| `Failed to refresh quotes ... 429 Too Many Requests` on startup | Yahoo Finance rate limit triggered. | Lower `YAHOO_QUOTE_BATCH_SIZE` in `.env`, disable refresh temporarily, or rely on cached quotes. |
+| `WinError 10048` when running `serve_chatbot.py` | Port 8000 already in use. | `Get-NetTCPConnection -LocalPort 8000` → `taskkill /PID <pid> /F`, or run `--port 8001`. |
+| `OpenAI API key not found` | Key not present in env, keyring, or fallback file. | Store it with the keyring command above or set `OPENAI_API_KEY` in `.env`. |
+| Tests complain about missing constructor args for `Settings` | Fixtures out of sync with dataclass signature. | See examples in `tests/` and mirror the required parameters. |
+| `ModuleNotFoundError: No module named 'main'` during pytest | `pythonpath` not set. | Ensure you run tests via the project root (pyproject sets the path automatically). |
+
+---
+
+## 9. Extending the Platform
+- **New metrics**: add calculations in `analytics_engine.py` and extend the schema if necessary (use `database.py`).
+- **Alternative LLM providers**: implement `LLMClient` in `llm_client.py` and update `build_llm_client`.
+- **Retrieval augmentation**: enrich `_build_rag_context` in `chatbot.py` with vector search or a knowledge graph.
+- **Web features**: customise the FastAPI routes in `web.py` or enhance the SPA in `webui/`.
+- **Deployment**: package with Docker or a PaaS. `serve_chatbot.py` already exposes a standard ASGI app.
+
+Document decisions, experiments, and deployment notes in `docs/` so other collaborators (and future you) can follow the reasoning behind each change.
+
+Happy building!
