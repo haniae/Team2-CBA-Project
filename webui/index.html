@@ -3,35 +3,85 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BenchmarkOS Chatbot</title>
+    <title>BenchmarkOS Copilot</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <div class="app">
-      <header class="app-header">
-        <div>
-          <h1>BenchmarkOS Chatbot</h1>
-          <p>Ask capital-markets questions grounded in your analytics store.</p>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="logo">BenchmarkOS</div>
+          <button id="new-chat" class="primary-action">+ New chat</button>
         </div>
-        <div class="status" role="status">
-          <span class="status-dot" id="api-status"></span>
-          <span id="status-message">Checking API…</span>
-        </div>
-      </header>
 
-      <main class="chat-panel">
-        <div id="chat-log" class="chat-log" aria-live="polite"></div>
-        <form id="chat-form" class="chat-form" autocomplete="off">
-          <textarea
-            id="chat-input"
-            rows="3"
-            placeholder="Example: How is MSFT performing vs AAPL on profitability?"
-            required
-          ></textarea>
-          <div class="chat-actions">
-            <button id="send-button" type="submit">Send</button>
+        <div class="sidebar-section">
+          <h2>Suggested prompts</h2>
+          <button class="prompt-chip" data-prompt="compare AAPL MSFT metrics revenue net_income">
+            Compare ticker fundamentals
+          </button>
+          <button class="prompt-chip" data-prompt="metrics NVDA years=2021-2023">
+            Show NVDA KPIs 2021-2023
+          </button>
+          <button class="prompt-chip" data-prompt="fact TSLA 2023 revenue">
+            Look up TSLA revenue FY2023
+          </button>
+          <button class="prompt-chip" data-prompt="scenario AAPL bull rev=+6% margin=+1% mult=+0.5">
+            Model a bull case for AAPL
+          </button>
+        </div>
+
+        <div class="sidebar-section conversations" id="conversation-list">
+          <h2>Recent chats</h2>
+          <p class="empty-state">New conversations will appear here.</p>
+        </div>
+
+        <footer class="sidebar-footer">
+          <p class="muted">
+            Grounded by BenchmarkOS analytics. Quotes refresh automatically when available.
+          </p>
+        </footer>
+      </aside>
+
+      <main class="main-panel">
+        <header class="top-bar">
+          <div>
+            <h1>BenchmarkOS Analyst Copilot</h1>
+            <p>Ask capital-markets questions grounded in your analytics store.</p>
           </div>
-        </form>
+          <div class="status-pill" role="status">
+            <span class="status-dot" id="api-status"></span>
+            <span id="status-message">Checking API…</span>
+          </div>
+        </header>
+
+        <section class="chat-panel">
+          <div id="chat-log" class="chat-log" aria-live="polite"></div>
+
+          <div class="suggested-actions" id="suggested-actions">
+            <button class="prompt-chip" data-prompt="metrics BRK-B vs SPY 2020-2024">
+              Compare BRK-B vs SPY
+            </button>
+            <button class="prompt-chip" data-prompt="audit MSFT 2022">
+              Show MSFT audit trail
+            </button>
+            <button class="prompt-chip" data-prompt="What is the outlook for semiconductor margins?">
+              Ask a natural question
+            </button>
+          </div>
+
+          <form id="chat-form" class="chat-form" autocomplete="off">
+            <textarea
+              id="chat-input"
+              rows="3"
+              placeholder="Ask anything about tickers, metrics, or scenarios…"
+              required
+            ></textarea>
+            <div class="chat-actions">
+              <span class="hint">Press Enter to send · Shift+Enter for a new line</span>
+              <button id="send-button" type="submit">Send</button>
+            </div>
+          </form>
+        </section>
       </main>
     </div>
 

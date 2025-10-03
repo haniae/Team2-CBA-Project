@@ -6,24 +6,53 @@ const chatInput = document.getElementById("chat-input");
 const sendButton = document.getElementById("send-button");
 const statusDot = document.getElementById("api-status");
 const statusMessage = document.getElementById("status-message");
+const newChatButton = document.getElementById("new-chat");
+const suggestedActions = document.getElementById("suggested-actions");
+const conversationList = document.getElementById("conversation-list");
 
 let conversationId = null;
 let isSending = false;
+let conversationCounter = 1;
+let pendingTitle = "";
 
 function appendMessage(role, text) {
+  if (role !== "system" && suggestedActions) {
+    suggestedActions.classList.add("hidden");
+  }
+
   const wrapper = document.createElement("div");
   wrapper.className = `message ${role}`;
 
+  const header = document.createElement("div");
+  header.className = "message-header";
+
+  const avatar = document.createElement("span");
+  avatar.className = `avatar ${role}`;
+  avatar.textContent = role === "user" ? "You" : role === "assistant" ? "BO" : "SYS";
+
   const label = document.createElement("span");
   label.className = "message-role";
-  label.textContent = role === "user" ? "You" : role === "assistant" ? "Assistant" : "System";
-  wrapper.append(label);
+  label.textContent = role === "user" ? "You" : role === "assistant" ? "BenchmarkOS" : "System";
+
+  header.append(avatar, label);
+  wrapper.append(header);
+
+  const body = document.createElement("div");
+  body.className = "message-body";
 
   const fragments = buildMessageBlocks(text);
-  fragments.forEach((node) => wrapper.append(node));
+  fragments.forEach((node) => body.append(node));
+  wrapper.append(body);
 
   chatLog.append(wrapper);
   chatLog.scrollTop = chatLog.scrollHeight;
+
+  if (role === "user" && !pendingTitle) {
+    const trimmed = text.trim();
+    if (trimmed) {
+      pendingTitle = trimmed.slice(0, 40) + (trimmed.length > 40 ? "…" : "");
+    }
+  }
 }
 
 function buildMessageBlocks(text) {
@@ -130,51 +159,50 @@ function renderTable(lines) {
 
   const tbody = document.createElement("tbody");
   for (let i = rowIndex; i < compact.length; i += 1) {
-    const rowCells = parseRow(compact[i]);
-    if (!rowCells.length) continue;
-    const tr = document.createElement("tr");
-    const totalColumns = Math.max(headerCells.length, rowCells.length);
-    for (let c = 0; c < totalColumns; c += 1) {
-      const raw = (rowCells[c] || "").trim();
-      const td = document.createElement("td");
-      const { isNumeric, value, suffix } = formatTableCell(raw);
-      if (isNumeric) {
-        td.classList.add("numeric");
-      }
-
-      const valueSpan = document.createElement("span");
-      valueSpan.className = "cell-value";
-      valueSpan.textContent = value;
-      td.append(valueSpan);
-
-      if (suffix) {
-        const suffixSpan = document.createElement("span");
-        suffixSpan.className = "cell-suffix";
-        suffixSpan.textContent = suffix;
-        td.append(suffixSpan);
-      }
-
-      tr.append(td);
+    const cells = parseRow(compact[i]);
+    if (!cells.length) {
+      continue;
     }
-    tbody.append(tr);
+    const row = document.createElement("tr");
+    cells.forEach((cell, idx) => {
+      const td = document.createElement("td");
+      const parsed = parseNumericCell(cell);
+      if (parsed.isNumeric) {
+        td.classList.add("numeric");
+        const value = document.createElement("span");
+        value.className = "cell-value";
+        value.textContent = parsed.value;
+        td.append(value);
+        if (parsed.suffix) {
+          const suffix = document.createElement("span");
+          suffix.className = "cell-suffix";
+          suffix.textContent = parsed.suffix;
+          td.append(suffix);
+        }
+      } else {
+        td.textContent = parsed.value;
+      }
+      if (idx === 0) {
+        td.scope = "row";
+      }
+      row.append(td);
+    });
+    tbody.append(row);
   }
   table.append(tbody);
   wrapper.append(table);
-
   return wrapper;
 }
 
 function parseRow(line) {
-  const trimmed = line.trim();
-  if (!trimmed) {
-    return [];
-  }
-  const withoutOuter = trimmed.replace(/^\|/, "").replace(/\|$/, "");
-  return withoutOuter.split("|").map((cell) => cell.trim());
+  return line
+    .split("|")
+    .map((cell) => cell.trim())
+    .filter(Boolean);
 }
 
-function formatTableCell(raw) {
-  const trimmed = raw.trim();
+function parseNumericCell(rawValue) {
+  const trimmed = rawValue.trim();
   if (!trimmed) {
     return { isNumeric: false, value: "", suffix: "" };
   }
@@ -224,10 +252,6 @@ function formatTableCell(raw) {
   return { isNumeric: true, value: valueText, suffix };
 }
 
-function isNumericCell(value) {
-  return /^[-+]?[$]?\d[\d,]*(\.\d+)?(%|x)?$/.test(value) || /^[-+]?\d+(\.\d+)?%?$/.test(value);
-}
-
 function setSending(state) {
   isSending = state;
   sendButton.disabled = state;
@@ -255,6 +279,37 @@ async function sendPrompt(prompt) {
   const data = await response.json();
   conversationId = data.conversation_id;
   return data.reply;
+}
+
+function startNewConversation() {
+  if (chatLog.children.length > 0) {
+    appendConversationPreview();
+  }
+  conversationId = null;
+  pendingTitle = "";
+  chatLog.innerHTML = "";
+  if (suggestedActions) {
+    suggestedActions.classList.remove("hidden");
+  }
+  chatInput.value = "";
+  chatInput.focus();
+}
+
+function appendConversationPreview() {
+  if (!conversationList) {
+    return;
+  }
+  const emptyState = conversationList.querySelector(".empty-state");
+  if (emptyState) {
+    emptyState.remove();
+  }
+  const title = pendingTitle || `Chat ${conversationCounter}`;
+  conversationCounter += 1;
+  const item = document.createElement("div");
+  item.className = "conversation-item";
+  item.textContent = title;
+  conversationList.append(item);
+  pendingTitle = "";
 }
 
 chatForm.addEventListener("submit", async (event) => {
@@ -286,10 +341,29 @@ chatInput.addEventListener("keydown", (event) => {
   }
 });
 
+function wirePromptChips() {
+  document.querySelectorAll(".prompt-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const prompt = chip.getAttribute("data-prompt");
+      if (!prompt) {
+        return;
+      }
+      chatInput.value = prompt;
+      chatForm.requestSubmit();
+    });
+  });
+}
+
+if (newChatButton) {
+  newChatButton.addEventListener("click", startNewConversation);
+}
+
+wirePromptChips();
+
 async function checkHealth() {
   try {
     const url = `${API_BASE}/health?ts=${Date.now()}`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error();
     statusDot.classList.remove("offline");
     statusDot.classList.add("online");
