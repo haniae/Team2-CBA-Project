@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+# Database access layer: manages schema creation, typed records, and CRUD helpers for messages,
+# metrics, financial facts, audit events, and scenario results.
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timezone

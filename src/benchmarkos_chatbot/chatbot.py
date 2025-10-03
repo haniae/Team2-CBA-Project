@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+# High-level conversation orchestrator: parses intents, calls the analytics engine, handles
+# ingestion commands, and falls back to the configured language model. Used by CLI and web UI.
+
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -109,6 +112,8 @@ SYSTEM_PROMPT = (
 
 
 @dataclass
+# Wraps settings, analytics, ingestion hooks, and the LLM client into a stateful conversation
+# object. Use `BenchmarkOSChatbot.create()` before calling `ask()`.
 class BenchmarkOSChatbot:
     """High-level interface wrapping the entire chatbot pipeline."""
 

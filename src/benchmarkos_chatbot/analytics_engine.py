@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+# Loads raw financial facts, computes derived metrics, and exposes helpers used by the
+# chatbot and web API for comparisons, scenarios, and quote refreshes.
+
 import logging
 import math
 import re
@@ -121,6 +124,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# Coordinates metric refresh, quote hydration, and accessors so higher layers stay declarative.
 class AnalyticsEngine:
     """Provides computed metrics and fact retrieval for the web/API layer."""
 

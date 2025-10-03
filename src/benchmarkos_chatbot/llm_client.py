@@ -12,6 +12,9 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Protocol
 
+# Language-model integrations live here. Implement the LLMClient protocol and register new
+# providers in `build_llm_client` without touching chatbot logic.
+
 try:  # pragma: no cover - optional dependency
     import keyring  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency

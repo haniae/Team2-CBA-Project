@@ -27,6 +27,8 @@ DatabaseType = Literal["sqlite", "postgresql"]
 
 
 @dataclass(frozen=True)
+# Immutable snapshot of validated configuration so downstream modules avoid reading environment
+# variables directly.
 class Settings:
     """A container object for runtime configuration.
 
