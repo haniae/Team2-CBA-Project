@@ -64,6 +64,15 @@ class FinancialFactRecord:
 
 
 @dataclass(frozen=True)
+class ScenarioResultRecord:
+    ticker: str
+    scenario_name: str
+    metrics: Dict[str, Optional[float]]
+    narrative: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class AuditEventRecord:
     ticker: str
     event_type: str
@@ -206,6 +215,18 @@ def initialise(database_path: Path) -> None:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS scenario_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                scenario_name TEXT NOT NULL,
+                metrics TEXT NOT NULL,
+                narrative TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS company_filings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cik TEXT NOT NULL,
@@ -308,6 +329,12 @@ def initialise(database_path: Path) -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_metric_snapshots_ticker
             ON metric_snapshots (ticker, metric)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_scenario_results_ticker
+            ON scenario_results (ticker, scenario_name, created_at DESC)
             """
         )
         connection.commit()
@@ -804,6 +831,78 @@ def fetch_metric_snapshots(
                 updated_at=_parse_dt(row["updated_at"]) or datetime(1970, 1, 1, tzinfo=timezone.utc),
                 start_year=row["start_year"],
                 end_year=row["end_year"],
+            )
+        )
+    return results
+
+# -----------------------------
+# Scenario results
+# -----------------------------
+
+
+def store_scenario_result(database_path: Path, record: ScenarioResultRecord) -> None:
+    payload = _json_dumps(record.metrics)
+    created_at = _ensure_utc(record.created_at).isoformat()
+    with _connect(database_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO scenario_results (ticker, scenario_name, metrics, narrative, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                _normalize_ticker(record.ticker),
+                record.scenario_name,
+                payload,
+                record.narrative,
+                created_at,
+            ),
+        )
+        connection.commit()
+
+
+def fetch_scenario_results(
+    database_path: Path,
+    *,
+    ticker: str,
+    scenario_name: Optional[str] = None,
+    limit: int = 10,
+) -> List[ScenarioResultRecord]:
+    query = [
+        "SELECT ticker, scenario_name, metrics, narrative, created_at",
+        "FROM scenario_results",
+        "WHERE ticker = ?",
+    ]
+    params: List[Any] = [_normalize_ticker(ticker)]
+    if scenario_name:
+        query.append("AND scenario_name = ?")
+        params.append(scenario_name)
+    query.append("ORDER BY created_at DESC")
+    if limit:
+        query.append("LIMIT ?")
+        params.append(limit)
+
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        query_str = "\n".join(query)
+        rows = connection.execute(query_str, params).fetchall()
+
+    results: List[ScenarioResultRecord] = []
+    for row in rows:
+        metrics_raw = json.loads(row["metrics"] or "{}")
+        metrics: Dict[str, Optional[float]] = {}
+        for key, value in metrics_raw.items():
+            if isinstance(value, (int, float)):
+                metrics[key] = float(value)
+            else:
+                metrics[key] = None
+        created_at = _parse_dt(row["created_at"]) or datetime.now(timezone.utc)
+        results.append(
+            ScenarioResultRecord(
+                ticker=_normalize_ticker(row["ticker"]),
+                scenario_name=row["scenario_name"],
+                metrics=metrics,
+                narrative=row["narrative"],
+                created_at=created_at,
             )
         )
     return results

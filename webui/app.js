@@ -3,24 +3,295 @@ const API_BASE = window.API_BASE || "";
 const chatLog = document.getElementById("chat-log");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
-const conversationInput = document.getElementById("conversation-id");
-
-const metricsForm = document.getElementById("metrics-form");
-const metricsOutput = document.getElementById("metrics-output");
-
-const factsForm = document.getElementById("facts-form");
-const factsOutput = document.getElementById("facts-output");
-
-const auditForm = document.getElementById("audit-form");
-const auditOutput = document.getElementById("audit-output");
-
+const sendButton = document.getElementById("send-button");
 const statusDot = document.getElementById("api-status");
 const statusMessage = document.getElementById("status-message");
 
+let conversationId = null;
+let isSending = false;
+
+function appendMessage(role, text) {
+  const wrapper = document.createElement("div");
+  wrapper.className = `message ${role}`;
+
+  const label = document.createElement("span");
+  label.className = "message-role";
+  label.textContent = role === "user" ? "You" : role === "assistant" ? "Assistant" : "System";
+  wrapper.append(label);
+
+  const fragments = buildMessageBlocks(text);
+  fragments.forEach((node) => wrapper.append(node));
+
+  chatLog.append(wrapper);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function buildMessageBlocks(text) {
+  const fragments = [];
+  const blocks = splitBlocks(text);
+
+  blocks.forEach((block) => {
+    if (block.type === "table") {
+      fragments.push(renderTable(block.lines));
+    } else {
+      const div = document.createElement("div");
+      div.className = "message-content";
+      div.textContent = block.text;
+      fragments.push(div);
+    }
+  });
+
+  if (!blocks.length) {
+    const div = document.createElement("div");
+    div.className = "message-content";
+    div.textContent = text;
+    fragments.push(div);
+  }
+
+  return fragments;
+}
+
+function splitBlocks(text) {
+  const lines = text.split(/\r?\n/);
+  const blocks = [];
+  let buffer = [];
+
+  const flush = () => {
+    if (!buffer.length) {
+      return;
+    }
+    const trimmedLines = buffer.map((line) => line);
+    if (looksLikeTable(trimmedLines)) {
+      blocks.push({ type: "table", lines: trimmedLines });
+    } else {
+      blocks.push({ type: "text", text: buffer.join("\n") });
+    }
+    buffer = [];
+  };
+
+  lines.forEach((line) => {
+    const normalized = line.replace(/\r/g, "");
+    if (!normalized.trim()) {
+      flush();
+    } else {
+      buffer.push(normalized);
+    }
+  });
+  flush();
+
+  return blocks;
+}
+
+function looksLikeTable(lines) {
+  if (lines.length < 2) {
+    return false;
+  }
+  if (!lines[0].includes("|")) {
+    return false;
+  }
+  const hasSeparator = lines.some((line, index) => {
+    if (index === 0) return false;
+    return /^[\s\-\+=|]+$/.test(line);
+  });
+  if (!hasSeparator) {
+    return false;
+  }
+  const rowCount = lines.filter((line) => line.includes("|")).length;
+  return rowCount >= 2;
+}
+
+function renderTable(lines) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "message-table";
+
+  const table = document.createElement("table");
+  table.className = "ascii-table";
+
+  const compact = lines.filter((line) => line.trim().length);
+  if (!compact.length) {
+    return wrapper;
+  }
+
+  const headerCells = parseRow(compact[0]);
+  let rowIndex = 1;
+  while (rowIndex < compact.length && /^[\s\-\+=|]+$/.test(compact[rowIndex])) {
+    rowIndex += 1;
+  }
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  headerCells.forEach((cell) => {
+    const th = document.createElement("th");
+    th.textContent = cell;
+    headRow.append(th);
+  });
+  thead.append(headRow);
+  table.append(thead);
+
+  const tbody = document.createElement("tbody");
+  for (let i = rowIndex; i < compact.length; i += 1) {
+    const rowCells = parseRow(compact[i]);
+    if (!rowCells.length) continue;
+    const tr = document.createElement("tr");
+    const totalColumns = Math.max(headerCells.length, rowCells.length);
+    for (let c = 0; c < totalColumns; c += 1) {
+      const raw = (rowCells[c] || "").trim();
+      const td = document.createElement("td");
+      const { isNumeric, value, suffix } = formatTableCell(raw);
+      if (isNumeric) {
+        td.classList.add("numeric");
+      }
+
+      const valueSpan = document.createElement("span");
+      valueSpan.className = "cell-value";
+      valueSpan.textContent = value;
+      td.append(valueSpan);
+
+      if (suffix) {
+        const suffixSpan = document.createElement("span");
+        suffixSpan.className = "cell-suffix";
+        suffixSpan.textContent = suffix;
+        td.append(suffixSpan);
+      }
+
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  wrapper.append(table);
+
+  return wrapper;
+}
+
+function parseRow(line) {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return [];
+  }
+  const withoutOuter = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+  return withoutOuter.split("|").map((cell) => cell.trim());
+}
+
+function formatTableCell(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { isNumeric: false, value: "", suffix: "" };
+  }
+
+  const match = trimmed.match(/^([+-]?\$?[\d,]+(?:\.\d+)?)(%?)(.*)$/);
+  if (!match) {
+    return { isNumeric: false, value: trimmed, suffix: "" };
+  }
+
+  const [, numericPart, percentPart, rest] = match;
+  const numericMatch = numericPart.match(/^([+-]?)(\$?)([\d,]+(?:\.\d+)?)/);
+  if (!numericMatch) {
+    return { isNumeric: false, value: trimmed, suffix: "" };
+  }
+
+  const [, sign, currency, digits] = numericMatch;
+  const numericValue = Number(digits.replace(/,/g, ""));
+  if (Number.isNaN(numericValue)) {
+    return { isNumeric: false, value: trimmed, suffix: "" };
+  }
+
+  const absValue = Math.abs(numericValue);
+  let decimals = 0;
+  if (absValue < 1) {
+    decimals = 3;
+  } else if (absValue < 1000) {
+    decimals = 2;
+  }
+
+  const formatter = new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+
+  let valueText = formatter.format(absValue);
+  if (currency) {
+    valueText = currency + valueText;
+  }
+  if (numericValue < 0 && sign !== "+") {
+    valueText = "-" + valueText;
+  }
+  if (percentPart) {
+    valueText += percentPart;
+  }
+
+  const suffix = rest.trim();
+  return { isNumeric: true, value: valueText, suffix };
+}
+
+function isNumericCell(value) {
+  return /^[-+]?[$]?\d[\d,]*(\.\d+)?(%|x)?$/.test(value) || /^[-+]?\d+(\.\d+)?%?$/.test(value);
+}
+
+function setSending(state) {
+  isSending = state;
+  sendButton.disabled = state;
+  chatInput.disabled = state;
+  sendButton.textContent = state ? "Sending..." : "Send";
+}
+
+async function sendPrompt(prompt) {
+  const payload = { prompt };
+  if (conversationId) {
+    payload.conversation_id = conversationId;
+  }
+
+  const response = await fetch(`${API_BASE}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API ${response.status}: ${errorText || "Unknown error"}`);
+  }
+
+  const data = await response.json();
+  conversationId = data.conversation_id;
+  return data.reply;
+}
+
+chatForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (isSending) return;
+
+  const prompt = chatInput.value.trim();
+  if (!prompt) return;
+
+  appendMessage("user", prompt);
+  chatInput.value = "";
+  setSending(true);
+
+  try {
+    const reply = await sendPrompt(prompt);
+    appendMessage("assistant", reply.trim() || "(no content)");
+  } catch (error) {
+    appendMessage("system", error.message);
+  } finally {
+    setSending(false);
+    chatInput.focus();
+  }
+});
+
+chatInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    chatForm.requestSubmit();
+  }
+});
+
 async function checkHealth() {
   try {
-    const res = await fetch(`${API_BASE}/health`);
+    const url = `${API_BASE}/health?ts=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error();
+    statusDot.classList.remove("offline");
     statusDot.classList.add("online");
     statusMessage.textContent = "API online";
   } catch (error) {
@@ -30,190 +301,7 @@ async function checkHealth() {
   }
 }
 
-function appendChat(role, text) {
-  const container = document.createElement("div");
-  container.className = "chat-entry";
-  const label = document.createElement("strong");
-  label.textContent = role;
-  const content = document.createElement("p");
-  content.textContent = text;
-  container.append(label, content);
-  chatLog.append(container);
-  chatLog.scrollTop = chatLog.scrollHeight;
-}
-
-chatForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const prompt = chatInput.value.trim();
-  if (!prompt) return;
-  const conversationId = conversationInput.value.trim() || undefined;
-  appendChat("You", prompt);
-  chatInput.value = "";
-
-  try {
-    const response = await fetch(`${API_BASE}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, conversation_id: conversationId }),
-    });
-    if (!response.ok) {
-      throw new Error(`API responded with ${response.status}`);
-    }
-    const data = await response.json();
-    conversationInput.value = data.conversation_id;
-    appendChat("Assistant", data.reply);
-  } catch (error) {
-    appendChat("System", `Unable to get response: ${error.message}`);
-  }
-});
-
-metricsForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  metricsOutput.innerHTML = "Loading metrics…";
-  const tickers = document.getElementById("metrics-tickers").value.trim();
-  const startYear = document.getElementById("metrics-start").value;
-  const endYear = document.getElementById("metrics-end").value;
-
-  const params = new URLSearchParams({ tickers });
-  if (startYear && endYear) {
-    params.set("start_year", startYear);
-    params.set("end_year", endYear);
-  }
-
-  try {
-    const response = await fetch(`${API_BASE}/metrics?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error(`API responded with ${response.status}`);
-    }
-    const payload = await response.json();
-    renderMetrics(payload);
-  } catch (error) {
-    metricsOutput.innerHTML = `<div class="alert warn">${error.message}</div>`;
-  }
-});
-
-function renderMetrics(payload) {
-  if (!Array.isArray(payload) || payload.length === 0) {
-    metricsOutput.innerHTML = `<div class="alert warn">No metrics returned.</div>`;
-    return;
-  }
-
-  const allMetrics = new Set();
-  payload.forEach((entry) => {
-    Object.keys(entry.metrics).forEach((metric) => allMetrics.add(metric));
-  });
-
-  const orderedMetrics = Array.from(allMetrics);
-  const table = document.createElement("table");
-  const thead = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-  headerRow.appendChild(document.createElement("th")).textContent = "Metric";
-  payload.forEach((entry) => {
-    const th = document.createElement("th");
-    th.innerHTML = `${entry.ticker}<span class="badge">${entry.period}</span>`;
-    headerRow.appendChild(th);
-  });
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
-
-  const tbody = document.createElement("tbody");
-  orderedMetrics.forEach((metric) => {
-    const row = document.createElement("tr");
-    row.appendChild(document.createElement("td")).textContent = metric;
-    payload.forEach((entry) => {
-      const td = document.createElement("td");
-      const value = entry.metrics[metric];
-      td.textContent = formatValue(value);
-      row.appendChild(td);
-    });
-    tbody.appendChild(row);
-  });
-  table.appendChild(tbody);
-
-  metricsOutput.innerHTML = "";
-  metricsOutput.appendChild(table);
-}
-
-function formatValue(value) {
-  if (value === null || value === undefined) return "n/a";
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) return "n/a";
-    if (Math.abs(value) >= 1000) return value.toFixed(0);
-    if (Math.abs(value) >= 1) return value.toFixed(2);
-    return value.toFixed(3);
-  }
-  return String(value);
-}
-
-factsForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  factsOutput.innerHTML = "Loading facts…";
-  const ticker = document.getElementById("facts-ticker").value.trim();
-  const fiscalYear = document.getElementById("facts-year").value;
-  const metric = document.getElementById("facts-metric").value.trim();
-
-  const params = new URLSearchParams({ ticker, fiscal_year: fiscalYear });
-  if (metric) params.set("metric", metric);
-
-  try {
-    const response = await fetch(`${API_BASE}/facts?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error(`API responded with ${response.status}`);
-    }
-    const payload = await response.json();
-    renderFacts(payload);
-  } catch (error) {
-    factsOutput.innerHTML = `<div class="alert warn">${error.message}</div>`;
-  }
-});
-
-function renderFacts(payload) {
-  factsOutput.innerHTML = "";
-  const heading = document.createElement("p");
-  heading.innerHTML = `<strong>${payload.ticker}</strong> – FY${payload.fiscal_year}`;
-  factsOutput.appendChild(heading);
-
-  payload.items.forEach((item) => {
-    const row = document.createElement("div");
-    row.className = "alert";
-    row.innerHTML = `<strong>${item.metric}</strong>: ${formatValue(item.value)}<br/><small>${item.source}${
-      item.adjusted ? " · adjusted" : ""
-    }${item.adjustment_note ? ` · ${item.adjustment_note}` : ""}</small>`;
-    factsOutput.appendChild(row);
-  });
-}
-
-auditForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  auditOutput.innerHTML = "Loading audit events…";
-  const ticker = document.getElementById("audit-ticker").value.trim();
-  const fiscalYear = document.getElementById("audit-year").value;
-  const params = new URLSearchParams({ ticker });
-  if (fiscalYear) params.set("fiscal_year", fiscalYear);
-
-  try {
-    const response = await fetch(`${API_BASE}/audit?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error(`API responded with ${response.status}`);
-    }
-    const payload = await response.json();
-    renderAudit(payload);
-  } catch (error) {
-    auditOutput.innerHTML = `<div class="alert warn">${error.message}</div>`;
-  }
-});
-
-function renderAudit(payload) {
-  auditOutput.innerHTML = "";
-  payload.events.forEach((event) => {
-    const row = document.createElement("div");
-    row.className = "alert";
-    row.innerHTML = `<strong>${event.event_type}</strong> · ${event.created_at}<br/>${
-      event.details
-    }${event.entity_id ? ` <span class="badge">${event.entity_id}</span>` : ""}`;
-    auditOutput.appendChild(row);
-  });
-}
-
 checkHealth();
 setInterval(checkHealth, 30000);
+
+chatInput.focus();

@@ -9,6 +9,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from benchmarkos_chatbot import AnalyticsEngine, BenchmarkOSChatbot, load_settings
 from benchmarkos_chatbot.analytics_engine import AGGREGATE_METRICS, BASE_METRICS, DERIVED_METRICS
+from benchmarkos_chatbot.table_renderer import render_table_command
 
 MAX_METRIC_COLUMNS = 6
 
@@ -338,83 +339,9 @@ def _resolve_metrics_and_tickers(
 
 
 def _try_table_command(user_input: str, engine: AnalyticsEngine) -> Optional[str]:
-    if not user_input.strip():
-        return None
+    """Backward-compatible wrapper around the shared table renderer."""
 
-    raw_tokens = user_input.strip().split()
-    if not raw_tokens:
-        return None
-
-    command = _clean_token(raw_tokens[0]).lower()
-    if command.endswith(":"):
-        command = command[:-1]
-
-    if command not in {"table", "compare"}:
-        return None
-
-    tokens = raw_tokens[1:]
-
-    try:
-        remaining, period_filters, layout = _parse_year_filters(tokens)
-    except ValueError:
-        return "Invalid year filter. Use year=YYYY or years=YYYY-YYYY."
-
-    try:
-        tickers, metrics, period_filters, layout_mode = _resolve_metrics_and_tickers(
-            command, remaining, period_filters, layout
-        )
-    except ValueError as exc:
-        return str(exc)
-
-    records_by_ticker = {
-        ticker: engine.get_metrics(ticker, period_filters=period_filters)
-        for ticker in tickers
-    }
-
-    if layout_mode in {"metrics", "metric", "rows", "matrix", "pivot"}:
-        headers = ["Metric"] + tickers
-        rows: List[List[str]] = []
-        for metric in metrics:
-            label = _metric_label(metric)
-            row = [label]
-            for ticker in tickers:
-                records = records_by_ticker[ticker]
-                latest = _select_latest(records, metric)
-                if latest is None:
-                    row.append("-")
-                else:
-                    period, value = latest
-                    row.append(f"{_format_value(value)} ({period})")
-            rows.append(row)
-        return _build_table(headers, rows)
-
-    metric_chunks = list(_chunked(metrics, MAX_METRIC_COLUMNS)) or [[]]
-    tables: List[str] = []
-    total_chunks = len(metric_chunks)
-
-    for index, metric_subset in enumerate(metric_chunks, start=1):
-        headers = ["Ticker"] + [metric.title().replace("_", " ") for metric in metric_subset]
-        rows: List[List[str]] = []
-        for ticker in tickers:
-            records = records_by_ticker[ticker]
-            row = [ticker]
-            for metric in metric_subset:
-                latest = _select_latest(records, metric)
-                if latest is None:
-                    row.append("-")
-                else:
-                    period, value = latest
-                    row.append(f"{_format_value(value)} ({period})")
-            rows.append(row)
-
-        table = _build_table(headers, rows)
-        if total_chunks > 1:
-            metric_label = ", ".join(metric.replace("_", " ") for metric in metric_subset)
-            title = f"Metrics {index}/{total_chunks}: {metric_label}"
-            table = title + "\n" + table
-        tables.append(table)
-
-    return "\n\n".join(tables)
+    return render_table_command(user_input, engine)
 
 
 def main() -> None:
@@ -437,7 +364,7 @@ def main() -> None:
             print("Goodbye!")
             break
 
-        table_output = _try_table_command(user_input, analytics)
+        table_output = render_table_command(user_input, analytics)
         if table_output is not None:
             print()
             print(table_output)

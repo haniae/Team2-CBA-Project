@@ -40,6 +40,13 @@ class IngestionError(Exception):
     """Raised when ingestion cannot proceed."""
 
 
+def ingest_financial_data(settings: Settings) -> Optional[IngestionReport]:
+    """Bootstrap ingestion hook used by the CLI."""
+
+    LOGGER.info("Bootstrap ingestion skipped (no packaged sample data).")
+    return None
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 

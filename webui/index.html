@@ -2,84 +2,38 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BenchmarkOS Analyst Copilot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BenchmarkOS Chatbot</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <header>
-      <h1>BenchmarkOS Analyst Copilot</h1>
-      <p>An institutional-grade finance assistant powered by your local analytics engine.</p>
-    </header>
+    <div class="app">
+      <header class="app-header">
+        <div>
+          <h1>BenchmarkOS Chatbot</h1>
+          <p>Ask capital-markets questions grounded in your analytics store.</p>
+        </div>
+        <div class="status" role="status">
+          <span class="status-dot" id="api-status"></span>
+          <span id="status-message">Checking API…</span>
+        </div>
+      </header>
 
-    <main>
-      <section class="card" id="chat-panel">
-        <h2>Chat</h2>
+      <main class="chat-panel">
         <div id="chat-log" class="chat-log" aria-live="polite"></div>
-        <form id="chat-form">
-          <label for="chat-input">Ask a question</label>
-          <textarea id="chat-input" rows="3" placeholder="Example: Compare TSLA and NVDA on profitability metrics"></textarea>
-          <div class="form-actions">
-            <label class="conversation">Conversation ID <input id="conversation-id" type="text" placeholder="Optional" /></label>
-            <button type="submit">Send</button>
+        <form id="chat-form" class="chat-form" autocomplete="off">
+          <textarea
+            id="chat-input"
+            rows="3"
+            placeholder="Example: How is MSFT performing vs AAPL on profitability?"
+            required
+          ></textarea>
+          <div class="chat-actions">
+            <button id="send-button" type="submit">Send</button>
           </div>
         </form>
-      </section>
-
-      <section class="card" id="metrics-panel">
-        <h2>KPI Explorer</h2>
-        <form id="metrics-form" class="form-grid">
-          <label>Tickers (comma separated)
-            <input id="metrics-tickers" type="text" placeholder="AAPL, MSFT" required />
-          </label>
-          <label>Start Year
-            <input id="metrics-start" type="number" placeholder="2019" />
-          </label>
-          <label>End Year
-            <input id="metrics-end" type="number" placeholder="2022" />
-          </label>
-          <button type="submit">Fetch Metrics</button>
-        </form>
-        <div id="metrics-output" class="scroll-area"></div>
-      </section>
-
-      <section class="card" id="facts-panel">
-        <h2>Financial Facts</h2>
-        <form id="facts-form" class="form-grid">
-          <label>Ticker
-            <input id="facts-ticker" type="text" placeholder="AAPL" required />
-          </label>
-          <label>Fiscal Year
-            <input id="facts-year" type="number" placeholder="2022" required />
-          </label>
-          <label>Metric (optional)
-            <input id="facts-metric" type="text" placeholder="revenue" />
-          </label>
-          <button type="submit">Lookup Facts</button>
-        </form>
-        <div id="facts-output" class="scroll-area"></div>
-      </section>
-
-      <section class="card" id="audit-panel">
-        <h2>Audit Trail</h2>
-        <form id="audit-form" class="form-grid">
-          <label>Ticker
-            <input id="audit-ticker" type="text" placeholder="AAPL" required />
-          </label>
-          <label>Fiscal Year (optional)
-            <input id="audit-year" type="number" placeholder="2022" />
-          </label>
-          <button type="submit">Show Audit Events</button>
-        </form>
-        <div id="audit-output" class="scroll-area"></div>
-      </section>
-    </main>
-
-    <footer>
-      <span>Status:</span>
-      <span id="api-status" class="status-dot"></span>
-      <span id="status-message">Checking API…</span>
-    </footer>
+      </main>
+    </div>
 
     <script src="/static/app.js" defer></script>
   </body>

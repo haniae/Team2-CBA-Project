@@ -9,10 +9,11 @@ from datetime import datetime
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from . import database
-from .analytics_engine import AnalyticsEngine, METRIC_DEFINITIONS
+from .analytics_engine import AnalyticsEngine
 from .config import Settings
 from .data_ingestion import IngestionReport, ingest_financial_data, ingest_live_tickers
 from .llm_client import LLMClient, build_llm_client
+from .table_renderer import render_table_command, METRIC_DEFINITIONS
 
 # Metric formatting categories mirrored from analytics_engine.generate_summary
 PERCENT_METRICS = {
@@ -37,6 +38,51 @@ MULTIPLE_METRICS = {
     "buyback_intensity",
     "pe_ratio",
     "pb_ratio",
+}
+
+
+# Metrics highlighted in retrieval-augmented context for the language model.
+CONTEXT_SUMMARY_METRICS: Sequence[str] = (
+    "revenue",
+    "net_income",
+    "operating_margin",
+    "net_margin",
+    "return_on_equity",
+    "free_cash_flow",
+    "free_cash_flow_margin",
+    "pe_ratio",
+)
+
+_METRIC_LABEL_MAP: Dict[str, str] = {
+    definition.name: definition.description for definition in METRIC_DEFINITIONS
+}
+
+_TICKER_TOKEN_PATTERN = re.compile(r"\b[A-Z]{1,5}(?:-[A-Z]{1,2})?\b")
+_COMPANY_PHRASE_PATTERN = re.compile(
+    r"\b(?:[A-Z][A-Za-z&.]+(?:\s+[A-Z][A-Za-z&.]+){0,3})\b"
+)
+_COMMON_WORDS = {
+    "AND",
+    "OR",
+    "THE",
+    "A",
+    "AN",
+    "OF",
+    "FOR",
+    "WITH",
+    "VS",
+    "VERSUS",
+    "PLEASE",
+    "SHOW",
+    "TELL",
+    "WHAT",
+    "HOW",
+    "WHY",
+    "IS",
+    "ARE",
+    "ON",
+    "IN",
+    "TO",
 }
 
 _METRICS_PATTERN = re.compile(r"^metrics(?:(?:\s+for)?\s+)(.+)$", re.IGNORECASE)
@@ -122,7 +168,11 @@ class BenchmarkOSChatbot:
 
         reply = self._handle_financial_intent(user_input)
         if reply is None:
-            reply = self.llm_client.generate_reply(self.conversation.as_llm_messages())
+            context = self._build_rag_context(user_input)
+            messages = self.conversation.as_llm_messages()
+            if context:
+                messages = [messages[0], {"role": "system", "content": context}, *messages[1:]]
+            reply = self.llm_client.generate_reply(messages)
 
         database.log_message(
             self.settings.database_path,
@@ -180,6 +230,12 @@ class BenchmarkOSChatbot:
         if lowered.startswith("compare "):
             tokens = text.split()[1:]
             return self._handle_metrics_comparison(tokens)
+
+        if lowered.startswith("table "):
+            table_output = render_table_command(text, self.analytics_engine)
+            if table_output is None:
+                return "Unable to generate a table for that request."
+            return table_output
 
         if lowered.startswith("fact "):
             return self._handle_fact_command(text)
@@ -271,12 +327,16 @@ class BenchmarkOSChatbot:
             elif token_lower.startswith("mult="):
                 deltas["multiple_delta"] = self._parse_percent(token_lower[5:])
 
-        summary = self.analytics_engine.run_scenario(
+        runner = getattr(self.analytics_engine, 'run_scenario', None)
+        if not callable(runner):
+            return 'Scenario analysis is not available in this configuration.'
+
+        summary = runner(
             ticker,
             scenario_name=name,
             **deltas,
         )
-        return summary.narrative
+        return getattr(summary, 'narrative', str(summary))
 
     # Fact and audit helpers
     # ------------------------------------------------------------------
@@ -429,13 +489,35 @@ class BenchmarkOSChatbot:
     def _resolve_tickers(self, subjects: Sequence[str]) -> "BenchmarkOSChatbot._TickerResolution":
         available: List[str] = []
         missing: List[str] = []
+        lookup = getattr(self.analytics_engine, "lookup_ticker", None)
         for subject in subjects:
-            resolved = self.analytics_engine.lookup_ticker(subject, allow_partial=True)
+            resolved: Optional[str] = None
+            if callable(lookup):
+                try:
+                    resolved = lookup(subject, allow_partial=True)  # type: ignore[misc]
+                except TypeError:
+                    try:
+                        resolved = lookup(subject)  # type: ignore[misc]
+                    except Exception:
+                        resolved = None
+                except Exception:
+                    resolved = None
             if resolved:
+                resolved = resolved.upper()
                 if resolved not in available:
                     available.append(resolved)
-            else:
-                missing.append(subject)
+                continue
+
+            candidate = subject.upper()
+            try:
+                records = self.analytics_engine.get_metrics(candidate)
+            except Exception:
+                records = []
+            if records:
+                if candidate not in available:
+                    available.append(candidate)
+                continue
+            missing.append(subject)
         return BenchmarkOSChatbot._TickerResolution(available=available, missing=missing)
 
     def _format_missing_message(
@@ -578,6 +660,99 @@ class BenchmarkOSChatbot:
             ):
                 selected[record.metric] = record
         return selected
+
+    def _build_rag_context(self, user_input: str) -> Optional[str]:
+        """Assemble finance facts to ground the LLM response."""
+
+        tickers = self._detect_tickers(user_input)
+        if not tickers:
+            return None
+
+        context_sections: List[str] = []
+        for ticker in tickers:
+            try:
+                records = self.analytics_engine.get_metrics(ticker)
+            except Exception:  # pragma: no cover - database path
+                continue
+            if not records:
+                continue
+
+            latest = self._select_latest_records(
+                records, span_fn=self.analytics_engine._period_span
+            )
+            if not latest:
+                continue
+
+            spans = [
+                self.analytics_engine._period_span(record.period)
+                for record in latest.values()
+                if record.period
+            ]
+            descriptor = (
+                self._describe_period_filters(spans) if spans else "latest available"
+            )
+
+            lines = [f"{ticker} ({descriptor})"]
+            for metric_name in CONTEXT_SUMMARY_METRICS:
+                formatted = self._format_metric_value(metric_name, latest)
+                if formatted == "n/a":
+                    continue
+                label = _METRIC_LABEL_MAP.get(
+                    metric_name, metric_name.replace("_", " ").title()
+                )
+                lines.append(f"- {label}: {formatted}")
+
+            if len(lines) > 1:
+                lines_text = "\n".join(lines)
+                context_sections.append(lines_text)
+
+        if not context_sections:
+            return None
+        combined = "\n\n".join(context_sections)
+        return "Financial context:\n" + combined
+
+    def _detect_tickers(self, text: str) -> List[str]:
+        candidates: List[str] = []
+        seen = set()
+
+        for token in _TICKER_TOKEN_PATTERN.findall(text.upper()):
+            normalized = token.upper()
+            if normalized in _COMMON_WORDS:
+                continue
+            if normalized not in seen:
+                seen.add(normalized)
+                candidates.append(normalized)
+
+        lookup = getattr(self.analytics_engine, "lookup_ticker", None)
+
+        def _try_lookup(term: str) -> Optional[str]:
+            if not callable(lookup):
+                return None
+            try:
+                return lookup(term, allow_partial=True)  # type: ignore[misc]
+            except TypeError:
+                try:
+                    return lookup(term)  # type: ignore[misc]
+                except Exception:
+                    return None
+            except Exception:
+                return None
+
+        if callable(lookup):
+            for match in _COMPANY_PHRASE_PATTERN.findall(text):
+                phrase = match.strip()
+                if not phrase:
+                    continue
+                if phrase.upper() in _COMMON_WORDS:
+                    continue
+                ticker = _try_lookup(phrase)
+                if ticker:
+                    ticker = ticker.upper()
+                    if ticker not in seen:
+                        seen.add(ticker)
+                        candidates.append(ticker)
+
+        return candidates
 
     def _compose_benchmark_summary(
         self, metrics_per_ticker: Dict[str, Dict[str, database.MetricRecord]]
