@@ -3,12 +3,14 @@
 from .analytics_engine import AnalyticsEngine
 from .chatbot import BenchmarkOSChatbot
 from .config import Settings, load_settings
+from .data_ingestion import ingest_financial_data
 from .ticker_universe import available_universes, load_ticker_universe
 
 __all__ = [
     "AnalyticsEngine",
     "BenchmarkOSChatbot",
     "Settings",
+    "ingest_financial_data",
     "available_universes",
     "load_settings",
     "load_ticker_universe",

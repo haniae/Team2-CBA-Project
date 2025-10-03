@@ -6,6 +6,7 @@ import logging
 import math
 import re
 import sqlite3
+from dataclasses import dataclass
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -16,6 +17,15 @@ from .data_sources import YahooFinanceClient
 from .secdb import SecPostgresStore
 
 LOGGER = logging.getLogger(__name__)
+
+@dataclass(frozen=True)
+class ScenarioSummary:
+    ticker: str
+    scenario_name: str
+    metrics: Dict[str, Optional[float]]
+    narrative: str
+    created_at: datetime
+
 
 BASE_METRICS = {
     "revenue",
@@ -390,6 +400,114 @@ class AnalyticsEngine:
             period_filters=period_filters,
         )
 
+
+    def run_scenario(
+        self,
+        ticker: str,
+        *,
+        scenario_name: str,
+        revenue_growth_delta: float = 0.0,
+        ebitda_margin_delta: float = 0.0,
+        multiple_delta: float = 0.0,
+    ) -> ScenarioSummary:
+        ticker_upper = ticker.upper()
+        records = database.fetch_metric_snapshots(
+            self.settings.database_path, ticker_upper
+        )
+        latest = self._select_latest_records(
+            records, span_fn=self._period_span
+        )
+
+        def metric_value(name: str) -> Optional[float]:
+            record = latest.get(name)
+            return record.value if record else None
+
+        baseline_revenue = metric_value("revenue")
+        baseline_ebitda = metric_value("ebitda")
+        baseline_margin = metric_value("ebitda_margin")
+        if baseline_margin is None and baseline_revenue and baseline_ebitda is not None:
+            if baseline_revenue != 0:
+                baseline_margin = baseline_ebitda / baseline_revenue
+
+        projected_revenue = (
+            None if baseline_revenue is None else baseline_revenue * (1 + revenue_growth_delta)
+        )
+
+        projected_margin = None
+        if baseline_margin is not None:
+            projected_margin = baseline_margin + ebitda_margin_delta
+
+        projected_ebitda = None
+        if projected_revenue is not None and projected_margin is not None:
+            projected_ebitda = projected_revenue * projected_margin
+
+        baseline_multiple = metric_value("ev_to_adjusted_ebitda")
+        if baseline_multiple is None:
+            baseline_multiple = metric_value("ev_ebitda")
+        if baseline_multiple is None:
+            baseline_multiple = metric_value("pe_ratio")
+
+        projected_multiple = (
+            None if baseline_multiple is None else baseline_multiple + multiple_delta
+        )
+
+        projected_enterprise_value = None
+        if projected_multiple is not None and projected_ebitda is not None:
+            projected_enterprise_value = projected_multiple * projected_ebitda
+
+        scenario_metrics: Dict[str, Optional[float]] = {
+            "baseline_revenue": baseline_revenue,
+            "projected_revenue": projected_revenue,
+            "baseline_ebitda_margin": baseline_margin,
+            "projected_ebitda_margin": projected_margin,
+            "projected_ebitda": projected_ebitda,
+            "baseline_multiple": baseline_multiple,
+            "projected_multiple": projected_multiple,
+            "projected_enterprise_value": projected_enterprise_value,
+        }
+
+        parts = [f"Scenario '{scenario_name}' for {ticker_upper}:"]
+        if baseline_revenue is not None and projected_revenue is not None:
+            parts.append(
+                f"revenue grows from {baseline_revenue:,.0f} to {projected_revenue:,.0f} ({revenue_growth_delta:+.1%})."
+            )
+        if baseline_margin is not None and projected_margin is not None:
+            parts.append(
+                f"EBITDA margin shifts from {baseline_margin:.1%} to {projected_margin:.1%}."
+            )
+        if projected_enterprise_value is not None:
+            parts.append(
+                f"Implied enterprise value: {projected_enterprise_value:,.0f}."
+            )
+        if len(parts) == 1:
+            parts.append(
+                "Insufficient baseline data to model this scenario - adjust deltas or ingest more facts."
+            )
+        narrative = " ".join(parts)
+
+        created_at = datetime.utcnow()
+        database.store_scenario_result(
+            self.settings.database_path,
+            database.ScenarioResultRecord(
+                ticker=ticker_upper,
+                scenario_name=scenario_name,
+                metrics={
+                    key: (float(value) if isinstance(value, (int, float)) and value is not None else None)
+                    for key, value in scenario_metrics.items()
+                },
+                narrative=narrative,
+                created_at=created_at,
+            ),
+        )
+
+        return ScenarioSummary(
+            ticker=ticker_upper,
+            scenario_name=scenario_name,
+            metrics=scenario_metrics,
+            narrative=narrative,
+            created_at=created_at,
+        )
+
     def financial_facts(
         self,
         *,
@@ -471,13 +589,37 @@ class AnalyticsEngine:
             return
         database.bulk_insert_market_quotes(self.settings.database_path, quotes)
 
+    def _select_latest_records(
+        self,
+        records: Sequence[database.MetricRecord],
+        *,
+        span_fn,
+    ) -> Dict[str, database.MetricRecord]:
+        selected: Dict[str, database.MetricRecord] = {}
+        for record in records:
+            existing = selected.get(record.metric)
+            if existing is None:
+                selected[record.metric] = record
+                continue
+            if record.value is not None and existing.value is None:
+                selected[record.metric] = record
+                continue
+            if record.value is None and existing.value is not None:
+                continue
+            new_span = span_fn(record.period)
+            old_span = span_fn(existing.period)
+            if new_span[1] > old_span[1] or (
+                new_span[1] == old_span[1] and new_span[0] > old_span[0]
+            ):
+                selected[record.metric] = record
+        return selected
+
     @staticmethod
     def _period_span(period: str) -> Tuple[int, int]:
         years = [int(match) for match in re.findall(r"\d{4}", period)]
         if not years:
             return (0, 0)
         return (min(years), max(years))
-
 
 def _latest_timestamp(metrics: Dict[str, Tuple[Optional[float], datetime]]) -> datetime:
     return max(pair[1] for pair in metrics.values()) if metrics else _now()
