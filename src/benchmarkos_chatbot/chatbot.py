@@ -359,7 +359,7 @@ class BenchmarkOSChatbot:
         ticker = resolution.available[0] if resolution.available else raw_ticker
 
         facts = self.analytics_engine.financial_facts(
-            ticker,
+            ticker=ticker,
             fiscal_year=fiscal_year,
             metric=metric_key,
             limit=20,
