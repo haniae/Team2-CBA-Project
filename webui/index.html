@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -16,27 +16,21 @@
 
         <nav class="sidebar-nav" aria-label="Assistant navigation">
           <button class="nav-item" data-action="new-chat">
-            <span class="nav-icon" aria-hidden="true">📝</span>
             <span class="nav-label">New chat</span>
           </button>
           <button class="nav-item" data-action="search-chats">
-            <span class="nav-icon" aria-hidden="true">🔍</span>
             <span class="nav-label">Search chats</span>
           </button>
           <button class="nav-item" data-action="open-library">
-            <span class="nav-icon" aria-hidden="true">📚</span>
             <span class="nav-label">Library</span>
           </button>
           <button class="nav-item" data-action="open-codex">
-            <span class="nav-icon" aria-hidden="true">🧠</span>
             <span class="nav-label">Codex</span>
           </button>
           <button class="nav-item" data-action="open-gpts">
-            <span class="nav-icon" aria-hidden="true">⚙️</span>
             <span class="nav-label">GPTs</span>
           </button>
           <button class="nav-item" data-action="open-projects">
-            <span class="nav-icon" aria-hidden="true">📁</span>
             <span class="nav-label">Projects</span>
           </button>
         </nav>
@@ -46,10 +40,10 @@
           <input
             type="search"
             id="chat-search-input"
-            placeholder="Search chats…"
+            placeholder="Search chats..."
             autocomplete="off"
           />
-          <button type="button" id="chat-search-clear" class="search-clear" aria-label="Clear search">✕</button>
+          <button type="button" id="chat-search-clear" class="search-clear" aria-label="Clear search">x</button>
         </div>
 
         <div class="sidebar-section conversations">
@@ -76,14 +70,14 @@
           </div>
           <div class="status-pill" role="status">
             <span class="status-dot" id="api-status"></span>
-            <span id="status-message">Checking API…</span>
+            <span id="status-message">Checking API...</span>
           </div>
         </header>
 
         <section class="utility-panel hidden" id="utility-panel" aria-live="polite">
           <div class="utility-panel-header">
             <h2 id="utility-title"></h2>
-            <button type="button" id="utility-close" aria-label="Close panel">✕</button>
+            <button type="button" id="utility-close" aria-label="Close panel">x</button>
           </div>
           <div class="utility-content" id="utility-content"></div>
         </section>
@@ -95,11 +89,11 @@
             <textarea
               id="chat-input"
               rows="3"
-              placeholder="Ask anything about tickers, metrics, or scenarios…"
+              placeholder="Ask anything about tickers, metrics, or scenarios..."
               required
             ></textarea>
             <div class="chat-actions">
-              <span class="hint">Press Enter to send · Shift+Enter for a new line</span>
+              <span class="hint">Press Enter to send - Shift+Enter for a new line</span>
               <button id="send-button" type="submit">Send</button>
             </div>
           </form>

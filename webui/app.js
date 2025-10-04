@@ -71,13 +71,27 @@ const UTILITY_SECTIONS = {
   },
 };
 
-function appendMessage(role, text, { smooth = true } = {}) {
+function appendMessage(
+  role,
+  text,
+  { smooth = true, forceScroll = false, isPlaceholder = false, animate = true } = {}
+) {
   if (!chatLog) {
-    return;
+    return null;
   }
 
   const wrapper = document.createElement("div");
-  wrapper.className = `message ${role}`;
+  wrapper.className = `message ${role}${isPlaceholder ? " typing" : ""}`;
+  wrapper.dataset.role = role;
+
+  if (animate) {
+    wrapper.classList.add("incoming");
+    wrapper.addEventListener(
+      "animationend",
+      () => wrapper.classList.remove("incoming"),
+      { once: true }
+    );
+  }
 
   const header = document.createElement("div");
   header.className = "message-header";
@@ -96,12 +110,85 @@ function appendMessage(role, text, { smooth = true } = {}) {
   const body = document.createElement("div");
   body.className = "message-body";
 
-  const fragments = buildMessageBlocks(text);
-  fragments.forEach((node) => body.append(node));
+  if (isPlaceholder) {
+    body.append(createTypingIndicator());
+  } else {
+    const fragments = buildMessageBlocks(text);
+    fragments.forEach((node) => body.append(node));
+  }
   wrapper.append(body);
 
   chatLog.append(wrapper);
-  scrollChatToBottom({ smooth });
+  scrollChatToBottom({ smooth, force: forceScroll });
+  return wrapper;
+}
+
+function createTypingIndicator() {
+  const container = document.createElement("div");
+  container.className = "typing-indicator";
+
+  const srLabel = document.createElement("span");
+  srLabel.className = "sr-only";
+  srLabel.textContent = "BenchmarkOS is typing";
+  container.append(srLabel);
+
+  for (let index = 0; index < 3; index += 1) {
+    const dot = document.createElement("span");
+    dot.className = "typing-dot";
+    dot.style.animationDelay = `${index * 0.2}s`;
+    container.append(dot);
+  }
+
+  return container;
+}
+
+function updateMessageRole(wrapper, role) {
+  if (!wrapper) {
+    return;
+  }
+  wrapper.className = `message ${role}`;
+  wrapper.dataset.role = role;
+
+  const avatar = wrapper.querySelector(".avatar");
+  if (avatar) {
+    avatar.className = `avatar ${role}`;
+    avatar.textContent = role === "user" ? "You" : role === "assistant" ? "BO" : "SYS";
+  }
+
+  const roleLabel = wrapper.querySelector(".message-role");
+  if (roleLabel) {
+    roleLabel.textContent =
+      role === "user" ? "You" : role === "assistant" ? "BenchmarkOS" : "System";
+  }
+}
+
+function setMessageBody(wrapper, text) {
+  if (!wrapper) {
+    return;
+  }
+  const body = wrapper.querySelector(".message-body");
+  if (!body) {
+    return;
+  }
+  body.innerHTML = "";
+  const fragments = buildMessageBlocks(text);
+  fragments.forEach((node) => body.append(node));
+}
+
+function showAssistantTyping() {
+  return appendMessage("assistant", "", { isPlaceholder: true, animate: false });
+}
+
+function resolvePendingMessage(wrapper, role, text, { forceScroll = false } = {}) {
+  if (!wrapper) {
+    appendMessage(role, text, { forceScroll, smooth: true });
+    return null;
+  }
+  updateMessageRole(wrapper, role);
+  wrapper.classList.remove("typing");
+  setMessageBody(wrapper, text);
+  scrollChatToBottom({ smooth: true, force: forceScroll });
+  return wrapper;
 }
 
 function buildMessageBlocks(text) {
@@ -535,10 +622,10 @@ function loadConversation(conversationId) {
   }
 
   conversation.messages.forEach((message) => {
-    appendMessage(message.role, message.text, { smooth: false });
+    appendMessage(message.role, message.text, { smooth: false, animate: false });
   });
 
-  scrollChatToBottom({ smooth: false });
+  scrollChatToBottom({ smooth: false, force: true });
   renderConversationList();
   chatInput.focus();
 }
@@ -724,20 +811,21 @@ chatForm.addEventListener("submit", async (event) => {
   }
 
   recordMessage("user", prompt);
-  appendMessage("user", prompt);
+  appendMessage("user", prompt, { forceScroll: true });
   chatInput.value = "";
   setSending(true);
+  const pendingMessage = showAssistantTyping();
 
   try {
     const reply = await sendPrompt(prompt);
     const cleanReply = typeof reply === "string" ? reply.trim() : "";
     const messageText = cleanReply || "(no content)";
     recordMessage("assistant", messageText);
-    appendMessage("assistant", messageText);
+    resolvePendingMessage(pendingMessage, "assistant", messageText, { forceScroll: true });
   } catch (error) {
     const fallback = error && error.message ? error.message : "Something went wrong. Please try again.";
     recordMessage("system", fallback);
-    appendMessage("system", fallback);
+    resolvePendingMessage(pendingMessage, "system", fallback, { forceScroll: true });
   } finally {
     setSending(false);
     chatInput.focus();
