@@ -145,6 +145,8 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
 
     # financial_facts
     if "financial_facts" in tables:
+        _ensure_column(connection, "financial_facts", "cik", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(connection, "financial_facts", "fiscal_period", "TEXT")
         _ensure_column(connection, "financial_facts", "period", "TEXT NOT NULL DEFAULT ''")
         _ensure_column(connection, "financial_facts", "unit", "TEXT")
         _ensure_column(connection, "financial_facts", "source", "TEXT NOT NULL DEFAULT 'edgar'")
@@ -168,6 +170,22 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
             SET source_filing = ''
             WHERE source_filing IS NULL
         """)
+        connection.execute(
+            """
+            DELETE FROM financial_facts
+            WHERE rowid NOT IN (
+                SELECT MAX(rowid)
+                FROM financial_facts
+                GROUP BY ticker, metric, period, source, source_filing
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_financial_facts_unique
+            ON financial_facts (ticker, metric, period, source, source_filing)
+            """
+        )
 
     # metric_snapshots
     if "metric_snapshots" in tables:
@@ -475,6 +493,7 @@ def bulk_upsert_financial_facts(
         (
             fact.cik,
             _normalize_ticker(fact.ticker),
+            "",
             fact.metric.lower(),
             fact.fiscal_year,
             fact.fiscal_period,
@@ -497,11 +516,15 @@ def bulk_upsert_financial_facts(
         cursor = connection.executemany(
             """
             INSERT INTO financial_facts (
-                cik, ticker, metric, fiscal_year, fiscal_period, period, value,
+                cik, ticker, company_name, metric, fiscal_year, fiscal_period, period, value,
                 unit, source_filing, raw, period_start, period_end, adjusted,
                 adjustment_note, source, ingested_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(ticker, metric, period, source, source_filing) DO UPDATE SET
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(ticker, fiscal_year, metric) DO UPDATE SET
+                cik = excluded.cik,
+                company_name = excluded.company_name,
+                fiscal_period = excluded.fiscal_period,
+                period = excluded.period,
                 value = excluded.value,
                 unit = excluded.unit,
                 raw = excluded.raw,
@@ -509,6 +532,8 @@ def bulk_upsert_financial_facts(
                 period_end = excluded.period_end,
                 adjusted = excluded.adjusted,
                 adjustment_note = excluded.adjustment_note,
+                source = excluded.source,
+                source_filing = excluded.source_filing,
                 ingested_at = excluded.ingested_at
             """,
             payload,

@@ -9,18 +9,71 @@ const statusDot = document.getElementById("api-status");
 const statusMessage = document.getElementById("status-message");
 const newChatButton = document.getElementById("new-chat");
 const conversationList = document.getElementById("conversation-list");
+const navItems = document.querySelectorAll(".nav-item");
+const chatSearchContainer = document.getElementById("chat-search");
+const chatSearchInput = document.getElementById("chat-search-input");
+const chatSearchClear = document.getElementById("chat-search-clear");
+const utilityPanel = document.getElementById("utility-panel");
+const utilityTitle = document.getElementById("utility-title");
+const utilityContent = document.getElementById("utility-content");
+const utilityCloseButton = document.getElementById("utility-close");
 
 let isSending = false;
 let conversations = loadStoredConversations();
 let activeConversation = null;
+let conversationSearch = "";
+let currentUtilityKey = null;
+
+const UTILITY_SECTIONS = {
+  library: {
+    title: "Library",
+    html: `
+      <p>Reference materials to help you understand the BenchmarkOS stack.</p>
+      <ul>
+        <li><strong>Onboarding guide:</strong> Read the in-repo README for setup, ingestion, and testing tips.</li>
+        <li><strong>Orchestration playbook:</strong> Explore queue/serverless/batch patterns under <code>docs/</code>.</li>
+        <li><strong>API surface:</strong> Review <code>serve_chatbot.py</code> and <code>web.py</code> for REST endpoints.</li>
+      </ul>
+    `,
+  },
+  codex: {
+    title: "Codex",
+    html: `
+      <p>Developer-centric shortcuts.</p>
+      <ul>
+        <li>Launch the CLI driver with <code>python main.py</code> for advanced table views.</li>
+        <li>Inspect analytics pipelines in <code>src/benchmarkos_chatbot/analytics_engine.py</code>.</li>
+        <li>Extend intents or tools in <code>chatbot.py</code> and <code>tasks.py</code>.</li>
+      </ul>
+    `,
+  },
+  gpts: {
+    title: "GPTs",
+    html: `
+      <p>Compose specialised assistants on top of the same analytics core.</p>
+      <ul>
+        <li>Clone the web UI and adjust prompts for sector-specific copilots.</li>
+        <li>Wire alternative LLM backends via <code>llm_client.py</code>.</li>
+        <li>Use conversation exports to fine-tune company coverage.</li>
+      </ul>
+    `,
+  },
+  projects: {
+    title: "Projects",
+    html: `
+      <p>Keep track of the workstreams tied to this deployment.</p>
+      <ul>
+        <li>Document ingestion runs, database snapshots, and experiment logs.</li>
+        <li>Track upcoming tasks like dashboard embeds or scenario templates.</li>
+        <li>Link to source control or notebooks that extend the platform.</li>
+      </ul>
+    `,
+  },
+};
 
 function appendMessage(role, text, { smooth = true } = {}) {
   if (!chatLog) {
     return;
-  }
-
-  if (role !== "system" && suggestedActions) {
-    suggestedActions.classList.add("hidden");
   }
 
   const wrapper = document.createElement("div");
@@ -394,6 +447,23 @@ function formatRelativeTime(isoString) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function getFilteredConversations() {
+  if (!conversationSearch) {
+    return conversations;
+  }
+  const query = conversationSearch.toLowerCase();
+  return conversations.filter((conversation) => {
+    const title = (conversation.title || "").toLowerCase();
+    if (title.includes(query)) {
+      return true;
+    }
+    return conversation.messages.some(
+      (message) =>
+        typeof message.text === "string" && message.text.toLowerCase().includes(query)
+    );
+  });
+}
+
 function renderConversationList() {
   if (!conversationList) {
     return;
@@ -401,15 +471,19 @@ function renderConversationList() {
 
   conversationList.innerHTML = "";
 
-  if (!conversations.length) {
+  const items = getFilteredConversations();
+
+  if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "empty-state";
-    empty.textContent = "New conversations will appear here.";
+    empty.textContent = conversationSearch
+      ? "No chats match your search yet."
+      : "New conversations will appear here.";
     conversationList.append(empty);
     return;
   }
 
-  conversations.forEach((conversation) => {
+  items.forEach((conversation) => {
     const item = document.createElement("div");
     item.className = "conversation-item";
     item.setAttribute("role", "listitem");
@@ -451,12 +525,13 @@ function loadConversation(conversationId) {
   }
   activeConversation = conversation;
 
-  if (chatLog) {
-    chatLog.innerHTML = "";
+  if (currentUtilityKey) {
+    closeUtilityPanel();
+    resetNavActive();
   }
 
-  if (suggestedActions) {
-    suggestedActions.classList.toggle("hidden", conversation.messages.length > 0);
+  if (chatLog) {
+    chatLog.innerHTML = "";
   }
 
   conversation.messages.forEach((message) => {
@@ -470,11 +545,12 @@ function loadConversation(conversationId) {
 
 function startNewConversation({ focusInput = true } = {}) {
   activeConversation = null;
+  if (currentUtilityKey) {
+    closeUtilityPanel();
+    resetNavActive();
+  }
   if (chatLog) {
     chatLog.innerHTML = "";
-  }
-  if (suggestedActions) {
-    suggestedActions.classList.remove("hidden");
   }
   chatInput.value = "";
   if (focusInput) {
@@ -503,6 +579,110 @@ function deleteConversation(conversationId) {
   }
 
   renderConversationList();
+}
+
+function setActiveNav(action) {
+  if (!navItems || !navItems.length) {
+    return;
+  }
+  navItems.forEach((item) => {
+    const itemAction = item.dataset.action || "";
+    item.classList.toggle("active", Boolean(action && itemAction === action));
+  });
+}
+
+function resetNavActive() {
+  setActiveNav(null);
+}
+
+function openUtilityPanel(key) {
+  if (!utilityPanel || !utilityTitle || !utilityContent) {
+    return;
+  }
+  const section = UTILITY_SECTIONS[key];
+  if (!section) {
+    return;
+  }
+  currentUtilityKey = key;
+  utilityPanel.classList.remove("hidden");
+  utilityTitle.textContent = section.title;
+  utilityContent.innerHTML = section.html;
+  setActiveNav(`open-${key}`);
+}
+
+function closeUtilityPanel() {
+  if (!utilityPanel || !utilityTitle || !utilityContent) {
+    return;
+  }
+  utilityPanel.classList.add("hidden");
+  utilityTitle.textContent = "";
+  utilityContent.innerHTML = "";
+  currentUtilityKey = null;
+}
+
+function showChatSearch({ focus = true } = {}) {
+  if (!chatSearchContainer) {
+    return;
+  }
+  chatSearchContainer.classList.remove("hidden");
+  setActiveNav("search-chats");
+  if (focus && chatSearchInput) {
+    chatSearchInput.focus();
+    chatSearchInput.select();
+  }
+}
+
+function clearConversationSearch({ hide = false } = {}) {
+  conversationSearch = "";
+  if (chatSearchInput) {
+    chatSearchInput.value = "";
+  }
+  if (hide && chatSearchContainer) {
+    chatSearchContainer.classList.add("hidden");
+  }
+  renderConversationList();
+}
+
+function handleNavAction(action) {
+  if (!action) {
+    return;
+  }
+  if (action === "new-chat") {
+    closeUtilityPanel();
+    clearConversationSearch({ hide: true });
+    resetNavActive();
+    startNewConversation();
+    return;
+  }
+  if (action === "search-chats") {
+    closeUtilityPanel();
+    if (!chatSearchContainer) {
+      return;
+    }
+    const isHidden = chatSearchContainer.classList.contains("hidden");
+    if (isHidden) {
+      showChatSearch({ focus: true });
+      return;
+    }
+    if (conversationSearch) {
+      showChatSearch({ focus: true });
+      return;
+    }
+    clearConversationSearch({ hide: true });
+    resetNavActive();
+    return;
+  }
+  if (action.startsWith("open-")) {
+    const key = action.replace("open-", "");
+    if (currentUtilityKey === key) {
+      closeUtilityPanel();
+      resetNavActive();
+      return;
+    }
+    clearConversationSearch({ hide: true });
+    openUtilityPanel(key);
+    return;
+  }
 }
 
 async function sendPrompt(prompt) {
@@ -581,6 +761,41 @@ function wirePromptChips() {
       chatInput.value = prompt;
       chatForm.requestSubmit();
     });
+  });
+}
+
+if (navItems && navItems.length) {
+  navItems.forEach((item) => {
+    item.addEventListener("click", () => handleNavAction(item.dataset.action));
+  });
+}
+
+if (chatSearchInput) {
+  chatSearchInput.addEventListener("input", (event) => {
+    conversationSearch = event.target.value.trim();
+    renderConversationList();
+    if (conversationSearch) {
+      showChatSearch({ focus: false });
+    }
+  });
+}
+
+if (chatSearchClear) {
+  chatSearchClear.addEventListener("click", () => {
+    if (conversationSearch) {
+      clearConversationSearch({ hide: false });
+      showChatSearch({ focus: true });
+      return;
+    }
+    clearConversationSearch({ hide: true });
+    resetNavActive();
+  });
+}
+
+if (utilityCloseButton) {
+  utilityCloseButton.addEventListener("click", () => {
+    closeUtilityPanel();
+    resetNavActive();
   });
 }
 

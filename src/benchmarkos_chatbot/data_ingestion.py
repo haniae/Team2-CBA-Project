@@ -67,6 +67,8 @@ def ingest_live_tickers(
     if not tickers:
         raise IngestionError("No tickers supplied for ingestion")
 
+    database.initialise(settings.database_path)
+
     unique_tickers = sorted({ticker.upper() for ticker in tickers})
     LOGGER.info("Starting ingestion for %d tickers", len(unique_tickers))
 

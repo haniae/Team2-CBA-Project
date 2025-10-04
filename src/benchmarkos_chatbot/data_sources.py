@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import requests
 
@@ -79,7 +79,12 @@ class AuditEvent:
 
 DEFAULT_FACT_CONCEPTS: Sequence[str] = (
     "us-gaap:Revenues",
+    "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+    "us-gaap:NetSales",
+    "us-gaap:SalesRevenueNet",
+    "us-gaap:SalesRevenueGoodsNet",
     "us-gaap:NetIncomeLoss",
+    "us-gaap:ProfitLoss",
     "us-gaap:OperatingIncomeLoss",
     "us-gaap:GrossProfit",
     "us-gaap:Assets",
@@ -112,7 +117,12 @@ DEFAULT_FACT_CONCEPTS: Sequence[str] = (
 
 METRIC_ALIASES = {
     "us-gaap:Revenues": "revenue",
+    "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax": "revenue",
+    "us-gaap:NetSales": "revenue",
+    "us-gaap:SalesRevenueNet": "revenue",
+    "us-gaap:SalesRevenueGoodsNet": "revenue",
     "us-gaap:NetIncomeLoss": "net_income",
+    "us-gaap:ProfitLoss": "net_income",
     "us-gaap:OperatingIncomeLoss": "operating_income",
     "us-gaap:GrossProfit": "gross_profit",
     "us-gaap:Assets": "total_assets",
@@ -122,8 +132,12 @@ METRIC_ALIASES = {
     "us-gaap:StockholdersEquity": "shareholders_equity",
     "us-gaap:CashAndCashEquivalentsAtCarryingValue": "cash_and_cash_equivalents",
     "us-gaap:NetCashProvidedByUsedInOperatingActivities": "cash_from_operations",
+    "us-gaap:NetCashProvidedByUsedInOperatingActivitiesContinuingOperations": "cash_from_operations",
+    "us-gaap:NetCashProvidedByUsedInOperatingActivitiesDiscontinuedOperations": "cash_from_operations",
     "us-gaap:NetCashProvidedByUsedInFinancingActivities": "cash_from_financing",
     "us-gaap:PaymentsToAcquirePropertyPlantAndEquipment": "capital_expenditures",
+    "us-gaap:PaymentsToAcquirePropertyPlantAndEquipmentContinuingOperations": "capital_expenditures",
+    "us-gaap:PaymentsToAcquireProductiveAssets": "capital_expenditures",
     "us-gaap:DepreciationAndAmortization": "depreciation_and_amortization",
     "us-gaap:EarningsBeforeInterestAndTaxes": "ebit",
     "us-gaap:IncomeTaxExpenseBenefit": "income_tax_expense",
@@ -142,6 +156,56 @@ METRIC_ALIASES = {
     "us-gaap:EarningsPerShareBasic": "eps_basic",
     "us-gaap:InterestExpense": "interest_expense",
 }
+
+
+FORM_PRIORITY = {
+    "10-K/A": 6,
+    "10-K": 5,
+    "20-F/A": 5,
+    "20-F": 5,
+    "40-F/A": 5,
+    "40-F": 5,
+    "10-Q/A": 4,
+    "10-Q": 4,
+    "8-K": 2,
+}
+
+UNIT_MULTIPLIERS: Dict[str, float] = {
+    "USD": 1.0,
+    "USD$": 1.0,
+    "USDm": 1_000_000.0,
+    "USDmm": 1_000_000.0,
+    "USDth": 1_000.0,
+    "USDThousands": 1_000.0,
+    "shares": 1.0,
+    "sharesBasic": 1.0,
+    "sharesDiluted": 1.0,
+}
+
+UNIT_PRIORITY: Dict[str, int] = {
+    "USD": 5,
+    "USD$": 5,
+    "USDm": 4,
+    "USDmm": 4,
+    "USDth": 3,
+    "USDThousands": 3,
+    "shares": 5,
+    "sharesBasic": 4,
+    "sharesDiluted": 4,
+}
+
+ALLOWED_FORMS = {
+    "10-K",
+    "10-K/A",
+    "10-Q",
+    "10-Q/A",
+    "20-F",
+    "20-F/A",
+    "40-F",
+    "40-F/A",
+}
+
+ALLOWED_PERIODS = {"FY", "CY", "FYTD", "Q4", "Q4YTD"}
 
 
 def _pad_cik(cik: str | int) -> str:
@@ -379,45 +443,95 @@ class EdgarClient:
     ) -> List[FinancialFact]:
         cik = self.cik_for_ticker(ticker)
         payload = self.company_facts(cik)
-        facts = payload.get("facts", {})
+        taxonomy_map = payload.get("facts", {})
         cutoff_year = datetime.now(timezone.utc).year - years + 1
-        results: List[FinancialFact] = []
-        for concept, data in facts.items():
-            if concepts and concept not in concepts:
+        concept_filter = set(concepts) if concepts else None
+        best: Dict[Tuple[str, Optional[int], Optional[str]], Tuple[Tuple, FinancialFact]] = {}
+
+        def _multiplier_for(unit: str) -> Optional[float]:
+            if unit in UNIT_MULTIPLIERS:
+                return UNIT_MULTIPLIERS[unit]
+            return None
+
+        def _score_entry(entry: Mapping[str, Any], unit: str) -> Tuple:
+            segment_score = 1 if not entry.get("segment") else 0
+            form = (entry.get("form") or "").upper()
+            form_score = FORM_PRIORITY.get(form, 1 if form else 0)
+            filed = entry.get("filed") or ""
+            period_end = entry.get("end") or ""
+            unit_score = UNIT_PRIORITY.get(unit, 0)
+            return (segment_score, form_score, filed, period_end, unit_score)
+
+        for taxonomy, concepts_map in taxonomy_map.items():
+            if not isinstance(concepts_map, Mapping):
                 continue
-            for unit, entries in data.get("units", {}).items():
-                for entry in entries:
-                    fiscal_year = entry.get("fy")
-                    if fiscal_year is not None and fiscal_year < cutoff_year:
+            for tag, data in concepts_map.items():
+                if not isinstance(data, Mapping):
+                    continue
+                concept_key = f"{taxonomy}:{tag}"
+                if concept_filter and concept_key not in concept_filter:
+                    # allow implicit aliases even if not explicitly requested
+                    if concept_key not in METRIC_ALIASES:
                         continue
-                    fiscal_period = entry.get("fp")
-                    value = entry.get("val")
-                    try:
-                        numeric_value = float(value) if value is not None else None
-                    except (TypeError, ValueError):
-                        numeric_value = None
-                    period_label = _derive_period_label(fiscal_year, fiscal_period)
-                    results.append(
-                        FinancialFact(
-                            cik=cik,
-                            ticker=ticker.upper(),
-                            metric=_canonical_metric(concept),
-                            fiscal_year=fiscal_year,
-                            fiscal_period=fiscal_period,
-                            period=period_label,
-                            value=numeric_value,
-                            unit=unit,
-                            source="edgar",
-                            source_filing=entry.get("accn"),
-                            period_start=_parse_datetime(entry.get("start")),
-                            period_end=_parse_datetime(entry.get("end")),
-                            adjusted=bool(entry.get("form") in {"10-K/A", "10-Q/A"}),
-                            adjustment_note=entry.get("form"),
-                            ingested_at=datetime.now(timezone.utc),
-                            raw=entry,
+                metric_name = _canonical_metric(concept_key)
+                units = data.get("units", {})
+                if not isinstance(units, Mapping):
+                    continue
+                for unit, entries in units.items():
+                    multiplier = _multiplier_for(unit)
+                    if multiplier is None:
+                        continue
+                    for entry in entries or []:
+                        if not isinstance(entry, Mapping):
+                            continue
+                        if entry.get("segment"):
+                            continue
+                        form = (entry.get("form") or "").upper()
+                        if form and form not in ALLOWED_FORMS:
+                            continue
+                        fiscal_year = entry.get("fy")
+                        if fiscal_year is not None and fiscal_year < cutoff_year:
+                            continue
+                        fiscal_period = entry.get("fp")
+                        period_code = fiscal_period.upper() if isinstance(fiscal_period, str) else None
+                        if period_code and period_code not in ALLOWED_PERIODS:
+                            continue
+                        value_raw = entry.get("val")
+                        try:
+                            numeric_value = (
+                                float(value_raw) * multiplier if value_raw is not None else None
+                            )
+                        except (TypeError, ValueError):
+                            continue
+                        period_label = _derive_period_label(fiscal_year, fiscal_period)
+                        score = _score_entry(entry, unit)
+                        key = (metric_name, fiscal_year, fiscal_period)
+                        existing = best.get(key)
+                        if existing and existing[0] >= score:
+                            continue
+                        best[key] = (
+                            score,
+                            FinancialFact(
+                                cik=cik,
+                                ticker=ticker.upper(),
+                                metric=metric_name,
+                                fiscal_year=fiscal_year,
+                                fiscal_period=fiscal_period,
+                                period=period_label,
+                                value=numeric_value,
+                                unit=unit,
+                                source="edgar",
+                                source_filing=entry.get("accn"),
+                                period_start=_parse_datetime(entry.get("start")),
+                                period_end=_parse_datetime(entry.get("end")),
+                                adjusted=form.endswith("/A"),
+                                adjustment_note=entry.get("form"),
+                                ingested_at=datetime.now(timezone.utc),
+                                raw=entry,
+                            ),
                         )
-                    )
-        return results
+
+        return [fact for _, fact in best.values()]
 
 
 def _derive_period_label(fy: Optional[int], fiscal_period: Optional[str]) -> str:
