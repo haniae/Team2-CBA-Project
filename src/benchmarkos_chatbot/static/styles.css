@@ -1,0 +1,54 @@
+:root{
+	--bg:#f6f8fb;
+	--panel:#ffffff;
+	--muted:#9aa4b2;
+	--accent:#276ef1;
+	--shadow: 0 6px 30px rgba(34,41,47,0.08);
+}
+*{box-sizing:border-box}
+html,body,#app{height:100%}
+body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;color:#12263f;background:linear-gradient(180deg,#f3f6fa, #eef2f6)}
+.app{display:flex;height:100vh}
+.sidebar{width:260px;background:linear-gradient(180deg,#0f2b56,#102a50);color:#fff;padding:24px;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.logo{font-weight:700;letter-spacing:1px}
+.new-chat{background:rgba(255,255,255,0.08);border:0;color:#fff;padding:8px 12px;border-radius:10px}
+.suggested h4,.conversations h4{font-size:12px;color:rgba(255,255,255,0.7);margin:18px 0 8px}
+.prompt{display:block;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.03);color:#fff;padding:10px;border-radius:8px;margin-bottom:8px;text-align:left;width:100%}
+.conversations{margin-top:auto}
+#convoList{color:rgba(255,255,255,0.9)}
+.convo-item{padding:10px;border-radius:8px;background:rgba(255,255,255,0.03);margin-bottom:8px;cursor:pointer}
+.convo-item .meta-row{display:flex;justify-content:space-between;align-items:center}
+.convo-item .delete-btn{background:transparent;border:0;color:rgba(255,255,255,0.6);padding:6px;border-radius:6px;cursor:pointer}
+.convo-item .delete-btn:hover{background:rgba(255,255,255,0.04);color:#fff}
+
+.main{flex:1;display:flex;flex-direction:column}
+.topbar{height:72px;display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid #eef2f6;background:linear-gradient(180deg,#fff,#fbfdff)}
+.title{font-size:20px;font-weight:700}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-left:8px}
+.dot.offline{background:#f2f4f6}
+.dot.online{background:#2ecc71}
+
+.chat-panel{padding:32px;flex:1;position:relative;overflow:hidden}
+.messages{background:#fff;border-radius:12px;padding:28px;min-height:300px;height:calc(100% - 140px);overflow:auto;box-shadow:var(--shadow)}
+.message{max-width:70%;padding:14px;border-radius:14px;margin:12px 0}
+.message.user{margin-left:auto;background:linear-gradient(90deg,#2d7cff,#1b5fe5);color:#fff;box-shadow:0 6px 24px rgba(34,82,255,0.12)}
+.message.bot{background:#f1f6fa;color:#12263f;border:1px solid #e6eef6}
+.message .meta{font-size:11px;color:var(--muted);margin-bottom:6px}
+.message .text{font-size:14px;line-height:1.5}
+
+.composer{display:flex;gap:8px;padding:12px 0;margin-top:12px}
+.composer input{flex:1;padding:12px;border-radius:10px;border:1px solid #dfe8f3}
+.composer button{padding:10px 14px;border-radius:10px;background:var(--accent);color:#fff;border:0}
+
+.metrics-table{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px}
+.metrics-table th{background:#f7fbff;padding:10px;text-align:left;color:#6b7a8a}
+.metrics-table td{padding:12px;border-top:1px solid #eef4fb}
+.metric-name{width:320px;color:#16324a}
+
+.message-bubble{background:#f3f7fb;padding:14px;border-radius:10px;margin:10px 0;color:#16324a}
+
+.scroll-btn{position:fixed;right:40px;bottom:120px;background:var(--accent);color:#fff;border:0;border-radius:999px;width:48px;height:48px;box-shadow:0 8px 30px rgba(39,110,241,0.18);display:none;align-items:center;justify-content:center;font-size:20px}
+.scroll-btn.show{display:flex}
+
+@media (max-width:900px){.sidebar{display:none}.metrics-table th,.metric-name{font-size:13px}}

@@ -1,4 +1,5 @@
 const API_BASE = window.API_BASE || "";
+const STORAGE_KEY = "benchmarkos.chatHistory.v1";
 
 const chatLog = document.getElementById("chat-log");
 const chatForm = document.getElementById("chat-form");
@@ -7,15 +8,17 @@ const sendButton = document.getElementById("send-button");
 const statusDot = document.getElementById("api-status");
 const statusMessage = document.getElementById("status-message");
 const newChatButton = document.getElementById("new-chat");
-const suggestedActions = document.getElementById("suggested-actions");
 const conversationList = document.getElementById("conversation-list");
 
-let conversationId = null;
 let isSending = false;
-let conversationCounter = 1;
-let pendingTitle = "";
+let conversations = loadStoredConversations();
+let activeConversation = null;
 
-function appendMessage(role, text) {
+function appendMessage(role, text, { smooth = true } = {}) {
+  if (!chatLog) {
+    return;
+  }
+
   if (role !== "system" && suggestedActions) {
     suggestedActions.classList.add("hidden");
   }
@@ -45,14 +48,7 @@ function appendMessage(role, text) {
   wrapper.append(body);
 
   chatLog.append(wrapper);
-  chatLog.scrollTop = chatLog.scrollHeight;
-
-  if (role === "user" && !pendingTitle) {
-    const trimmed = text.trim();
-    if (trimmed) {
-      pendingTitle = trimmed.slice(0, 40) + (trimmed.length > 40 ? "…" : "");
-    }
-  }
+  scrollChatToBottom({ smooth });
 }
 
 function buildMessageBlocks(text) {
@@ -252,6 +248,17 @@ function parseNumericCell(rawValue) {
   return { isNumeric: true, value: valueText, suffix };
 }
 
+function scrollChatToBottom({ smooth = true } = {}) {
+  if (!chatLog) {
+    return;
+  }
+  const behavior = smooth ? "smooth" : "auto";
+  const schedule = window.requestAnimationFrame || ((fn) => setTimeout(fn, 16));
+  schedule(() => {
+    chatLog.scrollTo({ top: chatLog.scrollHeight, behavior });
+  });
+}
+
 function setSending(state) {
   isSending = state;
   sendButton.disabled = state;
@@ -259,10 +266,249 @@ function setSending(state) {
   sendButton.textContent = state ? "Sending..." : "Send";
 }
 
+function loadStoredConversations() {
+  try {
+    if (!window.localStorage) {
+      return [];
+    }
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((entry) => entry && entry.id)
+      .map((entry) => ({
+        id: entry.id,
+        remoteId: entry.remoteId || null,
+        title: entry.title || "",
+        createdAt: entry.createdAt || entry.updatedAt || new Date().toISOString(),
+        updatedAt: entry.updatedAt || entry.createdAt || new Date().toISOString(),
+        messages: Array.isArray(entry.messages) ? entry.messages : [],
+      }))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  } catch (error) {
+    console.warn("Failed to load stored conversations", error);
+    return [];
+  }
+}
+
+function saveConversations() {
+  try {
+    if (!window.localStorage) {
+      return;
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  } catch (error) {
+    console.warn("Unable to persist conversations", error);
+  }
+}
+
+function generateLocalId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  return `conv-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function generateTitle(text) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return "Untitled chat";
+  }
+  const firstLine = trimmed.split(/\r?\n/)[0];
+  const slice = firstLine.slice(0, 60);
+  return slice + (firstLine.length > 60 ? "..." : "");
+}
+
+function ensureActiveConversation() {
+  if (activeConversation) {
+    return activeConversation;
+  }
+  const timestamp = new Date().toISOString();
+  activeConversation = {
+    id: generateLocalId(),
+    remoteId: null,
+    title: "",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    messages: [],
+  };
+  return activeConversation;
+}
+
+function promoteConversation(conversation) {
+  conversations = [conversation, ...conversations.filter((entry) => entry.id !== conversation.id)];
+}
+
+function recordMessage(role, text) {
+  const conversation = ensureActiveConversation();
+  const timestamp = new Date().toISOString();
+  if (!conversations.find((entry) => entry.id === conversation.id)) {
+    conversations = [conversation, ...conversations];
+  }
+  conversation.messages.push({ role, text, timestamp });
+  if (role === "user" && !conversation.title) {
+    conversation.title = generateTitle(text);
+  }
+  if (!conversation.title) {
+    conversation.title = "Untitled chat";
+  }
+  conversation.updatedAt = timestamp;
+  promoteConversation(conversation);
+  saveConversations();
+  renderConversationList();
+}
+
+function formatRelativeTime(isoString) {
+  if (!isoString) {
+    return "";
+  }
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const diff = Date.now() - date.getTime();
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diff < minute) {
+    return "Just now";
+  }
+  if (diff < hour) {
+    const value = Math.floor(diff / minute);
+    return `${value} min${value === 1 ? "" : "s"} ago`;
+  }
+  if (diff < day) {
+    const value = Math.floor(diff / hour);
+    return `${value} hr${value === 1 ? "" : "s"} ago`;
+  }
+  if (diff < 7 * day) {
+    const value = Math.floor(diff / day);
+    return `${value} day${value === 1 ? "" : "s"} ago`;
+  }
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function renderConversationList() {
+  if (!conversationList) {
+    return;
+  }
+
+  conversationList.innerHTML = "";
+
+  if (!conversations.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "New conversations will appear here.";
+    conversationList.append(empty);
+    return;
+  }
+
+  conversations.forEach((conversation) => {
+    const item = document.createElement("div");
+    item.className = "conversation-item";
+    item.setAttribute("role", "listitem");
+    if (activeConversation && conversation.id === activeConversation.id) {
+      item.classList.add("active");
+    }
+
+    const linkButton = document.createElement("button");
+    linkButton.type = "button";
+    linkButton.className = "conversation-link";
+    linkButton.dataset.id = conversation.id;
+
+    const title = document.createElement("span");
+    title.className = "conversation-title";
+    title.textContent = conversation.title || "Untitled chat";
+
+    const timestamp = document.createElement("span");
+    timestamp.className = "conversation-timestamp";
+    timestamp.textContent = formatRelativeTime(conversation.updatedAt);
+
+    linkButton.append(title, timestamp);
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "conversation-delete";
+    deleteButton.dataset.id = conversation.id;
+    deleteButton.setAttribute("aria-label", "Delete conversation");
+    deleteButton.textContent = "Remove";
+
+    item.append(linkButton, deleteButton);
+    conversationList.append(item);
+  });
+}
+
+function loadConversation(conversationId) {
+  const conversation = conversations.find((entry) => entry.id === conversationId);
+  if (!conversation) {
+    return;
+  }
+  activeConversation = conversation;
+
+  if (chatLog) {
+    chatLog.innerHTML = "";
+  }
+
+  if (suggestedActions) {
+    suggestedActions.classList.toggle("hidden", conversation.messages.length > 0);
+  }
+
+  conversation.messages.forEach((message) => {
+    appendMessage(message.role, message.text, { smooth: false });
+  });
+
+  scrollChatToBottom({ smooth: false });
+  renderConversationList();
+  chatInput.focus();
+}
+
+function startNewConversation({ focusInput = true } = {}) {
+  activeConversation = null;
+  if (chatLog) {
+    chatLog.innerHTML = "";
+  }
+  if (suggestedActions) {
+    suggestedActions.classList.remove("hidden");
+  }
+  chatInput.value = "";
+  if (focusInput) {
+    chatInput.focus();
+  }
+  renderConversationList();
+}
+
+function deleteConversation(conversationId) {
+  const index = conversations.findIndex((entry) => entry.id === conversationId);
+  if (index === -1) {
+    return;
+  }
+
+  const [removed] = conversations.splice(index, 1);
+  saveConversations();
+
+  if (activeConversation && removed.id === activeConversation.id) {
+    activeConversation = null;
+    if (conversations.length) {
+      loadConversation(conversations[0].id);
+    } else {
+      startNewConversation();
+    }
+    return;
+  }
+
+  renderConversationList();
+}
+
 async function sendPrompt(prompt) {
   const payload = { prompt };
-  if (conversationId) {
-    payload.conversation_id = conversationId;
+  if (activeConversation && activeConversation.remoteId) {
+    payload.conversation_id = activeConversation.remoteId;
   }
 
   const response = await fetch(`${API_BASE}/chat`, {
@@ -277,57 +523,41 @@ async function sendPrompt(prompt) {
   }
 
   const data = await response.json();
-  conversationId = data.conversation_id;
+  if (activeConversation && data.conversation_id) {
+    activeConversation.remoteId = data.conversation_id;
+    promoteConversation(activeConversation);
+    saveConversations();
+    renderConversationList();
+  }
   return data.reply;
-}
-
-function startNewConversation() {
-  if (chatLog.children.length > 0) {
-    appendConversationPreview();
-  }
-  conversationId = null;
-  pendingTitle = "";
-  chatLog.innerHTML = "";
-  if (suggestedActions) {
-    suggestedActions.classList.remove("hidden");
-  }
-  chatInput.value = "";
-  chatInput.focus();
-}
-
-function appendConversationPreview() {
-  if (!conversationList) {
-    return;
-  }
-  const emptyState = conversationList.querySelector(".empty-state");
-  if (emptyState) {
-    emptyState.remove();
-  }
-  const title = pendingTitle || `Chat ${conversationCounter}`;
-  conversationCounter += 1;
-  const item = document.createElement("div");
-  item.className = "conversation-item";
-  item.textContent = title;
-  conversationList.append(item);
-  pendingTitle = "";
 }
 
 chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (isSending) return;
+  if (isSending) {
+    return;
+  }
 
   const prompt = chatInput.value.trim();
-  if (!prompt) return;
+  if (!prompt) {
+    return;
+  }
 
+  recordMessage("user", prompt);
   appendMessage("user", prompt);
   chatInput.value = "";
   setSending(true);
 
   try {
     const reply = await sendPrompt(prompt);
-    appendMessage("assistant", reply.trim() || "(no content)");
+    const cleanReply = typeof reply === "string" ? reply.trim() : "";
+    const messageText = cleanReply || "(no content)";
+    recordMessage("assistant", messageText);
+    appendMessage("assistant", messageText);
   } catch (error) {
-    appendMessage("system", error.message);
+    const fallback = error && error.message ? error.message : "Something went wrong. Please try again.";
+    recordMessage("system", fallback);
+    appendMessage("system", fallback);
   } finally {
     setSending(false);
     chatInput.focus();
@@ -355,10 +585,36 @@ function wirePromptChips() {
 }
 
 if (newChatButton) {
-  newChatButton.addEventListener("click", startNewConversation);
+  newChatButton.addEventListener("click", () => startNewConversation());
+}
+
+if (conversationList) {
+  conversationList.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!target || typeof target.closest !== "function") {
+      return;
+    }
+    const deleteButton = target.closest(".conversation-delete");
+    if (deleteButton) {
+      deleteConversation(deleteButton.dataset.id);
+      return;
+    }
+    const linkButton = target.closest(".conversation-link");
+    if (linkButton) {
+      loadConversation(linkButton.dataset.id);
+    }
+  });
 }
 
 wirePromptChips();
+
+renderConversationList();
+
+if (conversations.length) {
+  loadConversation(conversations[0].id);
+} else {
+  startNewConversation({ focusInput: false });
+}
 
 async function checkHealth() {
   try {

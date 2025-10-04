@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>BenchmarkOS Analyst Copilot</title>
+		<link rel="stylesheet" href="/static/styles.css" />
+	</head>
+	<body>
+		<div class="app">
+			<aside class="sidebar">
+				<div class="brand">
+					<div class="logo">BENCHMARKOS</div>
+					<button id="newChatBtn" class="new-chat">+ New chat</button>
+				</div>
+				<div class="suggested">
+					<h4>Suggested prompts</h4>
+					<button class="prompt">Compare ticker fundamentals</button>
+					<button class="prompt">Show ALP KPIs 2021-2023</button>
+					<button class="prompt">Model a bull case for BRV</button>
+				</div>
+				<div class="conversations">
+					<h4>Recent chats</h4>
+					<div id="convoList">Loading...</div>
+				</div>
+			</aside>
+
+			<main class="main">
+				<header class="topbar">
+					<div class="title">BenchmarkOS Analyst Copilot</div>
+					<div class="status">API <span id="apiDot" class="dot offline"></span></div>
+				</header>
+
+				<section class="chat-panel">
+					<div id="messages" class="messages" tabindex="0" aria-live="polite"></div>
+
+					<button id="scrollBtn" title="Scroll to latest" class="scroll-btn" aria-hidden="true">↓</button>
+
+					<form id="composer" class="composer">
+						<input id="inputBox" placeholder="Ask a question or compare tickers (e.g. compare AAPL MSFT)" autocomplete="off" />
+						<button type="submit">Send</button>
+					</form>
+				</section>
+			</main>
+		</div>
+
+		<script src="/static/app.js"></script>
+	</body>
+</html>

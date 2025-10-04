@@ -31,8 +31,13 @@ app.add_middleware(
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = (BASE_DIR.parent / "webui").resolve()
+PACKAGE_STATIC = (BASE_DIR / 'static').resolve()
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+elif PACKAGE_STATIC.exists():
+    # serve packaged static assets from the python package when project-level webui is absent
+    app.mount('/static', StaticFiles(directory=PACKAGE_STATIC), name='static')
+
 
 
 class ChatRequest(BaseModel):
@@ -91,9 +96,12 @@ def build_bot(conversation_id: Optional[str] = None) -> BenchmarkOSChatbot:
 
 @app.get("/")
 def root() -> FileResponse:
-    if not FRONTEND_DIR.exists():
-        raise HTTPException(status_code=404, detail="Frontend assets are not available.")
-    return FileResponse(FRONTEND_DIR / "index.html")
+    # prefer project webui when present, otherwise serve packaged static index
+    if FRONTEND_DIR.exists():
+        return FileResponse(FRONTEND_DIR / "index.html")
+    if PACKAGE_STATIC.exists():
+        return FileResponse(PACKAGE_STATIC / "index.html")
+    raise HTTPException(status_code=404, detail="Frontend assets are not available.")
 
 
 @app.post("/chat", response_model=ChatResponse)
