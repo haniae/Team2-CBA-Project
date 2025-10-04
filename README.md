@@ -11,6 +11,7 @@ Institutional-grade analytics tooling for finance teams who need a conversationa
 - [Data ingestion playbooks](#data-ingestion-playbooks)
 - [Configuration reference](#configuration-reference)
 - [Project layout](#project-layout)
+- [File reference](#file-reference)
 - [Quality and testing](#quality-and-testing)
 - [Troubleshooting](#troubleshooting)
 - [Further reading](#further-reading)
@@ -197,6 +198,61 @@ Project/
     ├── test_data_ingestion.py
     └── test_database.py
 ```
+
+## File reference
+
+### Root scripts and helpers
+| File | Description |
+|------|-------------|
+| `main.py` | Rich CLI wrapper that exposes table/metrics commands, metric abbreviations, and scenario helpers for power users. |
+| `run_chatbot.py` | Lightweight REPL entry point that spins up `BenchmarkOSChatbot.create()` for interactive terminal chats. |
+| `serve_chatbot.py` | Convenience launcher for the FastAPI app in `src/benchmarkos_chatbot/web.py`; hands arguments to `uvicorn`. |
+| `batch_ingest.py` | Pulls a built-in mega-cap watch list through `ingest_live_tickers`, applying retry/backoff and basic rate limiting. |
+| `ingest_universe.py` | Parameterised batch ingester with resume support; calls `AnalyticsEngine` to refresh snapshots after each chunk. |
+| `ingest_frames.py` | Synchronously downloads SEC data frames for a fixed set of tags and writes them to Postgres for benchmarking. |
+| `load_prices_stooq.py` | Imports historical price data from Stooq into Postgres, providing a fallback when Yahoo limits are hit. |
+| `requirements.txt` | Runtime dependency pinning for local development and deployment targets. |
+| `pyproject.toml` | Project metadata, dependency list, and pytest configuration (adds `src/` to `PYTHONPATH`). |
+
+### Core package: `src/benchmarkos_chatbot/`
+| Module | Description |
+|--------|-------------|
+| `__init__.py` | Exports `BenchmarkOSChatbot`, `AnalyticsEngine`, and `load_settings` for easy imports. |
+| `analytics_engine.py` | Central analytics hub: loads fundamentals, computes base/derived/aggregate metrics, runs scenarios, and refreshes quote snapshots. |
+| `chatbot.py` | Orchestrates intent parsing, command routing, ingestion triggers, and LLM fallbacks for the conversational interface. |
+| `config.py` | Loads environment variables into the immutable `Settings` dataclass and exposes helper properties for SQLite/Postgres DSNs. |
+| `data_ingestion.py` | Coordinates live SEC/Yahoo/Bloomberg ingestion, returns `IngestionReport` summaries, and records audit events. |
+| `data_sources.py` | HTTP clients and DTOs for SEC EDGAR, Yahoo Finance, and Bloomberg integrations (caching, retry, normalisation). |
+| `database.py` | SQLite persistence layer: schema creation, dataclasses for stored records, and CRUD helpers for conversations, metrics, facts, and audit logs. |
+| `llm_client.py` | Language-model abstraction with a deterministic local echo client and an OpenAI-backed implementation. |
+| `table_renderer.py` | Utilities for producing consistent ASCII tables used by CLI commands and automated tests. |
+| `tasks.py` | Optional in-process task queue abstraction for scheduling ingestion/background jobs safely. |
+| `ticker_universe.py` | Loader utilities for predefined ticker universes consumed by ingestion scripts. |
+| `web.py` | FastAPI application exposing chat, metrics, facts, audit, and health endpoints; mounts the SPA assets. |
+| `static/` | Packaged static assets served when the project-level `webui/` folder is absent. |
+
+### Documentation and data
+| Path | Description |
+|------|-------------|
+| `docs/orchestration_playbook.md` | Strategy note outlining three ingestion/orchestration patterns (local queue, serverless, batch). |
+| `data/` | Sample CSV inputs and ticker lists used by ingestion scripts and tests. |
+| `cache/` | Runtime artifact directory for downloaded filings and ingestion progress (created automatically). |
+
+### Web client
+| Path | Description |
+|------|-------------|
+| `webui/index.html` | Shell HTML document that boots the single-page app and loads API base overrides when provided. |
+| `webui/app.js` | Front-end controller handling chat submission, conversation history rendering, table formatting, and status polling. |
+| `webui/styles.css` | Styling for the SPA, including responsive layout, message bubbles, and status indicators. |
+
+### Tests
+| File | Description |
+|------|-------------|
+| `tests/test_database.py` | Verifies schema invariants and CRUD helpers in `database.py`. |
+| `tests/test_analytics_engine.py` | Exercises growth, valuation metrics, and quote refresh behaviours. |
+| `tests/test_analytics.py` | End-to-end chatbot scenarios covering prompts, ingestion triggers, and responses. |
+| `tests/test_cli_tables.py` | Ensures the ASCII table renderer formats rows/columns as expected. |
+| `tests/test_data_ingestion.py` | Validates ingestion workflows, audit event recording, and error handling. |
 
 ## Quality and testing
 - **Run the whole suite**: `pytest`
