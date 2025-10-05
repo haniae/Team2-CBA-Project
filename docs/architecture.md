@@ -4,50 +4,125 @@ This workflow mirrors the product storyboard: user prompts begin on the client s
 
 ```mermaid
 flowchart LR
-    classDef front fill:#ffe57f,stroke:#d4a017,stroke-width:2px,color:#463c00,font-weight:bold
-    classDef llm fill:#a8f0d8,stroke:#2f9e80,stroke-width:2px,color:#064340,font-weight:bold
-    classDef sql fill:#8dc5ff,stroke:#1d6ee6,stroke-width:2px,color:#0b2c72,font-weight:bold
-    classDef insight fill:#cabdff,stroke:#6d4dd7,stroke-width:2px,color:#2e1c62,font-weight:bold
-    classDef speech fill:#ffffff,stroke:#94a3b8,stroke-width:2px,color:#1f2937
+    %% Class definitions
+    classDef front fill:#fde68a,stroke:#f59e0b,stroke-width:2px,color:#78350f,font-weight:bold
+    classDef orchestrator fill:#bbf7d0,stroke:#15803d,stroke-width:2px,color:#064e3b,font-weight:bold
+    classDef llm fill:#c7d2fe,stroke:#4338ca,stroke-width:2px,color:#1e1b4b,font-weight:bold
+    classDef data fill:#bae6fd,stroke:#0284c7,stroke-width:2px,color:#0c4a6e,font-weight:bold
+    classDef ops fill:#e2e8f0,stroke:#475569,stroke-width:2px,color:#1f2937,font-weight:bold
+    classDef external fill:#e9d5ff,stroke:#7c3aed,stroke-width:2px,color:#4c1d95,font-weight:bold
+    classDef artifact fill:#fbcfe8,stroke:#db2777,stroke-width:2px,color:#831843,font-weight:bold
 
-    subgraph FrontEnd["Front-End Interfaces"]
-        direction TB
-        userPrompt(["Input prompt\n(CLI, Web UI, API)"]):::front
-        agentAvatar(["Chat session\ncontext & controls"]):::speech
-        renderOutput(["Return final output\n(chat transcript)"]):::front
-        publishArtifacts(["Generate packaged artifacts\n(tables, charts, slides)"]):::insight
+    subgraph FE["Front-End Channels"]
+        WebUI["Web UI\n(streaming chat)"]:::front
+        CLI["CLI\n(ad-hoc prompts)"]:::front
+        Batch["Batch API\n(partner jobs)"]:::front
+        Auth["Auth gateway\n(optional)"]:::front
     end
-    style FrontEnd fill:#f8fafc,stroke:#cbd5f5,stroke-dasharray:8 4
+    style FE fill:#fffbeb,stroke:#fde68a,stroke-dasharray:8 4
 
-    subgraph BackEnd["Back-End Services"]
-        direction TB
-        promptIngress(["Input prompt\n(validation & routing)"]):::front
-        planQuery(["Convert to structured plan\n(prompt planner + LLM)"]):::llm
-        runSQL(["Execute analytics query\n(AnalyticsEngine + database)"]):::sql
-        analyzeResults(["Analyze query result\n(metric scripts, enrichers)"]):::llm
-        packageReply(["Package narrative & evidence\n(response composer)"]):::insight
+    subgraph ORCH["Orchestration & Guardrails"]
+        Ingress["FastAPI /chat\nrequest validation"]:::orchestrator
+        Session["Chat orchestrator\ncontext & guardrails"]:::orchestrator
+        Composer["Response composer\npayload assembly"]:::orchestrator
     end
-    style BackEnd fill:#f0f9ff,stroke:#a5d8ff,stroke-dasharray:8 4
+    style ORCH fill:#ecfdf5,stroke:#bbf7d0,stroke-dasharray:8 4
 
-    userPrompt --> promptIngress
-    promptIngress --> planQuery
-    planQuery --> runSQL
-    runSQL --> analyzeResults
-    analyzeResults --> packageReply
-    packageReply --> renderOutput
-    renderOutput --> publishArtifacts
-    userPrompt --> agentAvatar
-    agentAvatar --> renderOutput
-
-    subgraph Legend["Diagram keys"]
-        direction LR
-        keyFront(["User-facing surfaces"]):::front
-        keyPlanner(["LLM orchestration"]):::llm
-        keySQL(["Analytics & SQL layer"]):::sql
-        keyInsight(["Narrative & visualization"]):::insight
+    subgraph LLM["LLM Layer"]
+        Planner["Planner LLM\n(intent & SQL plan)"]:::llm
+        Generator["Narrative LLM\n(response drafting)"]:::llm
     end
-    style Legend fill:#ffffff,stroke:#e2e8f0,stroke-width:1.5px
+    style LLM fill:#eef2ff,stroke:#c7d2fe,stroke-dasharray:8 4
+
+    subgraph ANALYTICS["Analytics & Insights"]
+        Analytics["Analytics engine\nSQL + metric compute"]:::data
+        Metrics["Metrics API\n& calculators"]:::data
+        Facts["Facts API\nscenario models"]:::data
+        Insights["Insight formatter\nnarrative blocks"]:::data
+    end
+    style ANALYTICS fill:#f0f9ff,stroke:#bae6fd,stroke-dasharray:8 4
+
+    subgraph DATA["Data & Storage"]
+        Database["Operational database\n(conversations, metrics, quotes)"]:::data
+        Audit["Audit trail\nlineage & replay"]:::data
+    end
+    style DATA fill:#f8fafc,stroke:#bae6fd,stroke-dasharray:8 4
+
+    subgraph INGEST["Ingestion & Background"]
+        Ingestion["Ingestion manager\non-demand loaders"]:::orchestrator
+        Queue["Task queue\n(background jobs)"]:::ops
+    end
+    style INGEST fill:#f5f3ff,stroke:#e9d5ff,stroke-dasharray:8 4
+
+    subgraph OPS["Platform Operations"]
+        Keyring["Secrets vault\n(API keys)"]:::ops
+        Config["Config (.env)\nfeature flags"]:::ops
+        Observability["Observability\nlogs & health"]:::ops
+    end
+    style OPS fill:#f8fafc,stroke:#cbd5f5,stroke-dasharray:8 4
+
+    subgraph ARTIFACT["Delivery & Artifacts"]
+        ChatSurface["Chat surfaces\n(web, CLI transcripts)"]:::artifact
+        Exporters["Artifact exporters\n(CSV, PPTX, PDF)"]:::artifact
+    end
+    style ARTIFACT fill:#fff5f7,stroke:#fbcfe8,stroke-dasharray:8 4
+
+    subgraph SOURCES["External Data Providers"]
+        Edgar["SEC EDGAR"]:::external
+        Yahoo["Yahoo Finance"]:::external
+        Stooq["Stooq"]:::external
+        Bloomberg["Bloomberg\n(optional)"]:::external
+    end
+    style SOURCES fill:#faf5ff,stroke:#e9d5ff,stroke-dasharray:8 4
+
+    WebUI --> Auth
+    CLI --> Auth
+    Batch --> Auth
+    Auth --> Ingress
+
+    Ingress --> Session
+    Session --> Planner
+    Planner --> Session
+    Session --> Generator
+    Generator --> Composer
+
+    Session --> Analytics
+    Planner --> Analytics
+    Analytics --> Metrics
+    Analytics --> Facts
+    Metrics --> Insights
+    Facts --> Insights
+    Insights --> Composer
+    Composer --> ChatSurface
+    Composer --> Exporters
+
+    Analytics --> Database
+    Database --> Analytics
+    Session --> Database
+    Session --> Audit
+    Analytics --> Audit
+    Audit --> Exporters
+
+    Analytics -. data gap .-> Ingestion
+    Ingestion --> Queue
+    Queue --> Ingestion
+    Ingestion --> Database
+    Ingestion --> Edgar
+    Ingestion --> Yahoo
+    Ingestion --> Stooq
+    Ingestion --> Bloomberg
+
+    Keyring --> Session
+    Keyring --> Ingestion
+    Config --> Ingress
+    Config --> Analytics
+    Config --> Ingestion
+    Queue --> Observability
+    Analytics --> Observability
+    Session --> Observability
 ```
+
+Layer colors reinforce separation of concerns: yellow for front-end channels, green for orchestration, purple-lavender for LLM services, blue for analytics and storage, gray for platform operations, pink for delivery artifacts, and violet for external data providers.
 
 **Interaction walk-through**
 - Front-end clients (terminal, FastAPI-driven web UI, or batch API) capture a prompt and send it to the orchestrator.

@@ -227,6 +227,35 @@ Project/
 | `tests/test_cli_tables.py` | Ensures the ASCII table renderer formats rows/columns as expected. |
 | `tests/test_data_ingestion.py` | Validates ingestion workflows, audit event recording, and error handling. |
 
+### Quick module guide
+| Goal | Primary file(s) | Notes |
+|------|-----------------|-------|
+| Investigate how prompts become analytics plans | `src/benchmarkos_chatbot/chatbot.py`, `src/benchmarkos_chatbot/analytics_engine.py` | Intent handlers decide whether to run metrics, scenarios, or ingestion, then hand structured plans to the analytics engine. |
+| Add or tweak financial metrics | `src/benchmarkos_chatbot/analytics_engine.py`, `src/benchmarkos_chatbot/database.py` | Metrics are computed in `refresh_metrics`; persisted snapshots live in `database.py` so downstream clients pick them up automatically. |
+| Tune data ingestion or add new feeds | `src/benchmarkos_chatbot/data_ingestion.py`, `data_sources.py`, `data_sources_backup.py` | These modules manage SEC, Yahoo, and optional Bloomberg inputs with retry/backoff logic. |
+| Extend the FastAPI surface | `src/benchmarkos_chatbot/web.py` | All REST endpoints (chat, metrics, facts, audit) are defined here; mount new routes alongside the existing routers. |
+| Adjust the task queue / background jobs | `src/benchmarkos_chatbot/tasks.py` | Provides a lightweight in-process queue for long-running ingestion jobs. |
+| Update the SPA chat client | `webui/app.js`, `webui/styles.css`, `webui/index.html` | Client-side prompt submission, transcript rendering, and status badges live here. |
+
+### Script cheat sheet
+- `run_chatbot.py` — launch the terminal REPL for quick experiments (uses the same backend as the web UI).
+- `serve_chatbot.py` — run the FastAPI app with uvicorn; pass `--port` or `--reload` while iterating locally.
+- `ingest_universe.py` — crawl a configurable ticker universe with checkpointing; ideal for keeping demo datasets fresh.
+- `ingest_companyfacts.py` / `ingest_companyfacts_batch.py` — fetch SEC companyfacts for individual CIKs or large batches.
+- `ingest_frames.py` — pull SEC XBRL frame data (useful for macro-style aggregates such as industry totals).
+- `load_prices_stooq.py` — backfill historical prices when Yahoo rate limits hit or offline operation is required.
+- `load_ticker_cik.py` — populate the ticker → CIK lookup table; rerun whenever SEC publishes new mappings.
+- `batch_ingest.py` — example of orchestrating a curated watch list with retry/backoff, suitable for cron jobs.
+
+### Configuration crib sheet
+| File | Purpose |
+|------|---------|
+| `.env` | Local development defaults; mirrors the keys loaded in `config.py` (DB paths, API providers, feature flags). |
+| `pyproject.toml` | Python packaging metadata plus tooling config (`pytest`, `ruff`/formatters if added later). |
+| `.env.example` | Safe template you can share with collaborators; copy to `.env` and fill in secrets locally. |
+| `docs/orchestration_playbook.md` | Design notes for scaling ingestion/orchestration patterns beyond the single-process defaults. |
+
+
 ## Quality and testing
 - **Run the whole suite**: `pytest`
 - **Focus on a file**: `pytest tests/test_cli_tables.py::test_table_command_formats_rows`
