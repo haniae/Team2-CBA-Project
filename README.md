@@ -35,34 +35,7 @@ The repository doubles as coursework and reference material: every module is hea
 - **Task orchestration hooks** - `tasks.py` provides a queue abstraction you can wire into ingestion to hand off long-running fetches safely.
 
 ## Architecture map
-```
-+--------------+     +--------------------+     +--------------------+
-| CLI (run_*)  | --> | FastAPI app (web)  | --> | Web UI (webui/)    |
-+--------------+     +--------------------+     +--------------------+
-        | function calls and imports      REST API / HTTP
-+--------------------------------------------------------------------+
-| BenchmarkOSChatbot (chatbot.py) + AnalyticsEngine (analytics_engine)|
-+--------------------------------------------------------------------+
-        |
-+-------------------------------+
-| Persistence (database.py)     |
-| SQLite or PostgreSQL backend  |
-+-------------------------------+
-        |
-+-------------------------------+
-| Data ingestion (data_ingestion|
-| .py and helper scripts)       |
-+-------------------------------+
-        |
-+---------------------------------------------+
-| External data: SEC EDGAR, Yahoo Finance,    |
-| optional Bloomberg feeds                    |
-+---------------------------------------------+
-        |
-+-------------------------------+
-| LLM providers (local, OpenAI) |
-+-------------------------------+
-```
+See [`docs/architecture.md`](docs/architecture.md) for the high-level component diagram that accompanies this README. The doc highlights how the CLI, FastAPI service, analytics core, and ingestion pipelines collaborate.
 
 ## Quick start
 These steps assume Python 3.10+ and Git are installed.
