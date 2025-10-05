@@ -23,6 +23,7 @@ def _to_datetime(value: Optional[date | datetime]) -> Optional[datetime]:
 
 
 def _period_label(fiscal_year: Optional[int], fiscal_period: Optional[str]) -> str:
+    """Parse SEC period labels into canonical display strings."""
     if fiscal_year is None:
         return (fiscal_period or "unknown").upper()
     period = (fiscal_period or "").strip().upper()
@@ -33,6 +34,7 @@ def _period_label(fiscal_year: Optional[int], fiscal_period: Optional[str]) -> s
 
 @dataclass(frozen=True)
 class _PostgresParams:
+    """Connection parameters required to reach the SEC Postgres mirror."""
     host: str
     port: int
     dbname: str
@@ -45,6 +47,7 @@ class SecPostgresStore:
     """Lightweight client for reading SEC facts from Postgres."""
 
     def __init__(self, settings: Settings) -> None:
+        """Store settings used for building Postgres connections."""
         if settings.database_type != "postgresql":
             raise ValueError("SecPostgresStore requires DATABASE_TYPE=postgresql")
         if not settings.postgres_host or not settings.postgres_database or not settings.postgres_user:
@@ -73,6 +76,7 @@ class SecPostgresStore:
 
     @contextmanager
     def _connection(self) -> Iterator["psycopg2.extensions.connection"]:  # type: ignore[name-defined]
+        """Yield a Postgres connection using application settings."""
         conn = self._psycopg2.connect(
             host=self._params.host,
             port=self._params.port,
@@ -91,6 +95,7 @@ class SecPostgresStore:
         *,
         tickers: Optional[Sequence[str]] = None,
     ) -> List[Dict[str, Any]]:
+        """Fetch base fact rows for the requested metrics/tickers."""
         if not metrics:
             return []
 
@@ -152,6 +157,7 @@ class SecPostgresStore:
         metric: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> List[FinancialFactRecord]:
+        """Fetch detailed financial fact rows from Postgres."""
         schema = self._params.schema
         clauses = ["tc.ticker = %s"]
         params: List[Any] = [ticker.upper()]
@@ -223,6 +229,7 @@ class SecPostgresStore:
         return records
 
     def list_tickers(self) -> List[str]:
+        """Return a list of tickers available in the SEC Postgres store."""
         schema = self._params.schema
         query = f"SELECT DISTINCT ticker FROM {schema}.ticker_cik ORDER BY ticker"
         with self._connection() as conn:

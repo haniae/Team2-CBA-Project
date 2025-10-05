@@ -12,6 +12,7 @@ MAX_METRIC_COLUMNS = 6
 
 @dataclass(frozen=True)
 class MetricDefinition:
+    """Metadata describing a single metric and how to present it."""
     name: str
     description: str
 
@@ -167,6 +168,7 @@ class TableCommandError(Exception):
 
 
 def render_table_command(user_input: str, engine: AnalyticsEngine) -> Optional[str]:
+    """Render metrics into a table for the CLI command output."""
     if not user_input.strip():
         return None
 
@@ -242,6 +244,7 @@ def render_table_command(user_input: str, engine: AnalyticsEngine) -> Optional[s
 
 
 def _parse_year_filters(tokens: Sequence[str]) -> Tuple[List[str], Optional[List[Tuple[int, int]]], Optional[str]]:
+    """Parse tokens describing fiscal year ranges or lists."""
     period_filters: List[Tuple[int, int]] = []
     layout: Optional[str] = None
     remaining: List[str] = []
@@ -285,6 +288,7 @@ def _resolve_metrics_and_tickers(
     period_filters: Optional[List[Tuple[int, int]]],
     layout: Optional[str],
 ) -> Tuple[List[str], List[str], Optional[List[Tuple[int, int]]], str]:
+    """Resolve requested metric names and tickers simultaneously."""
     layout_mode = (layout or "").lower()
     lowered = [token.lower() for token in tokens]
 
@@ -326,6 +330,7 @@ def _resolve_metrics_and_tickers(
 
 
 def _extract_tickers(tokens: Sequence[str]) -> List[str]:
+    """Extract ticker symbols from free-form tokens."""
     tickers: List[str] = []
     for token in tokens:
         cleaned = token.strip().upper().rstrip(",")
@@ -338,6 +343,7 @@ def _extract_tickers(tokens: Sequence[str]) -> List[str]:
 
 
 def _expand_metrics(raw_metrics: Sequence[str]) -> List[str]:
+    """Expand metric aliases or groups into specific metric names."""
     metrics: List[str] = []
     for token in raw_metrics:
         cleaned = token.strip().lower().strip(string.punctuation)
@@ -364,6 +370,7 @@ def _expand_metrics(raw_metrics: Sequence[str]) -> List[str]:
 
 
 def _parse_year_filters(tokens: Sequence[str]) -> Tuple[List[str], Optional[List[Tuple[int, int]]], Optional[str]]:
+    """Parse tokens describing fiscal year ranges or lists."""
     remaining: List[str] = []
     period_filters: List[Tuple[int, int]] = []
     layout: Optional[str] = None
@@ -398,6 +405,7 @@ def _parse_year_filters(tokens: Sequence[str]) -> Tuple[List[str], Optional[List
 
 
 def _parse_period_token(token: str) -> Optional[Tuple[int, int]]:
+    """Interpret period tokens (e.g. FY2020) for filtering."""
     cleaned = token.strip().lower()
     if cleaned.startswith("fy") and cleaned[2:].isdigit():
         year = int(cleaned[2:])
@@ -418,6 +426,7 @@ def _parse_period_token(token: str) -> Optional[Tuple[int, int]]:
 
 
 def _select_latest(records: Iterable, metric: str) -> Optional[Tuple[str, Optional[float]]]:
+    """Return the most recent metric entries per ticker."""
     latest_period = None
     latest_value = None
     for record in records:
@@ -432,6 +441,7 @@ def _select_latest(records: Iterable, metric: str) -> Optional[Tuple[str, Option
 
 
 def _format_value_display(latest: Optional[Tuple[str, Optional[float]]]) -> str:
+    """Format a metric value for display alongside units/notes."""
     if latest is None:
         return "-"
     period, value = latest
@@ -441,6 +451,7 @@ def _format_value_display(latest: Optional[Tuple[str, Optional[float]]]) -> str:
 
 
 def _format_value(value: Optional[float]) -> str:
+    """Format numeric values with thousands separators and precision."""
     if value is None:
         return "-"
     abs_value = abs(value)
@@ -456,6 +467,7 @@ def _format_value(value: Optional[float]) -> str:
 
 
 def _metric_label(metric: str) -> str:
+    """Return the human-readable label for a metric."""
     for definition in METRIC_DEFINITIONS:
         if definition.name == metric:
             return definition.description
@@ -466,6 +478,7 @@ def _metric_label(metric: str) -> str:
 
 
 def _build_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
+    """Construct a printable table structure from metric data."""
     if not rows:
         return "No data available."
 
@@ -475,6 +488,7 @@ def _build_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
             widths[idx] = max(widths[idx], len(cell))
 
     def format_row(values: Sequence[str]) -> str:
+        """Format a row dictionary into a list of printable columns."""
         formatted = []
         for idx, value in enumerate(values):
             align = "<" if idx == 0 else ">"
@@ -488,11 +502,13 @@ def _build_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
 
 
 def _chunked(sequence: Sequence[str], size: int) -> Iterable[Sequence[str]]:
+    """Yield items from an iterable in fixed-size chunks."""
     for index in range(0, len(sequence), size):
         yield sequence[index : index + size]
 
 
 def _coerce_int(value: str) -> Optional[int]:
+    """Convert strings to integers when possible, ignoring blanks."""
     try:
         return int(value)
     except ValueError:
@@ -500,4 +516,5 @@ def _coerce_int(value: str) -> Optional[int]:
 
 
 def _clean_token(token: str) -> str:
+    """Normalise raw tokens taken from user input."""
     return token.strip(string.punctuation)

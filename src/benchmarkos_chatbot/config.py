@@ -137,6 +137,7 @@ class Settings:
 
 
 def _env_flag(name: str, *, default: bool = False) -> bool:
+    """Interpret environment variables that are meant to behave as booleans."""
     value = os.getenv(name)
     if value is None:
         return default

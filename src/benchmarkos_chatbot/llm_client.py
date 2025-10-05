@@ -37,6 +37,7 @@ class LocalEchoLLM:
     """
 
     def generate_reply(self, messages: Iterable[Mapping[str, str]]) -> str:
+        """Generate a reply using the configured language model backend."""
         last_user_message = ""
         for message in messages:
             if message["role"] == "user":
@@ -96,6 +97,7 @@ class OpenAILLMClient:
     """Wrapper around the OpenAI Chat Completions API."""
 
     def __init__(self, model: str) -> None:
+        """Initialise the OpenAI client wrapper with model and auth settings."""
         try:
             from openai import OpenAI
         except ImportError as exc:  # pragma: no cover - executed only if missing
@@ -109,6 +111,7 @@ class OpenAILLMClient:
         self._model = model
 
     def generate_reply(self, messages: Iterable[Mapping[str, str]]) -> str:
+        """Generate a reply using the configured language model backend."""
         response = self._client.chat.completions.create(
             model=self._model,
             messages=list(messages),

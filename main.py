@@ -145,6 +145,7 @@ _ALL_METRICS_SET = set(BASE_METRICS) | set(DERIVED_METRICS) | set(AGGREGATE_METR
 
 
 def _build_metric_order() -> List[str]:
+    """Order metric identifiers for column layout decisions."""
     order: List[str] = []
     for metric in PDS_METRICS:
         if metric in _ALL_METRICS_SET and metric not in order:
@@ -174,19 +175,23 @@ ALL_METRICS_SET = set(ALL_METRICS_ORDER)
 
 
 def _metric_label(metric: str) -> str:
+    """Return the human-readable label for a metric."""
     return METRIC_ABBREVIATIONS.get(metric, metric.replace("_", " ").title())
 
 
 def _chunked(seq: Sequence[str], size: int) -> Iterable[List[str]]:
+    """Yield items from an iterable in fixed-size chunks."""
     for idx in range(0, len(seq), size):
         yield list(seq[idx : idx + size])
 
 
 def _clean_token(token: str) -> str:
+    """Normalise raw CLI tokens for downstream parsing."""
     return token.strip(string.punctuation)
 
 
 def _extract_tickers(tokens: Sequence[str]) -> List[str]:
+    """Extract ticker symbols from CLI tokens."""
     tickers: List[str] = []
     for token in tokens:
         cleaned = _clean_token(token)
@@ -199,6 +204,7 @@ def _extract_tickers(tokens: Sequence[str]) -> List[str]:
 
 
 def _canonical_metric(token: str) -> str:
+    """Map metric shortcuts/aliases to canonical names."""
     key = token.lower()
     normalised = key.replace("/", "").replace("-", "")
     if normalised in METRIC_SYNONYMS:
@@ -209,6 +215,7 @@ def _canonical_metric(token: str) -> str:
 
 
 def _expand_metrics(raw_metrics: Sequence[str]) -> List[str]:
+    """Expand shorthand metric groups into explicit metric names."""
     if not raw_metrics:
         return ALL_METRICS_ORDER.copy()
 
@@ -231,6 +238,7 @@ def _expand_metrics(raw_metrics: Sequence[str]) -> List[str]:
 
 
 def _format_value(value: Optional[float]) -> str:
+    """Format numeric values with thousands separators and suffixes."""
     if value is None:
         return "-"
     if abs(value) >= 1_000_000_000:
@@ -241,6 +249,7 @@ def _format_value(value: Optional[float]) -> str:
 
 
 def _select_latest(records, metric: str) -> Optional[Tuple[str, Optional[float]]]:
+    """Pick the latest metric records per ticker."""
     best: Optional[Tuple[str, Optional[float], int]] = None
     for record in records:
         if record.metric != metric:
@@ -255,12 +264,14 @@ def _select_latest(records, metric: str) -> Optional[Tuple[str, Optional[float]]
 
 
 def _build_table(headers: List[str], rows: List[List[str]]) -> str:
+    """Render the comparison table for the selected metrics."""
     widths = [len(header) for header in headers]
     for row in rows:
         for idx, cell in enumerate(row):
             widths[idx] = max(widths[idx], len(cell))
 
     def _render_line(parts: Sequence[str]) -> str:
+        """Format a single table row for console output."""
         return " | ".join(part.ljust(widths[idx]) for idx, part in enumerate(parts))
 
     divider = "-+-".join("-" * width for width in widths)
@@ -270,6 +281,7 @@ def _build_table(headers: List[str], rows: List[List[str]]) -> str:
 
 
 def _parse_year_filters(tokens: List[str]) -> Tuple[List[str], Optional[Sequence[Tuple[int, int]]], Optional[str]]:
+    """Parse CLI tokens describing fiscal year filters."""
     period_filters: Optional[List[Tuple[int, int]]] = None
     layout: Optional[str] = None
     filtered_tokens: List[str] = []
@@ -299,6 +311,7 @@ def _resolve_metrics_and_tickers(
     period_filters: Optional[Sequence[Tuple[int, int]]],
     layout: Optional[str],
 ) -> Tuple[List[str], List[str], Optional[Sequence[Tuple[int, int]]], str]:
+    """Resolve user-supplied tickers and metrics simultaneously."""
     layout_mode = (layout or "").lower()
     lowered = [token.lower() for token in tokens]
 
@@ -345,6 +358,7 @@ def _try_table_command(user_input: str, engine: AnalyticsEngine) -> Optional[str
 
 
 def main() -> None:
+    """CLI entry point for the BenchmarkOS metrics/reporting tool."""
     settings = load_settings()
     chatbot = BenchmarkOSChatbot.create(settings)
     analytics = AnalyticsEngine(settings)

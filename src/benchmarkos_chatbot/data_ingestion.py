@@ -48,6 +48,7 @@ def ingest_financial_data(settings: Settings) -> Optional[IngestionReport]:
 
 
 def _now() -> datetime:
+    """Return the current UTC timestamp; extracted for easier testing."""
     return datetime.now(timezone.utc)
 
 

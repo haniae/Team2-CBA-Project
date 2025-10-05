@@ -9,6 +9,7 @@ BASE = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 SEED_TICKERS = ["MSFT","GE","F"]  # change this list as needed
 
 def to_date(s):
+    """Parse SEC date strings into date objects, tolerating blanks."""
     if not s:
         return None
     try:
@@ -17,12 +18,14 @@ def to_date(s):
         return None
 
 def get_ciks():
+    """Return the CIKs associated with the configured seed tickers."""
     conn = psycopg2.connect(**PG)
     with conn, conn.cursor() as cur:
         cur.execute("SELECT cik FROM sec.ticker_cik WHERE ticker = ANY(%s)", (SEED_TICKERS,))
         return [r[0] for r in cur.fetchall()]
 
 def process(cik, js):
+    """Transform the SEC companyfacts JSON payload into row dicts."""
     rows = []
     entity = js.get("entityName")
     for taxonomy, tags in (js.get("facts") or {}).items():
@@ -52,6 +55,7 @@ def process(cik, js):
     return rows
 
 def upsert(conn, rows):
+    """Bulk upsert transformed rows into the Postgres facts table."""
     if not rows:
         return
     with conn.cursor() as cur:
@@ -79,6 +83,7 @@ def upsert(conn, rows):
         )
 
 def main():
+    """Simple script entry point to ingest companyfacts for seed tickers."""
     ciks = get_ciks()
     print("CIKs:", ciks)
     conn = psycopg2.connect(**PG)

@@ -31,18 +31,23 @@ INSTANT  = {"Assets","Liabilities","StockholdersEquity",
             "CommonStockSharesOutstanding"}
 
 def polite_get(url, tries=5, base=0.4):
-  for i in range(tries):
-    r = requests.get(url, headers=UA, timeout=60)
-    if r.status_code in (200,404): return r
-    if r.status_code in (429,503):
-      time.sleep(base*(2**i)); continue
-    r.raise_for_status()
-  return r
+    """HTTP GET helper with retry/backoff for archival frame downloads."""
+    for i in range(tries):
+        r = requests.get(url, headers=UA, timeout=60)
+        if r.status_code in (200, 404):
+            return r
+        if r.status_code in (429, 503):
+            time.sleep(base * (2 ** i))
+            continue
+        r.raise_for_status()
+    return r
 
 def upsert_rows(conn, rows):
-  if not rows: return
-  with conn.cursor() as cur:
-    execute_batch(cur, """
+    """Persist fetched frame rows into the database."""
+    if not rows:
+        return
+    with conn.cursor() as cur:
+        execute_batch(cur, """
       INSERT INTO sec.frames (tag, unit, frame, cik, filed, val, uom, accn)
       VALUES (%(tag)s,%(unit)s,%(frame)s,%(cik)s,%(filed)s,%(val)s,%(uom)s,%(accn)s)
       ON CONFLICT (tag, unit, frame, cik, accn) DO UPDATE
@@ -50,27 +55,35 @@ def upsert_rows(conn, rows):
     """, rows, page_size=5000)
 
 def main():
-  conn = psycopg2.connect(**PG); conn.autocommit = True
-  for tag in TAGS:
-    for y in YEARS:
-      frame = f"CY{y}" if tag in DURATION else f"CY{y}I"
-      url = f"https://data.sec.gov/api/xbrl/frames/US-GAAP/{tag}/USD/{frame}.json"
-      print("GET", url)
-      r = polite_get(url)
-      if r.status_code == 404:
-        print("  404 – skip"); continue
-      js = r.json()
-      rows = []
-      for o in js.get("data", []):
-        rows.append(dict(
-          tag=tag, unit="USD", frame=frame,
-          cik=int(o["cik"]), filed=None,
-          val=o.get("val"), uom=o.get("uom"), accn=o.get("accn")
-        ))
-      print(f"  rows: {len(rows)}")
-      upsert_rows(conn, rows)
-      time.sleep(0.25)  # ~4 req/s
-  print("Done.")
+    """CLI entry point to ingest SEC XBRL frame data."""
+    conn = psycopg2.connect(**PG)
+    conn.autocommit = True
+    for tag in TAGS:
+        for y in YEARS:
+            frame = f"CY{y}" if tag in DURATION else f"CY{y}I"
+            url = f"https://data.sec.gov/api/xbrl/frames/US-GAAP/{tag}/USD/{frame}.json"
+            print("GET", url)
+            r = polite_get(url)
+            if r.status_code == 404:
+                print("  404 – skip")
+                continue
+            js = r.json()
+            rows = []
+            for o in js.get("data", []):
+                rows.append(dict(
+                    tag=tag,
+                    unit="USD",
+                    frame=frame,
+                    cik=int(o["cik"]),
+                    filed=None,
+                    val=o.get("val"),
+                    uom=o.get("uom"),
+                    accn=o.get("accn")
+                ))
+            print(f"  rows: {len(rows)}")
+            upsert_rows(conn, rows)
+            time.sleep(0.25)  # ~4 req/s
+    print("Done.")
 
 if __name__ == "__main__":
-  main()
+    main()

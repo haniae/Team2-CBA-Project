@@ -67,6 +67,7 @@ DERIVED_METRICS = {
 
 @dataclass
 class PostgresSettings:
+    """Connection parameters for writing SEC data to Postgres."""
     host: str = os.getenv("PGHOST", "localhost")
     port: int = int(os.getenv("PGPORT", "5432"))
     dbname: str = os.getenv("PGDATABASE", "secdb")
@@ -74,18 +75,22 @@ class PostgresSettings:
     password: str = os.getenv("PGPASSWORD", "hania123")
 
     def dsn(self) -> str:
+        """Return the psycopg connection string for the configured Postgres target."""
         return f"host={self.host} port={self.port} dbname={self.dbname} user={self.user} password={self.password}"
 
 
 @dataclass
 class RunSettings:
+    """Runtime configuration for the SEC company facts ingest."""
     tickers: List[str]
     schema: str = os.getenv("PGSCHEMA", "sec")
     min_interval: float = DEFAULT_MIN_INTERVAL
 
 
 class SecClient:
+    """Thin SEC API client with basic throttling and caching."""
     def __init__(self, *, user_agent: str, min_interval: float) -> None:
+        """Initialise the SEC client with configuration and optional session."""
         if not user_agent:
             raise ValueError("SEC_API_USER_AGENT must be set (e.g. 'Firstname Lastname email@example.com')")
         self._session = _build_session(user_agent)
@@ -93,11 +98,13 @@ class SecClient:
         self._min_interval = min_interval
 
     def _throttle(self) -> None:
+        """Respect SEC rate limits by sleeping between requests."""
         elapsed = time.monotonic() - self._last_call
         if elapsed < self._min_interval:
             time.sleep(self._min_interval - elapsed)
 
     def _request(self, url: str) -> Response:
+        """Perform a GET request to the SEC API with error handling."""
         self._throttle()
         resp = self._session.get(url, timeout=60)
         if resp.status_code == 404 and url.startswith("https://data.sec.gov"):
@@ -109,6 +116,7 @@ class SecClient:
         return resp
 
     def fetch_companyfacts(self, cik: str) -> Dict:
+        """Download the SEC companyfacts payload for a given CIK."""
         url = SEC_COMPANY_FACTS_PRIMARY.format(cik=cik.zfill(10))
         try:
             return self._request(url).json()
@@ -117,6 +125,7 @@ class SecClient:
             return self._request(fallback).json()
 
     def fetch_ticker_map(self) -> Dict[str, str]:
+        """Fetch the helper mapping between tickers and CIK identifiers."""
         payload = self._request(SEC_TICKER_LIST).json()
         mapping: Dict[str, str] = {}
         iterable = payload.values() if isinstance(payload, dict) else payload
@@ -128,6 +137,7 @@ class SecClient:
 
 
 def _build_session(user_agent: str) -> Session:
+    """Create a shared HTTP session with retry/backoff behaviour."""
     session = Session()
     retries = Retry(
         total=5,
@@ -148,6 +158,7 @@ def _build_session(user_agent: str) -> Session:
 
 
 def to_date(value: Optional[str]):
+    """Convert SEC date fields into Python date objects."""
     if not value:
         return None
     try:
@@ -157,6 +168,7 @@ def to_date(value: Optional[str]):
 
 
 def to_num(value):
+    """Coerce potentially numeric strings into floats, ignoring blanks."""
     if value is None:
         return None
     try:
@@ -168,6 +180,7 @@ def to_num(value):
 
 
 def ensure_schema(pg: PostgresSettings, schema: str) -> None:
+    """Create target tables and indexes required for ingestion outputs."""
     with psycopg2.connect(pg.dsn()) as conn, conn.cursor() as cur:
         cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
 
@@ -327,6 +340,7 @@ def ensure_schema(pg: PostgresSettings, schema: str) -> None:
 
 
 def get_ciks(pg: PostgresSettings, tickers: Iterable[str], schema: str) -> List[str]:
+    """Resolve the list of CIKs that should be processed this run."""
     tickers = [t.upper() for t in tickers]
     sql = f"SELECT cik FROM {schema}.ticker_cik WHERE ticker = ANY(%s)"
     with psycopg2.connect(pg.dsn()) as conn, conn.cursor() as cur:
@@ -335,6 +349,7 @@ def get_ciks(pg: PostgresSettings, tickers: Iterable[str], schema: str) -> List[
 
 
 def populate_ticker_map(pg: PostgresSettings, schema: str, client: SecClient) -> None:
+    """Build an in-memory ticker-to-CIK mapping for lookups."""
     mapping = client.fetch_ticker_map()
     payload = [(ticker, cik) for ticker, cik in mapping.items()]
     with psycopg2.connect(pg.dsn()) as conn, conn.cursor() as cur:
@@ -347,6 +362,7 @@ def populate_ticker_map(pg: PostgresSettings, schema: str, client: SecClient) ->
 
 
 def _canonical_metric(taxonomy: str, tag: str) -> Optional[str]:
+    """Normalise SEC metric names to the canonical identifiers used here."""
     key = (taxonomy.lower(), tag)
     if key in TAG_ALIASES:
         return TAG_ALIASES[key]
@@ -355,6 +371,7 @@ def _canonical_metric(taxonomy: str, tag: str) -> Optional[str]:
 
 
 def process_companyfacts(cik: str, data: Dict) -> Tuple[List[Dict], Dict[Tuple[str, str, str], Dict[str, Any]]]:
+    """Transform SEC companyfacts JSON into structured row records."""
     rows: List[Dict] = []
     index: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
     entity = data.get("entityName")
@@ -411,6 +428,7 @@ def process_companyfacts(cik: str, data: Dict) -> Tuple[List[Dict], Dict[Tuple[s
 
 
 def derive_metrics(rows: List[Dict], value_index: Dict[Tuple[str, str, str], Dict[str, Any]]) -> None:
+    """Compute derivative metrics (margins, ratios) from fact rows."""
     if not rows:
         return
     for metric, (numer_key, denom_key, operation) in DERIVED_METRICS.items():
@@ -482,6 +500,7 @@ def derive_metrics(rows: List[Dict], value_index: Dict[Tuple[str, str, str], Dic
 
 
 def upsert_rows(conn, rows: List[Dict], schema: str) -> None:
+    """Bulk upsert processed rows into the destination database."""
     if not rows:
         return
     # Fixed: use ON CONFLICT with the actual PK constraint
@@ -506,6 +525,7 @@ def upsert_rows(conn, rows: List[Dict], schema: str) -> None:
 
 
 def run_ingest() -> None:
+    """Entry point that orchestrates fetching, transforming, and writing facts."""
     pg_settings = PostgresSettings()
     run_settings = RunSettings(tickers=DEFAULT_TICKERS)
     ua = os.getenv("SEC_API_USER_AGENT") or os.getenv("SEC_USER_AGENT")

@@ -23,6 +23,7 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ScenarioSummary:
+    """Lightweight summary of a stored scenario result returned to clients."""
     ticker: str
     scenario_name: str
     metrics: Dict[str, Optional[float]]
@@ -121,6 +122,7 @@ DEFAULT_TAX_RATE = 0.21
 
 
 def _now() -> datetime:
+    """Return the current UTC timestamp; extracted for easier testing."""
     return datetime.now(timezone.utc)
 
 
@@ -129,13 +131,14 @@ class AnalyticsEngine:
     """Provides computed metrics and fact retrieval for the web/API layer."""
 
     def __init__(self, settings: Settings) -> None:
+        """Store runtime settings and bootstrap optional SEC store connections."""
         self.settings = settings
         self._sec_store: Optional[SecPostgresStore] = None
         if settings.database_type == "postgresql":
             self._sec_store = SecPostgresStore(settings)
 
     def refresh_metrics(self, *, force: bool = False) -> None:
-        """Compute/refresh metric snapshots from the latest financial facts."""
+        """Compute or refresh metric snapshots using the latest financial facts."""
 
         database.initialise(self.settings.database_path)
         rows = self._fetch_base_fact_rows()
@@ -239,6 +242,7 @@ class AnalyticsEngine:
             last_values = values_by_year.get(last_year, {})
 
             def _add_metric(name: str, value: Optional[float], *, start: Optional[int] = None, end: Optional[int] = None) -> None:
+                """Append a derived metric snapshot when a usable numeric value is available."""
                 numeric_value = _to_float(value)
                 if numeric_value is None:
                     return
@@ -257,6 +261,7 @@ class AnalyticsEngine:
                 last_metrics[name] = (numeric_value, last_updated)
 
             def _eps_from(values: Dict[str, Optional[float]]) -> Optional[float]:
+                """Derive earnings per share from the best available fact values."""
                 eps_value = _first_non_none(values, "eps_diluted", "eps_basic")
                 if eps_value is not None:
                     return eps_value
@@ -398,6 +403,7 @@ class AnalyticsEngine:
         *,
         period_filters: Optional[Sequence[Tuple[int, int]]] = None,
     ) -> List[database.MetricRecord]:
+        """Return cached metric snapshots for ``ticker`` with optional period filters."""
         return database.fetch_metric_snapshots(
             self.settings.database_path,
             ticker.upper(),
@@ -414,6 +420,7 @@ class AnalyticsEngine:
         ebitda_margin_delta: float = 0.0,
         multiple_delta: float = 0.0,
     ) -> ScenarioSummary:
+        """Generate an illustrative scenario by tweaking a few core inputs."""
         ticker_upper = ticker.upper()
         records = database.fetch_metric_snapshots(
             self.settings.database_path, ticker_upper
@@ -423,6 +430,7 @@ class AnalyticsEngine:
         )
 
         def metric_value(name: str) -> Optional[float]:
+            """Resolve a metric record from the latest snapshot dictionary."""
             record = latest.get(name)
             return record.value if record else None
 
@@ -520,6 +528,7 @@ class AnalyticsEngine:
         metric: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> List[database.FinancialFactRecord]:
+        """Fetch raw SEC facts for a ticker/year, falling back to SQLite copies."""
         if self._sec_store:
             return self._sec_store.fetch_financial_facts(
                 ticker.upper(),
@@ -542,6 +551,7 @@ class AnalyticsEngine:
         fiscal_year: Optional[int] = None,
         limit: Optional[int] = None,
     ) -> List[database.AuditEventRecord]:
+        """Return the most recent audit events persisted for ``ticker``."""
         return database.fetch_audit_events(
             self.settings.database_path,
             ticker.upper(),
@@ -550,6 +560,7 @@ class AnalyticsEngine:
         )
 
     def _fetch_base_fact_rows(self) -> List[Dict[str, Any]]:
+        """Yield raw fact rows from the configured backing store (Postgres or SQLite)."""
         if self._sec_store:
             return self._sec_store.fetch_base_facts(sorted(QUERY_METRICS))
 
@@ -569,6 +580,7 @@ class AnalyticsEngine:
         return [dict(row) for row in rows]
 
     def _ensure_quotes(self, tickers: Sequence[str]) -> None:
+        """Ensure supplemental market quotes exist for each ticker before deriving ratios."""
         if not tickers:
             return
         missing: List[str] = []
@@ -599,6 +611,7 @@ class AnalyticsEngine:
         *,
         span_fn,
     ) -> Dict[str, database.MetricRecord]:
+        """Pick the freshest metric snapshot for each metric name encountered."""
         selected: Dict[str, database.MetricRecord] = {}
         for record in records:
             existing = selected.get(record.metric)
@@ -620,16 +633,19 @@ class AnalyticsEngine:
 
     @staticmethod
     def _period_span(period: str) -> Tuple[int, int]:
+        """Parse period strings like 'FY2022' or ranges into integer year spans."""
         years = [int(match) for match in re.findall(r"\d{4}", period)]
         if not years:
             return (0, 0)
         return (min(years), max(years))
 
 def _latest_timestamp(metrics: Dict[str, Tuple[Optional[float], datetime]]) -> datetime:
+    """Return the newest ingestion timestamp among the metric entries."""
     return max(pair[1] for pair in metrics.values()) if metrics else _now()
 
 
 def _first_non_none(mapping: Mapping[str, Optional[float]], *keys: str) -> Optional[float]:
+    """Return the first non-None value that matches any of the provided keys."""
     for key in keys:
         if key not in mapping:
             continue
@@ -640,6 +656,7 @@ def _first_non_none(mapping: Mapping[str, Optional[float]], *keys: str) -> Optio
 
 
 def _to_float(value: Optional[float]) -> Optional[float]:
+    """Coerce numeric-like inputs to floats while filtering NaNs or infinities."""
     if value is None:
         return None
     try:
@@ -652,6 +669,7 @@ def _to_float(value: Optional[float]) -> Optional[float]:
 
 
 def _safe_div(numerator: Optional[float], denominator: Optional[float]) -> Optional[float]:
+    """Divide numerator by denominator while guarding against missing or zero values."""
     if numerator is None or denominator in (None, 0):
         return None
     try:
@@ -661,6 +679,7 @@ def _safe_div(numerator: Optional[float], denominator: Optional[float]) -> Optio
 
 
 def _calc_cagr(start: Optional[float], end: Optional[float], periods: int) -> Optional[float]:
+    """Compute a compound annual growth rate across the supplied periods."""
     start_value = _to_float(start)
     end_value = _to_float(end)
     if start_value in (None, 0) or end_value is None or periods <= 0:
@@ -674,6 +693,7 @@ def _calc_cagr(start: Optional[float], end: Optional[float], periods: int) -> Op
 
 
 def _calc_growth(previous: Optional[float], current: Optional[float]) -> Optional[float]:
+    """Compute the single-period growth relative to the previous value."""
     prev_val = _to_float(previous)
     curr_val = _to_float(current)
     if prev_val in (None, 0) or curr_val is None:
@@ -684,6 +704,7 @@ def _calc_growth(previous: Optional[float], current: Optional[float]) -> Optiona
 def _compute_derived_metrics(
     metrics: Dict[str, Tuple[Optional[float], datetime]]
 ) -> Dict[str, Optional[float]]:
+    """Derive additional ratios and margins from base metric values."""
     value_map = {name: _to_float(pair[0]) for name, pair in metrics.items()}
     derived: Dict[str, Optional[float]] = {}
 
@@ -744,3 +765,4 @@ def _compute_derived_metrics(
         derived["free_cash_flow"] = free_cash_flow
 
     return {name: value for name, value in derived.items() if name in DERIVED_METRICS}
+

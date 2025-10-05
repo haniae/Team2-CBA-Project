@@ -7,6 +7,7 @@ UA = {"User-Agent": "Hania MSBA / secdb loader (hania@gwu.edu)"}  # include your
 URL = "https://www.sec.gov/files/company_tickers.json"
 
 def main():
+    """CLI helper that populates the ticker→CIK lookup table."""
     r = requests.get(URL, headers=UA, timeout=60)
     r.raise_for_status()
     data = r.json()  # {"0": {"cik_str":..., "ticker":..., "title":...}, ...}

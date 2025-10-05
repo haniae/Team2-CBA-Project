@@ -121,6 +121,7 @@ YEARS_BACK = 5
 
 
 def main() -> None:
+    """CLI entry point that batches live ticker ingestion with retries."""
     settings = load_settings()
 
     print(f"Batch ingestion started at {datetime.utcnow():%Y-%m-%d %H:%M:%S} UTC")

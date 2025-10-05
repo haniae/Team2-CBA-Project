@@ -209,10 +209,12 @@ ALLOWED_PERIODS = {"FY", "CY", "FYTD", "Q4", "Q4YTD"}
 
 
 def _pad_cik(cik: str | int) -> str:
+    """Left-pad CIK identifiers to the expected SEC format."""
     return f"{int(cik):010d}"
 
 
 def _parse_date(value: Optional[str]) -> Optional[date]:
+    """Parse date strings returned by APIs into date objects."""
     if not value:
         return None
     try:
@@ -226,6 +228,7 @@ def _parse_date(value: Optional[str]) -> Optional[date]:
 
 
 def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Parse timestamp strings into timezone-aware datetime objects."""
     if not value:
         return None
     try:
@@ -242,6 +245,7 @@ def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
 
 
 def _extract_bloomberg_field_payload(field_data, fields: Sequence[str]) -> Dict[str, Any]:
+    """Normalise Bloomberg quote payloads to a flat dict."""
     payload: Dict[str, Any] = {}
     for field_name in fields:
         try:
@@ -269,6 +273,7 @@ def _extract_bloomberg_field_payload(field_data, fields: Sequence[str]) -> Dict[
 
 
 def _canonical_metric(concept: str) -> str:
+    """Map incoming metric aliases onto canonical metric names."""
     return METRIC_ALIASES.get(concept, concept.lower())
 
 
@@ -287,6 +292,7 @@ class EdgarClient:
         min_interval: float = 0.12,
         session: Optional[requests.Session] = None,
     ) -> None:
+        """Initialise the client with credentials, endpoints, and limits."""
         self.base_url = base_url.rstrip("/")
         self.user_agent = user_agent
         self.timeout = timeout
@@ -297,6 +303,7 @@ class EdgarClient:
         self._ticker_cache: Optional[Dict[str, str]] = None
 
     def _headers(self) -> Dict[str, str]:
+        """Return HTTP headers required for external data requests."""
         return {
             "User-Agent": self.user_agent,
             "Accept": "application/json",
@@ -304,11 +311,13 @@ class EdgarClient:
         }
 
     def _maybe_throttle(self) -> None:
+        """Sleep when necessary to respect upstream rate limits."""
         elapsed = time.monotonic() - self._last_request
         if elapsed < self.min_interval:
             time.sleep(self.min_interval - elapsed)
 
     def _request(self, path: str, *, params: Optional[Mapping[str, Any]] = None) -> Any:
+        """Perform an HTTP request and bubble up meaningful errors."""
         self._maybe_throttle()
         url = f"{self.base_url}{path}"
         try:
@@ -353,6 +362,7 @@ class EdgarClient:
 
 
     def ticker_map(self, *, force_refresh: bool = False) -> Dict[str, str]:
+        """Return a mapping of tickers to CIK identifiers."""
         if self._ticker_cache is not None and not force_refresh:
             return self._ticker_cache
         cache_file = self.cache_dir / "edgar_tickers.json"
@@ -383,6 +393,7 @@ class EdgarClient:
         return mapping
 
     def cik_for_ticker(self, ticker: str) -> str:
+        """Lookup the CIK for a supplied ticker symbol."""
         mapping = self.ticker_map()
         try:
             return mapping[ticker.upper()]
@@ -390,10 +401,12 @@ class EdgarClient:
             raise KeyError(f"Ticker {ticker} not recognised by EDGAR") from exc
 
     def company_submissions(self, cik: str) -> Mapping[str, Any]:
+        """Fetch the list of recent SEC submissions for a company."""
         cik = _pad_cik(cik)
         return self._request(f"/submissions/CIK{cik}.json")
 
     def company_facts(self, cik: str) -> Mapping[str, Any]:
+        """Retrieve detailed company facts from the SEC API."""
         cik = _pad_cik(cik)
         return self._request(f"/api/xbrl/companyfacts/CIK{cik}.json")
 
@@ -404,6 +417,7 @@ class EdgarClient:
         forms: Optional[Sequence[str]] = None,
         limit: int = 50,
     ) -> List[FilingRecord]:
+        """Yield filing metadata for tickers over a time range."""
         cik = self.cik_for_ticker(ticker)
         data = self.company_submissions(cik)
         recent = data.get("filings", {}).get("recent", {})
@@ -441,6 +455,7 @@ class EdgarClient:
         concepts: Sequence[str] = DEFAULT_FACT_CONCEPTS,
         years: int = 10,
     ) -> List[FinancialFact]:
+        """Yield raw fact entries for a company and metric set."""
         cik = self.cik_for_ticker(ticker)
         payload = self.company_facts(cik)
         taxonomy_map = payload.get("facts", {})
@@ -449,11 +464,13 @@ class EdgarClient:
         best: Dict[Tuple[str, Optional[int], Optional[str]], Tuple[Tuple, FinancialFact]] = {}
 
         def _multiplier_for(unit: str) -> Optional[float]:
+            """Determine conversion multipliers for incoming fact units."""
             if unit in UNIT_MULTIPLIERS:
                 return UNIT_MULTIPLIERS[unit]
             return None
 
         def _score_entry(entry: Mapping[str, Any], unit: str) -> Tuple:
+            """Compute a ranking score that favours recent, high-quality filings."""
             segment_score = 1 if not entry.get("segment") else 0
             form = (entry.get("form") or "").upper()
             form_score = FORM_PRIORITY.get(form, 1 if form else 0)
@@ -535,6 +552,7 @@ class EdgarClient:
 
 
 def _derive_period_label(fy: Optional[int], fiscal_period: Optional[str]) -> str:
+    """Generate a human-readable period label for quote history."""
     if fy is None:
         return fiscal_period or "unknown"
     if fiscal_period and fiscal_period.upper() not in {"FY", "CY"}:
@@ -553,12 +571,14 @@ class YahooFinanceClient:
         batch_size: int = 50,
         session: Optional[requests.Session] = None,
     ) -> None:
+        """Initialise the client with credentials, endpoints, and limits."""
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.batch_size = max(1, batch_size)
         self.session = session or requests.Session()
 
     def fetch_quotes(self, tickers: Sequence[str]) -> List[MarketQuote]:
+        """Fetch batch quotes from the configured market data provider."""
         if not tickers:
             return []
         results: List[MarketQuote] = []
@@ -605,6 +625,7 @@ class BloombergClient:
         port: Optional[int] = None,
         timeout: float = 30.0,
     ) -> None:
+        """Initialise the client with credentials, endpoints, and limits."""
         self.timeout = timeout
         try:
             import blpapi  # type: ignore
@@ -626,6 +647,7 @@ class BloombergClient:
         self._service = self._session.getService("//blp/refdata")
 
     def fetch_quotes(self, tickers: Sequence[str], fields: Optional[Sequence[str]] = None) -> List[MarketQuote]:
+        """Fetch batch quotes from the configured market data provider."""
         if not tickers:
             return []
         fields = list(fields or ("PX_LAST", "VOLUME", "CRNCY", "LAST_UPDATE"))
@@ -675,6 +697,7 @@ class BloombergClient:
         return quotes
 
     def close(self) -> None:
+        """Close any open HTTP session resources."""
         try:
             self._session.stop()
         except Exception:

@@ -41,45 +41,53 @@ elif PACKAGE_STATIC.exists():
 
 
 class ChatRequest(BaseModel):
+    """Payload expected by the /chat endpoint when posting a prompt."""
     prompt: str
     conversation_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
+    """Response returned after processing a chat prompt."""
     conversation_id: str
     reply: str
 
 
 class MetricsResponse(BaseModel):
+    """Shape of the metrics payload returned to the UI/API."""
     ticker: str
     metrics: Dict[str, Optional[float]]
     period: str
 
 
 class FactsResponse(BaseModel):
+    """Response schema for detailed financial fact lookups."""
     ticker: str
     fiscal_year: int
     items: List[Dict]
 
 
 class AuditEventResponse(BaseModel):
+    """Response structure describing recorded audit trail entries."""
     ticker: str
     events: List[Dict]
 
 
 @lru_cache
 def get_settings():
+    """Load application settings once per process."""
     return load_settings()
 
 
 @lru_cache
 def get_engine() -> AnalyticsEngine:
+    """Initialise and prime the analytics engine (cached for reuse)."""
     engine = AnalyticsEngine(get_settings())
     engine.refresh_metrics()
     return engine
 
 
 def build_bot(conversation_id: Optional[str] = None) -> BenchmarkOSChatbot:
+    """Create a chatbot instance and hydrate it with stored history when provided."""
     settings = get_settings()
     bot = BenchmarkOSChatbot.create(settings)
     if conversation_id:
@@ -96,6 +104,7 @@ def build_bot(conversation_id: Optional[str] = None) -> BenchmarkOSChatbot:
 
 @app.get("/")
 def root() -> FileResponse:
+    """Serve the static index file, preferring the local webui build when present."""
     # prefer project webui when present, otherwise serve packaged static index
     if FRONTEND_DIR.exists():
         return FileResponse(FRONTEND_DIR / "index.html")
@@ -106,6 +115,7 @@ def root() -> FileResponse:
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
+    """Proxy chat submissions to the BenchmarkOS chatbot."""
     if not request.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty.")
     bot = build_bot(request.conversation_id)
@@ -120,6 +130,7 @@ def _select_latest_records(
     records: Iterable[database.MetricRecord],
     span_fn,
 ) -> Dict[str, database.MetricRecord]:
+    """Pick the most recent record per metric, honouring period spans."""
     selected: Dict[str, database.MetricRecord] = {}
     for record in records:
         existing = selected.get(record.metric)
@@ -139,6 +150,7 @@ def _select_latest_records(
 
 
 def _summarise_period(spans: Iterable[Tuple[int, int]]) -> str:
+    """Render a human-friendly period label for the supplied spans."""
     spans = [(start, end) for start, end in spans if start or end]
     if not spans:
         return "latest"
@@ -153,6 +165,7 @@ def metrics(
     start_year: Optional[int] = Query(None),
     end_year: Optional[int] = Query(None),
 ) -> List[MetricsResponse]:
+    """Return latest metric snapshots for one or more tickers."""
     ticker_list = [ticker.strip().upper() for ticker in tickers.split(",") if ticker]
     if not ticker_list:
         raise HTTPException(status_code=400, detail="At least one ticker required.")
@@ -195,6 +208,7 @@ def facts(
     fiscal_year: int = Query(...),
     metric: Optional[str] = Query(None),
 ) -> FactsResponse:
+    """Expose detailed financial fact rows from the analytics store."""
     engine = get_engine()
     facts = engine.financial_facts(
         ticker=ticker.upper(),
@@ -226,6 +240,7 @@ def audit(
     ticker: str = Query(...),
     fiscal_year: Optional[int] = Query(None),
 ) -> AuditEventResponse:
+    """Return recorded audit trail events for a ticker."""
     engine = get_engine()
     events = engine.audit_events(ticker.upper(), fiscal_year=fiscal_year, limit=20)
     if not events:
@@ -248,4 +263,5 @@ def audit(
 
 @app.get("/health")
 def health() -> Dict[str, str]:
+    """Lightweight liveness probe used by deployment infra."""
     return {"status": "ok"}

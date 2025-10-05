@@ -14,9 +14,11 @@ def stooq_symbol(ticker):  # US tickers need .us
     return f"{ticker.lower()}.us"
 
 def stooq_url(ticker):
+    """Translate standard tickers to Stooq's symbol format."""
     return f"https://stooq.com/q/d/l/?s={stooq_symbol(ticker)}&i=d"
 
 def fetch_csv(ticker):
+    """Download historical price CSV data from Stooq."""
     r = requests.get(stooq_url(ticker), timeout=30)
     if r.status_code != 200 or not r.text.startswith("Date,Open,High,Low,Close,Volume"):
         print(f"{ticker}: no data (HTTP {r.status_code})"); return []
@@ -38,6 +40,7 @@ def fetch_csv(ticker):
     return rows
 
 def upsert(conn, rows):
+    """Upsert parsed price rows into the local market quotes table."""
     if not rows: return
     with conn.cursor() as cur:
         execute_batch(cur, """
@@ -50,6 +53,7 @@ def upsert(conn, rows):
         """, rows, page_size=2000)
 
 def main():
+    """CLI entry point for loading historical prices from Stooq."""
     conn = psycopg2.connect(**PG); conn.autocommit = True
     tickers = ENV_TICKERS
     print("Tickers:", ",".join(tickers))

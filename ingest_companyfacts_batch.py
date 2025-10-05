@@ -15,11 +15,13 @@ UA = {"User-Agent": UA_STR}
 BASE = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 
 def to_date(s):
+    """Parse SEC date strings into date objects."""
     if not s: return None
     try: return parser.parse(s).date()
     except Exception: return None
 
 def to_num(x):
+    """Convert numeric-looking values to floats, ignoring blanks."""
     try:
         if x is None: return None
         if isinstance(x, (int, float)): return float(x)
@@ -28,6 +30,7 @@ def to_num(x):
         return None
 
 def ensure_meta_tables(conn):
+    """Create metadata tables that track ingest progress."""
     with conn, conn.cursor() as cur:
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sec.etl_companyfacts (
@@ -38,6 +41,7 @@ def ensure_meta_tables(conn):
         """)
 
 def get_tickers():
+    """Return the tickers to ingest for this batch run."""
     env = os.getenv("SEC_TICKERS", "").strip()
     if env:
         parts = [t.strip().upper() for t in env.replace("\n"," ").replace("\t"," ").split(",") if t.strip()]
@@ -50,6 +54,7 @@ def get_tickers():
     return ["MSFT","GE","F"]
 
 def tickers_to_ciks(conn, tickers):
+    """Resolve tickers to their corresponding CIK identifiers."""
     with conn, conn.cursor() as cur:
         cur.execute("SELECT ticker, cik FROM sec.ticker_cik WHERE ticker = ANY(%s)", (tickers,))
         d = dict(cur.fetchall())
@@ -59,6 +64,7 @@ def tickers_to_ciks(conn, tickers):
     return [d[t] for t in tickers if t in d]
 
 def process_companyfacts(cik, js):
+    """Convert companyfacts JSON into rows ready for upsert."""
     rows = []
     entity = js.get("entityName")
     facts = js.get("facts") or {}
@@ -78,6 +84,7 @@ def process_companyfacts(cik, js):
     return rows
 
 def upsert_facts(conn, rows):
+    """Bulk upsert fact rows into the destination database."""
     if not rows: return
     with conn.cursor() as cur:
         execute_batch(cur, """
@@ -96,6 +103,7 @@ def upsert_facts(conn, rows):
         """, rows, page_size=1000)
 
 def update_checkpoint(conn, cik, status):
+    """Record ingest progress so resumed runs skip completed work."""
     with conn, conn.cursor() as cur:
         cur.execute("""
             INSERT INTO sec.etl_companyfacts (cik, last_status, last_fetched)
@@ -105,6 +113,7 @@ def update_checkpoint(conn, cik, status):
         """, (cik, status))
 
 def polite_get(url, headers, timeout, max_retries=5, base_delay=0.5):
+    """HTTP GET with retry and politeness delays for the SEC API."""
     for i in range(max_retries):
         r = requests.get(url, headers=headers, timeout=timeout)
         if r.status_code in (200, 404): return r
@@ -116,6 +125,7 @@ def polite_get(url, headers, timeout, max_retries=5, base_delay=0.5):
     return r
 
 def main():
+    """Batch ingest loop that fetches, processes, and stores companyfacts."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=300, help="Max tickers to process this run")
     ap.add_argument("--rps", type=float, default=3.0, help="Requests per second")

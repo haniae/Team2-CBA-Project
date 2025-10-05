@@ -99,6 +99,7 @@ class Conversation:
     messages: List[Mapping[str, str]] = field(default_factory=list)
 
     def as_llm_messages(self) -> List[Mapping[str, str]]:
+        """Render the conversation history in chat-completions format."""
         return [{"role": "system", "content": SYSTEM_PROMPT}, *self.messages]
 
 
@@ -125,6 +126,7 @@ class BenchmarkOSChatbot:
 
     @classmethod
     def create(cls, settings: Settings) -> "BenchmarkOSChatbot":
+        """Factory that wires analytics, storage, and the LLM client together."""
         llm_client = build_llm_client(
             settings.llm_provider,
             model=settings.openai_model,
@@ -205,6 +207,7 @@ class BenchmarkOSChatbot:
     # ------------------------------------------------------------------
 
     def _handle_financial_intent(self, text: str) -> Optional[str]:
+        """Handle natural-language requests that map to metrics workflows."""
         metrics_request = self._parse_metrics_request(text)
         if metrics_request is not None:
             if not metrics_request.tickers:
@@ -255,6 +258,7 @@ class BenchmarkOSChatbot:
 
         return None
     def _handle_metrics_comparison(self, tokens: Sequence[str]) -> str:
+        """Render a comparison table for the resolved tickers/metrics."""
         cleaned_tokens: List[str] = []
         for token in tokens:
             stripped = token.strip()
@@ -280,6 +284,7 @@ class BenchmarkOSChatbot:
         tickers: Sequence[str],
         period_filters: Optional[Sequence[tuple[int, int]]] = None,
     ) -> str:
+        """Fetch metrics and build a response message for the chat."""
         if not tickers:
             return "Provide at least one ticker for metrics."
         if len(tickers) == 1 and not period_filters:
@@ -291,6 +296,7 @@ class BenchmarkOSChatbot:
 
 
     def _handle_ingest_command(self, text: str) -> str:
+        """Execute ingestion commands issued by the user."""
         parts = text.split()
         if len(parts) < 2:
             return "Usage: ingest <TICKER> [years]"
@@ -311,6 +317,7 @@ class BenchmarkOSChatbot:
         )
 
     def _handle_scenario_command(self, text: str) -> str:
+        """Run scenario modelling commands and persist the results."""
         parts = text.split()
         if len(parts) < 3:
             return "Usage: scenario <TICKER> <NAME> [rev=+5% margin=+1% mult=+0.5%]"
@@ -345,6 +352,7 @@ class BenchmarkOSChatbot:
     # Fact and audit helpers
     # ------------------------------------------------------------------
     def _handle_fact_command(self, text: str) -> str:
+        """Return detailed fact rows for the requested ticker/year."""
         match = re.match(r"fact\s+([A-Za-z0-9.-]+)\s+(?:FY)?(\d{4})(?:\s+([A-Za-z0-9_]+))?", text, re.IGNORECASE)
         if not match:
             return "Usage: fact <TICKER> <YEAR> [metric]"
@@ -386,6 +394,7 @@ class BenchmarkOSChatbot:
         return "\n".join(lines_out)
 
     def _handle_audit_command(self, text: str) -> str:
+        """Summarise audit events for a given ticker."""
         match = re.match(r"audit\s+([A-Za-z0-9.-]+)(?:\s+(?:FY)?(\d{4}))?", text, re.IGNORECASE)
         if not match:
             return "Usage: audit <TICKER> [YEAR]"
@@ -424,6 +433,7 @@ class BenchmarkOSChatbot:
 
     @staticmethod
     def _parse_percent(value: str) -> float:
+        """Interpret percentage tokens and return them as floats."""
         value = value.strip().rstrip("%")
         try:
             return float(value) / 100.0
@@ -431,6 +441,7 @@ class BenchmarkOSChatbot:
             return 0.0
 
     def _parse_metrics_request(self, text: str) -> Optional["BenchmarkOSChatbot._MetricsRequest"]:
+        """Convert free-form text into a structured metrics request."""
         match = _METRICS_PATTERN.match(text.strip())
         if not match:
             return None
@@ -448,6 +459,7 @@ class BenchmarkOSChatbot:
     def _split_tickers_and_periods(
         self, tokens: Sequence[str]
     ) -> tuple[List[str], Optional[List[tuple[int, int]]]]:
+        """Separate ticker symbols from potential period filters."""
         period_filters: List[tuple[int, int]] = []
         tickers: List[str] = []
         for token in tokens:
@@ -463,6 +475,7 @@ class BenchmarkOSChatbot:
 
     @staticmethod
     def _parse_period_token(token: str) -> Optional[tuple[int, int]]:
+        """Convert textual period filters into numeric start/end years."""
         cleaned = token.strip().upper().rstrip(',')
         if cleaned.startswith('FY'):
             cleaned = cleaned[2:]
@@ -482,15 +495,18 @@ class BenchmarkOSChatbot:
 
     @dataclass
     class _MetricsRequest:
+        """Structured representation of a parsed metrics request."""
         tickers: List[str]
         period_filters: Optional[List[tuple[int, int]]]
 
     @dataclass
     class _TickerResolution:
+        """Tracks which tickers resolved successfully versus missing."""
         available: List[str]
         missing: List[str]
 
     def _resolve_tickers(self, subjects: Sequence[str]) -> "BenchmarkOSChatbot._TickerResolution":
+        """Resolve tickers against the dataset, recording missing entries."""
         available: List[str] = []
         missing: List[str] = []
         lookup = getattr(self.analytics_engine, "lookup_ticker", None)
@@ -527,6 +543,7 @@ class BenchmarkOSChatbot:
     def _format_missing_message(
         self, requested: Sequence[str], available: Sequence[str]
     ) -> str:
+        """Build a friendly message for unresolved tickers."""
         missing = [ticker for ticker in requested if ticker.upper() not in available]
         hint = ", ".join(sorted(set(available))) if available else None
         if hint:
@@ -546,6 +563,7 @@ class BenchmarkOSChatbot:
         *,
         period_filters: Optional[Sequence[tuple[int, int]]] = None,
     ) -> str:
+        """Render metrics output as a table suitable for chat."""
         metrics_per_ticker: Dict[str, Dict[str, database.MetricRecord]] = {}
         missing: List[str] = []
         latest_spans: Dict[str, tuple[int, int]] = {}
@@ -630,6 +648,7 @@ class BenchmarkOSChatbot:
     def _describe_period_filters(
         self, period_filters: Sequence[tuple[int, int]]
     ) -> str:
+        """Render a human-readable summary of applied period filters."""
         labels = []
         for start, end in period_filters:
             if start == 0 and end == 0:
@@ -646,6 +665,7 @@ class BenchmarkOSChatbot:
         *,
         span_fn,
     ) -> Dict[str, database.MetricRecord]:
+        """Choose latest metric snapshots for each metric name."""
         selected: Dict[str, database.MetricRecord] = {}
         for record in records:
             existing = selected.get(record.metric)
@@ -716,6 +736,7 @@ class BenchmarkOSChatbot:
         return "Financial context:\n" + combined
 
     def _detect_tickers(self, text: str) -> List[str]:
+        """Best-effort ticker extraction from user text."""
         candidates: List[str] = []
         seen = set()
 
@@ -730,6 +751,7 @@ class BenchmarkOSChatbot:
         lookup = getattr(self.analytics_engine, "lookup_ticker", None)
 
         def _try_lookup(term: str) -> Optional[str]:
+            """Attempt to fetch metrics, returning None if lookup fails."""
             if not callable(lookup):
                 return None
             try:
@@ -761,6 +783,7 @@ class BenchmarkOSChatbot:
     def _compose_benchmark_summary(
         self, metrics_per_ticker: Dict[str, Dict[str, database.MetricRecord]]
     ) -> List[str]:
+        """Summarise how a ticker compares against benchmarks."""
         if not metrics_per_ticker:
             return []
         key_metrics = {
@@ -790,6 +813,7 @@ class BenchmarkOSChatbot:
     def _format_metric_value(
         metric_name: str, metrics: Dict[str, database.MetricRecord]
     ) -> str:
+        """Format metric values with appropriate precision and units."""
         record = metrics.get(metric_name)
         if not record or record.value is None:
             return "n/a"
@@ -802,6 +826,7 @@ class BenchmarkOSChatbot:
 
     @staticmethod
     def _format_fact_value(value: float) -> str:
+        """Format fact values for display, preserving units where possible."""
         absolute = abs(value)
         if absolute >= 1_000_000:
             return f"{value/1_000_000:,.2f}M"
@@ -813,6 +838,7 @@ class BenchmarkOSChatbot:
 
     @staticmethod
     def _render_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
+        """Render rows and headers into a markdown-style table."""
         if not rows:
             return "No data available."
 
@@ -823,6 +849,7 @@ class BenchmarkOSChatbot:
                 widths[idx] = max(widths[idx], len(cell))
 
         def format_row(values: Sequence[str]) -> str:
+            """Format a single row tuple for display in tables."""
             formatted = []
             for idx, value in enumerate(values):
                 if alignments[idx] == "left":

@@ -55,6 +55,7 @@ def ingest_if_requested(tickers: Sequence[str], years: int) -> None:
 
 
 def build_chatbot() -> tuple[BenchmarkOSChatbot, AnalyticsEngine]:
+    """Initialise a chatbot and analytics engine ready for interactive use."""
     settings = load_settings()
     bot = BenchmarkOSChatbot.create(settings)
     engine = AnalyticsEngine(settings)
@@ -63,6 +64,7 @@ def build_chatbot() -> tuple[BenchmarkOSChatbot, AnalyticsEngine]:
 
 
 def run_chatbot(tickers: Sequence[str], years: int) -> None:
+    """Launch the REPL-style chat experience, optionally ingesting data first."""
     ingest_if_requested(tickers, years)
     bot, engine = build_chatbot()
 
@@ -124,6 +126,7 @@ _METRICS_PATTERN = re.compile(r"^metrics(?:(?:\s+for)?\s+)(.+)$", re.IGNORECASE)
 
 
 def parse_metrics_request(text: str) -> list[str] | None:
+    """Parse 'metrics' commands into a list of tickers."""
     match = _METRICS_PATTERN.match(text.strip())
     if not match:
         return None
@@ -137,6 +140,7 @@ def parse_metrics_request(text: str) -> list[str] | None:
 
 
 def format_metrics_table(engine: AnalyticsEngine, tickers: Sequence[str]) -> str:
+    """Render metrics for the supplied tickers as a comparison table."""
     metrics_per_ticker: Dict[str, Dict[str, MetricRecord]] = {}
     for ticker in tickers:
         records = engine.get_metrics(ticker)
@@ -155,6 +159,7 @@ def format_metrics_table(engine: AnalyticsEngine, tickers: Sequence[str]) -> str
 
 
 def format_metric_value(metric_name: str, metrics: Dict[str, MetricRecord]) -> str:
+    """Format a metric value with the right precision and suffix."""
     record = metrics.get(metric_name)
     if not record or record.value is None:
         return "n/a"
@@ -168,6 +173,7 @@ def format_metric_value(metric_name: str, metrics: Dict[str, MetricRecord]) -> s
 
 
 def render_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
+    """Render rows and headers into a markdown-style table."""
     if not rows:
         return "No metrics available."
 
@@ -178,6 +184,7 @@ def render_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
             widths[idx] = max(widths[idx], len(cell))
 
     def format_row(values: Sequence[str]) -> str:
+        """Format a MetricRecord into printable table cells."""
         formatted = []
         for idx, value in enumerate(values):
             if alignments[idx] == "left":
@@ -193,6 +200,7 @@ def render_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
 
 
 def handle_ingest(text: str, engine: AnalyticsEngine) -> str:
+    """Run on-demand data ingestion triggered from the chat UI."""
     parts = text.split()
     if len(parts) < 2:
         return "Usage: ingest <TICKER> [years]"
@@ -209,6 +217,7 @@ def handle_ingest(text: str, engine: AnalyticsEngine) -> str:
 
 
 def handle_scenario(text: str, engine: AnalyticsEngine) -> str:
+    """Execute a simple scenario model and return the narrative."""
     parts = text.split()
     if len(parts) < 3:
         return "Usage: scenario <TICKER> <NAME> [rev=+5% margin=+1% mult=+0.5%]"
@@ -236,6 +245,7 @@ def handle_scenario(text: str, engine: AnalyticsEngine) -> str:
 
 
 def parse_percent(value: str) -> float:
+    """Convert percentage tokens (e.g. '+5%') into floats."""
     value = value.strip().rstrip("%")
     try:
         return float(value) / 100.0
@@ -244,6 +254,7 @@ def parse_percent(value: str) -> float:
 
 
 def main() -> None:
+    """CLI entry point that launches the interactive metrics chat tool."""
     parser = argparse.ArgumentParser(
         description="BenchmarkOS finance chatbot runner with analytics shortcuts"
     )
