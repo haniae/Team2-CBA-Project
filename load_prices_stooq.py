@@ -11,14 +11,23 @@ ENV_TICKERS = [t.strip().upper() for t in os.getenv("SEC_TICKERS","MSFT,GE,AAPL,
 DAYS = int(os.getenv("PRICE_DAYS","1200"))  # ~5 years
 
 def stooq_symbol(ticker):  # US tickers need .us
+    """Translate a standard ticker into Stooq's expected symbol.
+
+    Args:
+        ticker: Ticker symbol (e.g. 'MSFT').
+    Returns:
+        Stooq-formatted symbol string (e.g. 'msft.us').
+    """
     return f"{ticker.lower()}.us"
 
 def stooq_url(ticker):
-    """Translate standard tickers to Stooq's symbol format."""
+    """Return the download URL for a Stooq CSV once provided a symbol.
+    """
     return f"https://stooq.com/q/d/l/?s={stooq_symbol(ticker)}&i=d"
 
 def fetch_csv(ticker):
-    """Download historical price CSV data from Stooq."""
+    """Download and return the historical price CSV payload from Stooq.
+    """
     r = requests.get(stooq_url(ticker), timeout=30)
     if r.status_code != 200 or not r.text.startswith("Date,Open,High,Low,Close,Volume"):
         print(f"{ticker}: no data (HTTP {r.status_code})"); return []
@@ -40,7 +49,8 @@ def fetch_csv(ticker):
     return rows
 
 def upsert(conn, rows):
-    """Upsert parsed price rows into the local market quotes table."""
+    """Insert or update Stooq price rows into the local SQLite database.
+    """
     if not rows: return
     with conn.cursor() as cur:
         execute_batch(cur, """
@@ -53,7 +63,8 @@ def upsert(conn, rows):
         """, rows, page_size=2000)
 
 def main():
-    """CLI entry point for loading historical prices from Stooq."""
+    """Load historical price data for the configured `TICKERS` collection.
+    """
     conn = psycopg2.connect(**PG); conn.autocommit = True
     tickers = ENV_TICKERS
     print("Tickers:", ",".join(tickers))

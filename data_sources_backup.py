@@ -145,12 +145,24 @@ METRIC_ALIASES = {
 
 
 def _pad_cik(cik: str | int) -> str:
-    """Left-pad CIK identifiers to the expected SEC width."""
+    """Left-pad CIK identifiers to the expected SEC width.
+
+    Args:
+        cik: Raw CIK string or integer.
+    Returns:
+        A zero-padded 10-character CIK string.
+    """
     return f"{int(cik):010d}"
 
 
 def _parse_date(value: Optional[str]) -> Optional[date]:
-    """Parse SEC date strings into date objects."""
+    """Parse SEC date strings into `datetime.date` objects.
+
+    Args:
+        value: Date string from the SEC payload.
+    Returns:
+        Parsed date or ``None`` when absent/invalid.
+    """
     if not value:
         return None
     try:
@@ -164,7 +176,13 @@ def _parse_date(value: Optional[str]) -> Optional[date]:
 
 
 def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
-    """Parse SEC timestamp strings into timezone-aware datetimes."""
+    """Parse SEC timestamp strings into timezone-aware datetimes.
+
+    Args:
+        value: Timestamp string from the SEC payload.
+    Returns:
+        `datetime` in UTC or ``None`` when absent/invalid.
+    """
     if not value:
         return None
     try:
@@ -181,7 +199,14 @@ def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
 
 
 def _extract_bloomberg_field_payload(field_data, fields: Sequence[str]) -> Dict[str, Any]:
-    """Normalise Bloomberg quote payloads into a flat dict."""
+    """Normalise Bloomberg quote payloads into a flat dict.
+
+    Args:
+        field_data: Bloomberg field payload structure.
+        fields: Iterable of field names to extract.
+    Returns:
+        Flat dictionary containing the field values and metadata.
+    """
     payload: Dict[str, Any] = {}
     for field_name in fields:
         try:
@@ -209,7 +234,13 @@ def _extract_bloomberg_field_payload(field_data, fields: Sequence[str]) -> Dict[
 
 
 def _canonical_metric(concept: str) -> str:
-    """Map incoming metric aliases onto canonical names."""
+    """Map incoming metric aliases onto canonical names.
+
+    Args:
+        concept: Metric name as supplied by an upstream data source.
+    Returns:
+        Canonical metric name understood by the analytics engine.
+    """
     return METRIC_ALIASES.get(concept, concept.lower())
 
 
@@ -436,7 +467,14 @@ class EdgarClient:
 
 
 def _derive_period_label(fy: Optional[int], fiscal_period: Optional[str]) -> str:
-    """Return a label describing the quote period (e.g. '1Y')."""
+    """Return a label describing the quote period (e.g. `1Y`).
+
+    Args:
+        fy: Fiscal year from the fact record.
+        fiscal_period: Fiscal period token (e.g. `FY`, `CY`, `Q1`).
+    Returns:
+        Human-friendly period label.
+    """
     if fy is None:
         return fiscal_period or "unknown"
     if fiscal_period and fiscal_period.upper() not in {"FY", "CY"}:

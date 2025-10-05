@@ -11,7 +11,11 @@ from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI arguments describing the ingest file source."""
+    """Parse CLI arguments describing the ingest file source.
+
+    Returns:
+        Parsed argparse namespace with `path` and optional flags.
+    """
     parser = argparse.ArgumentParser(
         description="Ingest tickers from a file and refresh analytics cache."
     )
@@ -30,7 +34,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_tickers(path: Path) -> list[str]:
-    """Load tickers from the provided CSV/text file."""
+    """Load ticker symbols from the supplied file, ignoring blanks/comments.
+    """
     if not path.exists():
         raise FileNotFoundError(f"Ticker file not found: {path}")
 
@@ -43,7 +48,8 @@ def load_tickers(path: Path) -> list[str]:
 
 
 def main() -> None:
-    """Ingest tickers listed in a file via the live data pipeline."""
+    """Run ingestion for all tickers listed in the provided file.
+    """
     args = parse_args()
     tickers = load_tickers(args.path)
     print(f"Ingesting {len(tickers)} tickers from {args.path}...")

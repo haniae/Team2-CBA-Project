@@ -7,6 +7,11 @@ UA = {"User-Agent": "Hania MSBA / secdb loader (hania@gwu.edu)"}  # include your
 URL = "https://www.sec.gov/files/company_tickers.json"
 
 def main():
+    """Populate the SQLite ticker→CIK mapping table from SEC data.
+
+    The script fetches the latest SEC ticker list, normalises it, and stores
+    the results in the local database used by the rest of the project.
+    """
     """CLI helper that populates the ticker→CIK lookup table."""
     r = requests.get(URL, headers=UA, timeout=60)
     r.raise_for_status()

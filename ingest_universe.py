@@ -18,7 +18,8 @@ DEFAULT_PROGRESS_FILE = Path.cwd() / ".ingestion_progress.json"
 
 
 def chunked(iterable: Iterable[str], size: int) -> Iterable[List[str]]:
-    """Yield ``size`` sized chunks from *iterable*."""
+    """Yield fixed-size chunks from the iterable, padding the final chunk if needed.
+    """
 
     chunk: List[str] = []
     for item in iterable:
@@ -31,7 +32,8 @@ def chunked(iterable: Iterable[str], size: int) -> Iterable[List[str]]:
 
 
 def load_progress(progress_file: Path) -> set[str]:
-    """Read the ingest progress checkpoint file if present."""
+    """Read the ingestion progress checkpoint metadata from disk.
+    """
     if not progress_file.exists():
         return set()
     try:
@@ -42,7 +44,8 @@ def load_progress(progress_file: Path) -> set[str]:
 
 
 def save_progress(progress_file: Path, completed: set[str]) -> None:
-    """Persist the current ingest checkpoint state."""
+    """Persist the current checkpoint metadata so runs can resume later.
+    """
     progress_file.write_text(json.dumps({"completed": sorted(completed)}, indent=2))
 
 
@@ -55,7 +58,8 @@ def ingest_universe(
     progress_file: Path,
     resume: bool,
 ) -> None:
-    """Iterate through a universe of tickers, ingesting each."""
+    """Iterate through the ticker universe, running ingestion with progress tracking.
+    """
     settings = load_settings()
     tickers = load_ticker_universe(universe)
     completed = load_progress(progress_file) if resume else set()
@@ -111,7 +115,8 @@ def ingest_universe(
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
-    """Parse command-line arguments for universe ingestion."""
+    """Parse CLI arguments controlling universe ingestion runs.
+    """
     parser = argparse.ArgumentParser(
         description="Ingest a predefined ticker universe into the BenchmarkOS datastore.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -155,7 +160,8 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
 
 
 def main(argv: List[str] | None = None) -> None:
-    """CLI entry point for large-scale universe ingestion runs."""
+    """Run the universe ingest loop with checkpointing and batching.
+    """
     args = parse_args(argv or sys.argv[1:])
     ingest_universe(
         universe=args.universe,

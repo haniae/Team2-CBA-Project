@@ -145,7 +145,8 @@ _ALL_METRICS_SET = set(BASE_METRICS) | set(DERIVED_METRICS) | set(AGGREGATE_METR
 
 
 def _build_metric_order() -> List[str]:
-    """Order metric identifiers for column layout decisions."""
+    """Return the ordered list of metrics to display based on flags.
+    """
     order: List[str] = []
     for metric in PDS_METRICS:
         if metric in _ALL_METRICS_SET and metric not in order:
@@ -175,23 +176,27 @@ ALL_METRICS_SET = set(ALL_METRICS_ORDER)
 
 
 def _metric_label(metric: str) -> str:
-    """Return the human-readable label for a metric."""
+    """Return the label used to display a metric column.
+    """
     return METRIC_ABBREVIATIONS.get(metric, metric.replace("_", " ").title())
 
 
 def _chunked(seq: Sequence[str], size: int) -> Iterable[List[str]]:
-    """Yield items from an iterable in fixed-size chunks."""
+    """Yield fixed-size chunks from an iterable, padding the last chunk if needed.
+    """
     for idx in range(0, len(seq), size):
         yield list(seq[idx : idx + size])
 
 
 def _clean_token(token: str) -> str:
-    """Normalise raw CLI tokens for downstream parsing."""
+    """Normalise CLI tokens (strip punctuation, convert to upper case).
+    """
     return token.strip(string.punctuation)
 
 
 def _extract_tickers(tokens: Sequence[str]) -> List[str]:
-    """Extract ticker symbols from CLI tokens."""
+    """Extract ticker-like tokens from the provided CLI arguments.
+    """
     tickers: List[str] = []
     for token in tokens:
         cleaned = _clean_token(token)
@@ -204,7 +209,8 @@ def _extract_tickers(tokens: Sequence[str]) -> List[str]:
 
 
 def _canonical_metric(token: str) -> str:
-    """Map metric shortcuts/aliases to canonical names."""
+    """Map shorthand metric tokens to canonical metric identifiers.
+    """
     key = token.lower()
     normalised = key.replace("/", "").replace("-", "")
     if normalised in METRIC_SYNONYMS:
@@ -215,7 +221,8 @@ def _canonical_metric(token: str) -> str:
 
 
 def _expand_metrics(raw_metrics: Sequence[str]) -> List[str]:
-    """Expand shorthand metric groups into explicit metric names."""
+    """Expand metric groups or aliases into explicit identifiers.
+    """
     if not raw_metrics:
         return ALL_METRICS_ORDER.copy()
 
@@ -238,7 +245,8 @@ def _expand_metrics(raw_metrics: Sequence[str]) -> List[str]:
 
 
 def _format_value(value: Optional[float]) -> str:
-    """Format numeric values with thousands separators and suffixes."""
+    """Format numeric values with separators, decimals, and optional suffixes.
+    """
     if value is None:
         return "-"
     if abs(value) >= 1_000_000_000:
@@ -249,7 +257,8 @@ def _format_value(value: Optional[float]) -> str:
 
 
 def _select_latest(records, metric: str) -> Optional[Tuple[str, Optional[float]]]:
-    """Pick the latest metric records per ticker."""
+    """Pick the latest metric record for each metric from the engine results.
+    """
     best: Optional[Tuple[str, Optional[float], int]] = None
     for record in records:
         if record.metric != metric:
@@ -264,7 +273,8 @@ def _select_latest(records, metric: str) -> Optional[Tuple[str, Optional[float]]
 
 
 def _build_table(headers: List[str], rows: List[List[str]]) -> str:
-    """Render the comparison table for the selected metrics."""
+    """Render a metrics comparison table for the supplied tickers.
+    """
     widths = [len(header) for header in headers]
     for row in rows:
         for idx, cell in enumerate(row):
@@ -281,7 +291,8 @@ def _build_table(headers: List[str], rows: List[List[str]]) -> str:
 
 
 def _parse_year_filters(tokens: List[str]) -> Tuple[List[str], Optional[Sequence[Tuple[int, int]]], Optional[str]]:
-    """Parse CLI tokens describing fiscal year filters."""
+    """Parse fiscal year filter tokens into start/end pairs.
+    """
     period_filters: Optional[List[Tuple[int, int]]] = None
     layout: Optional[str] = None
     filtered_tokens: List[str] = []
@@ -311,7 +322,8 @@ def _resolve_metrics_and_tickers(
     period_filters: Optional[Sequence[Tuple[int, int]]],
     layout: Optional[str],
 ) -> Tuple[List[str], List[str], Optional[Sequence[Tuple[int, int]]], str]:
-    """Resolve user-supplied tickers and metrics simultaneously."""
+    """Resolve ticker symbols and metric identifiers from CLI arguments.
+    """
     layout_mode = (layout or "").lower()
     lowered = [token.lower() for token in tokens]
 
@@ -352,13 +364,15 @@ def _resolve_metrics_and_tickers(
 
 
 def _try_table_command(user_input: str, engine: AnalyticsEngine) -> Optional[str]:
-    """Backward-compatible wrapper around the shared table renderer."""
+    """Render table output using the shared renderer for legacy commands.
+    """
 
     return render_table_command(user_input, engine)
 
 
 def main() -> None:
-    """CLI entry point for the BenchmarkOS metrics/reporting tool."""
+    """Run the BenchmarkOS CLI tool for metrics lookup and comparison.
+    """
     settings = load_settings()
     chatbot = BenchmarkOSChatbot.create(settings)
     analytics = AnalyticsEngine(settings)
@@ -396,3 +410,4 @@ def main() -> None:
 
 if __name__ == "__main__":  # pragma: no cover - CLI not unit tested
     main()
+

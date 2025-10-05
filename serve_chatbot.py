@@ -8,7 +8,8 @@ from typing import NoReturn
 
 
 def _ensure_uvicorn() -> None:
-    """Ensure uvicorn is installed and return the import if available."""
+    """Ensure `uvicorn` can be imported, raising a helpful error otherwise.
+    """
     try:
         import uvicorn  # noqa: F401
     except ImportError as exc:  # pragma: no cover - runtime safety guard
@@ -20,7 +21,8 @@ def _ensure_uvicorn() -> None:
 
 
 def main(argv: list[str] | None = None) -> NoReturn:
-    """Run the FastAPI chatbot service with uvicorn."""
+    """Start the FastAPI application using uvicorn with the provided settings.
+    """
     parser = argparse.ArgumentParser(
         description="Start the FastAPI-powered BenchmarkOS chatbot UI",
     )

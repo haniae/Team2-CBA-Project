@@ -31,7 +31,15 @@ INSTANT  = {"Assets","Liabilities","StockholdersEquity",
             "CommonStockSharesOutstanding"}
 
 def polite_get(url, tries=5, base=0.4):
-    """HTTP GET helper with retry/backoff for archival frame downloads."""
+    """Download a frame payload with polite retry/backoff handling.
+
+    Args:
+        url: Frame endpoint to query.
+        tries: Number of attempts before giving up.
+        base: Base delay used in the exponential backoff.
+    Returns:
+        `requests.Response` object from the SEC API.
+    """
     for i in range(tries):
         r = requests.get(url, headers=UA, timeout=60)
         if r.status_code in (200, 404):
@@ -43,7 +51,8 @@ def polite_get(url, tries=5, base=0.4):
     return r
 
 def upsert_rows(conn, rows):
-    """Persist fetched frame rows into the database."""
+    """Insert fetched frame rows into the Postgres frames table.
+    """
     if not rows:
         return
     with conn.cursor() as cur:
@@ -55,7 +64,8 @@ def upsert_rows(conn, rows):
     """, rows, page_size=5000)
 
 def main():
-    """CLI entry point to ingest SEC XBRL frame data."""
+    """Iterate across target tags/years and persist SEC XBRL frame data.
+    """
     conn = psycopg2.connect(**PG)
     conn.autocommit = True
     for tag in TAGS:

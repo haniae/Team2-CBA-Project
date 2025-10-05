@@ -9,7 +9,13 @@ BASE = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 SEED_TICKERS = ["MSFT","GE","F"]  # change this list as needed
 
 def to_date(s):
-    """Parse SEC date strings into date objects, tolerating blanks."""
+    """Parse SEC date strings into `datetime.date` objects.
+
+    Args:
+        s: Raw date string from the SEC payload.
+    Returns:
+        Parsed date or ``None`` when the field is missing or malformed.
+    """
     if not s:
         return None
     try:
@@ -18,14 +24,25 @@ def to_date(s):
         return None
 
 def get_ciks():
-    """Return the CIKs associated with the configured seed tickers."""
+    """Return the list of CIK identifiers corresponding to `SEED_TICKERS`.
+
+    Returns:
+        A list of integer CIKs sorted as returned by the database.
+    """
     conn = psycopg2.connect(**PG)
     with conn, conn.cursor() as cur:
         cur.execute("SELECT cik FROM sec.ticker_cik WHERE ticker = ANY(%s)", (SEED_TICKERS,))
         return [r[0] for r in cur.fetchall()]
 
 def process(cik, js):
-    """Transform the SEC companyfacts JSON payload into row dicts."""
+    """Transform the SEC companyfacts JSON payload into database rows.
+
+    Args:
+        cik: Integer CIK identifier being processed.
+        js: Parsed companyfacts JSON document.
+    Returns:
+        List of dictionaries ready for the ``upsert`` routine.
+    """
     rows = []
     entity = js.get("entityName")
     for taxonomy, tags in (js.get("facts") or {}).items():
@@ -55,7 +72,12 @@ def process(cik, js):
     return rows
 
 def upsert(conn, rows):
-    """Bulk upsert transformed rows into the Postgres facts table."""
+    """Bulk upsert transformed rows into the Postgres facts table.
+
+    Args:
+        conn: Open psycopg2 connection.
+        rows: Row dictionaries produced by ``process``.
+    """
     if not rows:
         return
     with conn.cursor() as cur:
@@ -83,7 +105,8 @@ def upsert(conn, rows):
         )
 
 def main():
-    """Simple script entry point to ingest companyfacts for seed tickers."""
+    """Run ingestion for `SEED_TICKERS`, fetching companyfacts and persisting them.
+    """
     ciks = get_ciks()
     print("CIKs:", ciks)
     conn = psycopg2.connect(**PG)

@@ -38,7 +38,12 @@ MULTIPLE_METRICS = {
 
 
 def ingest_if_requested(tickers: Sequence[str], years: int) -> None:
-    """Optionally run live ingestion before entering the chat."""
+    """Optionally ingest fresh data so summaries reflect recent filings.
+
+    Args:
+        tickers: Iterable of ticker symbols the user asked to refresh.
+        years: Number of fiscal years of history to request.
+    """
 
     if not tickers:
         return
@@ -55,7 +60,11 @@ def ingest_if_requested(tickers: Sequence[str], years: int) -> None:
 
 
 def build_chatbot() -> tuple[BenchmarkOSChatbot, AnalyticsEngine]:
-    """Initialise a chatbot and analytics engine ready for interactive use."""
+    """Construct the chatbot and analytics engine backing the CLI session.
+
+    Returns:
+        Tuple ``(chatbot, engine)`` primed with refreshed metrics.
+    """
     settings = load_settings()
     bot = BenchmarkOSChatbot.create(settings)
     engine = AnalyticsEngine(settings)
@@ -64,7 +73,12 @@ def build_chatbot() -> tuple[BenchmarkOSChatbot, AnalyticsEngine]:
 
 
 def run_chatbot(tickers: Sequence[str], years: int) -> None:
-    """Launch the REPL-style chat experience, optionally ingesting data first."""
+    """Run the interactive BenchmarkOS chat loop.
+
+    Args:
+        tickers: Optional tickers to ingest before conversation begins.
+        years: Number of fiscal years to fetch during ingestion.
+    """
     ingest_if_requested(tickers, years)
     bot, engine = build_chatbot()
 
@@ -85,7 +99,15 @@ def run_chatbot(tickers: Sequence[str], years: int) -> None:
 
 
 def dispatch_prompt(prompt: str, bot: BenchmarkOSChatbot, engine: AnalyticsEngine) -> str:
-    """Route the user request to the right handler."""
+    """Route a user prompt to metrics, ingestion, scenario, or LLM handlers.
+
+    Args:
+        prompt: Raw user text from stdin.
+        bot: Chatbot instance for free-form questions.
+        engine: Analytics engine for metrics-oriented commands.
+    Returns:
+        Response text ready to print.
+    """
 
     metrics_request = parse_metrics_request(prompt)
     if metrics_request is not None:
@@ -126,7 +148,13 @@ _METRICS_PATTERN = re.compile(r"^metrics(?:(?:\s+for)?\s+)(.+)$", re.IGNORECASE)
 
 
 def parse_metrics_request(text: str) -> list[str] | None:
-    """Parse 'metrics' commands into a list of tickers."""
+    """Parse a `metrics` command and extract ticker symbols.
+
+    Args:
+        text: Raw user command string.
+    Returns:
+        List of ticker tokens or ``None`` if the command does not match.
+    """
     match = _METRICS_PATTERN.match(text.strip())
     if not match:
         return None
@@ -140,7 +168,14 @@ def parse_metrics_request(text: str) -> list[str] | None:
 
 
 def format_metrics_table(engine: AnalyticsEngine, tickers: Sequence[str]) -> str:
-    """Render metrics for the supplied tickers as a comparison table."""
+    """Render a comparison table string for the provided tickers.
+
+    Args:
+        engine: Analytics engine used to fetch metric snapshots.
+        tickers: Ordered tickers to include in the comparison.
+    Returns:
+        Table formatted as plain text.
+    """
     metrics_per_ticker: Dict[str, Dict[str, MetricRecord]] = {}
     for ticker in tickers:
         records = engine.get_metrics(ticker)
@@ -159,7 +194,14 @@ def format_metrics_table(engine: AnalyticsEngine, tickers: Sequence[str]) -> str
 
 
 def format_metric_value(metric_name: str, metrics: Dict[str, MetricRecord]) -> str:
-    """Format a metric value with the right precision and suffix."""
+    """Format a metric value with appropriate precision and suffix.
+
+    Args:
+        metric_name: Metric identifier to look up.
+        metrics: Mapping of metric names to records for a ticker.
+    Returns:
+        Human readable string or ``"n/a"`` when missing.
+    """
     record = metrics.get(metric_name)
     if not record or record.value is None:
         return "n/a"
@@ -173,7 +215,14 @@ def format_metric_value(metric_name: str, metrics: Dict[str, MetricRecord]) -> s
 
 
 def render_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
-    """Render rows and headers into a markdown-style table."""
+    """Render headers and rows into a markdown-style table.
+
+    Args:
+        headers: Column headings for the table.
+        rows: Body rows of value strings.
+    Returns:
+        String ready for console output.
+    """
     if not rows:
         return "No metrics available."
 
@@ -184,7 +233,7 @@ def render_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
             widths[idx] = max(widths[idx], len(cell))
 
     def format_row(values: Sequence[str]) -> str:
-        """Format a MetricRecord into printable table cells."""
+        """Format a table row applying stored column widths/alignments."""
         formatted = []
         for idx, value in enumerate(values):
             if alignments[idx] == "left":
@@ -200,7 +249,14 @@ def render_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
 
 
 def handle_ingest(text: str, engine: AnalyticsEngine) -> str:
-    """Run on-demand data ingestion triggered from the chat UI."""
+    """Process an `ingest` command and refresh requested tickers.
+
+    Args:
+        prompt: Full user command containing tickers/years.
+        engine: Analytics engine to refresh after ingestion.
+    Returns:
+        Status message describing the ingestion outcome.
+    """
     parts = text.split()
     if len(parts) < 2:
         return "Usage: ingest <TICKER> [years]"
@@ -217,7 +273,14 @@ def handle_ingest(text: str, engine: AnalyticsEngine) -> str:
 
 
 def handle_scenario(text: str, engine: AnalyticsEngine) -> str:
-    """Execute a simple scenario model and return the narrative."""
+    """Execute a scenario command and return the generated narrative.
+
+    Args:
+        prompt: Scenario command with ticker and adjustments.
+        engine: Analytics engine used to calculate the scenario.
+    Returns:
+        Narrative string or an error message.
+    """
     parts = text.split()
     if len(parts) < 3:
         return "Usage: scenario <TICKER> <NAME> [rev=+5% margin=+1% mult=+0.5%]"
@@ -245,7 +308,13 @@ def handle_scenario(text: str, engine: AnalyticsEngine) -> str:
 
 
 def parse_percent(value: str) -> float:
-    """Convert percentage tokens (e.g. '+5%') into floats."""
+    """Convert a percentage token such as '+5%' into a decimal float.
+
+    Args:
+        token: Percentage token to parse.
+    Returns:
+        Parsed decimal (e.g. 0.05).
+    """
     value = value.strip().rstrip("%")
     try:
         return float(value) / 100.0
