@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import requests
+import random
 
 LOGGER = logging.getLogger(__name__)
 
@@ -582,36 +583,83 @@ class YahooFinanceClient:
         if not tickers:
             return []
         results: List[MarketQuote] = []
+        # Perform resilient HTTP fetches with retries/backoff to handle 429s or transient 5xx
+        max_attempts = 4
+        base_backoff = 1.0
         for idx in range(0, len(tickers), self.batch_size):
             chunk = [ticker.upper() for ticker in tickers[idx : idx + self.batch_size]]
-            response = self.session.get(
-                self.base_url,
-                params={"symbols": ",".join(chunk)},
-                timeout=self.timeout,
-                headers={"Accept": "application/json"},
-            )
-            response.raise_for_status()
-            data = response.json()
-            for item in data.get("quoteResponse", {}).get("result", []):
-                price = item.get("regularMarketPrice")
-                if price is None:
-                    continue
-                timestamp = item.get("regularMarketTime") or item.get("postMarketTime")
-                if timestamp:
-                    quote_time = datetime.fromtimestamp(int(timestamp), tz=timezone.utc)
-                else:
-                    quote_time = datetime.now(timezone.utc)
-                results.append(
-                    MarketQuote(
-                        ticker=item.get("symbol", "").upper(),
-                        price=float(price),
-                        currency=item.get("currency"),
-                        volume=float(item.get("regularMarketVolume")) if item.get("regularMarketVolume") is not None else None,
-                        timestamp=quote_time,
-                        source="yahoo",
-                        raw=item,
+            params = {"symbols": ",".join(chunk)}
+            attempt = 0
+            while attempt < max_attempts:
+                attempt += 1
+                try:
+                    response = self.session.get(
+                        self.base_url,
+                        params=params,
+                        timeout=self.timeout,
+                        headers={"Accept": "application/json"},
                     )
-                )
+                    # If we get 429 or 5xx, raise and handle below
+                    if response.status_code == 429 or 500 <= response.status_code < 600:
+                        raise requests.HTTPError(f"HTTP {response.status_code}", response=response)
+                    response.raise_for_status()
+                    data = response.json()
+                    for item in data.get("quoteResponse", {}).get("result", []):
+                        price = item.get("regularMarketPrice")
+                        if price is None:
+                            continue
+                        timestamp = item.get("regularMarketTime") or item.get("postMarketTime")
+                        if timestamp:
+                            quote_time = datetime.fromtimestamp(int(timestamp), tz=timezone.utc)
+                        else:
+                            quote_time = datetime.now(timezone.utc)
+                        results.append(
+                            MarketQuote(
+                                ticker=item.get("symbol", "").upper(),
+                                price=float(price),
+                                currency=item.get("currency"),
+                                volume=float(item.get("regularMarketVolume")) if item.get("regularMarketVolume") is not None else None,
+                                timestamp=quote_time,
+                                source="yahoo",
+                                raw=item,
+                            )
+                        )
+                    # success, break out of retry loop
+                    break
+                except requests.HTTPError as exc:
+                    status = None
+                    try:
+                        status = exc.response.status_code  # type: ignore[attr-defined]
+                    except Exception:
+                        status = None
+                    # For rate limiting or server errors, backoff and retry
+                    if status == 429 or (status and 500 <= status < 600):
+                        sleep_for = base_backoff * (2 ** (attempt - 1)) + random.uniform(0, 0.5)
+                        LOGGER.warning(
+                            "Yahoo fetch batch %s attempt %d/%d got status %s, sleeping %.2fs",
+                            ",".join(chunk[:3]) + ("..." if len(chunk) > 3 else ""),
+                            attempt,
+                            max_attempts,
+                            status,
+                            sleep_for,
+                        )
+                        time.sleep(sleep_for)
+                        continue
+                    # For other HTTP errors, don't retry
+                    LOGGER.exception("Yahoo fetch failed: %s", exc)
+                    break
+                except Exception as exc:  # network/connect/json errors
+                    sleep_for = base_backoff * (2 ** (attempt - 1)) + random.uniform(0, 0.5)
+                    LOGGER.warning(
+                        "Yahoo fetch batch %s attempt %d/%d error: %s; sleeping %.2fs",
+                        ",".join(chunk[:3]) + ("..." if len(chunk) > 3 else ""),
+                        attempt,
+                        max_attempts,
+                        exc,
+                        sleep_for,
+                    )
+                    time.sleep(sleep_for)
+                    continue
         return results
 
 

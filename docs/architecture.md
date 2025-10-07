@@ -1,64 +1,3 @@
-## BenchmarkOS — Architecture Overview
-
-This document contains a high-level architecture diagram for the BenchmarkOS Analyst Copilot and short guidance mapping components to the repository.
-
-```mermaid
-graph LR
-    User[Browser] --> UI[Chat UI]
-    UI --> API[FastAPI Server]
-    API --> DB[Database]
-    API --> LLM[LLM Service]
-    API --> Storage[Object Store]
-    LLM --> Provider[Model API]
-    
-    subgraph Frontend
-        UI
-    end
-    
-    subgraph Backend
-        API
-        DB
-        LLM
-        Storage
-    end
-    
-    subgraph External
-        Provider
-    end
-    
-    style Frontend fill:#f8fafc
-    style Backend fill:#ecfeff
-    style External fill:#eef2ff
-```
-![Architecture diagram](./architecture-highres.svg)
-
-Notes
-- Frontend: single-page app (current packaged static HTML in `src/benchmarkos_chatbot/static/` or a separate React/Vite app). The UI handles chat, metrics table rendering, and conversation management.
-- API server: `src/benchmarkos_chatbot/web.py` (FastAPI). Hosts endpoints: `/chat`, `/metrics`, `/facts`, `/conversations`, static assets.
-- Ingestion & Analytics: `src/benchmarkos_chatbot/data_ingestion.py` and `src/benchmarkos_chatbot/analytics_engine.py` implement metric extraction and indexing pipelines.
-- Storage: production uses PostgreSQL (with pgvector) and S3-compatible object storage for PDFs and ingested files; local dev can use SQLite and local disk.
-- Vector store / RAG: Vector index can be provided by pgvector (Postgres), Chroma, or a hosted vector DB; background workers compute embeddings and upsert documents.
-- LLM orchestration: An adapter layer (LLM client) mediates between the app and model providers; streaming can be implemented with SSE or WebSockets.
-- Workers: Background tasks and queues (Celery/RQ or asyncio-based workers) for ingestion, embedding, audit events, and scheduled refreshes.
-- Observability & infra: Reverse proxy (Traefik/Nginx), rate-limiting, logging (structured logs + Sentry), monitoring (Prometheus + Grafana), and CI/CD pipelines (GitHub Actions).
-
-Deployment recommendations
-- Development: run FastAPI locally with `uvicorn src.benchmarkos_chatbot.web:app --reload`, use SQLite, and local static files.
-- Staging/Prod: Deploy behind a reverse proxy, use PostgreSQL + pgvector, S3-compatible storage, and run workers separately. Use environment variables for secrets.
-- Security: enable authentication (JWT/session), store secrets in a secret manager, and enable HTTPS at the edge.
-
-Repository mapping
-- `src/benchmarkos_chatbot/web.py` — API & static file serving
-- `src/benchmarkos_chatbot/database.py` — storage helpers
-- `src/benchmarkos_chatbot/analytics_engine.py` — metric extraction and summarization
-- `src/benchmarkos_chatbot/data_ingestion.py` — ingestion pipelines
-- `src/benchmarkos_chatbot/llm_client.py` — LLM adapter (if present)
-- `src/benchmarkos_chatbot/static/` — packaged frontend assets
-
-If you'd like, I can:
-- produce a PNG/SVG export of the diagram,
-- expand the diagram to include sequence diagrams (chat flow, ingestion flow), or
-- tailor the diagram to a specific cloud provider (AWS/GCP/Azure) with concrete services.
 # BenchmarkOS Chatbot Architecture
 
 This workflow mirrors the product storyboard: user prompts begin on the client surfaces, traverse back-end planners and analytics engines, then return enriched responses to the chat surface.
@@ -75,64 +14,64 @@ flowchart LR
     classDef artifact fill:#fbcfe8,stroke:#db2777,stroke-width:2px,color:#831843,font-weight:bold
 
     subgraph FE["Front-End Channels"]
-        WebUI["Web UI - streaming chat"]:::front
-        CLI["CLI - ad-hoc prompts"]:::front
-        Batch["Batch API - partner jobs"]:::front
-        Auth["Auth gateway"]:::front
+        WebUI["Web UI\n(streaming chat)"]:::front
+        CLI["CLI\n(ad-hoc prompts)"]:::front
+        Batch["Batch API\n(partner jobs)"]:::front
+        Auth["Auth gateway\n(optional)"]:::front
     end
     style FE fill:#fffbeb,stroke:#fde68a,stroke-dasharray:8 4
 
     subgraph ORCH["Orchestration & Guardrails"]
-    Ingress["FastAPI /chat - request validation"]:::orchestrator
-    Session["Chat orchestrator - context & guardrails"]:::orchestrator
-    Composer["Response composer"]:::orchestrator
+        Ingress["FastAPI /chat\nrequest validation"]:::orchestrator
+        Session["Chat orchestrator\ncontext & guardrails"]:::orchestrator
+        Composer["Response composer\npayload assembly"]:::orchestrator
     end
     style ORCH fill:#ecfdf5,stroke:#bbf7d0,stroke-dasharray:8 4
 
     subgraph LLM["LLM Layer"]
-    Planner["Planner LLM - intent & plan"]:::llm
-    Generator["Generator LLM - drafting"]:::llm
+        Planner["Planner LLM\n(intent & SQL plan)"]:::llm
+        Generator["Narrative LLM\n(response drafting)"]:::llm
     end
     style LLM fill:#eef2ff,stroke:#c7d2fe,stroke-dasharray:8 4
 
     subgraph ANALYTICS["Analytics & Insights"]
-    Analytics["Analytics engine: SQL & metrics"]:::data
-    Metrics["Metrics API & calculators"]:::data
-    Facts["Facts API - scenario models"]:::data
-    Insights["Insight formatter"]:::data
+        Analytics["Analytics engine\nSQL + metric compute"]:::data
+        Metrics["Metrics API\n& calculators"]:::data
+        Facts["Facts API\nscenario models"]:::data
+        Insights["Insight formatter\nnarrative blocks"]:::data
     end
     style ANALYTICS fill:#f0f9ff,stroke:#bae6fd,stroke-dasharray:8 4
 
     subgraph DATA["Data & Storage"]
-    Database["Operational DB - conversations & metrics"]:::data
-    Audit["Audit trail & lineage"]:::data
+        Database["Operational database\n(conversations, metrics, quotes)"]:::data
+        Audit["Audit trail\nlineage & replay"]:::data
     end
     style DATA fill:#f8fafc,stroke:#bae6fd,stroke-dasharray:8 4
 
     subgraph INGEST["Ingestion & Background"]
-    Ingestion["Ingestion manager"]:::orchestrator
-    Queue["Task queue (background)"]:::ops
+        Ingestion["Ingestion manager\non-demand loaders"]:::orchestrator
+        Queue["Task queue\n(background jobs)"]:::ops
     end
     style INGEST fill:#f5f3ff,stroke:#e9d5ff,stroke-dasharray:8 4
 
     subgraph OPS["Platform Operations"]
-    Keyring["Secrets vault"]:::ops
-    Config["Config & feature flags"]:::ops
-    Observability["Observability - logs & health"]:::ops
+        Keyring["Secrets vault\n(API keys)"]:::ops
+        Config["Config (.env)\nfeature flags"]:::ops
+        Observability["Observability\nlogs & health"]:::ops
     end
     style OPS fill:#f8fafc,stroke:#cbd5f5,stroke-dasharray:8 4
 
     subgraph ARTIFACT["Delivery & Artifacts"]
-    ChatSurface["Chat surfaces"]:::artifact
-    Exporters["Exporters (CSV, PPTX, PDF)"]:::artifact
+        ChatSurface["Chat surfaces\n(web, CLI transcripts)"]:::artifact
+        Exporters["Artifact exporters\n(CSV, PPTX, PDF)"]:::artifact
     end
     style ARTIFACT fill:#fff5f7,stroke:#fbcfe8,stroke-dasharray:8 4
 
     subgraph SOURCES["External Data Providers"]
-    Edgar["SEC EDGAR"]:::external
-    Yahoo["Yahoo Finance"]:::external
-    Stooq["Stooq"]:::external
-    Bloomberg["Bloomberg (optional)"]:::external
+        Edgar["SEC EDGAR"]:::external
+        Yahoo["Yahoo Finance"]:::external
+        Stooq["Stooq"]:::external
+        Bloomberg["Bloomberg\n(optional)"]:::external
     end
     style SOURCES fill:#faf5ff,stroke:#e9d5ff,stroke-dasharray:8 4
 

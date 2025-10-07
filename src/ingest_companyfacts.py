@@ -504,6 +504,8 @@ def upsert_rows(conn, rows: List[Dict], schema: str) -> None:
     if not rows:
         return
     # Fixed: use ON CONFLICT with the actual PK constraint
+    # Use the named primary key constraint so the ON CONFLICT clause matches
+    # the schema even when the stored/generated column names differ (frame_key).
     sql = f"""
         INSERT INTO {schema}.facts (
             cik, entity_name, metric, raw_tag, taxonomy, unit, fy, fp, form,
@@ -513,7 +515,7 @@ def upsert_rows(conn, rows: List[Dict], schema: str) -> None:
             %(unit)s, %(fy)s, %(fp)s, %(form)s, %(filed)s, %(period_start)s,
             %(period_end)s, %(frame)s, %(val)s, %(accn)s, %(uom)s, %(qc)s
         )
-        ON CONFLICT (cik, metric, taxonomy, unit, period_end, frame, accn) DO UPDATE SET
+        ON CONFLICT ON CONSTRAINT facts_pkey DO UPDATE SET
             val = EXCLUDED.val,
             filed = EXCLUDED.filed,
             fy = EXCLUDED.fy,
