@@ -1,3 +1,90 @@
+## BenchmarkOS — Architecture Overview
+
+This document contains a high-level architecture diagram for the BenchmarkOS Analyst Copilot and short guidance mapping components to the repository.
+
+```mermaid
+flowchart LR
+  %% Users and UI
+  User[User / Browser]
+  subgraph Frontend
+    UI[SPA (Chat UI / Metrics UI)]
+  end
+
+  %% API / App
+  subgraph API[FastAPI App]
+    App[App Server (FastAPI)]
+    Auth[Auth / Sessions]
+    Webhook[Webhook / Integrations]
+  end
+
+  %% Workers & LLM
+  subgraph Workers
+    LLM[LLM Adapter / Orchestrator]
+    Tasks[Background workers (ingest, index, embeddings)]
+  end
+
+  %% Data Stores
+  subgraph Data
+    PG[(PostgreSQL + pgvector)]
+    SQLite[(SQLite) - local/dev]
+    ObjectStore[(S3 / MinIO for files)]
+    VectorStore[(Chroma / Milvus / pgvector)]
+  end
+
+  %% External
+  subgraph External
+    LLMAPI[(OpenAI / Anthropic / Local LLM)]
+    MarketData[(Market data providers / Yahoo / Xignite)]
+  end
+
+  User --> UI
+  UI --> App
+  App --> PG
+  App --> ObjectStore
+  App --> LLM
+  LLM -.-> LLMAPI
+  Tasks --> VectorStore
+  Tasks --> PG
+  Tasks --> ObjectStore
+  App --> Tasks
+  App --> MarketData
+
+  style Frontend fill:#f8fafc,stroke:#cbd5e1
+  style API fill:#ffffff,stroke:#94a3b8
+  style Workers fill:#fef3c7,stroke:#f59e0b
+  style Data fill:#ecfeff,stroke:#059669
+  style External fill:#eef2ff,stroke:#6366f1
+
+  click UI "../docs/orchestration_playbook.md" "Open orchestration playbook"
+```
+
+Notes
+- Frontend: single-page app (current packaged static HTML in `src/benchmarkos_chatbot/static/` or a separate React/Vite app). The UI handles chat, metrics table rendering, and conversation management.
+- API server: `src/benchmarkos_chatbot/web.py` (FastAPI). Hosts endpoints: `/chat`, `/metrics`, `/facts`, `/conversations`, static assets.
+- Ingestion & Analytics: `src/benchmarkos_chatbot/data_ingestion.py` and `src/benchmarkos_chatbot/analytics_engine.py` implement metric extraction and indexing pipelines.
+- Storage: production uses PostgreSQL (with pgvector) and S3-compatible object storage for PDFs and ingested files; local dev can use SQLite and local disk.
+- Vector store / RAG: Vector index can be provided by pgvector (Postgres), Chroma, or a hosted vector DB; background workers compute embeddings and upsert documents.
+- LLM orchestration: An adapter layer (LLM client) mediates between the app and model providers; streaming can be implemented with SSE or WebSockets.
+- Workers: Background tasks and queues (Celery/RQ or asyncio-based workers) for ingestion, embedding, audit events, and scheduled refreshes.
+- Observability & infra: Reverse proxy (Traefik/Nginx), rate-limiting, logging (structured logs + Sentry), monitoring (Prometheus + Grafana), and CI/CD pipelines (GitHub Actions).
+
+Deployment recommendations
+- Development: run FastAPI locally with `uvicorn src.benchmarkos_chatbot.web:app --reload`, use SQLite, and local static files.
+- Staging/Prod: Deploy behind a reverse proxy, use PostgreSQL + pgvector, S3-compatible storage, and run workers separately. Use environment variables for secrets.
+- Security: enable authentication (JWT/session), store secrets in a secret manager, and enable HTTPS at the edge.
+
+Repository mapping
+- `src/benchmarkos_chatbot/web.py` — API & static file serving
+- `src/benchmarkos_chatbot/database.py` — storage helpers
+- `src/benchmarkos_chatbot/analytics_engine.py` — metric extraction and summarization
+- `src/benchmarkos_chatbot/data_ingestion.py` — ingestion pipelines
+- `src/benchmarkos_chatbot/llm_client.py` — LLM adapter (if present)
+- `src/benchmarkos_chatbot/static/` — packaged frontend assets
+
+If you'd like, I can:
+- produce a PNG/SVG export of the diagram,
+- expand the diagram to include sequence diagrams (chat flow, ingestion flow), or
+- tailor the diagram to a specific cloud provider (AWS/GCP/Azure) with concrete services.
 # BenchmarkOS Chatbot Architecture
 
 This workflow mirrors the product storyboard: user prompts begin on the client surfaces, traverse back-end planners and analytics engines, then return enriched responses to the chat surface.
