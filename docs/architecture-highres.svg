@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <style>
+    .box { fill: #ffffff; stroke: #1f6feb; stroke-width: 2px; rx: 10px; }
+    .panel { fill: #f8fafc; stroke: #cbd5e1; stroke-width:1.2px; rx: 10px }
+    .label { font-family: Inter, Arial, sans-serif; font-size: 16px; fill: #0f172a; }
+    .title { font-weight: 700; font-size: 18px; fill: #0f172a; }
+    .arrow { stroke: #64748b; stroke-width: 1.6px; marker-end: url(#arrow); }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#64748b" />
+    </marker>
+  </defs>
+
+  <!-- Frontend -->
+  <rect x="60" y="60" width="360" height="160" class="panel" />
+  <text x="90" y="100" class="title">Frontend</text>
+  <text x="90" y="135" class="label">SPA (Chat UI / Metrics)</text>
+
+  <!-- API -->
+  <rect x="460" y="50" width="420" height="200" class="box" />
+  <text x="500" y="95" class="title">API / App (FastAPI)</text>
+  <text x="500" y="125" class="label">Endpoints: /chat, /metrics, /facts, /conversations</text>
+
+  <!-- Workers & LLM -->
+  <rect x="940" y="60" width="520" height="160" class="panel" />
+  <text x="980" y="100" class="title">Workers & LLM</text>
+  <text x="980" y="135" class="label">Ingest, embeddings, LLM adapter, background workers</text>
+
+  <!-- Data stores -->
+  <rect x="460" y="320" width="640" height="240" class="panel" />
+  <text x="500" y="360" class="title">Data Stores</text>
+  <text x="500" y="395" class="label">Postgres + pgvector (prod)</text>
+  <text x="500" y="425" class="label">SQLite (dev) · Object storage (S3 / MinIO)</text>
+
+  <!-- External -->
+  <rect x="1140" y="360" width="340" height="160" class="panel" />
+  <text x="1160" y="395" class="title">External</text>
+  <text x="1160" y="425" class="label">LLM Providers · Market Data</text>
+
+  <!-- arrows -->
+  <line x1="420" y1="140" x2="460" y2="140" class="arrow" />
+  <line x1="880" y1="140" x2="940" y2="140" class="arrow" />
+  <line x1="680" y1="250" x2="680" y2="320" class="arrow" />
+  <line x1="940" y1="220" x2="940" y2="320" class="arrow" />
+  <line x1="1100" y1="380" x2="1140" y2="380" class="arrow" />
+
+  <!-- footer notes -->
+  <text x="60" y="620" class="label">Deployment notes: Reverse proxy (NGINX/Traefik) · CI/CD (GitHub Actions) · Monitoring (Prometheus/Grafana) · Secrets manager for credentials.</text>
+
+</svg>
