@@ -3,59 +3,32 @@
 This document contains a high-level architecture diagram for the BenchmarkOS Analyst Copilot and short guidance mapping components to the repository.
 
 ```mermaid
-flowchart LR
-  %% Users and UI
-  User["User Browser"]
-  subgraph Frontend
-    UI["SPA - Chat UI & Metrics"]
-  end
-
-  %% API / App
-  subgraph API[FastAPI App]
-    App[App Server (FastAPI)]
-    Auth[Auth / Sessions]
-    Webhook[Webhook / Integrations]
-  end
-
-  %% Workers & LLM
-  subgraph Workers
-    LLM[LLM Adapter / Orchestrator]
-    Tasks[Background workers (ingest, index, embeddings)]
-  end
-
-  %% Data Stores
-  subgraph Data
-  PG["PostgreSQL + pgvector"]
-  SQLite["SQLite (dev)"]
-  ObjectStore["S3 / MinIO"]
-  VectorStore["Chroma / Milvus / pgvector"]
-  end
-
-  %% External
-  subgraph External
-  LLMAPI["LLM Provider (OpenAI/Anthropic)"]
-  MarketData["Market data: Yahoo, Xignite"]
-  end
-
-  User --> UI
-  UI --> App
-  App --> PG
-  App --> ObjectStore
-  App --> LLM
-  LLM -.-> LLMAPI
-  Tasks --> VectorStore
-  Tasks --> PG
-  Tasks --> ObjectStore
-  App --> Tasks
-  App --> MarketData
-
-  style Frontend fill:#f8fafc,stroke:#cbd5e1
-  style API fill:#ffffff,stroke:#94a3b8
-  style Workers fill:#fef3c7,stroke:#f59e0b
-  style Data fill:#ecfeff,stroke:#059669
-  style External fill:#eef2ff,stroke:#6366f1
-
-  click UI "../docs/orchestration_playbook.md" "Open orchestration playbook"
+graph LR
+    User[Browser] --> UI[Chat UI]
+    UI --> API[FastAPI Server]
+    API --> DB[Database]
+    API --> LLM[LLM Service]
+    API --> Storage[Object Store]
+    LLM --> Provider[Model API]
+    
+    subgraph Frontend
+        UI
+    end
+    
+    subgraph Backend
+        API
+        DB
+        LLM
+        Storage
+    end
+    
+    subgraph External
+        Provider
+    end
+    
+    style Frontend fill:#f8fafc
+    style Backend fill:#ecfeff
+    style External fill:#eef2ff
 ```
 ![Architecture diagram](./architecture-highres.svg)
 
