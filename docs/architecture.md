@@ -5,9 +5,9 @@ This document contains a high-level architecture diagram for the BenchmarkOS Ana
 ```mermaid
 flowchart LR
   %% Users and UI
-  User[User / Browser]
+  User["User Browser"]
   subgraph Frontend
-    UI[SPA (Chat UI / Metrics UI)]
+    UI["SPA - Chat UI & Metrics"]
   end
 
   %% API / App
@@ -25,16 +25,16 @@ flowchart LR
 
   %% Data Stores
   subgraph Data
-    PG[(PostgreSQL + pgvector)]
-    SQLite[(SQLite) - local/dev]
-    ObjectStore[(S3 / MinIO for files)]
-    VectorStore[(Chroma / Milvus / pgvector)]
+  PG["PostgreSQL + pgvector"]
+  SQLite["SQLite (dev)"]
+  ObjectStore["S3 / MinIO"]
+  VectorStore["Chroma / Milvus / pgvector"]
   end
 
   %% External
   subgraph External
-    LLMAPI[(OpenAI / Anthropic / Local LLM)]
-    MarketData[(Market data providers / Yahoo / Xignite)]
+  LLMAPI["LLM Provider (OpenAI/Anthropic)"]
+  MarketData["Market data: Yahoo, Xignite"]
   end
 
   User --> UI
@@ -57,6 +57,7 @@ flowchart LR
 
   click UI "../docs/orchestration_playbook.md" "Open orchestration playbook"
 ```
+![Architecture diagram](./architecture-highres.svg)
 
 Notes
 - Frontend: single-page app (current packaged static HTML in `src/benchmarkos_chatbot/static/` or a separate React/Vite app). The UI handles chat, metrics table rendering, and conversation management.
@@ -101,64 +102,64 @@ flowchart LR
     classDef artifact fill:#fbcfe8,stroke:#db2777,stroke-width:2px,color:#831843,font-weight:bold
 
     subgraph FE["Front-End Channels"]
-        WebUI["Web UI\n(streaming chat)"]:::front
-        CLI["CLI\n(ad-hoc prompts)"]:::front
-        Batch["Batch API\n(partner jobs)"]:::front
-        Auth["Auth gateway\n(optional)"]:::front
+        WebUI["Web UI - streaming chat"]:::front
+        CLI["CLI - ad-hoc prompts"]:::front
+        Batch["Batch API - partner jobs"]:::front
+        Auth["Auth gateway"]:::front
     end
     style FE fill:#fffbeb,stroke:#fde68a,stroke-dasharray:8 4
 
     subgraph ORCH["Orchestration & Guardrails"]
-        Ingress["FastAPI /chat\nrequest validation"]:::orchestrator
-        Session["Chat orchestrator\ncontext & guardrails"]:::orchestrator
-        Composer["Response composer\npayload assembly"]:::orchestrator
+    Ingress["FastAPI /chat - request validation"]:::orchestrator
+    Session["Chat orchestrator - context & guardrails"]:::orchestrator
+    Composer["Response composer"]:::orchestrator
     end
     style ORCH fill:#ecfdf5,stroke:#bbf7d0,stroke-dasharray:8 4
 
     subgraph LLM["LLM Layer"]
-        Planner["Planner LLM\n(intent & SQL plan)"]:::llm
-        Generator["Narrative LLM\n(response drafting)"]:::llm
+    Planner["Planner LLM - intent & plan"]:::llm
+    Generator["Generator LLM - drafting"]:::llm
     end
     style LLM fill:#eef2ff,stroke:#c7d2fe,stroke-dasharray:8 4
 
     subgraph ANALYTICS["Analytics & Insights"]
-        Analytics["Analytics engine\nSQL + metric compute"]:::data
-        Metrics["Metrics API\n& calculators"]:::data
-        Facts["Facts API\nscenario models"]:::data
-        Insights["Insight formatter\nnarrative blocks"]:::data
+    Analytics["Analytics engine: SQL & metrics"]:::data
+    Metrics["Metrics API & calculators"]:::data
+    Facts["Facts API - scenario models"]:::data
+    Insights["Insight formatter"]:::data
     end
     style ANALYTICS fill:#f0f9ff,stroke:#bae6fd,stroke-dasharray:8 4
 
     subgraph DATA["Data & Storage"]
-        Database["Operational database\n(conversations, metrics, quotes)"]:::data
-        Audit["Audit trail\nlineage & replay"]:::data
+    Database["Operational DB - conversations & metrics"]:::data
+    Audit["Audit trail & lineage"]:::data
     end
     style DATA fill:#f8fafc,stroke:#bae6fd,stroke-dasharray:8 4
 
     subgraph INGEST["Ingestion & Background"]
-        Ingestion["Ingestion manager\non-demand loaders"]:::orchestrator
-        Queue["Task queue\n(background jobs)"]:::ops
+    Ingestion["Ingestion manager"]:::orchestrator
+    Queue["Task queue (background)"]:::ops
     end
     style INGEST fill:#f5f3ff,stroke:#e9d5ff,stroke-dasharray:8 4
 
     subgraph OPS["Platform Operations"]
-        Keyring["Secrets vault\n(API keys)"]:::ops
-        Config["Config (.env)\nfeature flags"]:::ops
-        Observability["Observability\nlogs & health"]:::ops
+    Keyring["Secrets vault"]:::ops
+    Config["Config & feature flags"]:::ops
+    Observability["Observability - logs & health"]:::ops
     end
     style OPS fill:#f8fafc,stroke:#cbd5f5,stroke-dasharray:8 4
 
     subgraph ARTIFACT["Delivery & Artifacts"]
-        ChatSurface["Chat surfaces\n(web, CLI transcripts)"]:::artifact
-        Exporters["Artifact exporters\n(CSV, PPTX, PDF)"]:::artifact
+    ChatSurface["Chat surfaces"]:::artifact
+    Exporters["Exporters (CSV, PPTX, PDF)"]:::artifact
     end
     style ARTIFACT fill:#fff5f7,stroke:#fbcfe8,stroke-dasharray:8 4
 
     subgraph SOURCES["External Data Providers"]
-        Edgar["SEC EDGAR"]:::external
-        Yahoo["Yahoo Finance"]:::external
-        Stooq["Stooq"]:::external
-        Bloomberg["Bloomberg\n(optional)"]:::external
+    Edgar["SEC EDGAR"]:::external
+    Yahoo["Yahoo Finance"]:::external
+    Stooq["Stooq"]:::external
+    Bloomberg["Bloomberg (optional)"]:::external
     end
     style SOURCES fill:#faf5ff,stroke:#e9d5ff,stroke-dasharray:8 4
 
