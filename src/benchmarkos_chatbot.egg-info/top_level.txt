@@ -1,1 +1,4 @@
 benchmarkos_chatbot
+cache
+ingest_companyfacts
+load_ticker_cik

@@ -1,0 +1,20 @@
+{
+  "Workday": "DAY",
+  "CDAY": "DAY",
+  "Fiserv": "FI",
+  "FISV": "FI",
+  "ANSYS": "ANSS",
+  "Discover Financial": "DFS",
+  "Discover": "DFS",
+  "Hess": "HES",
+  "Juniper Networks": "JNPR",
+  "Marathon Oil": "MRO",
+  "Healthpeak Properties": "PEAK",
+  "Pioneer Natural Resources": "XOM",
+  "Walgreens Boots Alliance": "WBA",
+  "WestRock": "WRK",
+  "Cerner": "ORCL",
+  "Catalent": "CTLT",
+  "FleetCor": "FLT",
+  "Foot Locker": "FL"
+}

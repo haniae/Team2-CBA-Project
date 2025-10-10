@@ -98,6 +98,7 @@ class Settings:
     bloomberg_host: Optional[str]
     bloomberg_port: Optional[int]
     bloomberg_timeout: float
+    disable_quote_refresh: bool
 
     @property
     def sqlite_uri(self) -> str:
@@ -271,6 +272,7 @@ def load_settings() -> Settings:
         bloomberg_host=bloomberg_host,
         bloomberg_port=bloomberg_port,
         bloomberg_timeout=bloomberg_timeout,
+        disable_quote_refresh=_env_flag("DISABLE_QUOTE_REFRESH", default=False),
     )
 
 

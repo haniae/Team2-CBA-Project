@@ -7,8 +7,12 @@ from __future__ import annotations
 
 import re
 import uuid
+import json
+import requests
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from . import database
@@ -18,7 +22,191 @@ from .data_ingestion import IngestionReport, ingest_financial_data, ingest_live_
 from .llm_client import LLMClient, build_llm_client
 from .table_renderer import render_table_command, METRIC_DEFINITIONS
 
+LOGGER = logging.getLogger(__name__)
+
+# --------------------------------------------------------------------------------------
+# Company name → ticker resolver built from SEC company_tickers.json + local aliases
+# --------------------------------------------------------------------------------------
+class _CompanyNameIndex:
+    _SUFFIXES = (
+        "inc", "inc.", "corporation", "corp", "corp.", "co", "co.",
+        "company", "ltd", "ltd.", "plc", "llc", "lp", "s.a.", "sa",
+        "holdings", "holding", "group"
+    )
+
+    @staticmethod
+    def _normalize(s: str) -> str:
+        s = s.lower().strip()
+        s = re.sub(r"[^a-z0-9 &\-]", " ", s)
+        s = re.sub(r"\s+", " ", s).strip()
+        parts = [p for p in s.split(" ") if p]
+        while parts and parts[-1] in _CompanyNameIndex._SUFFIXES:
+            parts.pop()
+        return " ".join(parts)
+
+    def __init__(self) -> None:
+        self.by_exact: Dict[str, str] = {}        # normalized name -> ticker
+        self.rows: List[tuple[str, str]] = []     # (normalized name, ticker)
+        self._add_builtin_aliases()
+
+    def _add_builtin_aliases(self) -> None:
+        """Seed the index with a handful of high-usage aliases."""
+        extras = {
+            # Mega-cap technology
+            "apple": "AAPL",
+            "apple inc": "AAPL",
+            "apple incorporated": "AAPL",
+            "apple computer": "AAPL",
+            "microsoft": "MSFT",
+            "microsoft corp": "MSFT",
+            "microsoft corporation": "MSFT",
+            "google": "GOOGL",
+            "alphabet": "GOOGL",
+            "alphabet inc": "GOOGL",
+            "amazon": "AMZN",
+            "amazon.com": "AMZN",
+            "meta": "META",
+            "facebook": "META",
+            "tesla": "TSLA",
+            "tesla motors": "TSLA",
+            "nvidia": "NVDA",
+            "nvidia corporation": "NVDA",
+            # Financial heavyweights
+            "jpmorgan": "JPM",
+            "jpmorgan chase": "JPM",
+            "goldman sachs": "GS",
+            "bank of america": "BAC",
+            # Consumer staples
+            "coca cola": "KO",
+            "coca-cola": "KO",
+            "pepsi": "PEP",
+            "pepsico": "PEP",
+            # Industrials / others
+            "berkshire hathaway": "BRK-B",
+            "berkshire": "BRK-B",
+        }
+        for name, ticker in extras.items():
+            norm = self._normalize(name)
+            if not norm or not ticker:
+                continue
+            ticker = ticker.upper()
+            if norm not in self.by_exact:
+                self.by_exact[norm] = ticker
+                self.rows.append((norm, ticker))
+
+    def build_from_sec(self, base_url: str, user_agent: str, timeout: float = 20.0) -> None:
+        """Populate the index from the SEC company_tickers payload with graceful fallbacks."""
+        candidate_urls = [
+            f"{base_url.rstrip('/')}/files/company_tickers.json",
+        ]
+        if "sec.gov" not in base_url or base_url.rstrip("/").endswith("data.sec.gov"):
+            candidate_urls.append("https://www.sec.gov/files/company_tickers.json")
+
+        payload = None
+        last_error: Optional[Exception] = None
+        headers = {
+            "User-Agent": user_agent,
+            "Accept": "application/json",
+        }
+        for url in candidate_urls:
+            try:
+                response = requests.get(url, timeout=timeout, headers=headers)
+                response.raise_for_status()
+                payload = response.json()
+                break
+            except Exception as exc:  # pragma: no cover - network dependent
+                last_error = exc
+                LOGGER.warning("Unable to fetch SEC company tickers from %s: %s", url, exc)
+
+        if payload is None:
+            if last_error:
+                raise last_error
+            raise RuntimeError("SEC company ticker payload could not be retrieved.")
+
+        entries = payload.values() if isinstance(payload, dict) else payload
+
+        for e in entries:
+            title = str(e.get("title") or e.get("name") or "").strip()
+            ticker = str(e.get("ticker") or "").upper().strip()
+            if not title or not ticker:
+                continue
+            norm = self._normalize(title)
+            if norm:
+                if norm not in self.by_exact or "-" not in ticker:  # prefer common shares
+                    self.by_exact[norm] = ticker
+                self.rows.append((norm, ticker))
+
+        # friendly short names (seed)
+        extras = {
+            "alphabet": "GOOGL",
+            "google": "GOOGL",
+            "meta": "META",
+            "facebook": "META",
+            "berkshire hathaway": "BRK-B",
+            "berkshire": "BRK-B",
+            "coca cola": "KO",
+            "coca-cola": "KO",
+        }
+        for k, v in extras.items():
+            self.by_exact.setdefault(self._normalize(k), v)
+
+    def load_local_aliases(self, path: str | Path) -> None:
+        try:
+            p = Path(path)
+            if p.exists():
+                data = json.loads(p.read_text(encoding="utf-8"))
+                added = 0
+                for k, v in (data or {}).items():
+                    norm = self._normalize(k)
+                    if norm and v and norm not in self.by_exact:
+                        self.by_exact[norm] = str(v).upper()
+                        self.rows.append((norm, self.by_exact[norm]))
+                        added += 1
+                LOGGER.info("Loaded %d local name aliases from %s", added, p)
+            else:
+                LOGGER.warning("Local alias file not found: %s", p)
+        except Exception:
+            LOGGER.exception("Failed loading local alias file %s", path)
+
+    def resolve(self, phrase: str) -> Optional[str]:
+        if not phrase:
+            return None
+        q = self._normalize(phrase)
+        if not q:
+            return None
+
+        # 1) exact normalized
+        t = self.by_exact.get(q)
+        if t:
+            return t
+
+        # 2) prefix (e.g., "apple" vs "apple computer")
+        for name, tic in self.rows:
+            if name.startswith(q):
+                return tic
+
+        # 3) contains (e.g., "bank of america" vs "bank of america corp")
+        for name, tic in self.rows:
+            if q in name:
+                return tic
+
+        # 4) light token-overlap score
+        q_tokens = set(q.split())
+        best, best_score = None, 0.0
+        for name, tic in self.rows:
+            n_tokens = set(name.split())
+            inter = len(q_tokens & n_tokens)
+            if not inter:
+                continue
+            score = inter / max(len(q_tokens), 1)
+            if score > best_score:
+                best, best_score = tic, score
+        return best
+
+
+# --------------------------------------------------------------------------------------
 # Metric formatting categories mirrored from analytics_engine.generate_summary
+# --------------------------------------------------------------------------------------
 PERCENT_METRICS = {
     "revenue_cagr_3y",
     "eps_cagr_3y",
@@ -43,7 +231,6 @@ MULTIPLE_METRICS = {
     "pb_ratio",
 }
 
-
 # Metrics highlighted in retrieval-augmented context for the language model.
 CONTEXT_SUMMARY_METRICS: Sequence[str] = (
     "revenue",
@@ -62,7 +249,7 @@ _METRIC_LABEL_MAP: Dict[str, str] = {
 
 _TICKER_TOKEN_PATTERN = re.compile(r"\b[A-Z]{1,5}(?:-[A-Z]{1,2})?\b")
 _COMPANY_PHRASE_PATTERN = re.compile(
-    r"\b(?:[A-Z][A-Za-z&.]+(?:\s+[A-Z][A-Za-z&.]+){0,3})\b"
+    r"\b(?:[A-Za-z][A-Za-z&.]+(?:\s+[A-Za-z][A-Za-z&.]+){0,3})\b"
 )
 _COMMON_WORDS = {
     "AND",
@@ -123,6 +310,8 @@ class BenchmarkOSChatbot:
     analytics_engine: AnalyticsEngine
     ingestion_report: Optional[IngestionReport] = None
     conversation: Conversation = field(default_factory=Conversation)
+    # new: SEC-backed index
+    name_index: _CompanyNameIndex = field(default_factory=_CompanyNameIndex)
 
     @classmethod
     def create(cls, settings: Settings) -> "BenchmarkOSChatbot":
@@ -152,16 +341,259 @@ class BenchmarkOSChatbot:
         analytics_engine = AnalyticsEngine(settings)
         analytics_engine.refresh_metrics(force=True)
 
+        # Build the SEC-backed name index once; always attempt local alias fallback
+        index = _CompanyNameIndex()
+        base = getattr(settings, "edgar_base_url", None) or "https://www.sec.gov"
+        ua = getattr(settings, "sec_api_user_agent", None) or "BenchmarkOSBot/1.0 (support@benchmarkos.com)"
+        try:
+            index.build_from_sec(base, ua)
+            LOGGER.info("SEC company index built with %d names", len(index.by_exact))
+        except Exception as e:
+            LOGGER.warning("SEC company index build failed: %s", e)
+
+        # Always attempt local fallback (data/name_aliases.json)
+        try:
+            alias_path = Path(__file__).resolve().parent.parent / "data" / "name_aliases.json"
+            index.load_local_aliases(alias_path)
+        except Exception:
+            LOGGER.exception("Failed while loading local aliases")
+
+        LOGGER.info("Final name->ticker index size: %d", len(index.by_exact))
+
         return cls(
             settings=settings,
             llm_client=llm_client,
             analytics_engine=analytics_engine,
             ingestion_report=ingestion_report,
+            name_index=index,
         )
 
+    # ----------------------------------------------------------------------------------
+    # NL → command normalization (accept natural company names)
+    # ----------------------------------------------------------------------------------
+    def _name_to_ticker(self, term: str) -> Optional[str]:
+        """Resolve free-text company names to tickers using:
+           1) engine.lookup_ticker (if provided)
+           2) SEC-backed name index (exact/prefix/contains/token overlap)
+           3) local alias fallback
+        """
+        if not term:
+            return None
+        t = term.strip()
+
+        # engine's own mapping first
+        lookup = getattr(self.analytics_engine, "lookup_ticker", None)
+        if callable(lookup):
+            try:
+                tk = lookup(t, allow_partial=True)  # type: ignore[misc]
+            except TypeError:
+                tk = lookup(t)  # type: ignore[misc]
+            except Exception:
+                tk = None
+            if tk:
+                return tk.upper()
+
+        # SEC/local name index
+        tk = self.name_index.resolve(t)
+        if tk:
+            return tk.upper()
+
+        return None
+
+    def _normalize_nl_to_command(self, text: str) -> Optional[str]:
+        """Turn flexible NL prompts into the strict CLI-style commands this class handles."""
+        t = text.strip()
+
+        def _canon_year_span(txt: str) -> Optional[str]:
+            if not txt:
+                return None
+            m = re.search(r"(?:FY\s*)?(\d{4})\s*(?:[-/]\s*(?:FY\s*)?(\d{4}))?$", txt.strip(), re.IGNORECASE)
+            if not m:
+                return None
+            a = int(m.group(1)); b = int(m.group(2)) if m.group(2) else None
+            if b and b < a:
+                a, b = b, a
+            return f"{a}-{b}" if b else f"{a}"
+
+        def _split_entities(value: str) -> List[str]:
+            s = value.strip().strip(",")
+            if not s:
+                return []
+            quoted = re.findall(r'"([^"]+)"|\'([^\']+)\'', s)
+            taken, out = set(), []
+            for a, b in quoted:
+                name = (a or b).strip()
+                if name:
+                    out.append(name); taken.add(name)
+            s_clean = re.sub(r'"[^"]+"|\'[^\']+\'', "", s).strip()
+            parts = [p for p in re.split(r"\s*,\s*", s_clean)] if "," in s_clean else \
+                    [p for p in re.split(r"\s+and\s+", s_clean, flags=re.IGNORECASE)]
+            for p in parts:
+                p = p.strip()
+                if p and p not in taken:
+                    out.append(p)
+            return out or [s]
+
+        def _to_ticker(name_or_ticker: str) -> str:
+            return (self._name_to_ticker(name_or_ticker) or name_or_ticker).upper()
+
+        lower = t.lower()
+        skip_prefixes = (
+            "metrics",
+            "metric ",
+            "compare",
+            "versus",
+            "vs ",
+            "vs.",
+            "fact",
+            "facts",
+            "audit",
+            "ingest",
+            "fetch",
+            "hydrate",
+            "update",
+            "scenario",
+            "what-if",
+            "what if",
+            "table",
+        )
+        metric_terms = {
+            "eps",
+            "ebitda",
+            "roe",
+            "roa",
+            "fcf",
+            "peg",
+            "pe",
+            "p/e",
+            "cagr",
+        }
+
+        if not any(lower.startswith(prefix) for prefix in skip_prefixes):
+            detected_entities = self._detect_tickers(text)
+
+            def _has_metrics(candidate: str) -> bool:
+                try:
+                    records = self.analytics_engine.get_metrics(candidate)
+                except Exception:
+                    return False
+                return bool(records)
+
+            ordered_subjects: List[str] = []
+            seen_subjects: set[str] = set()
+            ticker_pattern = re.compile(r"[A-Z]{1,5}(?:-[A-Z]{1,2})?")
+
+            for raw in detected_entities:
+                candidate = self._name_to_ticker(raw)
+                if candidate:
+                    resolved = candidate.upper()
+                else:
+                    upper_raw = raw.upper()
+                    if not ticker_pattern.fullmatch(upper_raw):
+                        continue
+                    if not _has_metrics(upper_raw):
+                        continue
+                    resolved = upper_raw
+
+                if resolved.lower() in metric_terms:
+                    continue
+                if resolved in seen_subjects:
+                    continue
+                seen_subjects.add(resolved)
+                ordered_subjects.append(resolved)
+
+            if ordered_subjects:
+                span_match = re.search(
+                    r"(?:fy\s*)?\d{4}(?:\s*[-/]\s*(?:fy\s*)?\d{4})?",
+                    t,
+                    re.IGNORECASE,
+                )
+                period_token = _canon_year_span(span_match.group(0)) if span_match else None
+
+                compare_triggers = bool(
+                    re.search(r"\b(compare|versus|vs\.?|against|between|relative)\b", lower)
+                    or "better than" in lower
+                    or "outperform" in lower
+                    or "beats" in lower
+                )
+                if compare_triggers and len(ordered_subjects) >= 2:
+                    parts = ["compare", *ordered_subjects]
+                    if period_token:
+                        parts.append(period_token)
+                    return " ".join(parts)
+
+                parts = ["metrics", *ordered_subjects]
+                if period_token:
+                    parts.append(period_token)
+                return " ".join(parts)
+
+        # METRICS
+        m = re.match(
+            r'^(?:show|give me|get|what (?:are|is) the|list)?\s*(?:kpis?|metrics?|financials?)\s+(?:for\s+)?(?P<ents>.+?)(?:\s+(?:in|for)\s+(?P<per>(?:fy)?\d{4}(?:\s*[-/]\s*(?:fy)?\d{4})?))?\s*$',
+            t, re.IGNORECASE,
+        )
+        if m:
+            tickers = [_to_ticker(e) for e in _split_entities(m.group("ents")) if e]
+            per = _canon_year_span(m.group("per") or "")
+            if tickers:
+                return " ".join(["metrics", *tickers, *(per and [per] or [])])
+
+        # COMPARE
+        m = re.match(r"^(?:compare|versus|vs\.?|against)\s+(?P<body>.+)$", t, re.IGNORECASE)
+        if m:
+            body = m.group("body").strip()
+            yr = None
+            myr = re.search(r"(\d{4})\s*$", body)
+            if myr:
+                yr = myr.group(1); body = body[: myr.start()].strip()
+            parts = re.split(r"\s*(?:,|&|/|\s+vs\.?\s+|\s+versus\s+|\s+against\s+|\s+and\s+)\s*", body, maxsplit=1, flags=re.IGNORECASE)
+            if len(parts) == 2 and parts[0] and parts[1]:
+                a, b = _to_ticker(parts[0]), _to_ticker(parts[1])
+                return " ".join(filter(None, ["compare", a, b, yr]))
+
+        # FACTS
+        m = re.match(r'^(?:show|get|give me)?\s*(?:fact|facts?)\s+(?:for\s+)?(?P<e>.+?)\s+(?:fy)?(?P<y>\d{4})(?:\s+(?P<mtr>[A-Za-z0-9_]+))?\s*$', t, re.IGNORECASE)
+        if m:
+            tk = _to_ticker(_split_entities(m.group("e"))[0])
+            return " ".join(filter(None, ["fact", tk, m.group("y"), m.group("mtr")]))
+
+        # AUDIT
+        m = re.match(r'^(?:show|get|give me)?\s*(?:audit|audit trail|ingestion log)s?\s+(?:for\s+)?(?P<e>.+?)(?:\s+(?:fy)?(?P<y>\d{4}))?\s*$', t, re.IGNORECASE)
+        if m:
+            tk = _to_ticker(_split_entities(m.group("e"))[0])
+            return " ".join(filter(None, ["audit", tk, m.group("y")]))
+
+        # INGEST
+        m = re.match(r"^(?:ingest|fetch|hydrate|update)\s+(?P<e>.+?)(?:\s+(?P<yrs>\d{1,2}))?\s*$", t, re.IGNORECASE)
+        if m:
+            tk = _to_ticker(_split_entities(m.group("e"))[0])
+            return " ".join(filter(None, ["ingest", tk, m.group("yrs")]))
+
+        # SCENARIO / WHAT-IF
+        m = re.match(r"^(?:scenario|what[- ]?if)\s+(?P<e>.+?)\s+(?P<name>[A-Za-z0-9_\-]+)(?:\s+(?P<rest>.*))?$", t, re.IGNORECASE)
+        if m:
+            tk = _to_ticker(_split_entities(m.group("e"))[0])
+            rest = (m.group("rest") or "")
+            rest_norm = []
+            for tok in re.split(r"\s+", rest.strip()):
+                if not tok:
+                    continue
+                tl = tok.lower()
+                if tl.startswith(("rev=", "revenue=")):
+                    rest_norm.append("rev=" + tok.split("=", 1)[1])
+                elif tl.startswith(("margin=", "ebitda=", "ebitda_margin=")):
+                    rest_norm.append("margin=" + tok.split("=", 1)[1])
+                elif tl.startswith(("mult=", "multiple=")):
+                    rest_norm.append("mult=" + tok.split("=", 1)[1])
+            return " ".join(["scenario", tk, m.group("name"), *rest_norm]).strip()
+
+        return None
+
+    # ----------------------------------------------------------------------------------
+    # Public API
+    # ----------------------------------------------------------------------------------
     def ask(self, user_input: str) -> str:
         """Generate a reply and persist both sides of the exchange."""
-
         timestamp = datetime.utcnow()
         database.log_message(
             self.settings.database_path,
@@ -171,6 +603,21 @@ class BenchmarkOSChatbot:
             created_at=timestamp,
         )
         self.conversation.messages.append({"role": "user", "content": user_input})
+
+        # Try to normalize natural text into a concrete command first
+        normalized = self._normalize_nl_to_command(user_input)
+        if normalized and normalized.strip().lower() != user_input.strip().lower():
+            reply = self._handle_financial_intent(normalized)
+            if reply is not None:
+                database.log_message(
+                    self.settings.database_path,
+                    self.conversation.conversation_id,
+                    role="assistant",
+                    content=reply,
+                    created_at=datetime.utcnow(),
+                )
+                self.conversation.messages.append({"role": "assistant", "content": reply})
+                return reply
 
         reply = self._handle_financial_intent(user_input)
         if reply is None:
@@ -192,20 +639,17 @@ class BenchmarkOSChatbot:
 
     def history(self) -> Iterable[database.Message]:
         """Return the stored conversation from the database."""
-
         return database.fetch_conversation(
             self.settings.database_path, self.conversation.conversation_id
         )
 
     def reset(self) -> None:
         """Start a fresh conversation while keeping the same configuration."""
-
         self.conversation = Conversation()
 
-    # ------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------
     # Intent handling helpers
-    # ------------------------------------------------------------------
-
+    # ----------------------------------------------------------------------------------
     def _handle_financial_intent(self, text: str) -> Optional[str]:
         """Handle natural-language requests that map to metrics workflows."""
         metrics_request = self._parse_metrics_request(text)
@@ -229,8 +673,15 @@ class BenchmarkOSChatbot:
                     "  fact <TICKER> <YEAR> [metric]                     - show raw financial facts",
                     "  audit <TICKER> [YEAR]                             - recent audit trail entries",
                     "  ingest <TICKER> [years]                           - fetch SEC/Yahoo data and refresh",
-                    "  scenario <T> <NAME> rev=+5% margin=+1% mult=+0.5% - run what-if",
-                    "  anything else                                    - answered via the language model",
+                    "  scenario <T> <NAME> rev=+5% margin=+1% mult=+0.5  - run what-if",
+                    "",
+                    "Natural examples:",
+                    "  show KPIs for Apple in 2022-2024",
+                    "  compare Apple and Microsoft 2023",
+                    "  facts for Amazon FY2022 revenue",
+                    "  audit trail for Tesla",
+                    "  fetch Meta 5",
+                    "  what-if Alphabet bull rev=+8% margin=+1.5% mult=+0.5",
                 ]
             )
             return help_text
@@ -257,6 +708,7 @@ class BenchmarkOSChatbot:
             return self._handle_scenario_command(text)
 
         return None
+
     def _handle_metrics_comparison(self, tokens: Sequence[str]) -> str:
         """Render a comparison table for the resolved tickers/metrics."""
         cleaned_tokens: List[str] = []
@@ -293,7 +745,6 @@ class BenchmarkOSChatbot:
             tickers,
             period_filters=period_filters,
         )
-
 
     def _handle_ingest_command(self, text: str) -> str:
         """Execute ingestion commands issued by the user."""
@@ -349,8 +800,9 @@ class BenchmarkOSChatbot:
         )
         return getattr(summary, 'narrative', str(summary))
 
+    # ----------------------------------------------------------------------------------
     # Fact and audit helpers
-    # ------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------
     def _handle_fact_command(self, text: str) -> str:
         """Return detailed fact rows for the requested ticker/year."""
         match = re.match(r"fact\s+([A-Za-z0-9.-]+)\s+(?:FY)?(\d{4})(?:\s+([A-Za-z0-9_]+))?", text, re.IGNORECASE)
@@ -428,9 +880,9 @@ class BenchmarkOSChatbot:
             )
         return "\n".join(lines_out)
 
+    # ----------------------------------------------------------------------------------
     # Parsing helpers
-    # ------------------------------------------------------------------
-
+    # ----------------------------------------------------------------------------------
     @staticmethod
     def _parse_percent(value: str) -> float:
         """Interpret percentage tokens and return them as floats."""
@@ -455,7 +907,7 @@ class BenchmarkOSChatbot:
             tickers=tickers,
             period_filters=period_filters,
         )
-    # ------------------------------------------------------------------
+
     def _split_tickers_and_periods(
         self, tokens: Sequence[str]
     ) -> tuple[List[str], Optional[List[tuple[int, int]]]]:
@@ -490,9 +942,10 @@ class BenchmarkOSChatbot:
         if end < start:
             start, end = end, start
         return (start, end)
-    # Metrics formatting helpers
-    # ------------------------------------------------------------------
 
+    # ----------------------------------------------------------------------------------
+    # Metrics formatting helpers
+    # ----------------------------------------------------------------------------------
     @dataclass
     class _MetricsRequest:
         """Structured representation of a parsed metrics request."""
@@ -522,6 +975,8 @@ class BenchmarkOSChatbot:
                         resolved = None
                 except Exception:
                     resolved = None
+            if not resolved:
+                resolved = self._name_to_ticker(subject)
             if resolved:
                 resolved = resolved.upper()
                 if resolved not in available:
@@ -687,7 +1142,6 @@ class BenchmarkOSChatbot:
 
     def _build_rag_context(self, user_input: str) -> Optional[str]:
         """Assemble finance facts to ground the LLM response."""
-
         tickers = self._detect_tickers(user_input)
         if not tickers:
             return None
@@ -732,11 +1186,11 @@ class BenchmarkOSChatbot:
 
         if not context_sections:
             return None
-        combined = "\n\n".join(context_sections)
+        combined = "\n".join(context_sections)
         return "Financial context:\n" + combined
 
     def _detect_tickers(self, text: str) -> List[str]:
-        """Best-effort ticker extraction from user text."""
+        """Best-effort ticker extraction from user text (tickers + company names)."""
         candidates: List[str] = []
         seen = set()
 
@@ -748,35 +1202,17 @@ class BenchmarkOSChatbot:
                 seen.add(normalized)
                 candidates.append(normalized)
 
-        lookup = getattr(self.analytics_engine, "lookup_ticker", None)
-
-        def _try_lookup(term: str) -> Optional[str]:
-            """Attempt to fetch metrics, returning None if lookup fails."""
-            if not callable(lookup):
-                return None
-            try:
-                return lookup(term, allow_partial=True)  # type: ignore[misc]
-            except TypeError:
-                try:
-                    return lookup(term)  # type: ignore[misc]
-                except Exception:
-                    return None
-            except Exception:
-                return None
-
-        if callable(lookup):
-            for match in _COMPANY_PHRASE_PATTERN.findall(text):
-                phrase = match.strip()
-                if not phrase:
-                    continue
-                if phrase.upper() in _COMMON_WORDS:
-                    continue
-                ticker = _try_lookup(phrase)
-                if ticker:
-                    ticker = ticker.upper()
-                    if ticker not in seen:
-                        seen.add(ticker)
-                        candidates.append(ticker)
+        # Also resolve company phrases to tickers
+        for match in _COMPANY_PHRASE_PATTERN.findall(text):
+            phrase = match.strip()
+            if not phrase:
+                continue
+            if phrase.upper() in _COMMON_WORDS:
+                continue
+            ticker = self._name_to_ticker(phrase)
+            if ticker and ticker not in seen:
+                seen.add(ticker)
+                candidates.append(ticker)
 
         return candidates
 

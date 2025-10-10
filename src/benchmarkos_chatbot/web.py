@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,31 +14,40 @@ from pydantic import BaseModel
 
 from . import AnalyticsEngine, BenchmarkOSChatbot, database, load_settings
 
-ALLOWED_ORIGINS = [origin.strip() for origin in (
-    Path.cwd().joinpath(".allowed_origins").read_text().splitlines()
-    if Path.cwd().joinpath(".allowed_origins").exists()
-    else []
-) if origin.strip()]
+
+# ----- CORS / Static ----------------------------------------------------------
+
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in (
+        Path.cwd().joinpath(".allowed_origins").read_text().splitlines()
+        if Path.cwd().joinpath(".allowed_origins").exists()
+        else []
+    )
+    if origin.strip()
+]
 
 app = FastAPI(title="BenchmarkOS Analyst Copilot", version="1.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS or ["*"],
     allow_credentials=True,
-    allow_methods=["*"] ,
-    allow_headers=["*"] ,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = (BASE_DIR.parent / "webui").resolve()
-PACKAGE_STATIC = (BASE_DIR / 'static').resolve()
+PACKAGE_STATIC = (BASE_DIR / "static").resolve()
+
+# prefer project-level /webui build; fall back to packaged static
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 elif PACKAGE_STATIC.exists():
-    # serve packaged static assets from the python package when project-level webui is absent
-    app.mount('/static', StaticFiles(directory=PACKAGE_STATIC), name='static')
+    app.mount("/static", StaticFiles(directory=PACKAGE_STATIC), name="static")
 
 
+# ----- Schemas ----------------------------------------------------------------
 
 class ChatRequest(BaseModel):
     """Payload expected by the /chat endpoint when posting a prompt."""
@@ -72,6 +81,8 @@ class AuditEventResponse(BaseModel):
     events: List[Dict]
 
 
+# ----- Dependencies / Singletons ---------------------------------------------
+
 @lru_cache
 def get_settings():
     """Load application settings once per process."""
@@ -102,15 +113,22 @@ def build_bot(conversation_id: Optional[str] = None) -> BenchmarkOSChatbot:
     return bot
 
 
+# ----- Routes -----------------------------------------------------------------
+
 @app.get("/")
 def root() -> FileResponse:
     """Serve the static index file, preferring the local webui build when present."""
-    # prefer project webui when present, otherwise serve packaged static index
     if FRONTEND_DIR.exists():
         return FileResponse(FRONTEND_DIR / "index.html")
     if PACKAGE_STATIC.exists():
         return FileResponse(PACKAGE_STATIC / "index.html")
     raise HTTPException(status_code=404, detail="Frontend assets are not available.")
+
+
+@app.get("/health")
+def health() -> Dict[str, str]:
+    """Lightweight liveness probe used by deployment infra."""
+    return {"status": "ok"}
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -202,6 +220,65 @@ def metrics(
     return responses
 
 
+# ---------- NEW: /compare (bypasses LLM; uses AnalyticsEngine directly) --------
+
+@app.get("/compare")
+def compare(
+    tickers: List[str] = Query(..., min_items=2, description="Repeat ?tickers=AAPL&tickers=MSFT"),
+    start_year: int | None = Query(None),
+    end_year: int | None = Query(None),
+):
+    """
+    Compare metrics across tickers using the AnalyticsEngine.
+    Returns JSON: { tickers: [...], comparison: {metric -> {period -> {ticker -> value}}} }
+    """
+    # normalize
+    tickers = [t.strip().upper() for t in tickers if t and t.strip()]
+    if len(tickers) < 2:
+        raise HTTPException(status_code=400, detail="Provide at least two tickers.")
+
+    # optional period filter
+    period_filters = None
+    if (start_year is None) ^ (end_year is None):
+        raise HTTPException(status_code=400, detail="Provide both start_year and end_year, or neither.")
+    if start_year is not None:
+        if end_year < start_year:
+            start_year, end_year = end_year, start_year
+        period_filters = [(start_year, end_year)]
+
+    engine = get_engine()
+
+    # fetch records per ticker
+    by_ticker: Dict[str, list] = {}
+    missing: list[str] = []
+    for t in tickers:
+        recs = engine.get_metrics(t, period_filters=period_filters)
+        if not recs:
+            missing.append(t)
+        else:
+            by_ticker[t] = recs
+
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Missing metrics for some tickers", "missing": missing},
+        )
+
+    # shape as {metric -> {period -> {ticker -> value}}}
+    result: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    for t, recs in by_ticker.items():
+        for r in recs:
+            m = r.metric
+            p = str(r.period)
+            v = r.value
+            result.setdefault(m, {}).setdefault(p, {})[t] = v
+
+    # sorted keys for stable UI rendering
+    result = {m: dict(sorted(pmap.items())) for m, pmap in sorted(result.items())}
+
+    return {"tickers": tickers, "comparison": result}
+
+
 @app.get("/facts", response_model=FactsResponse)
 def facts(
     ticker: str = Query(...),
@@ -259,9 +336,3 @@ def audit(
         for event in events
     ]
     return AuditEventResponse(ticker=ticker.upper(), events=payload)
-
-
-@app.get("/health")
-def health() -> Dict[str, str]:
-    """Lightweight liveness probe used by deployment infra."""
-    return {"status": "ok"}

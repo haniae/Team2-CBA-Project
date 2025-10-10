@@ -583,6 +583,9 @@ class AnalyticsEngine:
         """Ensure supplemental market quotes exist for each ticker before deriving ratios."""
         if not tickers:
             return
+        if getattr(self.settings, "disable_quote_refresh", False):
+            LOGGER.debug("Quote refresh disabled via settings; skipping Yahoo fetch for %d tickers", len(tickers))
+            return
         missing: List[str] = []
         for ticker in tickers:
             quote = database.fetch_latest_quote(self.settings.database_path, ticker)
