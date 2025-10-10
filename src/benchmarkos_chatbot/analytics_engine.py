@@ -10,7 +10,7 @@ import math
 import re
 import sqlite3
 from dataclasses import dataclass
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -18,8 +18,11 @@ from . import database
 from .config import Settings
 from .data_sources import YahooFinanceClient
 from .secdb import SecPostgresStore
+from .ticker_universe import load_ticker_universe
 
 LOGGER = logging.getLogger(__name__)
+
+BENCHMARK_LABEL = "S&P 500 Avg"
 
 @dataclass(frozen=True)
 class ScenarioSummary:
@@ -130,12 +133,137 @@ def _now() -> datetime:
 class AnalyticsEngine:
     """Provides computed metrics and fact retrieval for the web/API layer."""
 
+    BENCHMARK_LABEL = BENCHMARK_LABEL
+
     def __init__(self, settings: Settings) -> None:
         """Store runtime settings and bootstrap optional SEC store connections."""
         self.settings = settings
         self._sec_store: Optional[SecPostgresStore] = None
         if settings.database_type == "postgresql":
             self._sec_store = SecPostgresStore(settings)
+
+    def benchmark_label(self) -> str:
+        """Return the human-readable label for benchmark columns."""
+        return self.BENCHMARK_LABEL
+
+    def compute_benchmark_metrics(
+        self,
+        metrics: Sequence[str],
+        *,
+        period_filters: Optional[Sequence[Tuple[int, int]]] = None,
+        universe: str = "sp500",
+    ) -> Dict[str, database.MetricRecord]:
+        """
+        Aggregate the latest metric snapshots across a ticker universe.
+
+        Parameters
+        ----------
+        metrics:
+            Metric identifiers to aggregate (case-insensitive).
+        period_filters:
+            Optional fiscal year ranges to constrain which snapshots contribute to the
+            benchmark. When omitted the most recent observation per ticker is used.
+        universe:
+            Named ticker universe defined in :mod:`ticker_universe`.
+        """
+
+        if not metrics:
+            return {}
+
+        tickers = load_ticker_universe(universe)
+        if not tickers:
+            return {}
+
+        normalized_metrics = sorted({metric.lower() for metric in metrics})
+        metric_placeholders = ",".join("?" for _ in normalized_metrics)
+        ticker_placeholders = ",".join("?" for _ in tickers)
+
+        where_clauses = [
+            f"metric IN ({metric_placeholders})",
+            f"ticker IN ({ticker_placeholders})",
+            "value IS NOT NULL",
+        ]
+
+        params: List[Any] = list(normalized_metrics) + tickers
+        if period_filters:
+            range_clauses: List[str] = []
+            for start, end in period_filters:
+                if start is None or end is None:
+                    continue
+                if end < start:
+                    start, end = end, start
+                range_clauses.append(
+                    "(COALESCE(start_year, end_year) >= ? AND COALESCE(end_year, start_year) <= ?)"
+                )
+                params.extend([start, end])
+            if range_clauses:
+                where_clauses.append("(" + " OR ".join(range_clauses) + ")")
+
+        where_sql = " AND ".join(where_clauses)
+        query = f"""
+            WITH ranked AS (
+                SELECT
+                    ticker,
+                    metric,
+                    period,
+                    value,
+                    start_year,
+                    end_year,
+                    updated_at,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY ticker, metric
+                        ORDER BY
+                            COALESCE(end_year, -9999) DESC,
+                            COALESCE(start_year, -9999) DESC,
+                            COALESCE(updated_at, '') DESC
+                    ) AS rn
+                FROM metric_snapshots
+                WHERE {where_sql}
+            )
+            SELECT metric, period, value, start_year, end_year
+            FROM ranked
+            WHERE rn = 1
+        """
+
+        grouped: Dict[str, List[sqlite3.Row]] = defaultdict(list)
+        with sqlite3.connect(self.settings.database_path) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(query, params).fetchall()
+            for row in rows:
+                metric_name = (row["metric"] or "").lower()
+                value = _to_float(row["value"])
+                if value is None:
+                    continue
+                grouped[metric_name].append(row)
+
+        if not grouped:
+            return {}
+
+        benchmark_records: Dict[str, database.MetricRecord] = {}
+        timestamp = _now()
+        for metric_name, rows in grouped.items():
+            values = [_to_float(row["value"]) for row in rows]
+            numeric_values = [value for value in values if value is not None]
+            if not numeric_values:
+                continue
+
+            average_value = sum(numeric_values) / len(numeric_values)
+            period_label = _most_common([row["period"] for row in rows])
+            start_year = _most_common([row["start_year"] for row in rows])
+            end_year = _most_common([row["end_year"] for row in rows])
+
+            benchmark_records[metric_name] = database.MetricRecord(
+                ticker=self.BENCHMARK_LABEL,
+                metric=metric_name,
+                period=str(period_label) if period_label else self.BENCHMARK_LABEL,
+                value=average_value,
+                source="benchmark",
+                updated_at=timestamp,
+                start_year=int(start_year) if isinstance(start_year, int) else None,
+                end_year=int(end_year) if isinstance(end_year, int) else None,
+            )
+
+        return benchmark_records
 
     def refresh_metrics(self, *, force: bool = False) -> None:
         """Compute or refresh metric snapshots using the latest financial facts."""
@@ -702,6 +830,15 @@ def _calc_growth(previous: Optional[float], current: Optional[float]) -> Optiona
     if prev_val in (None, 0) or curr_val is None:
         return None
     return (curr_val - prev_val) / abs(prev_val)
+
+
+def _most_common(values: Sequence[Any]) -> Optional[Any]:
+    """Return the most frequent non-null entry in ``values``."""
+    filtered = [value for value in values if value not in (None, "")]
+    if not filtered:
+        return None
+    counter = Counter(filtered)
+    return counter.most_common(1)[0][0]
 
 
 def _compute_derived_metrics(

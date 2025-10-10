@@ -7,11 +7,19 @@ from main import _try_table_command
 
 
 class StubEngine:
-    def __init__(self, records):
+    def __init__(self, records, benchmark=None, benchmark_label="S&P 500 Avg"):
         self._records = records
+        self._benchmark = benchmark
+        self._benchmark_label = benchmark_label
 
     def get_metrics(self, ticker, period_filters=None):
         return self._records.get(ticker, [])
+
+    def compute_benchmark_metrics(self, metrics, period_filters=None):
+        return self._benchmark or {}
+
+    def benchmark_label(self):
+        return self._benchmark_label
 
 
 def _record(ticker: str, metric: str, period: str, value: float, year: int):
@@ -87,4 +95,20 @@ def test_compare_command_defaults():
     assert output is not None
     assert "Metric" in output
     assert "AAPL" in output and "MSFT" in output
+
+
+def test_compare_command_adds_benchmark_column_when_available():
+    benchmark = {
+        "revenue": _record("S&P 500 Avg", "revenue", "FY2024", 95.0, 2024),
+    }
+    engine = StubEngine(
+        {
+            "AAPL": [_record("AAPL", "revenue", "FY2024", 100.0, 2024)],
+            "MSFT": [_record("MSFT", "revenue", "FY2024", 90.0, 2024)],
+        },
+        benchmark=benchmark,
+    )
+    output = _try_table_command("compare AAPL MSFT metrics revenue", engine)
+    assert output is not None
+    assert "S&P 500 Avg" in output
 

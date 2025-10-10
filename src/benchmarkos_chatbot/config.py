@@ -161,9 +161,9 @@ def load_settings() -> Settings:
         )
     database_type: DatabaseType = database_type_env  # type: ignore[assignment]
 
-    database_path = Path(
-        os.getenv("DATABASE_PATH", Path.cwd() / "benchmarkos_chatbot.sqlite3")
-    ).expanduser()
+    default_sqlite_path = Path.cwd() / "data" / "sqlite" / "benchmarkos_chatbot.sqlite3"
+    database_path = Path(os.getenv("DATABASE_PATH", default_sqlite_path)).expanduser()
+    database_path.parent.mkdir(parents=True, exist_ok=True)
 
     # PostgreSQL configuration
     postgres_host = os.getenv("POSTGRES_HOST")

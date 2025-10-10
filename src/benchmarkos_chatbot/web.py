@@ -264,6 +264,35 @@ def compare(
             detail={"error": "Missing metrics for some tickers", "missing": missing},
         )
 
+    display_tickers = list(tickers)
+    benchmark_label: Optional[str] = None
+    compute_benchmark = getattr(engine, "compute_benchmark_metrics", None)
+    if callable(compute_benchmark):
+        metric_names = sorted(
+            {
+                record.metric
+                for records in by_ticker.values()
+                for record in records
+                if record.metric
+            }
+        )
+        try:
+            benchmark_metrics = compute_benchmark(
+                metric_names,
+                period_filters=period_filters,
+            )
+        except Exception:
+            benchmark_metrics = {}
+        if benchmark_metrics:
+            label_getter = getattr(engine, "benchmark_label", None)
+            benchmark_label = (
+                label_getter()
+                if callable(label_getter)
+                else getattr(engine, "BENCHMARK_LABEL", "Benchmark")
+            )
+            by_ticker[benchmark_label] = list(benchmark_metrics.values())
+            display_tickers.append(benchmark_label)
+
     # shape as {metric -> {period -> {ticker -> value}}}
     result: Dict[str, Dict[str, Dict[str, Any]]] = {}
     for t, recs in by_ticker.items():
@@ -276,7 +305,7 @@ def compare(
     # sorted keys for stable UI rendering
     result = {m: dict(sorted(pmap.items())) for m, pmap in sorted(result.items())}
 
-    return {"tickers": tickers, "comparison": result}
+    return {"tickers": display_tickers, "comparison": result}
 
 
 @app.get("/facts", response_model=FactsResponse)

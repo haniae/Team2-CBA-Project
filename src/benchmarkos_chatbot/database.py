@@ -162,6 +162,7 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
         _ensure_column(connection, "financial_facts", "fiscal_period", "TEXT")
         _ensure_column(connection, "financial_facts", "period", "TEXT NOT NULL DEFAULT ''")
         _ensure_column(connection, "financial_facts", "unit", "TEXT")
+        _ensure_column(connection, "financial_facts", "company_name", "TEXT NOT NULL DEFAULT ''")
         _ensure_column(connection, "financial_facts", "source", "TEXT NOT NULL DEFAULT 'edgar'")
         _ensure_column(connection, "financial_facts", "source_filing", "TEXT NOT NULL DEFAULT ''")
         _ensure_column(connection, "financial_facts", "raw", "TEXT NOT NULL DEFAULT '{}'")
@@ -282,6 +283,7 @@ def initialise(database_path: Path) -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cik TEXT NOT NULL,
                 ticker TEXT NOT NULL,
+                company_name TEXT NOT NULL DEFAULT '',
                 metric TEXT NOT NULL,
                 fiscal_year INTEGER,
                 fiscal_period TEXT,
@@ -541,7 +543,7 @@ def bulk_upsert_financial_facts(
                 unit, source_filing, raw, period_start, period_end, adjusted,
                 adjustment_note, source, ingested_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(ticker, fiscal_year, metric) DO UPDATE SET
+            ON CONFLICT(ticker, metric, period, source, source_filing) DO UPDATE SET
                 cik = excluded.cik,
                 company_name = excluded.company_name,
                 fiscal_period = excluded.fiscal_period,

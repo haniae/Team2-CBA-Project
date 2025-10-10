@@ -6,6 +6,7 @@ import string
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+from . import database
 from .analytics_engine import AGGREGATE_METRICS, AnalyticsEngine, BASE_METRICS, DERIVED_METRICS
 
 MAX_METRIC_COLUMNS = 6
@@ -202,13 +203,32 @@ def render_table_command(user_input: str, engine: AnalyticsEngine) -> Optional[s
         for ticker in tickers
     }
 
+    benchmark_label: Optional[str] = None
+    compute_benchmark = getattr(engine, "compute_benchmark_metrics", None)
+    if command == "compare" and callable(compute_benchmark):
+        try:
+            aggregated = compute_benchmark(metrics, period_filters=period_filters)
+        except Exception:
+            aggregated = {}
+        if aggregated:
+            label_getter = getattr(engine, "benchmark_label", None)
+            if callable(label_getter):
+                benchmark_label = label_getter()
+            else:
+                benchmark_label = getattr(engine, "BENCHMARK_LABEL", "Benchmark")
+            records_by_ticker[benchmark_label] = list(aggregated.values())
+
+    display_tickers = list(tickers)
+    if benchmark_label:
+        display_tickers.append(benchmark_label)
+
     if layout_mode in {"metrics", "metric", "rows", "matrix", "pivot"}:
-        headers = ["Metric"] + tickers
+        headers = ["Metric"] + display_tickers
         rows: List[List[str]] = []
         for metric in metrics:
             label = _metric_label(metric)
             row = [label]
-            for ticker in tickers:
+            for ticker in display_tickers:
                 records = records_by_ticker[ticker]
                 latest = _select_latest(records, metric)
                 row.append(_format_value_display(latest))
@@ -222,7 +242,7 @@ def render_table_command(user_input: str, engine: AnalyticsEngine) -> Optional[s
     for index, metric_subset in enumerate(metric_chunks, start=1):
         headers = ["Ticker"] + [metric.title().replace("_", " ") for metric in metric_subset]
         rows: List[List[str]] = []
-        for ticker in tickers:
+        for ticker in display_tickers:
             records = records_by_ticker[ticker]
             row = [ticker]
             for metric in metric_subset:

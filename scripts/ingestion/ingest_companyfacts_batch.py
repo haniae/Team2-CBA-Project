@@ -1,6 +1,12 @@
-import os, time, argparse, requests, psycopg2
-from psycopg2.extras import execute_batch
+import argparse
+import os
+import time
+from pathlib import Path
+
+import psycopg2
+import requests
 from dateutil import parser
+from psycopg2.extras import execute_batch
 
 PG = dict(
     host=os.getenv("PGHOST", "localhost"),
@@ -13,6 +19,7 @@ PG = dict(
 UA_STR = os.getenv("SEC_API_USER_AGENT", "Hania MSBA / SEC loader (hania@gwu.edu)")
 UA = {"User-Agent": UA_STR}
 BASE = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
+DEFAULT_TICKER_FILE = Path("data") / "tickers" / "universe_sp500.txt"
 
 def to_date(s):
     """Parse SEC date strings into `datetime.date` instances, tolerating blanks.
@@ -50,11 +57,16 @@ def get_tickers():
     if env:
         parts = [t.strip().upper() for t in env.replace("\n"," ").replace("\t"," ").split(",") if t.strip()]
         if parts: return parts
-    if os.path.exists("tickers.txt"):
-        with open("tickers.txt","r",encoding="utf-8") as f:
-            raw = f.read()
-        parts = [t.strip().upper() for t in raw.replace("\n",",").replace("\t",",").split(",") if t.strip()]
-        return parts
+    for candidate in (DEFAULT_TICKER_FILE, Path("tickers.txt")):
+        if candidate.exists():
+            raw = candidate.read_text(encoding="utf-8")
+            parts = [
+                t.strip().upper()
+                for t in raw.replace("\n", ",").replace("\t", ",").split(",")
+                if t.strip()
+            ]
+            if parts:
+                return parts
     return ["MSFT","GE","F"]
 
 def tickers_to_ciks(conn, tickers):

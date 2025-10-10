@@ -1,4 +1,4 @@
-# BenchmarkOS Chatbot Platform
+﻿# BenchmarkOS Chatbot Platform
 
 Institutional-grade analytics tooling for finance teams who need a conversational interface, reproducible metrics, and transparent data lineage. The codebase includes a CLI copilot, FastAPI service, single-page web client, and ingestion utilities that keep SEC filings and market data in sync.
 
@@ -60,7 +60,7 @@ Open `.env` and customise database paths, API keys, and provider toggles (see [C
 ### 3. Prime the datastore (optional for demos)
 The project boots with SQLite and will lazily create tables on first run. To eagerly load metrics:
 ```bash
-python ingest_universe.py --years 5 --chunk-size 25 --sleep 2 --resume
+python scripts/ingestion/ingest_universe.py --years 5 --chunk-size 25 --sleep 2 --resume
 ```
 This pulls the sample ticker universe, respects SEC rate limits, and writes audit events.
 
@@ -79,6 +79,10 @@ Inside the prompt, type `help` to list verbs. Highlights:
 | `fact` | `fact AMZN 2023 revenue` | Inspect a normalised financial fact. |
 | `scenario` | `scenario GOOGL bull rev=+8% mult=+0.5` | Run a what-if analysis with deltas. |
 | `ingest` | `ingest SHOP 5` | Trigger live ingestion (SEC, Yahoo, optional Bloomberg). |
+
+Compare responses append an `S&P 500 Avg` column and highlight how each ticker stacks up
+against the 500-company universe on margins, ROE, and valuation multiples so you immediately
+see whether a name is running above or below the broad benchmark.
 
 ### FastAPI service and web client
 ```bash
@@ -107,11 +111,11 @@ Ingestion can happen synchronously from the CLI, scheduled batches, or backgroun
 ### Batch scripts
 | Script | When to use it | How to run |
 |--------|----------------|------------|
-| `ingest_universe.py` | Refresh a predefined ticker universe with rate-limit friendly batching and resume support. | `python ingest_universe.py --universe sp500 --years 10 --chunk-size 25 --sleep 2 --resume` |
-| `batch_ingest.py` | Load the curated mega-cap list shipped with the repo (hard-coded tickers, retry with backoff). | `python batch_ingest.py` |
-| `src/ingest_companyfacts.py` | Mirror SEC companyfacts into Postgres with metric aliases; configure via `SEC_TICKERS` and `PG*` env vars. | `SEC_TICKERS=MSFT,AAPL PGHOST=localhost python src/ingest_companyfacts.py` |
-| `ingest_frames.py` | Fetch SEC data frames (e.g., revenues, net income) into Postgres for benchmarking. | `SEC_TICKERS=MSFT,AAPL python ingest_frames.py` |
-| `load_prices_stooq.py` | Backfill prices from Stooq when Yahoo is rate limited; writes into Postgres. | `SEC_TICKERS=MSFT,AAPL python load_prices_stooq.py` |
+| `scripts/ingestion/ingest_universe.py` | Refresh a predefined ticker universe with rate-limit friendly batching and resume support. | `python scripts/ingestion/ingest_universe.py --universe sp500 --years 10 --chunk-size 25 --sleep 2 --resume` |
+| `scripts/ingestion/batch_ingest.py` | Load the curated mega-cap list shipped with the repo (hard-coded tickers, retry with backoff). | `python scripts/ingestion/batch_ingest.py` |
+| `scripts/ingestion/ingest_companyfacts.py` | Mirror SEC companyfacts into Postgres with metric aliases; configure via `SEC_TICKERS` and `PG*` env vars. | `SEC_TICKERS=MSFT,AAPL PGHOST=localhost python scripts/ingestion/ingest_companyfacts.py` |
+| `scripts/ingestion/ingest_frames.py` | Fetch SEC data frames (e.g., revenues, net income) into Postgres for benchmarking. | `SEC_TICKERS=MSFT,AAPL python scripts/ingestion/ingest_frames.py` |
+| `scripts/ingestion/load_prices_stooq.py` | Backfill prices from Stooq when Yahoo is rate limited; writes into Postgres. | `SEC_TICKERS=MSFT,AAPL python scripts/ingestion/load_prices_stooq.py` |
 
 All scripts honour the configuration loaded via `load_settings()` (where applicable) and persist audit events so the chatbot can explain sourcing decisions.
 
@@ -121,7 +125,7 @@ All scripts honour the configuration loaded via `load_settings()` (where applica
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `DATABASE_TYPE` | `sqlite` | Switch to `postgresql` for shared deployments. |
-| `DATABASE_PATH` | `./benchmarkos_chatbot.sqlite3` | SQLite file location; auto-created if missing. |
+| `DATABASE_PATH` | `./data/sqlite/benchmarkos_chatbot.sqlite3` | SQLite file location; auto-created if missing. |
 | `POSTGRES_HOST` / `POSTGRES_PORT` / `POSTGRES_DATABASE` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | unset | Required when `DATABASE_TYPE=postgresql`; supports schema override via `POSTGRES_SCHEMA`. |
 | `LLM_PROVIDER` | `local` | `local` uses the deterministic echo model. Set to `openai` for real completions. |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Model name passed to the OpenAI Chat Completions API. |
@@ -142,28 +146,50 @@ Secrets belong in your `.env` (never commit it). For Windows developers, `keyrin
 ```
 Project/
 ├── README.md
-├── pyproject.toml               # Packaging and pytest config
-├── requirements.txt             # Runtime dependencies
-├── run_chatbot.py               # Terminal assistant entry point
-├── serve_chatbot.py             # FastAPI launcher helper
-├── main.py                      # Rich CLI surface for tables and metrics
+├── pyproject.toml
+├── requirements.txt
+├── run_chatbot.py
+├── serve_chatbot.py
+├── scripts/
+│   ├── ingestion/
+│   │   ├── batch_ingest.py
+│   │   ├── ingest_companyfacts.py
+│   │   ├── ingest_companyfacts_batch.py
+│   │   ├── ingest_frames.py
+│   │   ├── ingest_from_file.py
+│   │   ├── ingest_universe.py
+│   │   ├── load_prices_stooq.py
+│   │   ├── load_prices_yfinance.py
+│   │   └── load_ticker_cik.py
+│   └── utility/
+│       ├── chat_metrics.py
+│       ├── data_sources_backup.py
+│       └── main.py
 ├── src/
 │   └── benchmarkos_chatbot/
-│       ├── analytics_engine.py  # Metric calculations and scenario logic
-│       ├── chatbot.py           # Conversation orchestration and intent routing
-│       ├── config.py            # Environment and settings loader
-│       ├── data_ingestion.py    # EDGAR, Yahoo, Bloomberg ingestion pipeline
-│       ├── data_sources.py      # API clients and data transfer objects
-│       ├── database.py          # SQLite or Postgres persistence helpers
-│       ├── llm_client.py        # LLM abstractions (local and OpenAI)
-│       ├── table_renderer.py    # ASCII table formatting utilities
-│       ├── tasks.py             # Optional ingestion and job queue helpers
-│       └── web.py               # FastAPI app and REST endpoints
-├── webui/                       # Static SPA (HTML, JS, CSS)
+│       ├── analytics_engine.py
+│       ├── chatbot.py
+│       ├── config.py
+│       ├── data_ingestion.py
+│       ├── data_sources.py
+│       ├── database.py
+│       ├── llm_client.py
+│       ├── table_renderer.py
+│       ├── tasks.py
+│       └── web.py
 ├── docs/
-│   └── orchestration_playbook.md# Scaling and ingestion strategies
-├── data/                        # Sample CSVs and ticker lists
-├── cache/                       # Populated at runtime; safe to delete
+│   ├── orchestration_playbook.md
+│   └── ticker_names.md
+├── data/
+│   ├── sample_financials.csv
+│   ├── sqlite/
+│   │   └── benchmarkos_chatbot.sqlite3
+│   └── tickers/
+│       ├── universe_sp500.txt
+│       ├── sec_top100.txt
+│       └── sample_watchlist.txt
+├── cache/
+├── webui/
 └── tests/
     ├── test_analytics.py
     ├── test_analytics_engine.py
@@ -171,19 +197,18 @@ Project/
     ├── test_data_ingestion.py
     └── test_database.py
 ```
-
 ## File reference
 
 ### Root scripts and helpers
 | File | Description |
 |------|-------------|
-| `main.py` | Rich CLI wrapper that exposes table/metrics commands, metric abbreviations, and scenario helpers for power users. |
+| `scripts/utility/main.py` | Rich CLI wrapper that exposes table/metrics commands, metric abbreviations, and scenario helpers for power users. |
 | `run_chatbot.py` | Lightweight REPL entry point that spins up `BenchmarkOSChatbot.create()` for interactive terminal chats. |
 | `serve_chatbot.py` | Convenience launcher for the FastAPI app in `src/benchmarkos_chatbot/web.py`; hands arguments to `uvicorn`. |
-| `batch_ingest.py` | Pulls a built-in mega-cap watch list through `ingest_live_tickers`, applying retry/backoff and basic rate limiting. |
-| `ingest_universe.py` | Parameterised batch ingester with resume support; calls `AnalyticsEngine` to refresh snapshots after each chunk. |
-| `ingest_frames.py` | Synchronously downloads SEC data frames for a fixed set of tags and writes them to Postgres for benchmarking. |
-| `load_prices_stooq.py` | Imports historical price data from Stooq into Postgres, providing a fallback when Yahoo limits are hit. |
+| `scripts/ingestion/batch_ingest.py` | Pulls a built-in mega-cap watch list through `ingest_live_tickers`, applying retry/backoff and basic rate limiting. |
+| `scripts/ingestion/ingest_universe.py` | Parameterised batch ingester with resume support; calls `AnalyticsEngine` to refresh snapshots after each chunk. |
+| `scripts/ingestion/ingest_frames.py` | Synchronously downloads SEC data frames for a fixed set of tags and writes them to Postgres for benchmarking. |
+| `scripts/ingestion/load_prices_stooq.py` | Imports historical price data from Stooq into Postgres, providing a fallback when Yahoo limits are hit. |
 | `requirements.txt` | Runtime dependency pinning for local development and deployment targets. |
 | `pyproject.toml` | Project metadata, dependency list, and pytest configuration (adds `src/` to `PYTHONPATH`). |
 
@@ -233,33 +258,33 @@ Project/
 |------|-----------------|-------|
 | Investigate how prompts become analytics plans | `src/benchmarkos_chatbot/chatbot.py`, `src/benchmarkos_chatbot/analytics_engine.py` | Intent handlers decide whether to run metrics, scenarios, or ingestion, then hand structured plans to the analytics engine. |
 | Add or tweak financial metrics | `src/benchmarkos_chatbot/analytics_engine.py`, `src/benchmarkos_chatbot/database.py` | Metrics are computed in `refresh_metrics`; persisted snapshots live in `database.py` so downstream clients pick them up automatically. |
-| Tune data ingestion or add new feeds | `src/benchmarkos_chatbot/data_ingestion.py`, `data_sources.py`, `data_sources_backup.py` | These modules manage SEC, Yahoo, and optional Bloomberg inputs with retry/backoff logic. |
+| Tune data ingestion or add new feeds | `src/benchmarkos_chatbot/data_ingestion.py`, `data_sources.py`, `scripts/utility/data_sources_backup.py` | These modules manage SEC, Yahoo, and optional Bloomberg inputs with retry/backoff logic. |
 | Extend the FastAPI surface | `src/benchmarkos_chatbot/web.py` | All REST endpoints (chat, metrics, facts, audit) are defined here; mount new routes alongside the existing routers. |
 | Adjust the task queue / background jobs | `src/benchmarkos_chatbot/tasks.py` | Provides a lightweight in-process queue for long-running ingestion jobs. |
 | Update the SPA chat client | `webui/app.js`, `webui/styles.css`, `webui/index.html` | Client-side prompt submission, transcript rendering, and status badges live here. |
 
 ### Script cheat sheet
-- `run_chatbot.py` — launch the terminal REPL for quick experiments (uses the same backend as the web UI).
-- `serve_chatbot.py` — run the FastAPI app with uvicorn; pass `--port` or `--reload` while iterating locally.
-- `ingest_universe.py` — crawl a configurable ticker universe with checkpointing; ideal for keeping demo datasets fresh.
-- `ingest_companyfacts.py` / `ingest_companyfacts_batch.py` — fetch SEC companyfacts for individual CIKs or large batches.
-- `ingest_frames.py` — pull SEC XBRL frame data (useful for macro-style aggregates such as industry totals).
-- `load_prices_stooq.py` – backfill historical prices when Yahoo rate limits hit or offline operation is required.
-- `load_prices_yfinance.py` – grab the latest close/volume from Yahoo Finance and seed the SQLite cache (and Postgres, when configured) so price-based ratios populate.
-- `load_ticker_cik.py` – populate the ticker → CIK lookup table; rerun whenever SEC publishes new mappings.
-- `batch_ingest.py` – example of orchestrating a curated watch list with retry/backoff, suitable for cron jobs.
-- `docs/ticker_names.md` – generated companion file enumerating the current coverage universe (see section below for how it is produced).
+- `run_chatbot.py` â€” launch the terminal REPL for quick experiments (uses the same backend as the web UI).
+- `serve_chatbot.py` â€” run the FastAPI app with uvicorn; pass `--port` or `--reload` while iterating locally.
+- `scripts/ingestion/ingest_universe.py` â€” crawl a configurable ticker universe with checkpointing; ideal for keeping demo datasets fresh.
+- `scripts/ingestion/ingest_companyfacts.py` / `scripts/ingestion/ingest_companyfacts_batch.py` â€” fetch SEC companyfacts for individual CIKs or large batches.
+- `scripts/ingestion/ingest_frames.py` â€” pull SEC XBRL frame data (useful for macro-style aggregates such as industry totals).
+- `scripts/ingestion/load_prices_stooq.py` â€“ backfill historical prices when Yahoo rate limits hit or offline operation is required.
+- `scripts/ingestion/load_prices_yfinance.py` â€“ grab the latest close/volume from Yahoo Finance and seed the SQLite cache (and Postgres, when configured) so price-based ratios populate.
+- `scripts/ingestion/load_ticker_cik.py` â€“ populate the ticker â†’ CIK lookup table; rerun whenever SEC publishes new mappings.
+- `scripts/ingestion/batch_ingest.py` â€“ example of orchestrating a curated watch list with retry/backoff, suitable for cron jobs.
+- `docs/ticker_names.md` â€“ generated companion file enumerating the current coverage universe (see section below for how it is produced).
 
 ### Price data refresh in practice
 Use this workflow to keep price-driven ratios (P/E, EV/EBITDA, dividend yield, TSR, buyback intensity) current without rerunning the full SEC ingestion:
 
 ```powershell
 pip install yfinance                         # one-time dependency
-$env:SEC_TICKERS = (Get-Content tickers.txt) -join ','
+$env:SEC_TICKERS = (Get-Content data/tickers/universe_sp500.txt) -join ','
 # Optional: seed Postgres as well
 $env:PGHOST='127.0.0.1'; $env:PGPORT='5432'
 $env:PGDATABASE='secdb'; $env:PGUSER='postgres'; $env:PGPASSWORD='hania123'
-python load_prices_yfinance.py               # writes to SQLite and Postgres
+python scripts/ingestion/load_prices_yfinance.py               # writes to SQLite and Postgres
 
 $env:PYTHONPATH = (Resolve-Path .\src).Path
 python -c "from benchmarkos_chatbot.config import load_settings; \
@@ -274,14 +299,18 @@ Finish by restarting `serve_chatbot.py` so the web UI picks up the refreshed met
 The chatbot is preloaded with the latest S&P 500 style universe (482 tickers at generation time). A machine-generated appendix with all company names is available in [`docs/ticker_names.md`](docs/ticker_names.md). Regenerate it at any time with:
 
 ```powershell
-$env:SEC_TICKERS = (Get-Content tickers.txt) -join ','
+$env:SEC_TICKERS = (Get-Content data/tickers/universe_sp500.txt) -join ','
 python - <<'PY'
 import os
 from pathlib import Path
 import yfinance as yf
 
 root = Path(__file__).resolve().parent
-tickers = [line.strip() for line in (root / "tickers.txt").read_text().splitlines() if line.strip()]
+tickers = [
+    line.strip()
+    for line in (root / "data" / "tickers" / "universe_sp500.txt").read_text().splitlines()
+    if line.strip()
+]
 pairs = []
 for ticker in tickers:
     name = None
@@ -322,7 +351,7 @@ CI/CD is not bundled, but `pytest -ra` (configured in `pyproject.toml`) surfaces
 ## Troubleshooting
 - **`OpenAI API key not found`** - set `OPENAI_API_KEY`, store it via `keyring`, or create `~/.config/benchmarkos-chatbot/openai_api_key`.
 - **`WinError 10048` when starting the server** - another process is bound to the port. Run `Get-NetTCPConnection -LocalPort 8000` and terminate the offender or pass `--port 8001`.
-- **Yahoo Finance 429 errors** - lower `YAHOO_QUOTE_BATCH_SIZE`, add sleeps between ingestion runs, or temporarily fall back to `load_prices_stooq.py`.
+- **Yahoo Finance 429 errors** - lower `YAHOO_QUOTE_BATCH_SIZE`, add sleeps between ingestion runs, or temporarily fall back to `scripts/ingestion/load_prices_stooq.py`.
 - **PostgreSQL auth failures** - confirm SSL and network rules, then verify `POSTGRES_*` variables. The DSN is logged at debug level when `DATABASE_TYPE=postgresql`.
 - **Pytest cannot locate modules** - run commands from the project root so the `pythonpath = ["src", "."]` setting in `pyproject.toml` applies.
 
@@ -332,3 +361,7 @@ CI/CD is not bundled, but `pytest -ra` (configured in `pyproject.toml`) surfaces
 - Consider versioning your `.env` defaults and deployment runbooks under `docs/` as the project evolves.
 
 Happy building!
+
+
+
+

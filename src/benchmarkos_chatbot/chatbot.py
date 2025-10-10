@@ -243,6 +243,13 @@ CONTEXT_SUMMARY_METRICS: Sequence[str] = (
     "pe_ratio",
 )
 
+BENCHMARK_KEY_METRICS: Dict[str, str] = {
+    "adjusted_ebitda_margin": "Adjusted EBITDA margin",
+    "net_margin": "Adjusted net margin",
+    "return_on_equity": "Return on equity",
+    "pe_ratio": "P/E ratio",
+}
+
 _METRIC_LABEL_MAP: Dict[str, str] = {
     definition.name: definition.description for definition in METRIC_DEFINITIONS
 }
@@ -1050,13 +1057,37 @@ class BenchmarkOSChatbot:
                 return f"No metrics available for {', '.join(tickers)} in {desc}."
             return "No metrics available for the requested tickers."
 
+        benchmark_label: Optional[str] = None
+        compute_benchmark = getattr(self.analytics_engine, "compute_benchmark_metrics", None)
+        if callable(compute_benchmark):
+            metrics_needed = {definition.name for definition in METRIC_DEFINITIONS}
+            metrics_needed.update(BENCHMARK_KEY_METRICS.keys())
+            try:
+                benchmark_metrics = compute_benchmark(
+                    sorted(metrics_needed),
+                    period_filters=period_filters,
+                )
+            except Exception:
+                benchmark_metrics = {}
+            if benchmark_metrics:
+                label_getter = getattr(self.analytics_engine, "benchmark_label", None)
+                benchmark_label = (
+                    label_getter()
+                    if callable(label_getter)
+                    else getattr(self.analytics_engine, "BENCHMARK_LABEL", "Benchmark")
+                )
+                metrics_per_ticker[benchmark_label] = benchmark_metrics
+
         ordered_tickers = [ticker for ticker in tickers if ticker in metrics_per_ticker]
-        headers = ["Metric"] + ordered_tickers
+        display_tickers = list(ordered_tickers)
+        if benchmark_label:
+            display_tickers.append(benchmark_label)
+        headers = ["Metric"] + display_tickers
         rows: List[List[str]] = []
         for definition in METRIC_DEFINITIONS:
             label = definition.description
             row = [label]
-            for ticker in ordered_tickers:
+            for ticker in display_tickers:
                 row.append(
                     self._format_metric_value(
                         definition.name, metrics_per_ticker[ticker]
@@ -1075,7 +1106,10 @@ class BenchmarkOSChatbot:
             else "latest available"
         )
 
-        highlights = self._compose_benchmark_summary(metrics_per_ticker)
+        highlights = self._compose_benchmark_summary(
+            metrics_per_ticker,
+            benchmark_label=benchmark_label,
+        )
 
         output_lines: List[str] = []
         if highlights:
@@ -1217,33 +1251,81 @@ class BenchmarkOSChatbot:
         return candidates
 
     def _compose_benchmark_summary(
-        self, metrics_per_ticker: Dict[str, Dict[str, database.MetricRecord]]
+        self,
+        metrics_per_ticker: Dict[str, Dict[str, database.MetricRecord]],
+        *,
+        benchmark_label: Optional[str] = None,
     ) -> List[str]:
-        """Summarise how a ticker compares against benchmarks."""
+        """Summarise how tickers stack up against an optional benchmark column."""
         if not metrics_per_ticker:
             return []
-        key_metrics = {
-            "adjusted_ebitda_margin": "Adjusted EBITDA margin",
-            "net_margin": "Adjusted net margin",
-            "return_on_equity": "Return on equity",
-            "pe_ratio": "P/E ratio",
+
+        contenders = {
+            ticker: records
+            for ticker, records in metrics_per_ticker.items()
+            if ticker != benchmark_label
         }
+        if not contenders:
+            return []
+
+        benchmark_metrics = (
+            metrics_per_ticker.get(benchmark_label) if benchmark_label else None
+        )
+
         highlights: List[str] = []
-        for metric, label in key_metrics.items():
+        for metric, label in BENCHMARK_KEY_METRICS.items():
             best_ticker: Optional[str] = None
             best_value: Optional[float] = None
-            for ticker, records in metrics_per_ticker.items():
+            best_display: Optional[str] = None
+            for ticker, records in contenders.items():
                 record = records.get(metric)
                 if not record or record.value is None:
                     continue
                 if best_value is None or record.value > best_value:
                     best_value = record.value
                     best_ticker = ticker
-            if best_ticker is None or best_value is None:
+                    best_display = self._format_metric_value(metric, records)
+            if best_ticker is None or best_value is None or best_display is None:
                 continue
-            display = self._format_metric_value(metric, metrics_per_ticker[best_ticker])
-            highlights.append(f"{label}: {best_ticker} {display}")
+
+            line = f"{label}: {best_ticker} {best_display}"
+
+            benchmark_display: Optional[str] = None
+            benchmark_value: Optional[float] = None
+            if benchmark_metrics:
+                benchmark_record = benchmark_metrics.get(metric)
+                if benchmark_record and benchmark_record.value is not None:
+                    benchmark_value = benchmark_record.value
+                    benchmark_display = self._format_metric_value(metric, benchmark_metrics)
+
+            if benchmark_display:
+                benchmark_name = benchmark_label or "Benchmark"
+                line += f" vs {benchmark_name} {benchmark_display}"
+                delta_note = self._format_benchmark_delta(metric, best_value, benchmark_value)
+                if delta_note is not None and benchmark_value is not None:
+                    direction = "above" if (best_value - benchmark_value) >= 0 else "below"
+                    line += f" ({delta_note} {direction})"
+
+            highlights.append(line)
         return highlights
+
+    def _format_benchmark_delta(
+        self,
+        metric_name: str,
+        best_value: Optional[float],
+        benchmark_value: Optional[float],
+    ) -> Optional[str]:
+        """Express the difference between the leader and benchmark in human terms."""
+        if best_value is None or benchmark_value is None:
+            return None
+        delta = best_value - benchmark_value
+        if abs(delta) < 1e-9:
+            return None
+        if metric_name in PERCENT_METRICS:
+            return f"{delta * 100:+.1f} pts"
+        if metric_name in MULTIPLE_METRICS:
+            return f"{delta:+.2f}x"
+        return f"{delta:+,.0f}"
 
     @staticmethod
     def _format_metric_value(
