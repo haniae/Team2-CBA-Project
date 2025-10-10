@@ -72,6 +72,7 @@ def test_bulk_upsert_financial_facts_roundtrip(temp_db: Path) -> None:
     fact = FinancialFact(
         cik="0000000123",
         ticker="TEST",
+        company_name="Test Corp",
         metric="revenue",
         fiscal_year=2024,
         fiscal_period="FY",

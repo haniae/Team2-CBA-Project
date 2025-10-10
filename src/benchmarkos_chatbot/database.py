@@ -516,7 +516,7 @@ def bulk_upsert_financial_facts(
         (
             fact.cik,
             _normalize_ticker(fact.ticker),
-            "",
+            fact.company_name or "",
             fact.metric.lower(),
             fact.fiscal_year,
             fact.fiscal_period,
@@ -546,6 +546,7 @@ def bulk_upsert_financial_facts(
             ON CONFLICT(ticker, metric, period, source, source_filing) DO UPDATE SET
                 cik = excluded.cik,
                 company_name = excluded.company_name,
+                fiscal_year = excluded.fiscal_year,
                 fiscal_period = excluded.fiscal_period,
                 period = excluded.period,
                 value = excluded.value,
@@ -801,6 +802,80 @@ def fetch_audit_events(
 # -----------------------------
 # Metric Snapshots
 # -----------------------------
+
+def lookup_ticker(
+    database_path: Path,
+    query: str,
+    *,
+    allow_partial: bool = False,
+) -> Optional[str]:
+    """Resolve a natural-language company reference into a ticker symbol."""
+    if not query:
+        return None
+
+    term = query.strip()
+    if not term:
+        return None
+
+    ticker_guess = _normalize_ticker(term)
+    name_upper = term.upper()
+
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+
+        # 1. Direct ticker match
+        row = connection.execute(
+            """
+            SELECT ticker
+            FROM financial_facts
+            WHERE ticker = ?
+            LIMIT 1
+            """,
+            (ticker_guess,),
+        ).fetchone()
+        if row:
+            return row["ticker"]
+
+        # 2. Exact company name match (case-insensitive)
+        row = connection.execute(
+            """
+            SELECT ticker
+            FROM (
+                SELECT DISTINCT ticker, company_name
+                FROM financial_facts
+            )
+            WHERE UPPER(company_name) = ?
+            ORDER BY LENGTH(company_name) ASC
+            LIMIT 1
+            """,
+            (name_upper,),
+        ).fetchone()
+        if row:
+            return row["ticker"]
+
+        if not allow_partial:
+            return None
+
+        pattern = f"%{name_upper}%"
+        row = connection.execute(
+            """
+            SELECT ticker
+            FROM (
+                SELECT DISTINCT ticker, company_name
+                FROM financial_facts
+                WHERE company_name IS NOT NULL AND company_name <> ''
+            )
+            WHERE UPPER(company_name) LIKE ?
+            ORDER BY LENGTH(company_name) ASC, ticker ASC
+            LIMIT 1
+            """,
+            (pattern,),
+        ).fetchone()
+        if row:
+            return row["ticker"]
+
+    return None
+
 
 def replace_metric_snapshots(
     database_path: Path,

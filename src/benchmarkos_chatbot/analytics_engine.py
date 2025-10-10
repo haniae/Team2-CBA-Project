@@ -34,6 +34,14 @@ class ScenarioSummary:
     created_at: datetime
 
 
+@dataclass(frozen=True)
+class MetricDefinition:
+    """Metadata describing a single metric and how it should be presented."""
+
+    name: str
+    description: str
+
+
 BASE_METRICS = {
     "revenue",
     "net_income",
@@ -122,6 +130,124 @@ AGGREGATE_METRICS = {
 }
 
 DEFAULT_TAX_RATE = 0.21
+
+METRIC_DEFINITIONS: List[MetricDefinition] = [
+    MetricDefinition("revenue", "Revenue"),
+    MetricDefinition("net_income", "Net income"),
+    MetricDefinition("operating_income", "Operating income"),
+    MetricDefinition("gross_profit", "Gross profit"),
+    MetricDefinition("cash_from_operations", "Cash from operations"),
+    MetricDefinition("free_cash_flow", "Free cash flow"),
+    MetricDefinition("total_assets", "Total assets"),
+    MetricDefinition("total_liabilities", "Total liabilities"),
+    MetricDefinition("shareholders_equity", "Shareholders' equity"),
+    MetricDefinition("revenue_cagr", "Revenue CAGR"),
+    MetricDefinition("eps_cagr", "EPS CAGR"),
+    MetricDefinition("ebitda_growth", "EBITDA growth"),
+    MetricDefinition("ebitda_margin", "EBITDA margin"),
+    MetricDefinition("profit_margin", "Profit margin"),
+    MetricDefinition("operating_margin", "Operating margin"),
+    MetricDefinition("net_margin", "Net margin"),
+    MetricDefinition("return_on_assets", "Return on assets"),
+    MetricDefinition("return_on_equity", "Return on equity"),
+    MetricDefinition("return_on_invested_capital", "Return on invested capital"),
+    MetricDefinition("free_cash_flow_margin", "Free cash flow margin"),
+    MetricDefinition("cash_conversion", "Cash conversion"),
+    MetricDefinition("debt_to_equity", "Debt to equity"),
+    MetricDefinition("pe_ratio", "P/E ratio"),
+    MetricDefinition("ev_ebitda", "EV/EBITDA"),
+    MetricDefinition("pb_ratio", "P/B ratio"),
+    MetricDefinition("peg_ratio", "PEG ratio"),
+    MetricDefinition("dividend_yield", "Dividend yield"),
+    MetricDefinition("tsr", "Total shareholder return"),
+    MetricDefinition("share_buyback_intensity", "Share buyback intensity"),
+]
+
+METRIC_LABELS: Dict[str, str] = {definition.name: definition.description for definition in METRIC_DEFINITIONS}
+
+CURRENCY_METRICS = {
+    "revenue",
+    "net_income",
+    "operating_income",
+    "gross_profit",
+    "cash_from_operations",
+    "cash_from_financing",
+    "free_cash_flow",
+    "total_assets",
+    "total_liabilities",
+    "shareholders_equity",
+    "working_capital",
+    "enterprise_value",
+    "market_cap",
+}
+
+PERCENTAGE_METRICS = {
+    "revenue_cagr",
+    "eps_cagr",
+    "ebitda_growth",
+    "ebitda_margin",
+    "profit_margin",
+    "operating_margin",
+    "net_margin",
+    "return_on_assets",
+    "return_on_equity",
+    "return_on_invested_capital",
+    "free_cash_flow_margin",
+    "cash_conversion",
+    "dividend_yield",
+    "tsr",
+    "share_buyback_intensity",
+}
+
+MULTIPLE_METRICS = {
+    "debt_to_equity",
+    "pe_ratio",
+    "ev_ebitda",
+    "pb_ratio",
+    "peg_ratio",
+}
+
+SUMMARY_SECTIONS: List[Tuple[str, Sequence[str]]] = [
+    (
+        "Phase1 KPIs",
+        (
+            "revenue",
+            "net_income",
+            "operating_income",
+            "gross_profit",
+            "cash_from_operations",
+            "free_cash_flow",
+            "total_assets",
+            "total_liabilities",
+            "shareholders_equity",
+        ),
+    ),
+    (
+        "Phase 2 KPIs",
+        (
+            "revenue_cagr",
+            "eps_cagr",
+            "ebitda_growth",
+            "ebitda_margin",
+            "profit_margin",
+            "operating_margin",
+            "net_margin",
+            "return_on_assets",
+            "return_on_equity",
+            "return_on_invested_capital",
+            "free_cash_flow_margin",
+            "cash_conversion",
+            "debt_to_equity",
+            "pe_ratio",
+            "ev_ebitda",
+            "pb_ratio",
+            "peg_ratio",
+            "dividend_yield",
+            "tsr",
+            "share_buyback_intensity",
+        ),
+    ),
+]
 
 
 def _now() -> datetime:
@@ -538,6 +664,80 @@ class AnalyticsEngine:
             period_filters=period_filters,
         )
 
+    def generate_summary(self, ticker: str) -> str:
+        """Return a narrative summary of key metrics for ``ticker``."""
+        ticker_upper = ticker.upper()
+        records = database.fetch_metric_snapshots(self.settings.database_path, ticker_upper)
+        if not records:
+            return (
+                f"No cached metrics for {ticker_upper}. "
+                f"Run 'ingest {ticker_upper}' to pull the latest filings."
+            )
+
+        latest = self._select_latest_records(records, span_fn=self._period_span)
+        if not latest:
+            return (
+                f"No cached metrics for {ticker_upper}. "
+                f"Run 'ingest {ticker_upper}' to pull the latest filings."
+            )
+
+        company_name: Optional[str] = None
+        try:
+            with database.temporary_connection(self.settings.database_path) as connection:
+                row = connection.execute(
+                    """
+                    SELECT company_name
+                    FROM financial_facts
+                    WHERE ticker = ? AND company_name <> ''
+                    ORDER BY ingested_at DESC
+                    LIMIT 1
+                    """,
+                    (ticker_upper,),
+                ).fetchone()
+                if row and row[0]:
+                    company_name = str(row[0])
+        except sqlite3.Error:
+            LOGGER.debug("Unable to fetch company name for %s", ticker_upper, exc_info=True)
+
+        updated_at = max(
+            (record.updated_at for record in latest.values() if record.updated_at),
+            default=None,
+        )
+        header_title = (
+            f"{company_name} ({ticker_upper}) snapshot"
+            if company_name and company_name.upper() != ticker_upper
+            else f"{ticker_upper} snapshot"
+        )
+        header_lines = [header_title]
+        if updated_at:
+            header_lines.append(f"Last updated {updated_at.strftime('%Y-%m-%d')}")
+        header_lines.append("")
+
+        section_blocks: List[str] = []
+        for section_title, metric_names in SUMMARY_SECTIONS:
+            lines: List[str] = []
+            for metric_name in metric_names:
+                label = METRIC_LABELS.get(metric_name, metric_name.replace("_", " ").title())
+                record = latest.get(metric_name)
+                value_repr = _format_metric_value(metric_name, record)
+                period_repr = _format_metric_period(record)
+                if period_repr:
+                    lines.append(f"- {label}: {value_repr} ({period_repr})")
+                else:
+                    lines.append(f"- {label}: {value_repr}")
+            section_blocks.append("\n".join([section_title, *lines]))
+
+        body = "\n\n".join(section_blocks)
+        return "\n".join(header_lines) + body
+
+    def lookup_ticker(self, query: str, *, allow_partial: bool = False) -> Optional[str]:
+        """Map a natural-language company reference to a ticker if possible."""
+        return database.lookup_ticker(
+            self.settings.database_path,
+            query,
+            allow_partial=allow_partial,
+        )
+
 
     def run_scenario(
         self,
@@ -840,6 +1040,56 @@ def _most_common(values: Sequence[Any]) -> Optional[Any]:
     counter = Counter(filtered)
     return counter.most_common(1)[0][0]
 
+def _format_currency(value: float) -> str:
+    """Return a compact currency string with magnitude suffixes."""
+    abs_value = abs(value)
+    suffix = ""
+    scaled = value
+    if abs_value >= 1_000_000_000:
+        scaled = value / 1_000_000_000
+        suffix = "B"
+    elif abs_value >= 1_000_000:
+        scaled = value / 1_000_000
+        suffix = "M"
+    elif abs_value >= 1_000:
+        scaled = value / 1_000
+        suffix = "K"
+    sign = "-" if scaled < 0 else ""
+    return f"{sign}${abs(scaled):,.1f}{suffix}"
+
+
+def _format_metric_period(record: Optional[database.MetricRecord]) -> str:
+    """Render the coverage period for a metric snapshot."""
+    if record is None:
+        return ""
+    start = record.start_year
+    end = record.end_year
+    if start and end:
+        if start == end:
+            return f"FY{start}"
+        return f"FY{start}-FY{end}"
+    if record.period:
+        return record.period
+    if end:
+        return f"FY{end}"
+    if start:
+        return f"FY{start}"
+    return ""
+
+
+def _format_metric_value(metric: str, record: Optional[database.MetricRecord]) -> str:
+    """Return a display string for a metric based on its unit semantics."""
+    if record is None or record.value is None:
+        return "–"
+    value = record.value
+    if metric in PERCENTAGE_METRICS:
+        return f"{value * 100:.1f}%"
+    if metric in MULTIPLE_METRICS:
+        return f"{value:.1f}x"
+    if metric in CURRENCY_METRICS:
+        return _format_currency(value)
+    return f"{value:,.1f}"
+
 
 def _compute_derived_metrics(
     metrics: Dict[str, Tuple[Optional[float], datetime]]
@@ -905,4 +1155,3 @@ def _compute_derived_metrics(
         derived["free_cash_flow"] = free_cash_flow
 
     return {name: value for name, value in derived.items() if name in DERIVED_METRICS}
-

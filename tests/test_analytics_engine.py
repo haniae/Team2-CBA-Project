@@ -15,6 +15,7 @@ def _fact(ticker: str, metric: str, year: int, value: float) -> FinancialFact:
     return FinancialFact(
         cik="0000000001",
         ticker=ticker,
+        company_name=f"{ticker} Inc",
         metric=metric,
         fiscal_year=year,
         fiscal_period="FY",
@@ -259,4 +260,3 @@ def test_refresh_metrics_handles_alias_metrics_without_quotes(tmp_path, monkeypa
     assert pytest.approx(latest_derived["cash_conversion"], rel=1e-6) == expected_cash_conversion
     assert pytest.approx(latest_derived["free_cash_flow_margin"], rel=1e-6) == expected_free_cash_flow_margin
     assert pytest.approx(latest_derived["debt_to_equity"], rel=1e-6) == expected_debt_to_equity
-

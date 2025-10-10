@@ -3,19 +3,18 @@
 from __future__ import annotations
 
 import string
-from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from . import database
-from .analytics_engine import AGGREGATE_METRICS, AnalyticsEngine, BASE_METRICS, DERIVED_METRICS
+from .analytics_engine import (
+    AGGREGATE_METRICS,
+    AnalyticsEngine,
+    BASE_METRICS,
+    DERIVED_METRICS,
+    METRIC_DEFINITIONS,
+    MetricDefinition,
+)
 
 MAX_METRIC_COLUMNS = 6
-
-@dataclass(frozen=True)
-class MetricDefinition:
-    """Metadata describing a single metric and how to present it."""
-    name: str
-    description: str
 
 PDS_METRICS: List[str] = [
     "revenue",
@@ -46,36 +45,6 @@ PDS_METRICS: List[str] = [
     "dividend_yield",
     "tsr",
     "share_buyback_intensity",
-]
-
-METRIC_DEFINITIONS: List[MetricDefinition] = [
-    MetricDefinition("revenue", "Revenue"),
-    MetricDefinition("net_income", "Net income"),
-    MetricDefinition("operating_income", "Operating income"),
-    MetricDefinition("gross_profit", "Gross profit"),
-    MetricDefinition("ebitda", "EBITDA"),
-    MetricDefinition("free_cash_flow", "Free cash flow"),
-    MetricDefinition("revenue_cagr", "Revenue CAGR"),
-    MetricDefinition("eps_cagr", "EPS CAGR"),
-    MetricDefinition("ebitda_growth", "EBITDA growth"),
-    MetricDefinition("working_capital", "Working capital"),
-    MetricDefinition("working_capital_change", "Working capital change"),
-    MetricDefinition("profit_margin", "Profit margin"),
-    MetricDefinition("operating_margin", "Operating margin"),
-    MetricDefinition("net_margin", "Net margin"),
-    MetricDefinition("return_on_assets", "Return on assets"),
-    MetricDefinition("return_on_equity", "Return on equity"),
-    MetricDefinition("return_on_invested_capital", "Return on invested capital"),
-    MetricDefinition("free_cash_flow_margin", "Free cash flow margin"),
-    MetricDefinition("cash_conversion", "Cash conversion"),
-    MetricDefinition("debt_to_equity", "Debt to equity"),
-    MetricDefinition("pe_ratio", "P/E ratio"),
-    MetricDefinition("ev_ebitda", "EV/EBITDA"),
-    MetricDefinition("pb_ratio", "P/B ratio"),
-    MetricDefinition("peg_ratio", "PEG ratio"),
-    MetricDefinition("dividend_yield", "Dividend yield"),
-    MetricDefinition("tsr", "Total shareholder return"),
-    MetricDefinition("share_buyback_intensity", "Share buyback intensity"),
 ]
 
 METRIC_ABBREVIATIONS: Dict[str, str] = {

@@ -37,6 +37,7 @@ class FinancialFact:
 
     cik: str
     ticker: str
+    company_name: str
     metric: str
     fiscal_year: Optional[int]
     fiscal_period: Optional[str]
@@ -459,6 +460,9 @@ class EdgarClient:
         """Yield raw fact entries for a company and metric set."""
         cik = self.cik_for_ticker(ticker)
         payload = self.company_facts(cik)
+        entity_name = payload.get("entityName")
+        if not isinstance(entity_name, str) or not entity_name.strip():
+            entity_name = ticker.upper()
         taxonomy_map = payload.get("facts", {})
         cutoff_year = datetime.now(timezone.utc).year - years + 1
         concept_filter = set(concepts) if concepts else None
@@ -532,6 +536,7 @@ class EdgarClient:
                             FinancialFact(
                                 cik=cik,
                                 ticker=ticker.upper(),
+                                company_name=entity_name,
                                 metric=metric_name,
                                 fiscal_year=fiscal_year,
                                 fiscal_period=fiscal_period,

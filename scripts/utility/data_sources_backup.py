@@ -36,6 +36,7 @@ class FinancialFact:
 
     cik: str
     ticker: str
+    company_name: str
     metric: str
     fiscal_year: Optional[int]
     fiscal_period: Optional[str]
@@ -425,6 +426,7 @@ class EdgarClient:
         """Yield fact records for the requested metrics and tickers."""
         cik = self.cik_for_ticker(ticker)
         payload = self.company_facts(cik)
+        entity_name = payload.get("entityName") or ticker.upper()
         facts = payload.get("facts", {})
         cutoff_year = datetime.now(timezone.utc).year - years + 1
         results: List[FinancialFact] = []
@@ -447,6 +449,7 @@ class EdgarClient:
                         FinancialFact(
                             cik=cik,
                             ticker=ticker.upper(),
+                            company_name=entity_name,
                             metric=_canonical_metric(concept),
                             fiscal_year=fiscal_year,
                             fiscal_period=fiscal_period,
