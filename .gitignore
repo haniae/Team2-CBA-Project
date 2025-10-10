@@ -5,3 +5,5 @@ __pycache__/
 .venv/
 .DS_Store
 .ipynb_checkpoints/
+benchmarkos_chatbot.sqlite3-shm
+benchmarkos_chatbot.sqlite3-wal

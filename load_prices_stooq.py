@@ -48,6 +48,24 @@ def fetch_csv(ticker):
         rows = rows[-DAYS:]
     return rows
 
+def ensure_table(conn):
+    """Create the prices table if it does not exist."""
+    with conn.cursor() as cur:
+        cur.execute("CREATE SCHEMA IF NOT EXISTS sec")
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sec.prices_daily (
+                ticker TEXT NOT NULL,
+                date DATE NOT NULL,
+                close DOUBLE PRECISION,
+                adj_close DOUBLE PRECISION,
+                volume BIGINT,
+                PRIMARY KEY (ticker, date)
+            )
+            """
+        )
+
+
 def upsert(conn, rows):
     """Insert or update Stooq price rows into the local SQLite database.
     """
@@ -66,6 +84,7 @@ def main():
     """Load historical price data for the configured `TICKERS` collection.
     """
     conn = psycopg2.connect(**PG); conn.autocommit = True
+    ensure_table(conn)
     tickers = ENV_TICKERS
     print("Tickers:", ",".join(tickers))
     for t in tickers:

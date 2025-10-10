@@ -210,6 +210,7 @@ Project/
 | `docs/orchestration_playbook.md` | Strategy note outlining three ingestion/orchestration patterns (local queue, serverless, batch). |
 | `data/` | Sample CSV inputs and ticker lists used by ingestion scripts and tests. |
 | `cache/` | Runtime artifact directory for downloaded filings and ingestion progress (created automatically). |
+| `docs/ticker_names.md` | Full coverage universe listing each supported company name alongside its ticker. |
 
 ### Web client
 | Path | Description |
@@ -243,9 +244,63 @@ Project/
 - `ingest_universe.py` — crawl a configurable ticker universe with checkpointing; ideal for keeping demo datasets fresh.
 - `ingest_companyfacts.py` / `ingest_companyfacts_batch.py` — fetch SEC companyfacts for individual CIKs or large batches.
 - `ingest_frames.py` — pull SEC XBRL frame data (useful for macro-style aggregates such as industry totals).
-- `load_prices_stooq.py` — backfill historical prices when Yahoo rate limits hit or offline operation is required.
-- `load_ticker_cik.py` — populate the ticker → CIK lookup table; rerun whenever SEC publishes new mappings.
-- `batch_ingest.py` — example of orchestrating a curated watch list with retry/backoff, suitable for cron jobs.
+- `load_prices_stooq.py` – backfill historical prices when Yahoo rate limits hit or offline operation is required.
+- `load_prices_yfinance.py` – grab the latest close/volume from Yahoo Finance and seed the SQLite cache (and Postgres, when configured) so price-based ratios populate.
+- `load_ticker_cik.py` – populate the ticker → CIK lookup table; rerun whenever SEC publishes new mappings.
+- `batch_ingest.py` – example of orchestrating a curated watch list with retry/backoff, suitable for cron jobs.
+- `docs/ticker_names.md` – generated companion file enumerating the current coverage universe (see section below for how it is produced).
+
+### Price data refresh in practice
+Use this workflow to keep price-driven ratios (P/E, EV/EBITDA, dividend yield, TSR, buyback intensity) current without rerunning the full SEC ingestion:
+
+```powershell
+pip install yfinance                         # one-time dependency
+$env:SEC_TICKERS = (Get-Content tickers.txt) -join ','
+# Optional: seed Postgres as well
+$env:PGHOST='127.0.0.1'; $env:PGPORT='5432'
+$env:PGDATABASE='secdb'; $env:PGUSER='postgres'; $env:PGPASSWORD='hania123'
+python load_prices_yfinance.py               # writes to SQLite and Postgres
+
+$env:PYTHONPATH = (Resolve-Path .\src).Path
+python -c "from benchmarkos_chatbot.config import load_settings; \
+from benchmarkos_chatbot.analytics_engine import AnalyticsEngine; \
+AnalyticsEngine(load_settings()).refresh_metrics(force=True)"
+```
+
+Finish by restarting `serve_chatbot.py` so the web UI picks up the refreshed metrics.
+
+### Coverage universe
+
+The chatbot is preloaded with the latest S&P 500 style universe (482 tickers at generation time). A machine-generated appendix with all company names is available in [`docs/ticker_names.md`](docs/ticker_names.md). Regenerate it at any time with:
+
+```powershell
+$env:SEC_TICKERS = (Get-Content tickers.txt) -join ','
+python - <<'PY'
+import os
+from pathlib import Path
+import yfinance as yf
+
+root = Path(__file__).resolve().parent
+tickers = [line.strip() for line in (root / "tickers.txt").read_text().splitlines() if line.strip()]
+pairs = []
+for ticker in tickers:
+    name = None
+    try:
+        info = yf.Ticker(ticker).info
+        name = info.get("longName") or info.get("shortName")
+    except Exception:
+        name = None
+    if not name:
+        name = ticker
+    pairs.append((ticker, name))
+
+out = root / "docs" / "ticker_names.md"
+out.write_text("## Coverage Universe\n\n" + "\n".join(f"- {name} ({ticker})" for ticker, name in pairs), encoding="utf-8")
+print(f"Updated {out}")
+PY
+```
+
+This appendix keeps the README concise while still documenting every supported company for compliance and comms stakeholders.
 
 ### Configuration crib sheet
 | File | Purpose |
