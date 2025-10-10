@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING
 
 import requests
 import random
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .sec_bulk import CompanyFactsBulkCache
 
 LOGGER = logging.getLogger(__name__)
 
@@ -293,6 +297,7 @@ class EdgarClient:
         timeout: float = 30.0,
         min_interval: float = 0.12,
         session: Optional[requests.Session] = None,
+        bulk_cache: Optional["CompanyFactsBulkCache"] = None,
     ) -> None:
         """Initialise the client with credentials, endpoints, and limits."""
         self.base_url = base_url.rstrip("/")
@@ -303,6 +308,7 @@ class EdgarClient:
         self.session = session or requests.Session()
         self._last_request = 0.0
         self._ticker_cache: Optional[Dict[str, str]] = None
+        self._bulk_cache = bulk_cache
 
     def _headers(self) -> Dict[str, str]:
         """Return HTTP headers required for external data requests."""
@@ -410,6 +416,14 @@ class EdgarClient:
     def company_facts(self, cik: str) -> Mapping[str, Any]:
         """Retrieve detailed company facts from the SEC API."""
         cik = _pad_cik(cik)
+        if getattr(self, "_bulk_cache", None) is not None:
+            try:
+                payload = self._bulk_cache.load_company_facts(cik)  # type: ignore[attr-defined]
+            except Exception:
+                LOGGER.debug("Bulk companyfacts lookup failed for CIK %s", cik, exc_info=True)
+                payload = None
+            if payload:
+                return payload
         return self._request(f"/api/xbrl/companyfacts/CIK{cik}.json")
 
     def fetch_filings(
@@ -564,6 +578,92 @@ def _derive_period_label(fy: Optional[int], fiscal_period: Optional[str]) -> str
     if fiscal_period and fiscal_period.upper() not in {"FY", "CY"}:
         return f"FY{fy}{fiscal_period.upper()}"
     return f"FY{fy}"
+
+
+class StooqQuoteClient:
+    """Lightweight fallback client for fetching end-of-day quotes from Stooq."""
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        symbol_suffix: str = ".us",
+        timeout: float = 20.0,
+        session: Optional[requests.Session] = None,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.symbol_suffix = symbol_suffix
+        self.timeout = timeout
+        self.session = session or requests.Session()
+
+    def fetch_quotes(self, tickers: Sequence[str]) -> List[MarketQuote]:
+        """Fetch the latest available quotes for the supplied tickers."""
+        results: List[MarketQuote] = []
+        if not tickers:
+            return results
+
+        for ticker in tickers:
+            symbol = f"{ticker.lower()}{self.symbol_suffix}"
+            try:
+                response = self.session.get(
+                    self.base_url,
+                    params={"s": symbol, "i": "d"},
+                    timeout=self.timeout,
+                    headers={"Accept": "text/csv"},
+                )
+                response.raise_for_status()
+            except Exception as exc:
+                LOGGER.warning("Stooq fetch failed for %s: %s", ticker, exc)
+                continue
+
+            reader = csv.DictReader(response.text.splitlines())
+            row = next(reader, None)
+            if not row:
+                continue
+
+            price_raw = row.get("Close") or row.get("close")
+            if price_raw in (None, "", "N/A"):
+                continue
+            try:
+                price = float(price_raw)
+            except (TypeError, ValueError):
+                continue
+
+            volume_raw = row.get("Volume") or row.get("volume")
+            try:
+                volume = float(volume_raw) if volume_raw not in (None, "", "N/A") else None
+            except (TypeError, ValueError):
+                volume = None
+
+            date_str = row.get("Date") or row.get("date")
+            time_str = row.get("Time") or row.get("time")
+            try:
+                if date_str:
+                    if time_str:
+                        quote_time = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
+                    else:
+                        quote_time = datetime.strptime(date_str, "%Y-%m-%d")
+                else:
+                    quote_time = datetime.utcnow()
+            except ValueError:
+                quote_time = datetime.utcnow()
+            if quote_time.tzinfo is None:
+                quote_time = quote_time.replace(tzinfo=timezone.utc)
+            else:
+                quote_time = quote_time.astimezone(timezone.utc)
+
+            results.append(
+                MarketQuote(
+                    ticker=ticker.upper(),
+                    price=price,
+                    currency="USD",
+                    volume=volume,
+                    timestamp=quote_time,
+                    source="stooq",
+                    raw=row,
+                )
+            )
+        return results
 
 
 class YahooFinanceClient:

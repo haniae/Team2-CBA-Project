@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List, Optional, Sequence
 
@@ -16,9 +16,11 @@ from .data_sources import (
     EdgarClient,
     FinancialFact,
     FilingRecord,
+    StooqQuoteClient,
     YahooFinanceClient,
     DEFAULT_FACT_CONCEPTS,
 )
+from .sec_bulk import CompanyFactsBulkCache
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +35,8 @@ class IngestionReport:
     facts_loaded: int
     quotes_loaded: int
     bloomberg_quotes_loaded: int
-    errors: List[str]
+    errors: List[str] = field(default_factory=list)
+    stooq_quotes_loaded: int = 0
 
 
 class IngestionError(Exception):
@@ -73,6 +76,31 @@ def ingest_live_tickers(
     unique_tickers = sorted({ticker.upper() for ticker in tickers})
     LOGGER.info("Starting ingestion for %d tickers", len(unique_tickers))
 
+    bulk_cache: Optional[CompanyFactsBulkCache] = None
+    if getattr(settings, "use_companyfacts_bulk", False):
+        try:
+            bulk_cache = CompanyFactsBulkCache(
+                settings.cache_dir / "companyfacts_bulk",
+                url=settings.companyfacts_bulk_url,
+                refresh_hours=settings.companyfacts_bulk_refresh_hours,
+                user_agent=settings.sec_api_user_agent,
+            )
+        except Exception:
+            LOGGER.warning("Failed to initialise SEC companyfacts bulk cache; continuing without it.", exc_info=True)
+            bulk_cache = None
+
+    stooq_client: Optional[StooqQuoteClient] = None
+    if getattr(settings, "use_stooq_fallback", False):
+        try:
+            stooq_client = StooqQuoteClient(
+                base_url=settings.stooq_quote_url,
+                symbol_suffix=settings.stooq_symbol_suffix,
+                timeout=settings.stooq_timeout,
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.warning("Failed to initialise Stooq fallback client: %s", exc)
+            stooq_client = None
+
     created_bloomberg = False
     edgar = edgar_client or EdgarClient(
         base_url=settings.edgar_base_url,
@@ -80,6 +108,7 @@ def ingest_live_tickers(
         cache_dir=settings.cache_dir,
         timeout=settings.http_request_timeout,
         min_interval=0.2,
+        bulk_cache=bulk_cache,
     )
     yahoo = yahoo_client or YahooFinanceClient(
         base_url=settings.yahoo_quote_url,
@@ -152,8 +181,36 @@ def ingest_live_tickers(
     facts_loaded = database.bulk_upsert_financial_facts(settings.database_path, facts)
     database.bulk_insert_audit_events(settings.database_path, audit_events)
 
-    quotes = yahoo.fetch_quotes(unique_tickers)
-    quotes_loaded = database.bulk_insert_market_quotes(settings.database_path, quotes)
+    quotes_loaded = 0
+    stooq_quotes_loaded = 0
+    missing_tickers: List[str] = []
+
+    if getattr(settings, "disable_quote_refresh", False):
+        LOGGER.debug("Quote refresh disabled via settings; skipping market data fetch")
+    else:
+        try:
+            quotes = yahoo.fetch_quotes(unique_tickers)
+        except Exception as exc:  # pragma: no cover - network dependent
+            LOGGER.warning("Yahoo quote ingestion failed: %s", exc)
+            quotes = []
+            missing_tickers = list(unique_tickers)
+        else:
+            quotes_loaded = database.bulk_insert_market_quotes(settings.database_path, quotes)
+            fetched = {quote.ticker.upper() for quote in quotes}
+            missing_tickers = [ticker for ticker in unique_tickers if ticker.upper() not in fetched]
+
+    if missing_tickers and stooq_client is not None:
+        try:
+            stooq_quotes = stooq_client.fetch_quotes(missing_tickers)
+        except Exception as exc:  # pragma: no cover - network dependent
+            LOGGER.warning("Stooq fallback ingestion failed: %s", exc)
+        else:
+            if stooq_quotes:
+                stooq_quotes_loaded = database.bulk_insert_market_quotes(
+                    settings.database_path, stooq_quotes
+                )
+                recovered = {quote.ticker.upper() for quote in stooq_quotes}
+                missing_tickers = [ticker for ticker in missing_tickers if ticker.upper() not in recovered]
 
     bloomberg_quotes_loaded = 0
     if bloomberg:
@@ -168,7 +225,13 @@ def ingest_live_tickers(
             if created_bloomberg:
                 bloomberg.close()
 
-    records_loaded = filings_loaded + facts_loaded + quotes_loaded + bloomberg_quotes_loaded
+    records_loaded = (
+        filings_loaded
+        + facts_loaded
+        + quotes_loaded
+        + bloomberg_quotes_loaded
+        + stooq_quotes_loaded
+    )
 
     return IngestionReport(
         companies=unique_tickers,
@@ -177,5 +240,6 @@ def ingest_live_tickers(
         facts_loaded=facts_loaded,
         quotes_loaded=quotes_loaded,
         bloomberg_quotes_loaded=bloomberg_quotes_loaded,
+        stooq_quotes_loaded=stooq_quotes_loaded,
         errors=errors,
     )

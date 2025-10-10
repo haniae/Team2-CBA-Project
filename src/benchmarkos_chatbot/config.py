@@ -99,6 +99,13 @@ class Settings:
     bloomberg_port: Optional[int]
     bloomberg_timeout: float
     disable_quote_refresh: bool
+    use_companyfacts_bulk: bool = False
+    companyfacts_bulk_url: str = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
+    companyfacts_bulk_refresh_hours: int = 24
+    use_stooq_fallback: bool = False
+    stooq_quote_url: str = "https://stooq.com/q/l/"
+    stooq_symbol_suffix: str = ".us"
+    stooq_timeout: float = 20.0
 
     @property
     def sqlite_uri(self) -> str:
@@ -250,6 +257,34 @@ def load_settings() -> Settings:
     if bloomberg_timeout <= 0:
         raise ValueError("BLOOMBERG_TIMEOUT must be positive.")
 
+    use_companyfacts_bulk = _env_flag("USE_COMPANYFACTS_BULK", default=False)
+    companyfacts_bulk_url = os.getenv(
+        "COMPANYFACTS_BULK_URL",
+        "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip",
+    ).strip()
+    if not companyfacts_bulk_url:
+        raise ValueError("COMPANYFACTS_BULK_URL must not be empty.")
+    companyfacts_refresh_env = os.getenv("COMPANYFACTS_BULK_REFRESH_HOURS", "24")
+    try:
+        companyfacts_bulk_refresh_hours = max(1, int(companyfacts_refresh_env))
+    except ValueError as exc:
+        raise ValueError("COMPANYFACTS_BULK_REFRESH_HOURS must be an integer.") from exc
+
+    use_stooq_fallback = _env_flag("USE_STOOQ_FALLBACK", default=False)
+    stooq_quote_url = os.getenv("STOOQ_QUOTE_URL", "https://stooq.com/q/l/").strip()
+    if not stooq_quote_url:
+        raise ValueError("STOOQ_QUOTE_URL must not be empty.")
+    stooq_symbol_suffix = os.getenv("STOOQ_SYMBOL_SUFFIX", ".us").strip()
+    if not stooq_symbol_suffix:
+        stooq_symbol_suffix = ".us"
+    stooq_timeout_env = os.getenv("STOOQ_TIMEOUT", "20")
+    try:
+        stooq_timeout = float(stooq_timeout_env)
+    except ValueError as exc:
+        raise ValueError("STOOQ_TIMEOUT must be numeric.") from exc
+    if stooq_timeout <= 0:
+        raise ValueError("STOOQ_TIMEOUT must be positive.")
+
     return Settings(
         database_type=database_type,
         database_path=database_path,
@@ -273,6 +308,13 @@ def load_settings() -> Settings:
         bloomberg_port=bloomberg_port,
         bloomberg_timeout=bloomberg_timeout,
         disable_quote_refresh=_env_flag("DISABLE_QUOTE_REFRESH", default=False),
+        use_companyfacts_bulk=use_companyfacts_bulk,
+        companyfacts_bulk_url=companyfacts_bulk_url,
+        companyfacts_bulk_refresh_hours=companyfacts_bulk_refresh_hours,
+        use_stooq_fallback=use_stooq_fallback,
+        stooq_quote_url=stooq_quote_url,
+        stooq_symbol_suffix=stooq_symbol_suffix,
+        stooq_timeout=stooq_timeout,
     )
 
 
