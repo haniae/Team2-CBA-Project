@@ -11,6 +11,7 @@ from typing import Dict, Optional
 
 from .data_ingestion import ingest_live_tickers
 from .config import Settings
+from .analytics_engine import AnalyticsEngine
 
 
 @dataclass(slots=True)
@@ -53,6 +54,7 @@ class TaskManager:
             status.updated_at = datetime.utcnow()
             try:
                 result = ingest_live_tickers(self._settings, [ticker], years=years)
+                AnalyticsEngine(self._settings).refresh_metrics(force=True)
             except Exception as exc:  # pragma: no cover - network path
                 status.state = "failed"
                 status.error = str(exc)
@@ -96,6 +98,10 @@ class TaskManager:
         if not future:
             return
         future.result(timeout=timeout)
+
+    def list_statuses(self) -> Dict[str, TaskStatus]:
+        """Return a copy of all tracked task statuses."""
+        return dict(self._statuses)
 
 
 _default_manager: Optional[TaskManager] = None

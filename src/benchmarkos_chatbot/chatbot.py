@@ -18,7 +18,8 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 from . import database
 from .analytics_engine import AnalyticsEngine
 from .config import Settings
-from .data_ingestion import IngestionReport, ingest_financial_data, ingest_live_tickers
+from .data_ingestion import IngestionReport, ingest_financial_data
+from . import tasks
 from .llm_client import LLMClient, build_llm_client
 from .table_renderer import render_table_command, METRIC_DEFINITIONS
 
@@ -680,6 +681,7 @@ class BenchmarkOSChatbot:
                     "  fact <TICKER> <YEAR> [metric]                     - show raw financial facts",
                     "  audit <TICKER> [YEAR]                             - recent audit trail entries",
                     "  ingest <TICKER> [years]                           - fetch SEC/Yahoo data and refresh",
+                    "  ingest status <TICKER>                           - show background ingestion status",
                     "  scenario <T> <NAME> rev=+5% margin=+1% mult=+0.5  - run what-if",
                     "",
                     "Natural examples:",
@@ -758,6 +760,19 @@ class BenchmarkOSChatbot:
         parts = text.split()
         if len(parts) < 2:
             return "Usage: ingest <TICKER> [years]"
+        if parts[1].lower() == "status":
+            if len(parts) < 3:
+                return "Usage: ingest status <TICKER>"
+            ticker = parts[2].upper()
+            manager = tasks.get_task_manager(self.settings)
+            status = manager.get_status(ticker)
+            if not status:
+                return f"No ingestion task found for {ticker}."
+            return (
+                f"Ingestion status for {ticker}: {status.summary()} "
+                f"(submitted {status.submitted_at:%Y-%m-%d %H:%M:%S} UTC)"
+            )
+
         ticker = parts[1].upper()
         years = 5
         if len(parts) >= 3:
@@ -765,13 +780,13 @@ class BenchmarkOSChatbot:
                 years = int(parts[2])
             except ValueError:
                 return "Years must be an integer (e.g. ingest TSLA 5)."
-
-        report = ingest_live_tickers(self.settings, [ticker], years=years)
-        self.analytics_engine.refresh_metrics(force=True)
-        companies = ", ".join(report.companies)
+        manager = tasks.get_task_manager(self.settings)
+        manager.submit_ingest(ticker, years=years)
+        current_status = manager.get_status(ticker)
+        summary = current_status.summary() if current_status else "queued"
         return (
-            f"Live ingestion complete for {companies or ticker}. "
-            f"Loaded {report.records_loaded} facts; metrics refreshed."
+            f"Ingestion for {ticker} queued (status: {summary}). "
+            f"Use 'ingest status {ticker}' to check progress."
         )
 
     def _handle_scenario_command(self, text: str) -> str:

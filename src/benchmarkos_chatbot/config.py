@@ -106,6 +106,7 @@ class Settings:
     stooq_quote_url: str = "https://stooq.com/q/l/"
     stooq_symbol_suffix: str = ".us"
     stooq_timeout: float = 20.0
+    ingestion_year_buffer: int = 2
 
     @property
     def sqlite_uri(self) -> str:
@@ -284,6 +285,11 @@ def load_settings() -> Settings:
         raise ValueError("STOOQ_TIMEOUT must be numeric.") from exc
     if stooq_timeout <= 0:
         raise ValueError("STOOQ_TIMEOUT must be positive.")
+    ingestion_year_buffer_env = os.getenv("INGESTION_YEAR_BUFFER", "2")
+    try:
+        ingestion_year_buffer = max(1, int(ingestion_year_buffer_env))
+    except ValueError as exc:
+        raise ValueError("INGESTION_YEAR_BUFFER must be an integer.") from exc
 
     return Settings(
         database_type=database_type,
@@ -315,6 +321,7 @@ def load_settings() -> Settings:
         stooq_quote_url=stooq_quote_url,
         stooq_symbol_suffix=stooq_symbol_suffix,
         stooq_timeout=stooq_timeout,
+        ingestion_year_buffer=ingestion_year_buffer,
     )
 
 

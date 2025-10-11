@@ -498,7 +498,10 @@ def iter_conversation_summaries(database_path: Path) -> Iterator[Tuple[str, int]
 # -----------------------------
 
 def bulk_upsert_company_filings(
-    database_path: Path, filings: Sequence["FilingRecord"]
+    database_path: Path,
+    filings: Sequence["FilingRecord"],
+    *,
+    connection: Optional[sqlite3.Connection] = None,
 ) -> int:
     """Upsert SEC filing metadata in bulk."""
     if not filings:
@@ -519,7 +522,11 @@ def bulk_upsert_company_filings(
         for filing in filings
     ]
 
-    with _connect(database_path) as connection:
+    own_connection = False
+    if connection is None:
+        connection = _connect(database_path)
+        own_connection = True
+    try:
         cursor = connection.executemany(
             """
             INSERT OR IGNORE INTO company_filings (
@@ -529,8 +536,12 @@ def bulk_upsert_company_filings(
             """,
             payload,
         )
-        connection.commit()
+        if own_connection:
+            connection.commit()
         return cursor.rowcount
+    finally:
+        if own_connection:
+            connection.close()
 
 
 # -----------------------------
@@ -538,7 +549,10 @@ def bulk_upsert_company_filings(
 # -----------------------------
 
 def bulk_upsert_financial_facts(
-    database_path: Path, facts: Sequence["FinancialFact"]
+    database_path: Path,
+    facts: Sequence["FinancialFact"],
+    *,
+    connection: Optional[sqlite3.Connection] = None,
 ) -> int:
     """Upsert SEC financial facts in batches."""
     if not facts:
@@ -567,7 +581,11 @@ def bulk_upsert_financial_facts(
         for fact in facts
     ]
 
-    with _connect(database_path) as connection:
+    own_connection = False
+    if connection is None:
+        connection = _connect(database_path)
+        own_connection = True
+    try:
         cursor = connection.executemany(
             """
             INSERT INTO financial_facts (
@@ -594,8 +612,12 @@ def bulk_upsert_financial_facts(
             """,
             payload,
         )
-        connection.commit()
+        if own_connection:
+            connection.commit()
         return cursor.rowcount
+    finally:
+        if own_connection:
+            connection.close()
 
 
 def fetch_financial_facts(
@@ -660,7 +682,10 @@ def fetch_financial_facts(
 # -----------------------------
 
 def bulk_insert_market_quotes(
-    database_path: Path, quotes: Sequence["MarketQuote"]
+    database_path: Path,
+    quotes: Sequence["MarketQuote"],
+    *,
+    connection: Optional[sqlite3.Connection] = None,
 ) -> int:
     """Insert or replace market quotes used for ratios."""
     if not quotes:
@@ -679,7 +704,11 @@ def bulk_insert_market_quotes(
         for quote in quotes
     ]
 
-    with _connect(database_path) as connection:
+    own_connection = False
+    if connection is None:
+        connection = _connect(database_path)
+        own_connection = True
+    try:
         cursor = connection.executemany(
             """
             INSERT OR IGNORE INTO market_quotes (
@@ -688,8 +717,12 @@ def bulk_insert_market_quotes(
             """,
             payload,
         )
-        connection.commit()
+        if own_connection:
+            connection.commit()
         return cursor.rowcount
+    finally:
+        if own_connection:
+            connection.close()
 
 
 def fetch_latest_quote(database_path: Path, ticker: str) -> Optional[Dict[str, Any]]:
@@ -757,6 +790,8 @@ def fetch_quote_on_or_before(
 def bulk_insert_audit_events(
     database_path: Path,
     events: Sequence["AuditEvent"],
+    *,
+    connection: Optional[sqlite3.Connection] = None,
 ) -> int:
     """Persist audit trail events for later inspection."""
     if not events:
@@ -774,7 +809,11 @@ def bulk_insert_audit_events(
         for event in events
     ]
 
-    with _connect(database_path) as connection:
+    own_connection = False
+    if connection is None:
+        connection = _connect(database_path)
+        own_connection = True
+    try:
         cursor = connection.executemany(
             """
             INSERT INTO audit_events (
@@ -783,8 +822,12 @@ def bulk_insert_audit_events(
             """,
             payload,
         )
-        connection.commit()
+        if own_connection:
+            connection.commit()
         return cursor.rowcount
+    finally:
+        if own_connection:
+            connection.close()
 
 
 def fetch_audit_events(
@@ -836,9 +879,38 @@ def fetch_audit_events(
 # -----------------------------
 
 
+def latest_fiscal_year(
+    database_path: Path,
+    ticker: str,
+    *,
+    connection: Optional[sqlite3.Connection] = None,
+) -> Optional[int]:
+    """Return the most recent fiscal year stored for ``ticker``."""
+    own_connection = False
+    if connection is None:
+        connection = _connect(database_path)
+        own_connection = True
+    try:
+        row = connection.execute(
+            """
+            SELECT MAX(fiscal_year)
+            FROM financial_facts
+            WHERE ticker = ?
+            """,
+            (_normalize_ticker(ticker),),
+        ).fetchone()
+        max_year = row[0] if row and row[0] is not None else None
+        return int(max_year) if max_year is not None else None
+    finally:
+        if own_connection:
+            connection.close()
+
+
 def upsert_ticker_aliases(
     database_path: Path,
     aliases: Sequence[TickerAliasRecord],
+    *,
+    connection: Optional[sqlite3.Connection] = None,
 ) -> int:
     """Persist canonical ticker aliases with company names."""
     if not aliases:
@@ -854,7 +926,11 @@ def upsert_ticker_aliases(
         for alias in aliases
     ]
 
-    with _connect(database_path) as connection:
+    own_connection = False
+    if connection is None:
+        connection = _connect(database_path)
+        own_connection = True
+    try:
         cursor = connection.executemany(
             """
             INSERT INTO ticker_aliases (ticker, cik, company_name, updated_at)
@@ -866,8 +942,12 @@ def upsert_ticker_aliases(
             """,
             payload,
         )
-        connection.commit()
+        if own_connection:
+            connection.commit()
         return cursor.rowcount
+    finally:
+        if own_connection:
+            connection.close()
 
 
 def lookup_ticker(

@@ -137,11 +137,18 @@ def ingest_live_tickers(
     alias_records: List[database.TickerAliasRecord] = []
 
     concepts = tuple(fact_concepts or DEFAULT_FACT_CONCEPTS)
+    year_buffer = max(1, getattr(settings, "ingestion_year_buffer", 2))
+    current_year = _now().year
 
     for ticker in unique_tickers:
+        existing_year = database.latest_fiscal_year(settings.database_path, ticker)
+        years_to_fetch = years
+        if existing_year is not None:
+            delta_years = max(1, current_year - existing_year + year_buffer)
+            years_to_fetch = max(year_buffer, min(years, delta_years))
         try:
             new_filings = edgar.fetch_filings(ticker, forms=edgar_forms)
-            new_facts = edgar.fetch_facts(ticker, concepts=concepts, years=years)
+            new_facts = edgar.fetch_facts(ticker, concepts=concepts, years=years_to_fetch)
         except Exception as exc:  # pragma: no cover - exercised in live ingestion
             message = f"{ticker}: {exc}"
             LOGGER.error("Failed to ingest %s", ticker, exc_info=True)
@@ -161,12 +168,13 @@ def ingest_live_tickers(
         filings.extend(new_filings)
         facts.extend(new_facts)
         if new_facts:
+            alias_timestamp = _now()
             alias_records.append(
                 database.TickerAliasRecord(
                     ticker=ticker.upper(),
                     cik=new_facts[0].cik,
                     company_name=new_facts[0].company_name,
-                    updated_at=_now(),
+                    updated_at=alias_timestamp,
                 )
             )
         if new_facts and new_facts[0].fiscal_year is not None:
@@ -187,11 +195,20 @@ def ingest_live_tickers(
             )
         )
 
-    filings_loaded = database.bulk_upsert_company_filings(settings.database_path, filings)
-    facts_loaded = database.bulk_upsert_financial_facts(settings.database_path, facts)
-    database.bulk_insert_audit_events(settings.database_path, audit_events)
-    if alias_records:
-        database.upsert_ticker_aliases(settings.database_path, alias_records)
+    with database.temporary_connection(settings.database_path) as connection:
+        filings_loaded = database.bulk_upsert_company_filings(
+            settings.database_path, filings, connection=connection
+        )
+        facts_loaded = database.bulk_upsert_financial_facts(
+            settings.database_path, facts, connection=connection
+        )
+        database.bulk_insert_audit_events(
+            settings.database_path, audit_events, connection=connection
+        )
+        if alias_records:
+            database.upsert_ticker_aliases(
+                settings.database_path, alias_records, connection=connection
+            )
 
     quotes_loaded = 0
     stooq_quotes_loaded = 0
@@ -207,7 +224,10 @@ def ingest_live_tickers(
             quotes = []
             missing_tickers = list(unique_tickers)
         else:
-            quotes_loaded = database.bulk_insert_market_quotes(settings.database_path, quotes)
+            with database.temporary_connection(settings.database_path) as quote_connection:
+                quotes_loaded = database.bulk_insert_market_quotes(
+                    settings.database_path, quotes, connection=quote_connection
+                )
             fetched = {quote.ticker.upper() for quote in quotes}
             missing_tickers = [ticker for ticker in unique_tickers if ticker.upper() not in fetched]
 
@@ -218,19 +238,23 @@ def ingest_live_tickers(
             LOGGER.warning("Stooq fallback ingestion failed: %s", exc)
         else:
             if stooq_quotes:
-                stooq_quotes_loaded = database.bulk_insert_market_quotes(
-                    settings.database_path, stooq_quotes
-                )
+                with database.temporary_connection(settings.database_path) as quote_connection:
+                    stooq_quotes_loaded = database.bulk_insert_market_quotes(
+                        settings.database_path, stooq_quotes, connection=quote_connection
+                    )
                 recovered = {quote.ticker.upper() for quote in stooq_quotes}
-                missing_tickers = [ticker for ticker in missing_tickers if ticker.upper() not in recovered]
+                missing_tickers = [
+                    ticker for ticker in missing_tickers if ticker.upper() not in recovered
+                ]
 
     bloomberg_quotes_loaded = 0
     if bloomberg:
         try:
             bloomberg_quotes = bloomberg.fetch_quotes(unique_tickers)
-            bloomberg_quotes_loaded = database.bulk_insert_market_quotes(
-                settings.database_path, bloomberg_quotes
-            )
+            with database.temporary_connection(settings.database_path) as quote_connection:
+                bloomberg_quotes_loaded = database.bulk_insert_market_quotes(
+                    settings.database_path, bloomberg_quotes, connection=quote_connection
+                )
         except Exception as exc:  # pragma: no cover - depends on Bloomberg availability
             LOGGER.warning("Bloomberg quote ingestion failed: %s", exc)
         finally:
