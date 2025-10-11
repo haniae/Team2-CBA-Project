@@ -89,6 +89,16 @@ class AuditEventRecord:
     created_by: str
 
 
+@dataclass(frozen=True)
+class TickerAliasRecord:
+    """Canonical mapping of ticker symbols to CIK/company names."""
+
+    ticker: str
+    cik: str
+    company_name: str
+    updated_at: datetime
+
+
 # -----------------------------
 # Helpers
 # -----------------------------
@@ -228,6 +238,12 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
         _ensure_column(connection, "company_filings", "data", "TEXT NOT NULL DEFAULT '{}'")
         _ensure_column(connection, "company_filings", "source", "TEXT NOT NULL DEFAULT 'edgar'")
 
+    # ticker_aliases
+    if "ticker_aliases" in tables:
+        _ensure_column(connection, "ticker_aliases", "cik", "TEXT NOT NULL")
+        _ensure_column(connection, "ticker_aliases", "company_name", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(connection, "ticker_aliases", "updated_at", "TEXT NOT NULL")
+
 
 # -----------------------------
 # Schema init
@@ -346,6 +362,16 @@ def initialise(database_path: Path) -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ticker_aliases (
+                ticker TEXT PRIMARY KEY,
+                cik TEXT NOT NULL,
+                company_name TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
 
         _apply_migrations(connection)
 
@@ -371,6 +397,12 @@ def initialise(database_path: Path) -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_scenario_results_ticker
             ON scenario_results (ticker, scenario_name, created_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_ticker_aliases_name
+            ON ticker_aliases (company_name)
             """
         )
         connection.commit()
@@ -803,6 +835,41 @@ def fetch_audit_events(
 # Metric Snapshots
 # -----------------------------
 
+
+def upsert_ticker_aliases(
+    database_path: Path,
+    aliases: Sequence[TickerAliasRecord],
+) -> int:
+    """Persist canonical ticker aliases with company names."""
+    if not aliases:
+        return 0
+
+    payload = [
+        (
+            _normalize_ticker(alias.ticker),
+            alias.cik,
+            alias.company_name,
+            _iso_utc(alias.updated_at),
+        )
+        for alias in aliases
+    ]
+
+    with _connect(database_path) as connection:
+        cursor = connection.executemany(
+            """
+            INSERT INTO ticker_aliases (ticker, cik, company_name, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(ticker) DO UPDATE SET
+                cik = excluded.cik,
+                company_name = excluded.company_name,
+                updated_at = excluded.updated_at
+            """,
+            payload,
+        )
+        connection.commit()
+        return cursor.rowcount
+
+
 def lookup_ticker(
     database_path: Path,
     query: str,
@@ -836,6 +903,18 @@ def lookup_ticker(
         if row:
             return row["ticker"]
 
+        row = connection.execute(
+            """
+            SELECT ticker
+            FROM ticker_aliases
+            WHERE ticker = ?
+            LIMIT 1
+            """,
+            (ticker_guess,),
+        ).fetchone()
+        if row:
+            return row["ticker"]
+
         # 2. Exact company name match (case-insensitive)
         row = connection.execute(
             """
@@ -846,6 +925,18 @@ def lookup_ticker(
             )
             WHERE UPPER(company_name) = ?
             ORDER BY LENGTH(company_name) ASC
+            LIMIT 1
+            """,
+            (name_upper,),
+        ).fetchone()
+        if row:
+            return row["ticker"]
+
+        row = connection.execute(
+            """
+            SELECT ticker
+            FROM ticker_aliases
+            WHERE UPPER(company_name) = ?
             LIMIT 1
             """,
             (name_upper,),
@@ -865,6 +956,19 @@ def lookup_ticker(
                 FROM financial_facts
                 WHERE company_name IS NOT NULL AND company_name <> ''
             )
+            WHERE UPPER(company_name) LIKE ?
+            ORDER BY LENGTH(company_name) ASC, ticker ASC
+            LIMIT 1
+            """,
+            (pattern,),
+        ).fetchone()
+        if row:
+            return row["ticker"]
+
+        row = connection.execute(
+            """
+            SELECT ticker
+            FROM ticker_aliases
             WHERE UPPER(company_name) LIKE ?
             ORDER BY LENGTH(company_name) ASC, ticker ASC
             LIMIT 1

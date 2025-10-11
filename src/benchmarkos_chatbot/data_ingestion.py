@@ -134,6 +134,7 @@ def ingest_live_tickers(
     facts: List[FinancialFact] = []
     audit_events: List[AuditEvent] = []
     errors: List[str] = []
+    alias_records: List[database.TickerAliasRecord] = []
 
     concepts = tuple(fact_concepts or DEFAULT_FACT_CONCEPTS)
 
@@ -159,6 +160,15 @@ def ingest_live_tickers(
 
         filings.extend(new_filings)
         facts.extend(new_facts)
+        if new_facts:
+            alias_records.append(
+                database.TickerAliasRecord(
+                    ticker=ticker.upper(),
+                    cik=new_facts[0].cik,
+                    company_name=new_facts[0].company_name,
+                    updated_at=_now(),
+                )
+            )
         if new_facts and new_facts[0].fiscal_year is not None:
             entity_id = f"{ticker}-FY{new_facts[0].fiscal_year}"
         else:
@@ -180,6 +190,8 @@ def ingest_live_tickers(
     filings_loaded = database.bulk_upsert_company_filings(settings.database_path, filings)
     facts_loaded = database.bulk_upsert_financial_facts(settings.database_path, facts)
     database.bulk_insert_audit_events(settings.database_path, audit_events)
+    if alias_records:
+        database.upsert_ticker_aliases(settings.database_path, alias_records)
 
     quotes_loaded = 0
     stooq_quotes_loaded = 0
