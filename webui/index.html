@@ -9,68 +9,88 @@
   <body>
     <div class="layout">
       <aside class="sidebar">
-        <div class="sidebar-header">
-          <div class="logo">BenchmarkOS</div>
-          <button id="new-chat" class="primary-action">+ New chat</button>
+        <div class="sidebar-brand-zone">
+          <div class="brand-identity">
+            <div class="brand-badge" aria-hidden="true">BO</div>
+            <div class="brand-text">
+              <span class="brand-name">BenchmarkOS</span>
+            </div>
+          </div>
+          <div class="brand-status">
+            <div class="status-connection">
+              <span class="status-dot" id="api-status"></span>
+              <span id="status-message">Checking API...</span>
+            </div>
+          </div>
         </div>
 
-        <nav class="sidebar-nav" aria-label="Assistant navigation">
-          <button class="nav-item" data-action="new-chat">
-            <span class="nav-label">New chat</span>
+        <div class="sidebar-divider" role="presentation"></div>
+
+        <nav class="sidebar-nav" aria-label="Analyst navigation">
+          <button class="nav-item" data-action="new-analysis">
+            <span class="nav-icon" aria-hidden="true">🔍</span>
+            <span class="nav-label">New Analysis</span>
           </button>
-          <button class="nav-item" data-action="search-chats">
-            <span class="nav-label">Search chats</span>
+          <button class="nav-item" data-action="saved-reports">
+            <span class="nav-icon" aria-hidden="true">📁</span>
+            <span class="nav-label">Saved Reports</span>
           </button>
-          <button class="nav-item" data-action="open-library">
-            <span class="nav-label">Library</span>
+          <button class="nav-item" data-action="open-kpi-library">
+            <span class="nav-icon" aria-hidden="true">📊</span>
+            <span class="nav-label">KPI Library</span>
           </button>
-          <button class="nav-item" data-action="open-codex">
-            <span class="nav-label">Codex</span>
+          <button class="nav-item" data-action="open-company-universe">
+            <span class="nav-icon" aria-hidden="true">🏢</span>
+            <span class="nav-label">Company Universe</span>
           </button>
-          <button class="nav-item" data-action="open-gpts">
-            <span class="nav-label">GPTs</span>
-          </button>
-          <button class="nav-item" data-action="open-projects">
-            <span class="nav-label">Projects</span>
+          <button class="nav-item" data-action="open-filing-viewer">
+            <span class="nav-icon" aria-hidden="true">📚</span>
+            <span class="nav-label">Filing Source Viewer</span>
           </button>
         </nav>
 
-        <div class="sidebar-search hidden" id="chat-search" role="search">
-          <label class="sr-only" for="chat-search-input">Search saved conversations</label>
-          <input
-            type="search"
-            id="chat-search-input"
-            placeholder="Search chats..."
-            autocomplete="off"
-          />
-          <button type="button" id="chat-search-clear" class="search-clear" aria-label="Clear search">x</button>
-        </div>
+        <div class="sidebar-divider" role="presentation"></div>
 
-        <div class="sidebar-section conversations">
-          <div class="conversations-header">
-            <h2>Recent chats</h2>
+        <nav class="sidebar-nav secondary" aria-label="Workspace navigation">
+          <button class="nav-item" data-action="open-settings">
+            <span class="nav-icon" aria-hidden="true">⚙️</span>
+            <span class="nav-label">Settings</span>
+          </button>
+        </nav>
+
+        <section class="sidebar-section saved-reports" aria-labelledby="saved-reports-heading">
+          <div class="section-header">
+            <h2 id="saved-reports-heading">Saved Reports</h2>
+            <button class="section-action" data-action="search-saved">
+              <span aria-hidden="true">🔎</span>
+              <span class="section-action-label">Search</span>
+            </button>
+          </div>
+          <div class="sidebar-search hidden" id="chat-search" role="search">
+            <label class="sr-only" for="chat-search-input">Search saved conversations</label>
+            <input
+              type="search"
+              id="chat-search-input"
+              placeholder="Filter reports..."
+              autocomplete="off"
+            />
+            <button type="button" id="chat-search-clear" class="search-clear" aria-label="Clear search">&times;</button>
           </div>
           <div class="conversation-list" id="conversation-list" role="list">
-            <p class="empty-state">New conversations will appear here.</p>
+            <p class="empty-state">Saved analyses will appear here.</p>
           </div>
-        </div>
+        </section>
 
         <footer class="sidebar-footer">
-          <p class="muted">
-            Grounded by BenchmarkOS analytics. Quotes refresh automatically when available.
-          </p>
+          <p>Grounded by BenchmarkOS analytics &mdash; audit-ready by design.</p>
         </footer>
       </aside>
 
       <main class="main-panel">
         <header class="top-bar">
-          <div>
+          <div class="hero-copy">
             <h1>BenchmarkOS Analyst Copilot</h1>
             <p>Ask capital-markets questions grounded in your analytics store.</p>
-          </div>
-          <div class="status-pill" role="status">
-            <span class="status-dot" id="api-status"></span>
-            <span id="status-message">Checking API...</span>
           </div>
         </header>
 
@@ -83,6 +103,26 @@
         </section>
 
         <section class="chat-panel">
+          <div class="chat-intro" id="chat-intro">
+            <div class="intro-card">
+              <h2>Run metrics, compare, and fact commands on the S&amp;P 500 dataset.</h2>
+              <p class="intro-subtitle">
+                The copilot speaks in command syntax&mdash;start with <code>help</code> or jump into the
+                shortcuts below to grab KPIs, comparisons, and fact tables immediately.
+              </p>
+            </div>
+            <div class="intro-prompts">
+              <button class="prompt-chip" data-prompt="metrics AAPL 2022-2024">
+                Metrics AAPL 2022-2024
+              </button>
+              <button class="prompt-chip" data-prompt="compare NVDA AMD 2023">
+                Compare NVDA AMD 2023
+              </button>
+              <button class="prompt-chip" data-prompt="fact TSLA 2022 revenue">
+                Fact TSLA 2022 Revenue
+              </button>
+            </div>
+          </div>
           <div id="chat-log" class="chat-log" aria-live="polite"></div>
 
           <form id="chat-form" class="chat-form" autocomplete="off">
