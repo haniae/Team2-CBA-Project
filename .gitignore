@@ -1,4 +1,6 @@
 __pycache__/
+.ingestion_progress.json
+cache/companyfacts_bulk/
 *.py[cod]
 *.sqlite3
 .env

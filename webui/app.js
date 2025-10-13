@@ -389,7 +389,7 @@ function humaniseLabel(value) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function createList(items, className = "kpi-library__list") {
+function createList(items, className = "kpi-library__doc-list") {
   const list = document.createElement("ul");
   list.className = className;
   (items || [])
@@ -401,34 +401,6 @@ function createList(items, className = "kpi-library__list") {
       list.append(li);
     });
   return list;
-}
-
-function formatInputDescriptor(input) {
-  if (!input || typeof input !== "object") {
-    return "";
-  }
-  const segments = [];
-  if (input.source) {
-    segments.push(`[${input.source}]`);
-  }
-  if (input.tag) {
-    segments.push(input.tag);
-  }
-  if (input.statement) {
-    segments.push(`(${input.statement})`);
-  }
-  let text = segments.join(" ").trim();
-  const extras = [];
-  if (Array.isArray(input.components) && input.components.length) {
-    extras.push(`components: ${input.components.join(", ")}`);
-  }
-  if (Array.isArray(input.fallbacks) && input.fallbacks.length) {
-    extras.push(`fallback: ${input.fallbacks.join(", ")}`);
-  }
-  if (extras.length) {
-    text = `${text} — ${extras.join("; ")}`.trim();
-  }
-  return text;
 }
 
 function formatDirectionality(value) {
@@ -443,42 +415,184 @@ function formatDirectionality(value) {
   return mapping[value] || humaniseLabel(value);
 }
 
-function appendDetail(list, label, content) {
+function formatPeriodLabel(value) {
+  if (!value) {
+    return "";
+  }
+  return `${value}`
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatTagName(tag) {
+  if (!tag) {
+    return "";
+  }
+  return `${tag}`
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatFriendlyInput(input) {
+  if (!input || typeof input !== "object") {
+    return "";
+  }
+  const label = input.tag ? formatTagName(input.tag) : formatTagName(input.source);
+  const statement = input.statement ? humaniseLabel(input.statement) : "";
+  const derived = input.source === "derived" ? " (Derived)" : "";
+  const base = label ? `${label}${derived}` : statement;
+  if (base && statement) {
+    return `${base} (${statement})`;
+  }
+  return base || statement || "";
+}
+
+function formatTechnicalInput(input) {
+  if (!input || typeof input !== "object") {
+    return "";
+  }
+  const segments = [];
+  if (input.source) {
+    segments.push(`[${input.source}]`);
+  }
+  if (input.tag) {
+    segments.push(input.tag);
+  }
+  if (input.statement) {
+    segments.push(`(${input.statement})`);
+  }
+  if (Array.isArray(input.components) && input.components.length) {
+    segments.push(`components: ${input.components.join(", ")}`);
+  }
+  if (Array.isArray(input.fallbacks) && input.fallbacks.length) {
+    segments.push(`fallbacks: ${input.fallbacks.join(", ")}`);
+  }
+  return segments.join(" ").trim();
+}
+
+function createMetaBadge(label, value) {
+  if (!value) {
+    return null;
+  }
+  const badge = document.createElement("span");
+  badge.className = "kpi-library__meta-pill";
+  badge.textContent = `${label}: ${value}`;
+  return badge;
+}
+
+function createDocSection(label, content, options = {}) {
   if (
     content === undefined ||
     content === null ||
     (typeof content === "string" && !content.trim())
   ) {
-    return;
+    return null;
   }
-  if (Array.isArray(content) && !content.filter(Boolean).length) {
-    return;
+  if (Array.isArray(content)) {
+    const filtered = content.map((entry) => (entry ? `${entry}`.trim() : "")).filter(Boolean);
+    if (!filtered.length) {
+      return null;
+    }
+    content = filtered;
   }
-  const dt = document.createElement("dt");
-  dt.className = "kpi-library__detail-term";
-  dt.textContent = label;
-  const dd = document.createElement("dd");
-  dd.className = "kpi-library__detail-desc";
+
+  const section = document.createElement("section");
+  section.className = "kpi-library__doc-section";
+
+  const heading = document.createElement("h6");
+  heading.className = "kpi-library__doc-label";
+  heading.textContent = label;
+  section.append(heading);
+
+  if (options.type === "code") {
+    const block = document.createElement("pre");
+    block.className = "kpi-library__formula";
+    const code = document.createElement("code");
+    code.textContent = `${content}`;
+    block.append(code);
+    section.append(block);
+    return section;
+  }
 
   if (Array.isArray(content)) {
-    dd.append(createList(content, "kpi-library__detail-list"));
-  } else if (typeof content === "object") {
-    const entries = Object.entries(content).map(([key, value]) => {
-      if (Array.isArray(value)) {
-        return `${humaniseLabel(key)}: ${value.join(", ")}`;
-      }
-      if (value && typeof value === "object") {
-        return `${humaniseLabel(key)}: ${JSON.stringify(value)}`;
-      }
-      return `${humaniseLabel(key)}: ${value}`;
-    });
-    dd.append(createList(entries, "kpi-library__detail-list"));
-  } else {
-    dd.textContent = `${content}`;
+    section.append(createList(content, options.listClass || "kpi-library__doc-list"));
+    return section;
   }
 
-  list.append(dt);
-  list.append(dd);
+  if (typeof content === "object") {
+    const entries = Object.entries(content).map(
+      ([key, value]) => `${humaniseLabel(key)}: ${value}`
+    );
+    section.append(createList(entries, options.listClass || "kpi-library__doc-list"));
+    return section;
+  }
+
+  const paragraph = document.createElement("p");
+  paragraph.className = "kpi-library__doc-text";
+  paragraph.textContent = `${content}`;
+  section.append(paragraph);
+  return section;
+}
+
+function buildTechnicalDetails(kpi) {
+  const lines = [];
+  (kpi.inputs || []).forEach((input) => {
+    const descriptor = formatTechnicalInput(input);
+    if (descriptor) {
+      lines.push(`Input: ${descriptor}`);
+    }
+  });
+
+  if (kpi.parameters && Object.keys(kpi.parameters).length) {
+    lines.push(`Parameters: ${JSON.stringify(kpi.parameters)}`);
+  }
+  if (kpi.presentation && Object.keys(kpi.presentation).length) {
+    lines.push(`Presentation: ${JSON.stringify(kpi.presentation)}`);
+  }
+  if (Array.isArray(kpi.dimensions_supported) && kpi.dimensions_supported.length) {
+    lines.push(`Dimensions: ${kpi.dimensions_supported.join(", ")}`);
+  }
+  if (kpi.quality_notes) {
+    lines.push(`Quality notes: ${kpi.quality_notes}`);
+  }
+
+  const detailLines = lines.filter(Boolean);
+  if (!detailLines.length) {
+    return null;
+  }
+
+  const container = document.createElement("div");
+  container.className = "kpi-library__tech";
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "kpi-library__tech-toggle";
+  toggle.textContent = "Show technical tags ▸";
+
+  const body = document.createElement("div");
+  body.className = "kpi-library__tech-body";
+  body.hidden = true;
+  body.append(createList(detailLines, "kpi-library__tech-list"));
+
+  toggle.addEventListener("click", () => {
+    const isOpen = !body.hidden;
+    if (isOpen) {
+      body.hidden = true;
+      toggle.textContent = "Show technical tags ▸";
+      toggle.classList.remove("is-open");
+    } else {
+      body.hidden = false;
+      toggle.textContent = "Hide technical tags ▾";
+      toggle.classList.add("is-open");
+    }
+  });
+
+  container.append(toggle);
+  container.append(body);
+  return container;
 }
 
 async function loadKpiLibraryData() {
@@ -528,174 +642,114 @@ function buildKpiLibraryHero(data) {
   const metaList = document.createElement("ul");
   metaList.className = "kpi-library__meta";
 
-  if (data.schema_version) {
-    const schemaItem = document.createElement("li");
-    schemaItem.textContent = `Schema ${data.schema_version}`;
-    metaList.append(schemaItem);
-  }
-  if (data.last_updated) {
-    const updatedItem = document.createElement("li");
-    updatedItem.textContent = `Updated ${formatDisplayDate(data.last_updated)}`;
-    metaList.append(updatedItem);
-  }
-
   copy.append(title);
   copy.append(subtitle);
-  if (metaList.children.length) {
-    copy.append(metaList);
-  }
-
-  if (Array.isArray(data.example_queries) && data.example_queries.length) {
-    const chips = document.createElement("ul");
-    chips.className = "kpi-library__chips";
-    data.example_queries
-      .filter(Boolean)
-      .forEach((query) => {
-        const chip = document.createElement("li");
-        chip.className = "kpi-library__chip";
-        chip.textContent = query;
-        chips.append(chip);
-      });
-    copy.append(chips);
-  }
 
   hero.append(badge);
   hero.append(copy);
   return hero;
 }
 
-function buildConventionsSection(conventions) {
-  if (!conventions || typeof conventions !== "object") {
-    return null;
-  }
-  const section = document.createElement("section");
-  section.className = "kpi-library__section";
-
-  const heading = document.createElement("h4");
-  heading.className = "kpi-library__section-title";
-  heading.textContent = "Global Conventions";
-  section.append(heading);
-
-  const definition = document.createElement("dl");
-  definition.className = "kpi-library__conventions";
-
-  const order = [
-    "periods_supported",
-    "currency_policy",
-    "averaging_policy",
-    "peer_group_policy",
-    "source_priority",
-    "missing_data_strategy",
-  ];
-
-  order
-    .filter((key) => Object.prototype.hasOwnProperty.call(conventions, key))
-    .forEach((key) => {
-      const value = conventions[key];
-      const term = document.createElement("dt");
-      term.className = "kpi-library__convention-term";
-      term.textContent = humaniseLabel(key);
-
-      const desc = document.createElement("dd");
-      desc.className = "kpi-library__convention-desc";
-
-      if (Array.isArray(value)) {
-        desc.append(createList(value, "kpi-library__bullet-list"));
-      } else {
-        desc.textContent = `${value}`;
-      }
-      definition.append(term);
-      definition.append(desc);
-    });
-
-  section.append(definition);
-  return section;
-}
-
 function buildKpiCard(kpi) {
   const card = document.createElement("article");
-  card.className = "kpi-library__card";
+  card.className = "kpi-library__doc-card";
 
-  const header = document.createElement("div");
-  header.className = "kpi-library__card-header";
+  const header = document.createElement("header");
+  header.className = "kpi-library__doc-header";
 
   const title = document.createElement("h5");
-  title.className = "kpi-library__card-title";
-  title.textContent = kpi.display_name || kpi.kpi_id;
-
-  const code = document.createElement("span");
-  code.className = "kpi-library__code";
-  code.textContent = kpi.kpi_id || "";
-
+  title.className = "kpi-library__doc-title";
+  title.textContent = kpi.display_name || formatTagName(kpi.kpi_id);
   header.append(title);
-  if (code.textContent) {
+
+  if (kpi.kpi_id) {
+    const code = document.createElement("span");
+    code.className = "kpi-library__doc-code";
+    code.textContent = kpi.kpi_id;
     header.append(code);
   }
 
-  const pillGroup = document.createElement("div");
-  pillGroup.className = "kpi-library__pills";
-
-  if (kpi.units) {
-    const pill = document.createElement("span");
-    pill.className = "kpi-library__pill";
-    pill.textContent = `Units: ${humaniseLabel(kpi.units)}`;
-    pillGroup.append(pill);
+  const meta = document.createElement("div");
+  meta.className = "kpi-library__doc-meta";
+  const unitsBadge = createMetaBadge("Units", humaniseLabel(kpi.units));
+  const directionBadge = createMetaBadge("Direction", formatDirectionality(kpi.directionality));
+  if (unitsBadge) {
+    meta.append(unitsBadge);
   }
-
-  if (kpi.default_period) {
-    const pill = document.createElement("span");
-    pill.className = "kpi-library__pill";
-    pill.textContent = `Default: ${kpi.default_period}`;
-    pillGroup.append(pill);
+  if (directionBadge) {
+    meta.append(directionBadge);
   }
-
-  if (kpi.directionality) {
-    const pill = document.createElement("span");
-    pill.className = "kpi-library__pill";
-    pill.textContent = `Direction: ${formatDirectionality(kpi.directionality)}`;
-    pillGroup.append(pill);
-  }
-
-  if (pillGroup.children.length) {
-    header.append(pillGroup);
+  if (meta.children.length) {
+    header.append(meta);
   }
 
   card.append(header);
 
-  if (kpi.definition_short) {
-    const shortDef = document.createElement("p");
-    shortDef.className = "kpi-library__definition";
-    shortDef.textContent = kpi.definition_short;
-    card.append(shortDef);
+  const body = document.createElement("div");
+  body.className = "kpi-library__doc-body";
+
+  const definitionSection = createDocSection("Definition", kpi.definition_short || kpi.definition_long);
+  if (definitionSection) {
+    body.append(definitionSection);
   }
 
-  if (kpi.definition_long && kpi.definition_long !== kpi.definition_short) {
-    const longDef = document.createElement("p");
-    longDef.className = "kpi-library__definition kpi-library__definition--secondary";
-    longDef.textContent = kpi.definition_long;
-    card.append(longDef);
+  const categorySection = createDocSection("Category", kpi.category);
+  if (categorySection) {
+    body.append(categorySection);
   }
 
-  const details = document.createElement("dl");
-  details.className = "kpi-library__details";
+  const formulaSection = createDocSection("Formula", kpi.formula_text, { type: "code" });
+  if (formulaSection) {
+    body.append(formulaSection);
+  }
 
-  appendDetail(details, "Formula", kpi.formula_text);
-  appendDetail(
-    details,
-    "Inputs",
-    (kpi.inputs || []).map(formatInputDescriptor).filter(Boolean)
-  );
-  appendDetail(details, "Computation", kpi.computation);
-  appendDetail(details, "Supported Periods", kpi.supports_periods);
-  appendDetail(details, "Dimensions", kpi.dimensions_supported);
-  appendDetail(details, "Parameters", kpi.parameters);
-  appendDetail(details, "Edge Cases", kpi.edge_cases);
-  appendDetail(details, "Presentation", kpi.presentation);
-  appendDetail(details, "Notes", kpi.notes);
-  appendDetail(details, "Quality Notes", kpi.quality_notes);
+  const friendlyInputs = (kpi.inputs || [])
+    .map(formatFriendlyInput)
+    .filter(Boolean);
+  const inputsSection = createDocSection("Inputs", friendlyInputs);
+  if (inputsSection) {
+    body.append(inputsSection);
+  }
 
-  if (details.children.length) {
-    card.append(details);
+  const computationSection = createDocSection("Computation Notes", kpi.computation || []);
+  if (computationSection) {
+    body.append(computationSection);
+  }
+
+  const periods = (kpi.supports_periods || []).map(formatPeriodLabel);
+  const periodsSection = createDocSection("Supported Periods", periods);
+  if (periodsSection) {
+    body.append(periodsSection);
+  }
+
+  const interpretationSource =
+    (kpi.definition_long && kpi.definition_long !== kpi.definition_short
+      ? kpi.definition_long
+      : null) || kpi.notes;
+  const interpretationSection = createDocSection("Interpretation", interpretationSource);
+  if (interpretationSection) {
+    body.append(interpretationSection);
+  }
+
+  if (Array.isArray(kpi.edge_cases) && kpi.edge_cases.length) {
+    const edgeSection = createDocSection("Edge Cases", kpi.edge_cases);
+    if (edgeSection) {
+      body.append(edgeSection);
+    }
+  }
+
+  if (kpi.quality_notes && !interpretationSource) {
+    const qualitySection = createDocSection("Quality Notes", kpi.quality_notes);
+    if (qualitySection) {
+      body.append(qualitySection);
+    }
+  }
+
+  card.append(body);
+
+  const technicalDetails = buildTechnicalDetails(kpi);
+  if (technicalDetails) {
+    card.append(technicalDetails);
   }
 
   return card;
@@ -755,11 +809,6 @@ function buildKpiLibraryView(data) {
   const container = document.createElement("div");
   container.className = "kpi-library";
   container.append(buildKpiLibraryHero(data));
-
-  const conventions = buildConventionsSection(data.global_conventions);
-  if (conventions) {
-    container.append(conventions);
-  }
 
   const categories = buildCategoriesSection(data.kpis);
   if (categories) {
@@ -2313,7 +2362,7 @@ function openUtilityPanel(key) {
     }
   }
   setActiveNav(`open-${key}`);
-  if (key === "help") {
+  if (key === "help" || key === "kpi-library") {
     if (chatPanel) {
       chatPanel.classList.add("chat-panel--collapsed");
     }
