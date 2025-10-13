@@ -6,22 +6,23 @@ from __future__ import annotations
 # ingestion commands, and falls back to the configured language model. Used by CLI and web UI.
 
 import re
-import uuid
 import json
-import requests
 import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
-from . import database
+import requests
+
+from . import database, tasks
 from .analytics_engine import AnalyticsEngine
 from .config import Settings
 from .data_ingestion import IngestionReport, ingest_financial_data
-from . import tasks
+from .help_content import HELP_TEXT
 from .llm_client import LLMClient, build_llm_client
-from .table_renderer import render_table_command, METRIC_DEFINITIONS
+from .table_renderer import METRIC_DEFINITIONS, render_table_command
 
 LOGGER = logging.getLogger(__name__)
 
@@ -281,6 +282,7 @@ _COMMON_WORDS = {
     "ON",
     "IN",
     "TO",
+    "HELP",
 }
 
 _METRICS_PATTERN = re.compile(r"^metrics(?:(?:\s+for)?\s+)(.+)$", re.IGNORECASE)
@@ -612,6 +614,18 @@ class BenchmarkOSChatbot:
         )
         self.conversation.messages.append({"role": "user", "content": user_input})
 
+        if user_input.strip().lower() == "help":
+            reply = HELP_TEXT
+            database.log_message(
+                self.settings.database_path,
+                self.conversation.conversation_id,
+                role="assistant",
+                content=reply,
+                created_at=datetime.utcnow(),
+            )
+            self.conversation.messages.append({"role": "assistant", "content": reply})
+            return reply
+
         # Try to normalize natural text into a concrete command first
         normalized = self._normalize_nl_to_command(user_input)
         if normalized and normalized.strip().lower() != user_input.strip().lower():
@@ -669,31 +683,11 @@ class BenchmarkOSChatbot:
                 return self._format_missing_message(metrics_request.tickers, resolution.available)
             return self._dispatch_metrics_request(
                 resolution.available, metrics_request.period_filters
-            )
+        )
 
         lowered = text.strip().lower()
         if lowered == "help":
-            help_text = "\n".join(
-                [
-                    "Commands:",
-                    "  metrics <TICKER> [YYYY | YYYY-YYYY] [vs <OTHER>...] - KPI summary or comparison table",
-                    "  compare <TICKER_A> <TICKER_B> [MORE] [YYYY]        - metric comparison",
-                    "  fact <TICKER> <YEAR> [metric]                     - show raw financial facts",
-                    "  audit <TICKER> [YEAR]                             - recent audit trail entries",
-                    "  ingest <TICKER> [years]                           - fetch SEC/Yahoo data and refresh",
-                    "  ingest status <TICKER>                           - show background ingestion status",
-                    "  scenario <T> <NAME> rev=+5% margin=+1% mult=+0.5  - run what-if",
-                    "",
-                    "Natural examples:",
-                    "  show KPIs for Apple in 2022-2024",
-                    "  compare Apple and Microsoft 2023",
-                    "  facts for Amazon FY2022 revenue",
-                    "  audit trail for Tesla",
-                    "  fetch Meta 5",
-                    "  what-if Alphabet bull rev=+8% margin=+1.5% mult=+0.5",
-                ]
-            )
-            return help_text
+            return HELP_TEXT
         if lowered.startswith("compare "):
             tokens = text.split()[1:]
             return self._handle_metrics_comparison(tokens)

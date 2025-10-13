@@ -47,6 +47,10 @@
             <span class="nav-icon" aria-hidden="true">📚</span>
             <span class="nav-label">Filing Source Viewer</span>
           </button>
+          <button class="nav-item" data-action="open-help">
+            <span class="nav-icon" aria-hidden="true">🆘</span>
+            <span class="nav-label">Help Center</span>
+          </button>
         </nav>
 
         <div class="sidebar-divider" role="presentation"></div>
@@ -97,32 +101,11 @@
         <section class="utility-panel hidden" id="utility-panel" aria-live="polite">
           <div class="utility-panel-header">
             <h2 id="utility-title"></h2>
-            <button type="button" id="utility-close" aria-label="Close panel">x</button>
           </div>
           <div class="utility-content" id="utility-content"></div>
         </section>
 
         <section class="chat-panel">
-          <div class="chat-intro" id="chat-intro">
-            <div class="intro-card">
-              <h2>Run metrics, compare, and fact commands on the S&amp;P 500 dataset.</h2>
-              <p class="intro-subtitle">
-                The copilot speaks in command syntax&mdash;start with <code>help</code> or jump into the
-                shortcuts below to grab KPIs, comparisons, and fact tables immediately.
-              </p>
-            </div>
-            <div class="intro-prompts">
-              <button class="prompt-chip" data-prompt="metrics AAPL 2022-2024">
-                Metrics AAPL 2022-2024
-              </button>
-              <button class="prompt-chip" data-prompt="compare NVDA AMD 2023">
-                Compare NVDA AMD 2023
-              </button>
-              <button class="prompt-chip" data-prompt="fact TSLA 2022 revenue">
-                Fact TSLA 2022 Revenue
-              </button>
-            </div>
-          </div>
           <div id="chat-log" class="chat-log" aria-live="polite"></div>
 
           <form id="chat-form" class="chat-form" autocomplete="off">

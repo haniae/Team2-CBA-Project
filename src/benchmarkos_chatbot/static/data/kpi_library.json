@@ -1,0 +1,555 @@
+{
+  "schema_version": "1.0",
+  "library_name": "BenchmarkOS KPI Library",
+  "last_updated": "2025-10-12",
+  "global_conventions": {
+    "periods_supported": ["FY", "Quarter", "TTM", "LTM", "YTD"],
+    "currency_policy": "Report in company reporting currency unless user requests normalization.",
+    "averaging_policy": "Use 2-point average for balance sheet denominators (e.g., ROE, ROA).",
+    "peer_group_policy": "Peer groups provided by user or system default (e.g., Big 5 Tech).",
+    "source_priority": [
+      "SEC companyfacts (us-gaap, dei)",
+      "SEC 10-K/10-Q extracted tables",
+      "Market data provider (prices/dividends)",
+      "Vendor fallback (if enabled)"
+    ],
+    "missing_data_strategy": "If a preferred tag is missing, use listed fallbacks; otherwise mark KPI as partial and set quality_flag=LOW."
+  },
+  "kpis": [
+    {
+      "kpi_id": "gross_margin_pct",
+      "display_name": "Gross Margin (%)",
+      "category": "Profitability",
+      "definition_short": "Percent of revenue retained after direct costs of goods/services.",
+      "definition_long": "Measures pricing power and production efficiency by comparing gross profit to revenue.",
+      "formula_text": "(Revenue - CostOfGoodsSold) / Revenue * 100",
+      "inputs": [
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "CostOfGoodsAndServicesSold", "statement": "IncomeStatement", "fallbacks": ["CostOfRevenue"]}
+      ],
+      "computation": [
+        "gross_profit = Revenues - (COGS_or_CostOfRevenue)",
+        "gross_margin_pct = (gross_profit / Revenues) * 100"
+      ],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "default_period": "FY",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "dimensions_supported": ["company", "peer_group", "time"],
+      "edge_cases": [
+        "If Revenues == 0 -> return null, quality_flag=LOW",
+        "If both COGS and CostOfRevenue missing -> return null"
+      ],
+      "presentation": {"number_format": "percentage", "decimals": 1, "show_trend": true, "show_rank": true}
+    },
+    {
+      "kpi_id": "operating_margin_pct",
+      "display_name": "Operating Margin (%)",
+      "category": "Profitability",
+      "definition_short": "Profitability from core operations before interest and taxes.",
+      "definition_long": "Indicates the efficiency and scalability of operations excluding financing and tax effects.",
+      "formula_text": "OperatingIncome / Revenue * 100",
+      "inputs": [
+        {"source": "us-gaap", "tag": "OperatingIncomeLoss", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
+      ],
+      "computation": ["operating_margin_pct = OperatingIncomeLoss / Revenues * 100"],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "default_period": "FY",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "presentation": {"number_format": "percentage", "decimals": 1, "show_trend": true}
+    },
+    {
+      "kpi_id": "net_profit_margin_pct",
+      "display_name": "Net Profit Margin (%)",
+      "category": "Profitability",
+      "definition_short": "Bottom-line profitability after all expenses, interest, and taxes.",
+      "formula_text": "NetIncome / Revenue * 100",
+      "inputs": [
+        {"source": "us-gaap", "tag": "NetIncomeLoss", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
+      ],
+      "computation": ["net_profit_margin_pct = NetIncomeLoss / Revenues * 100"],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "presentation": {"number_format": "percentage", "decimals": 1}
+    },
+    {
+      "kpi_id": "ebitda_margin_pct",
+      "display_name": "EBITDA Margin (%)",
+      "category": "Profitability",
+      "definition_short": "Earnings before interest, taxes, depreciation, and amortization as a % of revenue.",
+      "formula_text": "EBITDA / Revenue * 100",
+      "inputs": [
+        {"source": "derived", "tag": "EBITDA", "components": ["NetIncomeLoss", "InterestExpense", "IncomeTaxExpenseBenefit", "DepreciationAndAmortization"]},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
+      ],
+      "computation": [
+        "DandA = DepreciationAndAmortization (fallback: DepreciationDepletionAndAmortization)",
+        "EBITDA = NetIncomeLoss + InterestExpense + IncomeTaxExpenseBenefit + DandA",
+        "ebitda_margin_pct = EBITDA / Revenues * 100"
+      ],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "edge_cases": ["If any component missing, compute with available parts and set quality_flag=MEDIUM"]
+    },
+    {
+      "kpi_id": "roe_pct",
+      "display_name": "Return on Equity (ROE)",
+      "category": "Profitability",
+      "definition_short": "Net income relative to average shareholder equity.",
+      "formula_text": "NetIncome / Average(EquityBeginning, EquityEnding) * 100",
+      "inputs": [
+        {"source": "us-gaap", "tag": "NetIncomeLoss", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "StockholdersEquity", "statement": "BalanceSheet"}
+      ],
+      "computation": [
+        "avg_equity = average(Equity_t, Equity_t_minus_1)",
+        "roe_pct = NetIncomeLoss / avg_equity * 100"
+      ],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "TTM"],
+      "edge_cases": ["If avg_equity <= 0 -> set quality_flag=LOW; consider using TotalEquityIncludingNoncontrollingInterest as fallback"]
+    },
+    {
+      "kpi_id": "roa_pct",
+      "display_name": "Return on Assets (ROA)",
+      "category": "Profitability",
+      "definition_short": "Net income relative to average total assets.",
+      "formula_text": "NetIncome / Average(TotalAssets) * 100",
+      "inputs": [
+        {"source": "us-gaap", "tag": "NetIncomeLoss", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "Assets", "statement": "BalanceSheet"}
+      ],
+      "computation": [
+        "avg_assets = average(Assets_t, Assets_t_minus_1)",
+        "roa_pct = NetIncomeLoss / avg_assets * 100"
+      ],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "TTM"]
+    },
+    {
+      "kpi_id": "revenue_cagr_pct",
+      "display_name": "Revenue CAGR (%)",
+      "category": "Growth",
+      "definition_short": "Compound annual growth rate of revenue over N years.",
+      "formula_text": "((Revenue_n / Revenue_0)^(1/n) - 1) * 100",
+      "inputs": [{"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}],
+      "computation": [
+        "Require N+1 years of Revenues.",
+        "cagr = pow(Revenues[n] / Revenues[0], 1/n) - 1",
+        "revenue_cagr_pct = cagr * 100"
+      ],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["multi-year"],
+      "parameters": {"min_years": 3, "default_years": 3}
+    },
+    {
+      "kpi_id": "eps_cagr_pct",
+      "display_name": "EPS CAGR (%)",
+      "category": "Growth",
+      "definition_short": "Compound annual growth rate of earnings per share.",
+      "formula_text": "((EPS_n / EPS_0)^(1/n) - 1) * 100",
+      "inputs": [
+        {"source": "us-gaap", "tag": "EarningsPerShareBasic", "statement": "IncomeStatement", "fallbacks": ["EarningsPerShareDiluted"]}
+      ],
+      "computation": [
+        "Use Diluted if available; else Basic.",
+        "cagr = pow(EPS[n] / EPS[0], 1/n) - 1",
+        "eps_cagr_pct = cagr * 100"
+      ],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "parameters": {"min_years": 3, "default_years": 3},
+      "edge_cases": ["If EPS_0 <= 0 or sign changes -> return null, quality_flag=LOW"]
+    },
+    {
+      "kpi_id": "fcf_growth_yoy_pct",
+      "display_name": "Free Cash Flow Growth (YoY) (%)",
+      "category": "Growth",
+      "definition_short": "Year-over-year growth rate of free cash flow.",
+      "formula_text": "(FCF_t - FCF_t-1) / |FCF_t-1| * 100",
+      "inputs": [
+        {"source": "us-gaap", "tag": "NetCashProvidedByUsedInOperatingActivities", "statement": "CashFlow"},
+        {"source": "us-gaap", "tag": "PaymentsToAcquirePropertyPlantAndEquipment", "statement": "CashFlow", "fallbacks": ["CapitalExpenditures"]}
+      ],
+      "computation": [
+        "fcf_t = CFO_t - CapEx_t",
+        "fcf_prev = CFO_t-1 - CapEx_t-1",
+        "fcf_growth_yoy_pct = (fcf_t - fcf_prev) / abs(fcf_prev) * 100"
+      ],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "TTM"]
+    },
+    {
+      "kpi_id": "free_cash_flow",
+      "display_name": "Free Cash Flow (FCF)",
+      "category": "Cash Flow & Liquidity",
+      "definition_short": "Cash generated after capital expenditures.",
+      "formula_text": "OperatingCashFlow - CapitalExpenditures",
+      "inputs": [
+        {"source": "us-gaap", "tag": "NetCashProvidedByUsedInOperatingActivities", "statement": "CashFlow"},
+        {"source": "us-gaap", "tag": "PaymentsToAcquirePropertyPlantAndEquipment", "statement": "CashFlow", "fallbacks": ["CapitalExpenditures"]}
+      ],
+      "computation": ["fcf = CFO - CapEx"],
+      "units": "currency",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"]
+    },
+    {
+      "kpi_id": "operating_cash_flow_ratio",
+      "display_name": "Operating Cash Flow Ratio",
+      "category": "Cash Flow & Liquidity",
+      "definition_short": "Ability to cover short-term liabilities with operating cash flow.",
+      "formula_text": "OperatingCashFlow / CurrentLiabilities",
+      "inputs": [
+        {"source": "us-gaap", "tag": "NetCashProvidedByUsedInOperatingActivities", "statement": "CashFlow"},
+        {"source": "us-gaap", "tag": "LiabilitiesCurrent", "statement": "BalanceSheet"}
+      ],
+      "computation": ["ocf_ratio = CFO / CurrentLiabilities"],
+      "units": "ratio",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "TTM"]
+    },
+    {
+      "kpi_id": "current_ratio",
+      "display_name": "Current Ratio",
+      "category": "Cash Flow & Liquidity",
+      "definition_short": "Short-term solvency measure.",
+      "formula_text": "CurrentAssets / CurrentLiabilities",
+      "inputs": [
+        {"source": "us-gaap", "tag": "AssetsCurrent", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "LiabilitiesCurrent", "statement": "BalanceSheet"}
+      ],
+      "computation": ["current_ratio = AssetsCurrent / LiabilitiesCurrent"],
+      "units": "ratio",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter"]
+    },
+    {
+      "kpi_id": "quick_ratio",
+      "display_name": "Quick Ratio",
+      "category": "Cash Flow & Liquidity",
+      "definition_short": "Near-cash liquidity excluding inventory.",
+      "formula_text": "(CurrentAssets - Inventory) / CurrentLiabilities",
+      "inputs": [
+        {"source": "us-gaap", "tag": "AssetsCurrent", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "InventoryNet", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "LiabilitiesCurrent", "statement": "BalanceSheet"}
+      ],
+      "computation": ["quick_ratio = (AssetsCurrent - InventoryNet) / LiabilitiesCurrent"],
+      "units": "ratio",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter"]
+    },
+    {
+      "kpi_id": "debt_to_equity",
+      "display_name": "Debt-to-Equity",
+      "category": "Capital Efficiency & Leverage",
+      "definition_short": "Total liabilities relative to shareholders' equity.",
+      "formula_text": "TotalLiabilities / StockholdersEquity",
+      "inputs": [
+        {"source": "us-gaap", "tag": "Liabilities", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "StockholdersEquity", "statement": "BalanceSheet", "fallbacks": ["StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"]}
+      ],
+      "computation": ["de_ratio = Liabilities / Equity"],
+      "units": "ratio",
+      "directionality": "lower_is_better",
+      "supports_periods": ["FY", "Quarter"],
+      "edge_cases": ["If Equity <= 0 -> return null, quality_flag=LOW"]
+    },
+    {
+      "kpi_id": "debt_to_assets",
+      "display_name": "Debt-to-Assets",
+      "category": "Capital Efficiency & Leverage",
+      "definition_short": "Portion of assets financed by liabilities.",
+      "formula_text": "TotalLiabilities / TotalAssets",
+      "inputs": [
+        {"source": "us-gaap", "tag": "Liabilities", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "Assets", "statement": "BalanceSheet"}
+      ],
+      "computation": ["da_ratio = Liabilities / Assets"],
+      "units": "ratio",
+      "directionality": "lower_is_better",
+      "supports_periods": ["FY", "Quarter"]
+    },
+    {
+      "kpi_id": "interest_coverage",
+      "display_name": "Interest Coverage",
+      "category": "Capital Efficiency & Leverage",
+      "definition_short": "Ability to cover interest expense with EBIT.",
+      "formula_text": "EBIT / InterestExpense",
+      "inputs": [
+        {"source": "derived", "tag": "EBIT", "components": ["OperatingIncomeLoss", "NonOperatingIncomeExpenseNet"]},
+        {"source": "us-gaap", "tag": "InterestExpense", "statement": "IncomeStatement", "fallbacks": ["InterestExpenseDebt", "InterestAndDebtExpense"]}
+      ],
+      "computation": [
+        "Approx EBIT = OperatingIncomeLoss (fallback: PretaxIncome + InterestExpense)",
+        "interest_coverage = EBIT / InterestExpense"
+      ],
+      "units": "ratio",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "TTM"],
+      "edge_cases": ["If InterestExpense ~ 0 -> return large cap value but set quality_flag=MEDIUM"]
+    },
+    {
+      "kpi_id": "asset_turnover",
+      "display_name": "Asset Turnover",
+      "category": "Capital Efficiency & Leverage",
+      "definition_short": "Revenue generated per dollar of assets.",
+      "formula_text": "Revenue / Average(TotalAssets)",
+      "inputs": [
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "Assets", "statement": "BalanceSheet"}
+      ],
+      "computation": [
+        "avg_assets = average(Assets_t, Assets_t_minus_1)",
+        "asset_turnover = Revenues / avg_assets"
+      ],
+      "units": "ratio",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "TTM"]
+    },
+    {
+      "kpi_id": "eps_basic",
+      "display_name": "Earnings per Share (Basic)",
+      "category": "Market Performance",
+      "definition_short": "Net income per basic share.",
+      "formula_text": "NetIncomeAvailableToCommon / WeightedAverageBasicShares",
+      "inputs": [
+        {"source": "us-gaap", "tag": "EarningsPerShareBasic", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "WeightedAverageNumberOfSharesOutstandingBasic", "statement": "IncomeStatement"}
+      ],
+      "computation": [
+        "Prefer reported EPSBasic; if missing, compute: NetIncomeCommon / WA_Shares_Basic"
+      ],
+      "units": "per_share",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"]
+    },
+    {
+      "kpi_id": "pe_ratio",
+      "display_name": "Price-to-Earnings (P/E)",
+      "category": "Market Performance",
+      "definition_short": "Share price relative to earnings per share.",
+      "formula_text": "PricePerShare / EPS (TTM preferred)",
+      "inputs": [
+        {"source": "market", "tag": "PricePerShare", "freq": "daily_close"},
+        {"source": "derived", "tag": "EPS_TTM", "components": ["EarningsPerShareDiluted"]}
+      ],
+      "computation": [
+        "eps_ttm = sum(last_4_quarters(EPS_Diluted or EPS_Basic))",
+        "pe_ratio = PricePerShare / eps_ttm"
+      ],
+      "units": "ratio",
+      "directionality": "lower_is_better",
+      "supports_periods": ["PointInTime"]
+    },
+    {
+      "kpi_id": "pb_ratio",
+      "display_name": "Price-to-Book (P/B)",
+      "category": "Market Performance",
+      "definition_short": "Market capitalization relative to book equity.",
+      "formula_text": "MarketCap / BookValueOfEquity",
+      "inputs": [
+        {"source": "market", "tag": "SharesOutstanding"},
+        {"source": "market", "tag": "PricePerShare"},
+        {"source": "us-gaap", "tag": "StockholdersEquity", "statement": "BalanceSheet"}
+      ],
+      "computation": [
+        "market_cap = SharesOutstanding * PricePerShare",
+        "pb_ratio = market_cap / StockholdersEquity"
+      ],
+      "units": "ratio",
+      "directionality": "depends",
+      "supports_periods": ["PointInTime"],
+      "notes": "Interpret in context - high P/B suggests growth/intangibles; low P/B may indicate undervaluation."
+    },
+    {
+      "kpi_id": "tsr_pct",
+      "display_name": "Total Shareholder Return (%)",
+      "category": "Market Performance",
+      "definition_short": "Price appreciation plus dividends over a period.",
+      "formula_text": "((P1 - P0 + Dividends) / P0) * 100",
+      "inputs": [
+        {"source": "market", "tag": "AdjClosePriceSeries"},
+        {"source": "market", "tag": "DividendsCashSeries"}
+      ],
+      "computation": [
+        "Use adjusted close to incorporate splits.",
+        "tsr_pct = (adj_close_end - adj_close_start + sum(dividends)) / adj_close_start * 100"
+      ],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["custom_range"]
+    },
+    {
+      "kpi_id": "dividend_yield_pct",
+      "display_name": "Dividend Yield (%)",
+      "category": "Market Performance",
+      "definition_short": "Annual cash dividends per share divided by price.",
+      "formula_text": "AnnualDividendsPerShare / PricePerShare * 100",
+      "inputs": [
+        {"source": "market", "tag": "DividendsTTMPerShare"},
+        {"source": "market", "tag": "PricePerShare"}
+      ],
+      "computation": ["dividend_yield_pct = Dividends_TTM / PricePerShare * 100"],
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["PointInTime"]
+    },
+    {
+      "kpi_id": "rd_intensity_pct",
+      "display_name": "R&D Intensity (%)",
+      "category": "Operational Efficiency",
+      "definition_short": "R&D expense as a percentage of revenue.",
+      "formula_text": "ResearchAndDevelopment / Revenue * 100",
+      "inputs": [
+        {"source": "us-gaap", "tag": "ResearchAndDevelopmentExpense", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
+      ],
+      "computation": ["rd_intensity_pct = ResearchAndDevelopmentExpense / Revenues * 100"],
+      "units": "percent",
+      "directionality": "depends",
+      "supports_periods": ["FY", "TTM"]
+    },
+    {
+      "kpi_id": "sga_ratio_pct",
+      "display_name": "SG&A Ratio (%)",
+      "category": "Operational Efficiency",
+      "definition_short": "Selling, General & Administrative expense as % of revenue.",
+      "formula_text": "SGA / Revenue * 100",
+      "inputs": [
+        {"source": "us-gaap", "tag": "SellingGeneralAndAdministrativeExpense", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
+      ],
+      "computation": ["sga_ratio_pct = SellingGeneralAndAdministrativeExpense / Revenues * 100"],
+      "units": "percent",
+      "directionality": "lower_is_better",
+      "supports_periods": ["FY", "TTM"]
+    },
+    {
+      "kpi_id": "capex_to_revenue_pct",
+      "display_name": "CapEx-to-Revenue (%)",
+      "category": "Operational Efficiency",
+      "definition_short": "Capital expenditures relative to revenue.",
+      "formula_text": "CapEx / Revenue * 100",
+      "inputs": [
+        {"source": "us-gaap", "tag": "PaymentsToAcquirePropertyPlantAndEquipment", "statement": "CashFlow"},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
+      ],
+      "computation": ["capex_to_revenue_pct = CapEx / Revenues * 100"],
+      "units": "percent",
+      "directionality": "depends",
+      "supports_periods": ["FY", "TTM"]
+    },
+    {
+      "kpi_id": "revenue_per_employee",
+      "display_name": "Revenue per Employee",
+      "category": "Operational Efficiency",
+      "definition_short": "Revenue generated per employee.",
+      "formula_text": "Revenue / Employees",
+      "inputs": [
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"},
+        {"source": "company", "tag": "Employees", "statement": "10-K front matter or company website"}
+      ],
+      "computation": ["rev_per_employee = Revenues / Employees"],
+      "units": "currency_per_employee",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY"],
+      "edge_cases": ["If Employees not disclosed in period, use latest available and flag quality_flag=MEDIUM"]
+    },
+    {
+      "kpi_id": "ev_ebitda",
+      "display_name": "EV/EBITDA",
+      "category": "Valuation",
+      "definition_short": "Enterprise value relative to EBITDA.",
+      "formula_text": "(MarketCap + TotalDebt - CashAndEquivalents) / EBITDA",
+      "inputs": [
+        {"source": "market", "tag": "SharesOutstanding"},
+        {"source": "market", "tag": "PricePerShare"},
+        {"source": "us-gaap", "tag": "DebtCurrent", "statement": "BalanceSheet", "fallbacks": ["ShortTermBorrowings"]},
+        {"source": "us-gaap", "tag": "LongTermDebtNoncurrent", "statement": "BalanceSheet", "fallbacks": ["LongTermDebt"]},
+        {"source": "us-gaap", "tag": "CashAndCashEquivalentsAtCarryingValue", "statement": "BalanceSheet", "fallbacks": ["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"]},
+        {"source": "derived", "tag": "EBITDA"}
+      ],
+      "computation": [
+        "market_cap = SharesOutstanding * PricePerShare",
+        "total_debt = DebtCurrent + LongTermDebtNoncurrent",
+        "EV = market_cap + total_debt - CashAndCashEquivalents",
+        "ev_ebitda = EV / EBITDA"
+      ],
+      "units": "multiple",
+      "directionality": "lower_is_better",
+      "supports_periods": ["PointInTime with trailing EBITDA (TTM)"]
+    },
+    {
+      "kpi_id": "ev_sales",
+      "display_name": "EV/Sales",
+      "category": "Valuation",
+      "definition_short": "Enterprise value relative to revenue.",
+      "formula_text": "EV / Revenue (TTM)",
+      "inputs": [
+        {"source": "derived", "tag": "EnterpriseValue"},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
+      ],
+      "computation": [
+        "Use EV from ev_ebitda inputs.",
+        "revenue_ttm = sum(last_4_quarters(Revenues))",
+        "ev_sales = EV / revenue_ttm"
+      ],
+      "units": "multiple",
+      "directionality": "lower_is_better",
+      "supports_periods": ["PointInTime"]
+    },
+    {
+      "kpi_id": "peg_ratio",
+      "display_name": "PEG Ratio",
+      "category": "Valuation",
+      "definition_short": "P/E adjusted for EPS growth rate.",
+      "formula_text": "PE / EPS_Growth (annualized)",
+      "inputs": [
+        {"source": "derived", "tag": "PE"},
+        {"source": "derived", "tag": "EPS_CAGR"}
+      ],
+      "computation": ["peg_ratio = pe_ratio / max(eps_growth_rate, 0.0001)"],
+      "units": "ratio",
+      "directionality": "lower_is_better",
+      "edge_cases": ["Negative or zero growth -> return null, quality_flag=LOW"]
+    },
+    {
+      "kpi_id": "carbon_intensity_per_revenue",
+      "display_name": "Carbon Intensity (tCO2e / $ Revenue)",
+      "category": "ESG",
+      "definition_short": "Greenhouse gas emissions per dollar of revenue.",
+      "formula_text": "tCO2e / Revenue",
+      "inputs": [
+        {"source": "esg", "tag": "GHGEmissionsScope1And2", "statement": "SustainabilityReport"},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
+      ],
+      "computation": ["carbon_intensity = EmissionsScope1and2 / Revenues"],
+      "units": "tCO2e_per_currency",
+      "directionality": "lower_is_better",
+      "supports_periods": ["FY"],
+      "quality_notes": "ESG disclosure varies; unit harmonization may be required."
+    }
+  ],
+  "rendering_guidelines": {
+    "insight_card_fields": ["display_name", "value", "period", "company", "formula_text", "source_note", "interpretation_hint", "peer_rank"],
+    "table_defaults": {"decimals": 1, "show_peer_rank": true, "color_scale": "auto-by-directionality"},
+    "quality_flags": ["HIGH", "MEDIUM", "LOW"]
+  },
+  "example_queries": [
+    "Compare ROE of AAPL, MSFT, GOOGL from 2021-2023",
+    "Show TTM EBITDA margin for NVDA",
+    "What's EV/EBITDA for AMZN today?",
+    "Explain FCF and show YoY growth for META"
+  ]
+}

@@ -15,8 +15,9 @@ const chatSearchClear = document.getElementById("chat-search-clear");
 const utilityPanel = document.getElementById("utility-panel");
 const utilityTitle = document.getElementById("utility-title");
 const utilityContent = document.getElementById("utility-content");
-const utilityCloseButton = document.getElementById("utility-close");
 const introPanel = document.getElementById("chat-intro");
+const chatPanel = document.querySelector(".chat-panel");
+const chatFormContainer = document.getElementById("chat-form");
 const savedSearchTrigger = document.querySelector("[data-action='search-saved']");
 const archivedToggleButton = document.querySelector("[data-action='toggle-archived']");
 
@@ -64,6 +65,10 @@ let shareModalConversationId = null;
 let toastContainer = null;
 const toastTimeouts = new Map();
 
+const KPI_LIBRARY_PATH = "/static/data/kpi_library.json";
+let kpiLibraryCache = null;
+let kpiLibraryLoadPromise = null;
+
 const METRIC_KEYWORD_MAP = [
   { regex: /\bgrowth|cagr|yoy\b/i, label: "Growth" },
   { regex: /\brevenue\b/i, label: "Revenue" },
@@ -88,6 +93,716 @@ const INTENT_LABELS = {
 };
 
 
+const HELP_PROMPTS = [
+  "Show Apple KPIs for 2022–2024",
+  "Compare Microsoft and Amazon in FY2023",
+  "What was Tesla’s 2022 revenue?",
+];
+
+const HELP_SECTIONS = [
+  {
+    icon: "📊",
+    title: "KPI & Comparisons",
+    command: "Metrics TICKER [YEAR | YEAR–YEAR] [+ peers]",
+    purpose: "Summarise a company’s finance snapshot or line up peers on one table.",
+    example: "Metrics AAPL 2023 vs MSFT",
+    delivers: "Revenue, profitability, free cash flow, ROE, valuation ratios.",
+  },
+  {
+    icon: "🧾",
+    title: "Facts from SEC Filings",
+    command: "Fact TICKER YEAR [metric]",
+    purpose: "Retrieve exactly what was reported in 10-K/10-Q filings.",
+    example: "Fact TSLA 2022 revenue",
+    delivers: "Original value, adjustment notes, and source reference.",
+  },
+  {
+    icon: "🧮",
+    title: "Scenario Modelling",
+    command: "Scenario TICKER NAME rev=+X% margin=+Y% mult=+Z",
+    purpose: "Run what-if cases for growth, margin shifts, or valuation moves.",
+    example: "Scenario NVDA Bull rev=+8% margin=+1.5% mult=+0.5",
+    delivers: "Projected revenue, margins, EPS/FCF change, implied valuation.",
+  },
+  {
+    icon: "⚙️",
+    title: "Data Management",
+    command: ["Ingest TICKER [years]", "Ingest status TICKER", "Audit TICKER [year]"],
+    purpose: "Refresh data, track ingestion progress, or review the audit log.",
+    examples: [
+      "Ingest META 5 — refreshes five fiscal years of filings and quotes.",
+      "Audit META 2023 — lists the latest import activity and KPI updates.",
+    ],
+  },
+];
+
+function getHelpContent() {
+  return {
+    prompts: HELP_PROMPTS,
+    sections: HELP_SECTIONS,
+    tips: HELP_TIPS,
+  };
+}
+
+let HELP_TIPS = [
+  // Intentionally empty; tips section removed.
+];
+
+let HELP_TEXT = composeHelpText(getHelpContent());
+let HELP_GUIDE_HTML = renderHelpGuide(getHelpContent()).outerHTML;
+
+function composeHelpText(content) {
+  const lines = [];
+  lines.push("📘 BenchmarkOS Copilot — Quick Reference", "", "How to ask:");
+  content.prompts.forEach((prompt) => lines.push(`• ${prompt}`));
+  lines.push("", "──────────────────────────────────────");
+
+  content.sections.forEach((section, index) => {
+    lines.push(`${section.icon} ${section.title.toUpperCase()}`);
+    if (Array.isArray(section.command)) {
+      section.command.forEach((entry, entryIndex) => {
+        const prefix = entryIndex === 0 ? "Command:" : "         ";
+        lines.push(`${prefix} ${entry}`);
+      });
+    } else {
+      lines.push(`Command: ${section.command}`);
+    }
+    if (section.purpose) {
+      lines.push(`Purpose: ${section.purpose}`);
+    }
+    if (section.example) {
+      lines.push(`Example: ${section.example}`);
+    }
+    if (section.delivers) {
+      lines.push(`Delivers: ${section.delivers}`);
+    }
+    if (section.examples && section.examples.length) {
+      lines.push("Examples:");
+      section.examples.forEach((example) => lines.push(`• ${example}`));
+    }
+    lines.push("");
+    if (index !== content.sections.length - 1) {
+      lines.push("──────────────────────────────────────");
+    }
+  });
+
+  if (content.tips && content.tips.length) {
+    lines.push("──────────────────────────────────────", "💡 Tips");
+    content.tips.forEach((tip) => lines.push(`• ${tip}`));
+  }
+
+  return lines.join("\n");
+}
+
+function renderHelpGuide(content) {
+  const article = document.createElement("article");
+  article.className = "help-guide";
+
+  const hero = document.createElement("header");
+  hero.className = "help-guide__hero";
+
+  const badge = document.createElement("span");
+  badge.className = "help-guide__badge";
+  badge.textContent = "📘";
+
+  const heroCopy = document.createElement("div");
+  heroCopy.className = "help-guide__hero-copy";
+
+  const title = document.createElement("h2");
+  title.className = "help-guide__title";
+  title.textContent = "BenchmarkOS Copilot — Quick Reference";
+
+  const subtitle = document.createElement("p");
+  subtitle.className = "help-guide__subtitle";
+  subtitle.textContent = "Ask natural prompts and I will translate them into institutional-grade analysis.";
+
+  const promptList = document.createElement("ul");
+  promptList.className = "help-guide__prompts";
+  content.prompts.forEach((prompt) => {
+    const item = document.createElement("li");
+    item.className = "help-guide__prompt";
+    item.textContent = prompt;
+    promptList.append(item);
+  });
+
+  heroCopy.append(title, subtitle, promptList);
+  hero.append(badge, heroCopy);
+  article.append(hero);
+
+  const sectionGrid = document.createElement("div");
+  sectionGrid.className = "help-guide__grid";
+
+  content.sections.forEach((section) => {
+    const card = document.createElement("section");
+    card.className = "help-guide__card";
+
+    const cardHeader = document.createElement("div");
+    cardHeader.className = "help-guide__card-header";
+
+    const icon = document.createElement("span");
+    icon.className = "help-guide__card-icon";
+    icon.textContent = section.icon;
+
+    const heading = document.createElement("h3");
+    heading.className = "help-guide__card-title";
+    heading.textContent = section.title;
+
+    cardHeader.append(icon, heading);
+    card.append(cardHeader);
+
+    appendHelpLine(card, "Command", section.command, { tokens: true });
+    appendHelpLine(card, "Purpose", section.purpose);
+    appendHelpLine(card, "Example", section.example);
+    appendHelpLine(card, "Delivers", section.delivers);
+
+    if (section.examples && section.examples.length) {
+      const examplesLabel = document.createElement("p");
+      examplesLabel.className = "help-guide__label help-guide__label--stack";
+      examplesLabel.textContent = "Examples";
+      card.append(examplesLabel);
+
+      const exampleList = document.createElement("ul");
+      exampleList.className = "help-guide__list";
+      section.examples.forEach((example) => {
+        const li = document.createElement("li");
+        li.textContent = example;
+        exampleList.append(li);
+      });
+      card.append(exampleList);
+    }
+
+    sectionGrid.append(card);
+  });
+
+  article.append(sectionGrid);
+
+  if (content.tips && content.tips.length) {
+    const tipsSection = document.createElement("section");
+    tipsSection.className = "help-guide__tips";
+
+    const tipsHeading = document.createElement("h3");
+    tipsHeading.className = "help-guide__tips-title";
+    tipsHeading.textContent = "💡 Tips";
+
+    const tipsList = document.createElement("ul");
+    tipsList.className = "help-guide__tips-list";
+    content.tips.forEach((tip) => {
+      const li = document.createElement("li");
+      li.textContent = tip;
+      tipsList.append(li);
+    });
+
+    tipsSection.append(tipsHeading, tipsList);
+    article.append(tipsSection);
+  }
+
+  return article;
+}
+
+function appendHelpLine(container, label, value, { tokens = false } = {}) {
+  if (!value) {
+    return;
+  }
+
+  const line = document.createElement("p");
+  line.className = "help-guide__line";
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "help-guide__label";
+  labelEl.textContent = `${label}`;
+  line.append(labelEl);
+
+  if (Array.isArray(value) || tokens) {
+    const values = Array.isArray(value) ? value : [value];
+    const tokenGroup = document.createElement("div");
+    tokenGroup.className = "help-guide__tokens";
+    values.forEach((token) => {
+      const pill = document.createElement("span");
+      pill.className = "help-guide__token";
+      pill.textContent = token;
+      tokenGroup.append(pill);
+    });
+    line.append(tokenGroup);
+  } else {
+    const valueEl = document.createElement("span");
+    valueEl.className = "help-guide__value";
+    valueEl.textContent = value;
+    line.append(valueEl);
+  }
+
+  container.append(line);
+}
+
+function refreshHelpArtifacts() {
+  HELP_TEXT = composeHelpText(getHelpContent());
+  HELP_GUIDE_HTML = renderHelpGuide(getHelpContent()).outerHTML;
+  if (UTILITY_SECTIONS.help) {
+    UTILITY_SECTIONS.help.html = HELP_GUIDE_HTML;
+  }
+  if (currentUtilityKey === "help" && utilityContent) {
+    utilityContent.innerHTML = HELP_GUIDE_HTML;
+  }
+}
+
+async function loadHelpContentOverrides() {
+  try {
+    const response = await fetch(`${API_BASE}/help-content`);
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    if (Array.isArray(data?.tips) && data.tips.length) {
+      const customTips = data.tips.map((tip) => `${tip}`.trim()).filter(Boolean);
+      if (customTips.length) {
+        HELP_TIPS = customTips;
+        refreshHelpArtifacts();
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to load help tip overrides:", error);
+  }
+}
+
+
+
+function formatDisplayDate(value) {
+  if (!value) {
+    return "";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return `${value}`;
+  }
+  return parsed.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function humaniseLabel(value) {
+  if (!value) {
+    return "";
+  }
+  return `${value}`
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function createList(items, className = "kpi-library__list") {
+  const list = document.createElement("ul");
+  list.className = className;
+  (items || [])
+    .map((item) => (typeof item === "string" ? item.trim() : item))
+    .filter(Boolean)
+    .forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = `${item}`;
+      list.append(li);
+    });
+  return list;
+}
+
+function formatInputDescriptor(input) {
+  if (!input || typeof input !== "object") {
+    return "";
+  }
+  const segments = [];
+  if (input.source) {
+    segments.push(`[${input.source}]`);
+  }
+  if (input.tag) {
+    segments.push(input.tag);
+  }
+  if (input.statement) {
+    segments.push(`(${input.statement})`);
+  }
+  let text = segments.join(" ").trim();
+  const extras = [];
+  if (Array.isArray(input.components) && input.components.length) {
+    extras.push(`components: ${input.components.join(", ")}`);
+  }
+  if (Array.isArray(input.fallbacks) && input.fallbacks.length) {
+    extras.push(`fallback: ${input.fallbacks.join(", ")}`);
+  }
+  if (extras.length) {
+    text = `${text} — ${extras.join("; ")}`.trim();
+  }
+  return text;
+}
+
+function formatDirectionality(value) {
+  if (!value) {
+    return "";
+  }
+  const mapping = {
+    higher_is_better: "Higher is better",
+    lower_is_better: "Lower is better",
+    depends: "Depends",
+  };
+  return mapping[value] || humaniseLabel(value);
+}
+
+function appendDetail(list, label, content) {
+  if (
+    content === undefined ||
+    content === null ||
+    (typeof content === "string" && !content.trim())
+  ) {
+    return;
+  }
+  if (Array.isArray(content) && !content.filter(Boolean).length) {
+    return;
+  }
+  const dt = document.createElement("dt");
+  dt.className = "kpi-library__detail-term";
+  dt.textContent = label;
+  const dd = document.createElement("dd");
+  dd.className = "kpi-library__detail-desc";
+
+  if (Array.isArray(content)) {
+    dd.append(createList(content, "kpi-library__detail-list"));
+  } else if (typeof content === "object") {
+    const entries = Object.entries(content).map(([key, value]) => {
+      if (Array.isArray(value)) {
+        return `${humaniseLabel(key)}: ${value.join(", ")}`;
+      }
+      if (value && typeof value === "object") {
+        return `${humaniseLabel(key)}: ${JSON.stringify(value)}`;
+      }
+      return `${humaniseLabel(key)}: ${value}`;
+    });
+    dd.append(createList(entries, "kpi-library__detail-list"));
+  } else {
+    dd.textContent = `${content}`;
+  }
+
+  list.append(dt);
+  list.append(dd);
+}
+
+async function loadKpiLibraryData() {
+  if (kpiLibraryCache) {
+    return kpiLibraryCache;
+  }
+  if (kpiLibraryLoadPromise) {
+    return kpiLibraryLoadPromise;
+  }
+  kpiLibraryLoadPromise = fetch(KPI_LIBRARY_PATH, { cache: "no-store" })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`KPI library fetch failed (${response.status})`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      kpiLibraryCache = data;
+      return data;
+    })
+    .finally(() => {
+      kpiLibraryLoadPromise = null;
+    });
+  return kpiLibraryLoadPromise;
+}
+
+function buildKpiLibraryHero(data) {
+  const hero = document.createElement("section");
+  hero.className = "kpi-library__hero";
+
+  const badge = document.createElement("div");
+  badge.className = "kpi-library__badge";
+  badge.textContent = "📊";
+
+  const copy = document.createElement("div");
+  copy.className = "kpi-library__hero-copy";
+
+  const title = document.createElement("h3");
+  title.className = "kpi-library__title";
+  title.textContent = data.library_name || "KPI Library";
+
+  const subtitle = document.createElement("p");
+  subtitle.className = "kpi-library__subtitle";
+  subtitle.textContent =
+    "Standardised KPI definitions, formulas, and data lineage policies.";
+
+  const metaList = document.createElement("ul");
+  metaList.className = "kpi-library__meta";
+
+  if (data.schema_version) {
+    const schemaItem = document.createElement("li");
+    schemaItem.textContent = `Schema ${data.schema_version}`;
+    metaList.append(schemaItem);
+  }
+  if (data.last_updated) {
+    const updatedItem = document.createElement("li");
+    updatedItem.textContent = `Updated ${formatDisplayDate(data.last_updated)}`;
+    metaList.append(updatedItem);
+  }
+
+  copy.append(title);
+  copy.append(subtitle);
+  if (metaList.children.length) {
+    copy.append(metaList);
+  }
+
+  if (Array.isArray(data.example_queries) && data.example_queries.length) {
+    const chips = document.createElement("ul");
+    chips.className = "kpi-library__chips";
+    data.example_queries
+      .filter(Boolean)
+      .forEach((query) => {
+        const chip = document.createElement("li");
+        chip.className = "kpi-library__chip";
+        chip.textContent = query;
+        chips.append(chip);
+      });
+    copy.append(chips);
+  }
+
+  hero.append(badge);
+  hero.append(copy);
+  return hero;
+}
+
+function buildConventionsSection(conventions) {
+  if (!conventions || typeof conventions !== "object") {
+    return null;
+  }
+  const section = document.createElement("section");
+  section.className = "kpi-library__section";
+
+  const heading = document.createElement("h4");
+  heading.className = "kpi-library__section-title";
+  heading.textContent = "Global Conventions";
+  section.append(heading);
+
+  const definition = document.createElement("dl");
+  definition.className = "kpi-library__conventions";
+
+  const order = [
+    "periods_supported",
+    "currency_policy",
+    "averaging_policy",
+    "peer_group_policy",
+    "source_priority",
+    "missing_data_strategy",
+  ];
+
+  order
+    .filter((key) => Object.prototype.hasOwnProperty.call(conventions, key))
+    .forEach((key) => {
+      const value = conventions[key];
+      const term = document.createElement("dt");
+      term.className = "kpi-library__convention-term";
+      term.textContent = humaniseLabel(key);
+
+      const desc = document.createElement("dd");
+      desc.className = "kpi-library__convention-desc";
+
+      if (Array.isArray(value)) {
+        desc.append(createList(value, "kpi-library__bullet-list"));
+      } else {
+        desc.textContent = `${value}`;
+      }
+      definition.append(term);
+      definition.append(desc);
+    });
+
+  section.append(definition);
+  return section;
+}
+
+function buildKpiCard(kpi) {
+  const card = document.createElement("article");
+  card.className = "kpi-library__card";
+
+  const header = document.createElement("div");
+  header.className = "kpi-library__card-header";
+
+  const title = document.createElement("h5");
+  title.className = "kpi-library__card-title";
+  title.textContent = kpi.display_name || kpi.kpi_id;
+
+  const code = document.createElement("span");
+  code.className = "kpi-library__code";
+  code.textContent = kpi.kpi_id || "";
+
+  header.append(title);
+  if (code.textContent) {
+    header.append(code);
+  }
+
+  const pillGroup = document.createElement("div");
+  pillGroup.className = "kpi-library__pills";
+
+  if (kpi.units) {
+    const pill = document.createElement("span");
+    pill.className = "kpi-library__pill";
+    pill.textContent = `Units: ${humaniseLabel(kpi.units)}`;
+    pillGroup.append(pill);
+  }
+
+  if (kpi.default_period) {
+    const pill = document.createElement("span");
+    pill.className = "kpi-library__pill";
+    pill.textContent = `Default: ${kpi.default_period}`;
+    pillGroup.append(pill);
+  }
+
+  if (kpi.directionality) {
+    const pill = document.createElement("span");
+    pill.className = "kpi-library__pill";
+    pill.textContent = `Direction: ${formatDirectionality(kpi.directionality)}`;
+    pillGroup.append(pill);
+  }
+
+  if (pillGroup.children.length) {
+    header.append(pillGroup);
+  }
+
+  card.append(header);
+
+  if (kpi.definition_short) {
+    const shortDef = document.createElement("p");
+    shortDef.className = "kpi-library__definition";
+    shortDef.textContent = kpi.definition_short;
+    card.append(shortDef);
+  }
+
+  if (kpi.definition_long && kpi.definition_long !== kpi.definition_short) {
+    const longDef = document.createElement("p");
+    longDef.className = "kpi-library__definition kpi-library__definition--secondary";
+    longDef.textContent = kpi.definition_long;
+    card.append(longDef);
+  }
+
+  const details = document.createElement("dl");
+  details.className = "kpi-library__details";
+
+  appendDetail(details, "Formula", kpi.formula_text);
+  appendDetail(
+    details,
+    "Inputs",
+    (kpi.inputs || []).map(formatInputDescriptor).filter(Boolean)
+  );
+  appendDetail(details, "Computation", kpi.computation);
+  appendDetail(details, "Supported Periods", kpi.supports_periods);
+  appendDetail(details, "Dimensions", kpi.dimensions_supported);
+  appendDetail(details, "Parameters", kpi.parameters);
+  appendDetail(details, "Edge Cases", kpi.edge_cases);
+  appendDetail(details, "Presentation", kpi.presentation);
+  appendDetail(details, "Notes", kpi.notes);
+  appendDetail(details, "Quality Notes", kpi.quality_notes);
+
+  if (details.children.length) {
+    card.append(details);
+  }
+
+  return card;
+}
+
+function buildCategoriesSection(kpis) {
+  if (!Array.isArray(kpis) || !kpis.length) {
+    return null;
+  }
+  const byCategory = new Map();
+  kpis.forEach((kpi) => {
+    const category = kpi.category || "Other";
+    if (!byCategory.has(category)) {
+      byCategory.set(category, []);
+    }
+    byCategory.get(category).push(kpi);
+  });
+
+  const categories = Array.from(byCategory.entries()).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "kpi-library__categories";
+
+  categories.forEach(([category, items]) => {
+    const section = document.createElement("section");
+    section.className = "kpi-library__category";
+
+    const heading = document.createElement("h4");
+    heading.className = "kpi-library__category-title";
+    heading.textContent = category;
+
+    const grid = document.createElement("div");
+    grid.className = "kpi-library__grid";
+
+    items
+      .slice()
+      .sort((a, b) => {
+        const left = a.display_name || a.kpi_id || "";
+        const right = b.display_name || b.kpi_id || "";
+        return left.localeCompare(right);
+      })
+      .forEach((kpi) => {
+        grid.append(buildKpiCard(kpi));
+      });
+
+    section.append(heading);
+    section.append(grid);
+    wrapper.append(section);
+  });
+
+  return wrapper;
+}
+
+function buildKpiLibraryView(data) {
+  const container = document.createElement("div");
+  container.className = "kpi-library";
+  container.append(buildKpiLibraryHero(data));
+
+  const conventions = buildConventionsSection(data.global_conventions);
+  if (conventions) {
+    container.append(conventions);
+  }
+
+  const categories = buildCategoriesSection(data.kpis);
+  if (categories) {
+    container.append(categories);
+  }
+
+  return container;
+}
+
+async function renderKpiLibrarySection({ container } = {}) {
+  if (!container) {
+    return;
+  }
+  container.innerHTML = `<div class="utility-loading">Loading KPI library…</div>`;
+  try {
+    const data = await loadKpiLibraryData();
+    if (!container.isConnected) {
+      return;
+    }
+    container.innerHTML = "";
+    container.append(buildKpiLibraryView(data));
+  } catch (error) {
+    console.warn("Unable to load KPI library:", error);
+    if (!container.isConnected) {
+      return;
+    }
+    container.innerHTML = `
+      <div class="utility-error">
+        <p>Không thể tải KPI Library. Vui lòng thử lại.</p>
+        <button type="button" class="utility-error__retry" data-action="retry-kpi-library">Thử lại</button>
+      </div>
+    `;
+    const retry = container.querySelector("[data-action='retry-kpi-library']");
+    if (retry) {
+      retry.addEventListener("click", () => {
+        renderKpiLibrarySection({ container });
+      });
+    }
+  }
+}
+
+
+
 let isSending = false;
 let conversations = loadStoredConversations();
 let activeConversation = null;
@@ -95,17 +810,14 @@ let conversationSearch = "";
 let currentUtilityKey = null;
 
 const UTILITY_SECTIONS = {
+  help: {
+    title: "Copilot Quick Reference",
+    html: HELP_GUIDE_HTML,
+  },
   "kpi-library": {
     title: "KPI Library",
-    html: `
-      <p>Central knowledge base for the standardized KPIs that BenchmarkOS supports.</p>
-      <ul>
-        <li>Review definitions, formulas, and calculation logic for each KPI (EPS CAGR, ROE, TSR, FCF Margin, and more).</li>
-        <li>Understand source data lineage and any preprocessing done before metrics are calculated.</li>
-        <li>Browse KPIs by category: growth, profitability, efficiency, valuation.</li>
-      </ul>
-      <p class="panel-note">Tip: ask the assistant with "help metrics" to surface featured KPIs instantly.</p>
-    `,
+    html: `<div class="utility-loading">Đang tải KPI library…</div>`,
+    render: renderKpiLibrarySection,
   },
   "company-universe": {
     title: "Company Universe",
@@ -201,7 +913,11 @@ function appendMessage(
 
   if (isPlaceholder) {
     body.append(createTypingIndicator());
+  } else if (text === HELP_TEXT) {
+    wrapper.classList.add("message-help");
+    body.innerHTML = HELP_GUIDE_HTML;
   } else {
+    wrapper.classList.remove("message-help");
     const fragments = buildMessageBlocks(text);
     fragments.forEach((node) => body.append(node));
   }
@@ -260,8 +976,14 @@ function setMessageBody(wrapper, text) {
     return;
   }
   body.innerHTML = "";
-  const fragments = buildMessageBlocks(text);
-  fragments.forEach((node) => body.append(node));
+  if (text === HELP_TEXT) {
+    wrapper.classList.add("message-help");
+    body.innerHTML = HELP_GUIDE_HTML;
+  } else {
+    wrapper.classList.remove("message-help");
+    const fragments = buildMessageBlocks(text);
+    fragments.forEach((node) => body.append(node));
+  }
 }
 
 function showAssistantTyping() {
@@ -1578,7 +2300,30 @@ function openUtilityPanel(key) {
   utilityPanel.classList.remove("hidden");
   utilityTitle.textContent = section.title;
   utilityContent.innerHTML = section.html;
+  if (typeof section.render === "function") {
+    try {
+      const maybePromise = section.render({ container: utilityContent, key });
+      if (maybePromise && typeof maybePromise.then === "function") {
+        maybePromise.catch((error) =>
+          console.warn(`Utility panel "${key}" render error:`, error)
+        );
+      }
+    } catch (error) {
+      console.warn(`Utility panel "${key}" render error:`, error);
+    }
+  }
   setActiveNav(`open-${key}`);
+  if (key === "help") {
+    if (chatPanel) {
+      chatPanel.classList.add("chat-panel--collapsed");
+    }
+    if (chatLog) {
+      chatLog.classList.add("hidden");
+    }
+    if (chatFormContainer) {
+      chatFormContainer.classList.add("chat-form--collapsed");
+    }
+  }
 }
 
 function closeUtilityPanel() {
@@ -1589,6 +2334,15 @@ function closeUtilityPanel() {
   utilityTitle.textContent = "";
   utilityContent.innerHTML = "";
   currentUtilityKey = null;
+  if (chatPanel) {
+    chatPanel.classList.remove("chat-panel--collapsed");
+  }
+  if (chatLog) {
+    chatLog.classList.remove("hidden");
+  }
+  if (chatFormContainer) {
+    chatFormContainer.classList.remove("chat-form--collapsed");
+  }
 }
 
 function showChatSearch({ focus = true, source = "saved-reports" } = {}) {
@@ -1697,6 +2451,14 @@ chatForm.addEventListener("submit", async (event) => {
   recordMessage("user", prompt);
   appendMessage("user", prompt, { forceScroll: true });
   chatInput.value = "";
+
+  if (prompt.toLowerCase() === "help") {
+    recordMessage("assistant", HELP_TEXT);
+    appendMessage("assistant", HELP_TEXT, { forceScroll: true, animate: false });
+    chatInput.focus();
+    return;
+  }
+
   setSending(true);
   const pendingMessage = showAssistantTyping();
 
@@ -1764,13 +2526,6 @@ if (chatSearchClear) {
       return;
     }
     clearConversationSearch({ hide: true });
-    resetNavActive();
-  });
-}
-
-if (utilityCloseButton) {
-  utilityCloseButton.addEventListener("click", () => {
-    closeUtilityPanel();
     resetNavActive();
   });
 }
@@ -1851,5 +2606,7 @@ async function checkHealth() {
 
 checkHealth();
 setInterval(checkHealth, 30000);
+
+loadHelpContentOverrides();
 
 chatInput.focus();

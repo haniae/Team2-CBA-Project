@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple, Any
+import uuid
+from datetime import datetime
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import AnalyticsEngine, BenchmarkOSChatbot, database, load_settings
+from .help_content import HELP_TEXT, get_help_metadata
 
 
 # ----- CORS / Static ----------------------------------------------------------
@@ -136,12 +139,44 @@ def chat(request: ChatRequest) -> ChatResponse:
     """Proxy chat submissions to the BenchmarkOS chatbot."""
     if not request.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty.")
+
+    prompt = request.prompt.strip()
+    lowered = prompt.lower()
+    if lowered == "help":
+        settings = get_settings()
+        conversation_id = request.conversation_id or str(uuid.uuid4())
+        timestamp = datetime.utcnow()
+        database.log_message(
+            settings.database_path,
+            conversation_id,
+            role="user",
+            content=prompt,
+            created_at=timestamp,
+        )
+        database.log_message(
+            settings.database_path,
+            conversation_id,
+            role="assistant",
+            content=HELP_TEXT,
+            created_at=datetime.utcnow(),
+        )
+        return ChatResponse(
+            conversation_id=conversation_id,
+            reply=HELP_TEXT,
+        )
+
     bot = build_bot(request.conversation_id)
     reply = bot.ask(request.prompt)
     return ChatResponse(
         conversation_id=bot.conversation.conversation_id,
         reply=reply,
     )
+
+
+@app.get("/help-content")
+def help_content() -> Dict[str, Any]:
+    """Expose help metadata for the web UI."""
+    return get_help_metadata()
 
 
 def _select_latest_records(
