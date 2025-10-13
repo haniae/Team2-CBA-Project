@@ -64,17 +64,18 @@ let shareCancelButton = null;
 let shareModalConversationId = null;
 let toastContainer = null;
 const toastTimeouts = new Map();
-const companyUniverseModal = document.getElementById("company-universe");
-const companyUniverseClose = document.getElementById("company-universe-close");
-const companyUniverseTable = document.getElementById("company-universe-table");
-const companyUniverseEmpty = document.getElementById("company-universe-empty");
-const companySearchInput = document.getElementById("company-search");
-const companySectorSelect = document.getElementById("company-sector");
-const companyCoverageSelect = document.getElementById("company-coverage");
-const companyUniverseMetrics = document.getElementById("company-universe-metrics");
 let companyUniverseData = [];
 let filteredCompanyData = [];
-let universeFocusRestore = null;
+let companyUniverseMetrics = null;
+let companyUniverseTable = null;
+let companyUniverseEmpty = null;
+let companySearchInput = null;
+let companySectorSelect = null;
+let companyCoverageSelect = null;
+let companyUniverseMetaUniverse = null;
+let companyUniverseMetaSectors = null;
+let companyUniverseMetaLatest = null;
+let companyUniverseMetaCoverage = null;
 
 const KPI_LIBRARY_PATH = "/static/data/kpi_library.json";
 const COMPANY_UNIVERSE_PATH = "/static/data/company_universe.json";
@@ -104,6 +105,168 @@ const INTENT_LABELS = {
   scenario: "Scenario Analysis",
   insight: "Insight",
 };
+
+async function renderCompanyUniverseSection({ container } = {}) {
+  if (!container) {
+    return;
+  }
+
+  companyUniverseMetrics = null;
+  companyUniverseTable = null;
+  companyUniverseEmpty = null;
+  companySearchInput = null;
+  companySectorSelect = null;
+  companyCoverageSelect = null;
+  companyUniverseMetaUniverse = null;
+  companyUniverseMetaSectors = null;
+  companyUniverseMetaLatest = null;
+  companyUniverseMetaCoverage = null;
+
+  container.innerHTML = `
+    <div class="company-universe" role="region" aria-live="polite">
+      <section class="company-universe__hero">
+        <div class="company-universe__badge" aria-hidden="true">CU</div>
+        <div class="company-universe__hero-copy">
+          <h3 class="company-universe__title">Company Universe</h3>
+          <p class="company-universe__subtitle">
+            Explore coverage across every tracked company, segment results, and monitor ingestion progress.
+          </p>
+          <ul class="company-universe__meta">
+            <li class="company-universe__meta-item">
+              <span class="company-universe__meta-label">Universe</span>
+              <span class="company-universe__meta-value" data-role="company-universe-meta-universe">Loading...</span>
+            </li>
+            <li class="company-universe__meta-item">
+              <span class="company-universe__meta-label">Sectors</span>
+              <span class="company-universe__meta-value" data-role="company-universe-meta-sectors">Loading...</span>
+            </li>
+            <li class="company-universe__meta-item">
+              <span class="company-universe__meta-label">Latest filing</span>
+              <span class="company-universe__meta-value" data-role="company-universe-meta-latest">Loading...</span>
+            </li>
+            <li class="company-universe__meta-item">
+              <span class="company-universe__meta-label">Coverage mix</span>
+              <span class="company-universe__meta-value" data-role="company-universe-meta-coverage">Loading...</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+      <div class="company-universe__controls">
+        <label class="sr-only" for="company-universe-search-input">Search companies</label>
+        <input
+          type="search"
+          id="company-universe-search-input"
+          data-role="company-universe-search"
+          placeholder="Search by company, ticker, or sector"
+          autocomplete="off"
+        />
+        <label class="sr-only" for="company-universe-sector-filter">Filter by sector</label>
+        <select id="company-universe-sector-filter" data-role="company-universe-sector">
+          <option value="">All sectors</option>
+        </select>
+        <label class="sr-only" for="company-universe-coverage-filter">Filter by coverage</label>
+        <select id="company-universe-coverage-filter" data-role="company-universe-coverage">
+          <option value="">All coverage</option>
+          <option value="complete">Complete coverage</option>
+          <option value="partial">Partial coverage</option>
+          <option value="missing">Missing coverage</option>
+        </select>
+      </div>
+      <div class="company-universe__metrics" data-role="company-universe-metrics">
+        <div class="utility-loading">Loading coverage snapshot...</div>
+      </div>
+      <div class="company-universe__table-wrapper">
+        <table class="company-universe__table hidden" data-role="company-universe-table">
+          <thead>
+            <tr>
+              <th scope="col">Company</th>
+              <th scope="col">Ticker</th>
+              <th scope="col">Sector</th>
+              <th scope="col">Market cap</th>
+              <th scope="col">Latest filing</th>
+              <th scope="col">Coverage</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p class="company-universe__empty hidden" data-role="company-universe-empty">
+          No companies match the current filters.
+        </p>
+      </div>
+    </div>
+  `;
+
+  companySearchInput = container.querySelector("[data-role='company-universe-search']");
+  companySectorSelect = container.querySelector("[data-role='company-universe-sector']");
+  companyCoverageSelect = container.querySelector("[data-role='company-universe-coverage']");
+  companyUniverseMetrics = container.querySelector("[data-role='company-universe-metrics']");
+  companyUniverseTable = container.querySelector("[data-role='company-universe-table']");
+  companyUniverseEmpty = container.querySelector("[data-role='company-universe-empty']");
+  companyUniverseMetaUniverse = container.querySelector("[data-role='company-universe-meta-universe']");
+  companyUniverseMetaSectors = container.querySelector("[data-role='company-universe-meta-sectors']");
+  companyUniverseMetaLatest = container.querySelector("[data-role='company-universe-meta-latest']");
+  companyUniverseMetaCoverage = container.querySelector("[data-role='company-universe-meta-coverage']");
+
+  if (companySearchInput) {
+    companySearchInput.value = "";
+    companySearchInput.addEventListener("input", applyCompanyUniverseFilters);
+  }
+  if (companySectorSelect) {
+    companySectorSelect.value = "";
+    companySectorSelect.addEventListener("change", applyCompanyUniverseFilters);
+  }
+  if (companyCoverageSelect) {
+    companyCoverageSelect.value = "";
+    companyCoverageSelect.addEventListener("change", applyCompanyUniverseFilters);
+  }
+  if (companyUniverseMetrics) {
+    companyUniverseMetrics.innerHTML = `<div class="utility-loading">Loading coverage snapshot...</div>`;
+  }
+  if (companyUniverseTable) {
+    companyUniverseTable.classList.add("hidden");
+  }
+  if (companyUniverseEmpty) {
+    companyUniverseEmpty.classList.add("hidden");
+  }
+
+  try {
+    await loadCompanyUniverseData();
+    if (!container.isConnected) {
+      return;
+    }
+    applyCompanyUniverseFilters();
+    if (companySearchInput) {
+      companySearchInput.focus();
+      companySearchInput.select();
+    }
+  } catch (error) {
+    companyUniverseMetrics = null;
+    companyUniverseTable = null;
+    companyUniverseEmpty = null;
+    companySearchInput = null;
+    companySectorSelect = null;
+    companyCoverageSelect = null;
+    companyUniverseMetaUniverse = null;
+    companyUniverseMetaSectors = null;
+    companyUniverseMetaLatest = null;
+    companyUniverseMetaCoverage = null;
+    if (!container.isConnected) {
+      return;
+    }
+    container.innerHTML = `
+      <div class="utility-error">
+        <p>Unable to load the company universe right now. Please try again.</p>
+        <button type="button" class="utility-error__retry" data-action="retry-company-universe">Retry</button>
+      </div>
+    `;
+    const retryButton = container.querySelector("[data-action='retry-company-universe']");
+    if (retryButton) {
+      retryButton.addEventListener("click", () => {
+        renderCompanyUniverseSection({ container });
+      });
+    }
+  }
+}
 
 
 const HELP_PROMPTS = [
@@ -883,15 +1046,8 @@ const UTILITY_SECTIONS = {
   },
   "company-universe": {
     title: "Company Universe",
-    html: `
-      <p>Catalog of companies and sectors currently covered in BenchmarkOS.</p>
-      <ul>
-        <li>Filter by industry (Tech, Consumer, Healthcare...) and market-cap tiers.</li>
-        <li>Check coverage status: <strong>✅ complete</strong>, <strong>🟡 filings missing</strong>, <strong>❌ not yet ingested</strong>.</li>
-        <li>Look up aliases or brand names and map them to their official tickers.</li>
-      </ul>
-      <p class="panel-note">Tip: run “metrics &lt;ticker&gt;” right after confirming coverage.</p>
-    `,
+    html: `<div class="utility-loading">Loading company universe…</div>`,
+    render: renderCompanyUniverseSection,
   },
   "filing-viewer": {
     title: "Filing Source Viewer",
@@ -2375,7 +2531,7 @@ function openUtilityPanel(key) {
     }
   }
   setActiveNav(`open-${key}`);
-  if (key === "help" || key === "kpi-library") {
+  if (["help", "kpi-library", "company-universe"].includes(key)) {
     if (chatPanel) {
       chatPanel.classList.add("chat-panel--collapsed");
     }
@@ -2460,9 +2616,14 @@ function handleNavAction(action) {
     return;
   }
   if (action === "open-company-universe") {
-    closeUtilityPanel();
+    const key = "company-universe";
+    if (currentUtilityKey === key) {
+      closeUtilityPanel();
+      resetNavActive();
+      return;
+    }
     clearConversationSearch({ hide: true });
-    openCompanyUniverse();
+    openUtilityPanel(key);
     return;
   }
   if (action.startsWith("open-")) {
@@ -2544,63 +2705,159 @@ function populateCompanyUniverseFilters(data) {
   });
 }
 
+function getMostRecentCompanyRecord(records) {
+  if (!Array.isArray(records) || !records.length) {
+    return null;
+  }
+  return records
+    .filter((entry) => entry.latest_filing)
+    .sort((a, b) => Date.parse(b.latest_filing) - Date.parse(a.latest_filing))[0] || null;
+}
+
+function updateCompanyUniverseMeta({
+  filteredCount = 0,
+  totalCount = 0,
+  sectorsCount = 0,
+  latestRecord = null,
+  coverage = null,
+} = {}) {
+  if (companyUniverseMetaUniverse) {
+    if (totalCount > 0) {
+      const displayFiltered = typeof filteredCount === "number" ? filteredCount : totalCount;
+      if (displayFiltered === totalCount) {
+        companyUniverseMetaUniverse.textContent = `${totalCount.toLocaleString()} companies tracked`;
+      } else {
+        companyUniverseMetaUniverse.textContent = `${displayFiltered.toLocaleString()} of ${totalCount.toLocaleString()} companies`;
+      }
+    } else if (typeof filteredCount === "number" && filteredCount > 0) {
+      companyUniverseMetaUniverse.textContent = `${filteredCount.toLocaleString()} companies`;
+    } else {
+      companyUniverseMetaUniverse.textContent = "No companies loaded";
+    }
+  }
+
+  if (companyUniverseMetaSectors) {
+    if (typeof sectorsCount === "number" && sectorsCount > 0) {
+      companyUniverseMetaSectors.textContent = `${sectorsCount} sector${sectorsCount === 1 ? "" : "s"} in view`;
+    } else {
+      companyUniverseMetaSectors.textContent = "No sectors";
+    }
+  }
+
+  if (companyUniverseMetaLatest) {
+    if (latestRecord && latestRecord.latest_filing) {
+      const dateLabel = formatDateHuman(latestRecord.latest_filing);
+      const ticker = latestRecord.ticker ? ` | ${latestRecord.ticker}` : "";
+      companyUniverseMetaLatest.textContent = `${dateLabel}${ticker}`;
+    } else {
+      companyUniverseMetaLatest.textContent = "No filings ingested";
+    }
+  }
+
+  if (companyUniverseMetaCoverage) {
+    const complete = coverage && typeof coverage.complete === "number" ? coverage.complete : 0;
+    const partial = coverage && typeof coverage.partial === "number" ? coverage.partial : 0;
+    const missing = coverage && typeof coverage.missing === "number" ? coverage.missing : 0;
+    const total = complete + partial + missing;
+    const detail = `${complete} complete | ${partial} partial | ${missing} missing`;
+    if (total > 0) {
+      const percent = Math.round((complete / total) * 100);
+      companyUniverseMetaCoverage.textContent = `${percent}% complete (${detail})`;
+    } else if (totalCount > 0) {
+      companyUniverseMetaCoverage.textContent = `No coverage for current filters (${detail})`;
+    } else {
+      companyUniverseMetaCoverage.textContent = "Coverage data unavailable";
+    }
+  }
+}
+
 function renderCompanyUniverseMetrics(data) {
   if (!companyUniverseMetrics) {
     return;
   }
+
+  const rows = Array.isArray(data) ? data : [];
+  const filteredCount = rows.length;
+  const totalTracked = companyUniverseData.length;
+
+  const complete = rows.filter((entry) => entry.coverage === "complete").length;
+  const partial = rows.filter((entry) => entry.coverage === "partial").length;
+  const missing = rows.filter((entry) => entry.coverage === "missing").length;
+  const sectors = new Set(rows.map((entry) => entry.sector).filter(Boolean));
+  const referenceForLatest = rows.length ? rows : companyUniverseData;
+  const mostRecent = getMostRecentCompanyRecord(referenceForLatest);
+
+  updateCompanyUniverseMeta({
+    filteredCount,
+    totalCount: totalTracked,
+    sectorsCount: sectors.size,
+    latestRecord: mostRecent,
+    coverage: { complete, partial, missing },
+  });
+
   companyUniverseMetrics.innerHTML = "";
-  if (!data.length) {
-    companyUniverseMetrics.innerHTML = '<p class\"modal__empty\">No companies to display.</p>';
-    return;
-  }
-  const total = data.length;
-  const complete = data.filter((entry) => entry.coverage === "complete").length;
-  const partial = data.filter((entry) => entry.coverage === "partial").length;
-  const missing = data.filter((entry) => entry.coverage === "missing").length;
-  const sectors = new Set(data.map((entry) => entry.sector).filter(Boolean));
+
+  const coverageTotal = complete + partial + missing;
+  const coveragePercent =
+    coverageTotal > 0 ? Math.round((complete / coverageTotal) * 100) : null;
+
   const cards = [];
 
-  cards.push({
-    label: "Companies covered",
-    value: total ? total.toLocaleString() : "—",
-    detail: sectors.size ? `${sectors.size} sectors` : "",
-  });
+  if (filteredCount > 0) {
+    cards.push({
+      label: "Companies in view",
+      value: filteredCount.toLocaleString(),
+      detail: sectors.size
+        ? `${sectors.size} sector${sectors.size === 1 ? "" : "s"}`
+        : "No sector tags",
+    });
 
-  cards.push({
-    label: "Coverage mix",
-    value: total
-      ? `${complete} complete • ${partial} partial • ${missing} missing`
-      : "—",
-    detail: "",
-  });
+    cards.push({
+      label: "Coverage mix",
+      value: coveragePercent !== null ? `${coveragePercent}% complete` : "-",
+      detail: `${complete} complete | ${partial} partial | ${missing} missing`,
+    });
 
-  const mostRecent = data
-    .filter((entry) => entry.latest_filing)
-    .sort((a, b) => Date.parse(b.latest_filing) - Date.parse(a.latest_filing))[0];
-
-  cards.push({
-    label: "Most recent filing",
-    value: mostRecent ? formatDateHuman(mostRecent.latest_filing) : "—",
-    detail: mostRecent ? mostRecent.ticker : "",
-  });
+    cards.push({
+      label: "Latest filing ingested",
+      value: mostRecent ? formatDateHuman(mostRecent.latest_filing) : "-",
+      detail: mostRecent?.ticker || "",
+    });
+  } else {
+    cards.push({
+      label: "Companies in view",
+      value: "0",
+      detail: "Adjust filters to rediscover the universe.",
+    });
+    cards.push({
+      label: "Coverage mix",
+      value: "-",
+      detail: "Complete 0 | Partial 0 | Missing 0",
+    });
+    cards.push({
+      label: "Latest filing ingested",
+      value: "-",
+      detail: "",
+    });
+  }
 
   cards.forEach((card) => {
     const wrapper = document.createElement("div");
-    wrapper.className = "modal__metric-card";
+    wrapper.className = "company-universe__metric";
 
     const label = document.createElement("span");
-    label.className = "modal__metric-label";
+    label.className = "company-universe__metric-label";
     label.textContent = card.label;
     wrapper.append(label);
 
     const value = document.createElement("span");
-    value.className = "modal__metric-value";
+    value.className = "company-universe__metric-value";
     value.textContent = card.value;
     wrapper.append(value);
 
     if (card.detail) {
       const detail = document.createElement("span");
-      detail.className = "modal__metric-detail";
+      detail.className = "company-universe__metric-detail";
       detail.textContent = card.detail;
       wrapper.append(detail);
     }
@@ -2608,7 +2865,6 @@ function renderCompanyUniverseMetrics(data) {
     companyUniverseMetrics.append(wrapper);
   });
 }
-
 function formatMarketCap(rawValue, displayValue) {
   if (displayValue) {
     return displayValue;
@@ -2749,89 +3005,6 @@ function applyCompanyUniverseFilters() {
   renderCompanyUniverseTable(filteredCompanyData);
 }
 
-function openCompanyUniverse() {
-  if (!companyUniverseModal) {
-    showToast("Company universe is unavailable right now.", "warning");
-    return;
-  }
-  universeFocusRestore = document.activeElement;
-  companyUniverseModal.classList.remove("hidden");
-  companyUniverseModal.setAttribute("aria-hidden", "false");
-  document.body.style.overflow = "hidden";
-  setActiveNav("open-company-universe");
-  if (companySearchInput) {
-    companySearchInput.value = "";
-  }
-  if (companyCoverageSelect) {
-    companyCoverageSelect.value = "";
-  }
-  if (companySectorSelect) {
-    companySectorSelect.value = "";
-  }
-  loadCompanyUniverseData()
-    .then(() => {
-      applyCompanyUniverseFilters();
-      if (companySearchInput) {
-        companySearchInput.focus();
-        companySearchInput.select();
-      }
-    })
-    .catch(() => {
-      renderCompanyUniverseMetrics([]);
-      renderCompanyUniverseTable([]);
-    });
-  document.addEventListener("keydown", handleCompanyUniverseKeydown);
-}
-
-function closeCompanyUniverse() {
-  if (!companyUniverseModal) {
-    return;
-  }
-  companyUniverseModal.classList.add("hidden");
-  companyUniverseModal.setAttribute("aria-hidden", "true");
-  document.body.style.overflow = "";
-  document.removeEventListener("keydown", handleCompanyUniverseKeydown);
-  resetNavActive();
-  if (universeFocusRestore && typeof universeFocusRestore.focus === "function") {
-    universeFocusRestore.focus();
-  }
-  universeFocusRestore = null;
-}
-
-function handleCompanyUniverseKeydown(event) {
-  if (!companyUniverseModal || companyUniverseModal.classList.contains("hidden")) {
-    return;
-  }
-  if (event.key === "Escape") {
-    event.preventDefault();
-    closeCompanyUniverse();
-    return;
-  }
-  if (event.key !== "Tab") {
-    return;
-  }
-  const focusableSelectors =
-    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-  const focusable = Array.from(
-    companyUniverseModal.querySelectorAll(focusableSelectors)
-  ).filter((node) => !node.hasAttribute("disabled") && node.getAttribute("tabindex") !== "-1");
-  if (!focusable.length) {
-    event.preventDefault();
-    return;
-  }
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  if (event.shiftKey) {
-    if (document.activeElement === first || !companyUniverseModal.contains(document.activeElement)) {
-      event.preventDefault();
-      last.focus();
-    }
-  } else if (document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
-}
-
 async function sendPrompt(prompt) {
   const payload = { prompt };
   if (activeConversation && activeConversation.remoteId) {
@@ -2962,32 +3135,6 @@ if (conversationList) {
   });
 }
 
-if (companyUniverseClose) {
-  companyUniverseClose.addEventListener("click", closeCompanyUniverse);
-}
-
-if (companyUniverseModal) {
-  companyUniverseModal.addEventListener("click", (event) => {
-    if (event.target === companyUniverseModal) {
-      closeCompanyUniverse();
-    }
-  });
-}
-
-if (companySearchInput) {
-  companySearchInput.addEventListener("input", () => {
-    applyCompanyUniverseFilters();
-  });
-}
-
-if (companySectorSelect) {
-  companySectorSelect.addEventListener("change", applyCompanyUniverseFilters);
-}
-
-if (companyCoverageSelect) {
-  companyCoverageSelect.addEventListener("change", applyCompanyUniverseFilters);
-}
-
 wirePromptChips();
 
 function ensureToastContainer() {
@@ -3058,3 +3205,5 @@ setInterval(checkHealth, 30000);
 loadHelpContentOverrides();
 
 chatInput.focus();
+
+
