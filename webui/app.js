@@ -64,10 +64,23 @@ let shareCancelButton = null;
 let shareModalConversationId = null;
 let toastContainer = null;
 const toastTimeouts = new Map();
+const companyUniverseModal = document.getElementById("company-universe");
+const companyUniverseClose = document.getElementById("company-universe-close");
+const companyUniverseTable = document.getElementById("company-universe-table");
+const companyUniverseEmpty = document.getElementById("company-universe-empty");
+const companySearchInput = document.getElementById("company-search");
+const companySectorSelect = document.getElementById("company-sector");
+const companyCoverageSelect = document.getElementById("company-coverage");
+const companyUniverseMetrics = document.getElementById("company-universe-metrics");
+let companyUniverseData = [];
+let filteredCompanyData = [];
+let universeFocusRestore = null;
 
 const KPI_LIBRARY_PATH = "/static/data/kpi_library.json";
+const COMPANY_UNIVERSE_PATH = "/static/data/company_universe.json";
 let kpiLibraryCache = null;
 let kpiLibraryLoadPromise = null;
+let companyUniversePromise = null;
 
 const METRIC_KEYWORD_MAP = [
   { regex: /\bgrowth|cagr|yoy\b/i, label: "Growth" },
@@ -2446,6 +2459,12 @@ function handleNavAction(action) {
     resetNavActive();
     return;
   }
+  if (action === "open-company-universe") {
+    closeUtilityPanel();
+    clearConversationSearch({ hide: true });
+    openCompanyUniverse();
+    return;
+  }
   if (action.startsWith("open-")) {
     const key = action.replace("open-", "");
     if (currentUtilityKey === key) {
@@ -2456,6 +2475,360 @@ function handleNavAction(action) {
     clearConversationSearch({ hide: true });
     openUtilityPanel(key);
     return;
+  }
+}
+
+async function loadCompanyUniverseData() {
+  if (companyUniverseData.length) {
+    return companyUniverseData;
+  }
+  if (companyUniversePromise) {
+    return companyUniversePromise;
+  }
+  companyUniversePromise = fetch(COMPANY_UNIVERSE_PATH, { cache: "no-store" })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Company universe fetch failed (${response.status})`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      const normalised = Array.isArray(data) ? data : [];
+      companyUniverseData = normalised.map((record) => {
+        const coverage = (record.coverage || "complete").toLowerCase();
+        const marketCap = Number.isFinite(record.market_cap) ? record.market_cap : null;
+        return {
+          ...record,
+          coverage,
+          market_cap: marketCap,
+          market_cap_display: record.market_cap_display || record.marketCapDisplay || null,
+          latest_filing: record.latest_filing || record.latestFiling || null,
+          sector: record.sector || "Uncategorised",
+        };
+      });
+      populateCompanyUniverseFilters(companyUniverseData);
+      applyCompanyUniverseFilters();
+      return companyUniverseData;
+    })
+    .catch((error) => {
+      console.warn("Company universe load failed:", error);
+      showToast("Unable to load company universe data. Please try again later.", "error");
+      companyUniverseData = [];
+      throw error;
+    })
+    .finally(() => {
+      companyUniversePromise = null;
+    });
+  return companyUniversePromise;
+}
+
+function populateCompanyUniverseFilters(data) {
+  if (!companySectorSelect) {
+    return;
+  }
+  while (companySectorSelect.options.length > 1) {
+    companySectorSelect.remove(1);
+  }
+  const sectors = Array.from(
+    new Set(
+      data
+        .map((item) => item.sector || "")
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+  sectors.forEach((sector) => {
+    const option = document.createElement("option");
+    option.value = sector;
+    option.textContent = sector;
+    companySectorSelect.append(option);
+  });
+}
+
+function renderCompanyUniverseMetrics(data) {
+  if (!companyUniverseMetrics) {
+    return;
+  }
+  companyUniverseMetrics.innerHTML = "";
+  if (!data.length) {
+    companyUniverseMetrics.innerHTML = '<p class\"modal__empty\">No companies to display.</p>';
+    return;
+  }
+  const total = data.length;
+  const complete = data.filter((entry) => entry.coverage === "complete").length;
+  const partial = data.filter((entry) => entry.coverage === "partial").length;
+  const missing = data.filter((entry) => entry.coverage === "missing").length;
+  const sectors = new Set(data.map((entry) => entry.sector).filter(Boolean));
+  const cards = [];
+
+  cards.push({
+    label: "Companies covered",
+    value: total ? total.toLocaleString() : "—",
+    detail: sectors.size ? `${sectors.size} sectors` : "",
+  });
+
+  cards.push({
+    label: "Coverage mix",
+    value: total
+      ? `${complete} complete • ${partial} partial • ${missing} missing`
+      : "—",
+    detail: "",
+  });
+
+  const mostRecent = data
+    .filter((entry) => entry.latest_filing)
+    .sort((a, b) => Date.parse(b.latest_filing) - Date.parse(a.latest_filing))[0];
+
+  cards.push({
+    label: "Most recent filing",
+    value: mostRecent ? formatDateHuman(mostRecent.latest_filing) : "—",
+    detail: mostRecent ? mostRecent.ticker : "",
+  });
+
+  cards.forEach((card) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "modal__metric-card";
+
+    const label = document.createElement("span");
+    label.className = "modal__metric-label";
+    label.textContent = card.label;
+    wrapper.append(label);
+
+    const value = document.createElement("span");
+    value.className = "modal__metric-value";
+    value.textContent = card.value;
+    wrapper.append(value);
+
+    if (card.detail) {
+      const detail = document.createElement("span");
+      detail.className = "modal__metric-detail";
+      detail.textContent = card.detail;
+      wrapper.append(detail);
+    }
+
+    companyUniverseMetrics.append(wrapper);
+  });
+}
+
+function formatMarketCap(rawValue, displayValue) {
+  if (displayValue) {
+    return displayValue;
+  }
+  if (!Number.isFinite(rawValue)) {
+    return "—";
+  }
+  const absValue = Math.abs(rawValue);
+  if (absValue >= 1e12) {
+    return `${(rawValue / 1e12).toFixed(2)}T`;
+  }
+  if (absValue >= 1e9) {
+    return `${(rawValue / 1e9).toFixed(2)}B`;
+  }
+  if (absValue >= 1e6) {
+    return `${(rawValue / 1e6).toFixed(2)}M`;
+  }
+  return rawValue.toLocaleString();
+}
+
+function formatDateHuman(dateInput) {
+  if (!dateInput) {
+    return "—";
+  }
+  const parsed = new Date(dateInput);
+  if (Number.isNaN(parsed.getTime())) {
+    return dateInput;
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(parsed);
+}
+
+function createCoverageBadge(coverage) {
+  const span = document.createElement("span");
+  span.className = `badge ${coverage}`;
+  span.textContent =
+    coverage === "complete"
+      ? "Complete"
+      : coverage === "partial"
+      ? "Partial"
+      : coverage === "missing"
+      ? "Missing"
+      : coverage;
+  return span;
+}
+
+function renderCompanyUniverseTable(data) {
+  if (!companyUniverseTable) {
+    return;
+  }
+  const tbody = companyUniverseTable.querySelector("tbody");
+  if (!tbody) {
+    return;
+  }
+  tbody.innerHTML = "";
+  if (!data.length) {
+    companyUniverseTable.classList.add("hidden");
+    if (companyUniverseEmpty) {
+      companyUniverseEmpty.classList.remove("hidden");
+    }
+    return;
+  }
+  companyUniverseTable.classList.remove("hidden");
+  if (companyUniverseEmpty) {
+    companyUniverseEmpty.classList.add("hidden");
+  }
+
+  const sorted = [...data].sort((a, b) => (b.market_cap || 0) - (a.market_cap || 0));
+  sorted.forEach((company) => {
+    const row = document.createElement("tr");
+
+    const companyCell = document.createElement("td");
+    const companyWrap = document.createElement("div");
+    companyWrap.className = "company-cell";
+    const companyName = document.createElement("span");
+    companyName.className = "company-name";
+    companyName.textContent = company.company || company.ticker;
+    companyWrap.append(companyName);
+    if (company.hq) {
+      const meta = document.createElement("span");
+      meta.className = "company-meta";
+      meta.textContent = company.hq;
+      companyWrap.append(meta);
+    }
+    companyCell.append(companyWrap);
+
+    const tickerCell = document.createElement("td");
+    const tickerBadge = document.createElement("span");
+    tickerBadge.className = "ticker-badge";
+    tickerBadge.textContent = company.ticker || "—";
+    tickerCell.append(tickerBadge);
+
+    const sectorCell = document.createElement("td");
+    sectorCell.textContent = company.sector || "—";
+
+    const marketCapCell = document.createElement("td");
+    marketCapCell.textContent = formatMarketCap(company.market_cap, company.market_cap_display);
+
+    const filingCell = document.createElement("td");
+    filingCell.textContent = formatDateHuman(company.latest_filing);
+
+    const coverageCell = document.createElement("td");
+    coverageCell.append(createCoverageBadge(company.coverage || "complete"));
+
+    row.append(companyCell);
+    row.append(tickerCell);
+    row.append(sectorCell);
+    row.append(marketCapCell);
+    row.append(filingCell);
+    row.append(coverageCell);
+    tbody.append(row);
+  });
+}
+
+function applyCompanyUniverseFilters() {
+  if (!companyUniverseData.length) {
+    return;
+  }
+  const term = (companySearchInput?.value || "").trim().toLowerCase();
+  const sectorFilter = companySectorSelect?.value || "";
+  const coverageFilter = companyCoverageSelect?.value || "";
+
+  filteredCompanyData = companyUniverseData.filter((entry) => {
+    const matchesTerm =
+      !term ||
+      [entry.company, entry.ticker, entry.sector]
+        .filter(Boolean)
+        .some((field) => field.toLowerCase().includes(term));
+    const matchesSector = !sectorFilter || entry.sector === sectorFilter;
+    const matchesCoverage = !coverageFilter || entry.coverage === coverageFilter;
+    return matchesTerm && matchesSector && matchesCoverage;
+  });
+
+  renderCompanyUniverseMetrics(filteredCompanyData);
+  renderCompanyUniverseTable(filteredCompanyData);
+}
+
+function openCompanyUniverse() {
+  if (!companyUniverseModal) {
+    showToast("Company universe is unavailable right now.", "warning");
+    return;
+  }
+  universeFocusRestore = document.activeElement;
+  companyUniverseModal.classList.remove("hidden");
+  companyUniverseModal.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  setActiveNav("open-company-universe");
+  if (companySearchInput) {
+    companySearchInput.value = "";
+  }
+  if (companyCoverageSelect) {
+    companyCoverageSelect.value = "";
+  }
+  if (companySectorSelect) {
+    companySectorSelect.value = "";
+  }
+  loadCompanyUniverseData()
+    .then(() => {
+      applyCompanyUniverseFilters();
+      if (companySearchInput) {
+        companySearchInput.focus();
+        companySearchInput.select();
+      }
+    })
+    .catch(() => {
+      renderCompanyUniverseMetrics([]);
+      renderCompanyUniverseTable([]);
+    });
+  document.addEventListener("keydown", handleCompanyUniverseKeydown);
+}
+
+function closeCompanyUniverse() {
+  if (!companyUniverseModal) {
+    return;
+  }
+  companyUniverseModal.classList.add("hidden");
+  companyUniverseModal.setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+  document.removeEventListener("keydown", handleCompanyUniverseKeydown);
+  resetNavActive();
+  if (universeFocusRestore && typeof universeFocusRestore.focus === "function") {
+    universeFocusRestore.focus();
+  }
+  universeFocusRestore = null;
+}
+
+function handleCompanyUniverseKeydown(event) {
+  if (!companyUniverseModal || companyUniverseModal.classList.contains("hidden")) {
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeCompanyUniverse();
+    return;
+  }
+  if (event.key !== "Tab") {
+    return;
+  }
+  const focusableSelectors =
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  const focusable = Array.from(
+    companyUniverseModal.querySelectorAll(focusableSelectors)
+  ).filter((node) => !node.hasAttribute("disabled") && node.getAttribute("tabindex") !== "-1");
+  if (!focusable.length) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey) {
+    if (document.activeElement === first || !companyUniverseModal.contains(document.activeElement)) {
+      event.preventDefault();
+      last.focus();
+    }
+  } else if (document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
   }
 }
 
@@ -2587,6 +2960,32 @@ if (conversationList) {
     }
     loadConversation(target.dataset.id);
   });
+}
+
+if (companyUniverseClose) {
+  companyUniverseClose.addEventListener("click", closeCompanyUniverse);
+}
+
+if (companyUniverseModal) {
+  companyUniverseModal.addEventListener("click", (event) => {
+    if (event.target === companyUniverseModal) {
+      closeCompanyUniverse();
+    }
+  });
+}
+
+if (companySearchInput) {
+  companySearchInput.addEventListener("input", () => {
+    applyCompanyUniverseFilters();
+  });
+}
+
+if (companySectorSelect) {
+  companySectorSelect.addEventListener("change", applyCompanyUniverseFilters);
+}
+
+if (companyCoverageSelect) {
+  companyCoverageSelect.addEventListener("change", applyCompanyUniverseFilters);
 }
 
 wirePromptChips();
