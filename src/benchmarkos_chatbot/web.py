@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+import json
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -83,6 +84,41 @@ class AuditEventResponse(BaseModel):
     ticker: str
     events: List[Dict]
 
+
+class FilingFact(BaseModel):
+    """Detailed view of a fact with source metadata."""
+    ticker: str
+    metric: str
+    value: Optional[float]
+    unit: Optional[str]
+    fiscal_year: Optional[int]
+    fiscal_period: Optional[str]
+    period: str
+    source: str
+    source_filing: Optional[str]
+    accession: Optional[str]
+    form: Optional[str]
+    filed_at: Optional[str]
+    period_start: Optional[str]
+    period_end: Optional[str]
+    adjusted: bool
+    adjustment_note: Optional[str]
+    sec_url: Optional[str]
+    archive_url: Optional[str]
+
+
+class FilingFactsSummary(BaseModel):
+    """Aggregate stats describing the filing facts payload."""
+    count: int
+    fiscal_years: List[int]
+    metrics: List[str]
+
+
+class FilingFactsResponse(BaseModel):
+    """Response shape for the filing source viewer."""
+    ticker: str
+    items: List[FilingFact]
+    summary: FilingFactsSummary
 
 # ----- Dependencies / Singletons ---------------------------------------------
 
@@ -210,6 +246,21 @@ def _summarise_period(spans: Iterable[Tuple[int, int]]) -> str:
     start = min(span[0] for span in spans if span[0])
     end = max(span[1] for span in spans if span[1])
     return f"FY{start}" if start == end else f"FY{start}-FY{end}"
+
+
+def _build_filing_urls(accession: Optional[str], cik: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """Generate viewer and archive URLs for a filing accession."""
+    if not accession:
+        return None, None
+    ix_url = f"https://www.sec.gov/ixviewer/doc?action=fetch&accn={accession}"
+    archive_url = None
+    if cik:
+        clean_cik = cik.lstrip("0") or cik
+        acc_no_dash = accession.replace("-", "")
+        archive_url = (
+            f"https://www.sec.gov/Archives/edgar/data/{clean_cik}/{acc_no_dash}/{acc_no_dash}-index.html"
+        )
+    return ix_url, archive_url
 
 
 @app.get("/metrics", response_model=List[MetricsResponse])
@@ -374,6 +425,125 @@ def facts(
         for fact in facts
     ]
     return FactsResponse(ticker=ticker.upper(), fiscal_year=fiscal_year, items=items)
+
+
+@app.get("/filings", response_model=FilingFactsResponse)
+def filing_sources(
+    ticker: str = Query(...),
+    metric: Optional[str] = Query(None),
+    fiscal_year: Optional[int] = Query(None),
+    start_year: Optional[int] = Query(None),
+    end_year: Optional[int] = Query(None),
+    limit: int = Query(250, ge=1, le=1000),
+) -> FilingFactsResponse:
+    """Return fact rows with filing metadata for the filing source viewer."""
+    ticker_clean = ticker.strip().upper()
+    if not ticker_clean:
+        raise HTTPException(status_code=400, detail="Ticker is required.")
+
+    if (start_year is not None or end_year is not None) and fiscal_year is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either fiscal_year or start_year/end_year, not both.",
+        )
+
+    if (start_year is None) ^ (end_year is None):
+        raise HTTPException(
+            status_code=400,
+            detail="start_year and end_year must be provided together.",
+        )
+
+    years_to_fetch: List[Optional[int]] = []
+    if fiscal_year is not None:
+        years_to_fetch = [fiscal_year]
+    elif start_year is not None and end_year is not None:
+        if end_year < start_year:
+            start_year, end_year = end_year, start_year
+        years_to_fetch = list(range(start_year, end_year + 1))
+    else:
+        years_to_fetch = [None]
+
+    engine = get_engine()
+    metric_key = None
+    if metric:
+        metric_key = metric.strip().lower().replace(" ", "_")
+
+    collected: List[database.FinancialFactRecord] = []
+    for year in years_to_fetch:
+        try:
+            collected.extend(
+                engine.financial_facts(
+                    ticker=ticker_clean,
+                    fiscal_year=year,
+                    metric=metric_key,
+                    limit=(limit if year is None else None),
+                )
+            )
+        except Exception as exc:  # pragma: no cover - defensive guard
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if not collected:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No filings found for {ticker_clean}.",
+        )
+
+    def _sort_key(fact: database.FinancialFactRecord) -> Tuple[int, str, str]:
+        year = fact.fiscal_year if fact.fiscal_year is not None else -1
+        period = fact.period or ""
+        metric_name = fact.metric or ""
+        return (-year, period, metric_name)
+
+    collected.sort(key=_sort_key)
+    if limit:
+        collected = collected[:limit]
+
+    items: List[FilingFact] = []
+    for fact in collected:
+        raw_payload = getattr(fact, "raw", None) or {}
+        if isinstance(raw_payload, str):
+            try:
+                raw_payload = json.loads(raw_payload)
+            except Exception:
+                raw_payload = {}
+        accession = raw_payload.get("accn") or fact.source_filing or None
+        form = raw_payload.get("form")
+        filed_at = raw_payload.get("filed")
+        period_start = fact.period_start.isoformat() if fact.period_start else None
+        period_end = fact.period_end.isoformat() if fact.period_end else None
+        sec_url, archive_url = _build_filing_urls(accession, getattr(fact, "cik", None))
+        items.append(
+            FilingFact(
+                ticker=fact.ticker,
+                metric=fact.metric,
+                value=fact.value,
+                unit=fact.unit,
+                fiscal_year=fact.fiscal_year,
+                fiscal_period=fact.fiscal_period,
+                period=fact.period,
+                source=fact.source,
+                source_filing=fact.source_filing,
+                accession=accession,
+                form=form,
+                filed_at=filed_at,
+                period_start=period_start,
+                period_end=period_end,
+                adjusted=fact.adjusted,
+                adjustment_note=fact.adjustment_note,
+                sec_url=sec_url,
+                archive_url=archive_url,
+            )
+        )
+
+    summary = FilingFactsSummary(
+        count=len(items),
+        fiscal_years=sorted(
+            {item.fiscal_year for item in items if item.fiscal_year is not None}, reverse=True
+        ),
+        metrics=sorted({item.metric for item in items if item.metric}),
+    )
+
+    return FilingFactsResponse(ticker=ticker_clean, items=items, summary=summary)
 
 
 @app.get("/audit", response_model=AuditEventResponse)

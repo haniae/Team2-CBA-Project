@@ -66,6 +66,8 @@ class FinancialFactRecord:
     adjusted: bool
     adjustment_note: Optional[str]
     ingested_at: Optional[datetime]
+    cik: Optional[str] = None
+    raw: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -630,8 +632,8 @@ def fetch_financial_facts(
 ) -> List[FinancialFactRecord]:
     """Stream financial facts filtered by ticker/year/metric."""
     sql = [
-        "SELECT metric, fiscal_year, fiscal_period, period, value, unit, source,",
-        "       source_filing, period_start, period_end, adjusted, adjustment_note, ingested_at",
+        "SELECT cik, metric, fiscal_year, fiscal_period, period, value, unit, source,",
+        "       source_filing, period_start, period_end, adjusted, adjustment_note, ingested_at, raw",
         "FROM financial_facts",
         "WHERE ticker = ?",
     ]
@@ -656,6 +658,8 @@ def fetch_financial_facts(
 
     records: List[FinancialFactRecord] = []
     for row in rows:
+        raw_payload = row["raw"]
+        raw_data = json.loads(raw_payload) if raw_payload else None
         records.append(
             FinancialFactRecord(
                 ticker=_normalize_ticker(ticker),
@@ -672,6 +676,8 @@ def fetch_financial_facts(
                 adjusted=bool(row["adjusted"]),
                 adjustment_note=row["adjustment_note"],
                 ingested_at=_parse_dt(row["ingested_at"]),
+                cik=row["cik"],
+                raw=raw_data,
             )
         )
     return records

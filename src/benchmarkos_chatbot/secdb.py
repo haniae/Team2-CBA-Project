@@ -181,7 +181,8 @@ class SecPostgresStore:
                    f.period_start,
                    f.period_end,
                    f.accn,
-                   f.taxonomy
+                   f.taxonomy,
+                   tc.cik
             FROM {schema}.facts AS f
             JOIN {schema}.ticker_cik AS tc
               ON tc.cik = f.cik
@@ -208,6 +209,14 @@ class SecPostgresStore:
             period_end = _to_datetime(row.get("period_end"))
             form = (row.get("form") or "")
             taxonomy = (row.get("taxonomy") or "").lower()
+            accession = row.get("accn")
+            raw_payload = {
+                "accn": accession,
+                "form": form or None,
+                "filed": filed.isoformat() if filed else None,
+                "fy": fiscal_year_row,
+                "fp": fiscal_period,
+            }
             records.append(
                 FinancialFactRecord(
                     ticker=ticker.upper(),
@@ -224,6 +233,8 @@ class SecPostgresStore:
                     adjusted=form.endswith("/A"),
                     adjustment_note=form or None,
                     ingested_at=filed,
+                    cik=row.get("cik"),
+                    raw=raw_payload,
                 )
             )
         return records

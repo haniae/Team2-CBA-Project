@@ -273,6 +273,7 @@ _COMMON_WORDS = {
     "VERSUS",
     "PLEASE",
     "SHOW",
+    "ME",
     "TELL",
     "WHAT",
     "HOW",
@@ -286,6 +287,31 @@ _COMMON_WORDS = {
 }
 
 _METRICS_PATTERN = re.compile(r"^metrics(?:(?:\s+for)?\s+)(.+)$", re.IGNORECASE)
+
+FACT_METRIC_ALIASES: Dict[str, str] = {
+    "total revenue": "revenue",
+    "revenue": "revenue",
+    "sales": "revenue",
+    "quarterly revenue": "revenue",
+    "annual revenue": "revenue",
+    "net income": "net_income",
+    "quarterly net income": "net_income",
+    "net earnings": "net_income",
+    "net profit": "net_income",
+    "operating income": "operating_income",
+    "operating profit": "operating_income",
+    "gross profit": "gross_profit",
+    "gross margin": "gross_margin",
+    "earnings per share": "eps",
+    "diluted eps": "eps",
+    "eps": "eps",
+    "free cash flow": "free_cash_flow",
+    "fcf": "free_cash_flow",
+    "ebitda": "ebitda",
+    "adjusted ebitda": "adjusted_ebitda",
+    "operating cash flow": "cash_from_operations",
+    "cash from operations": "cash_from_operations",
+}
 
 
 @dataclass
@@ -410,6 +436,23 @@ class BenchmarkOSChatbot:
 
         return None
 
+    def _detect_fact_metric(self, text: str) -> Optional[str]:
+        """Identify if the prompt references a specific fact metric."""
+        cleaned = re.sub(r"[^a-z0-9\s/.-]", " ", text.lower())
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        if not cleaned:
+            return None
+
+        best_match: Optional[str] = None
+        best_len = -1
+        for alias, canonical in FACT_METRIC_ALIASES.items():
+            if re.search(rf"\b{re.escape(alias)}\b", cleaned):
+                alias_len = len(alias)
+                if alias_len > best_len:
+                    best_match = canonical
+                    best_len = alias_len
+        return best_match
+
     def _normalize_nl_to_command(self, text: str) -> Optional[str]:
         """Turn flexible NL prompts into the strict CLI-style commands this class handles."""
         t = text.strip()
@@ -424,6 +467,118 @@ class BenchmarkOSChatbot:
             if b and b < a:
                 a, b = b, a
             return f"{a}-{b}" if b else f"{a}"
+
+        def _extract_year_phrase(full_text: str) -> Optional[str]:
+            """Handle richer year phrasing such as 'between 2020 and 2022'."""
+            if not full_text:
+                return None
+            current_year = datetime.utcnow().year
+            if re.search(r"\b(this|current)\s+year\b", full_text, re.IGNORECASE):
+                return str(current_year)
+            if re.search(r"\bnext\s+year\b", full_text, re.IGNORECASE):
+                return str(current_year + 1)
+            if re.search(r"\blast\s+year\b", full_text, re.IGNORECASE):
+                return str(current_year - 1)
+            if re.search(r"\blast\s+fiscal\s+year\b", full_text, re.IGNORECASE):
+                return str(current_year - 1)
+            patterns = [
+                r"(?:between|from)\s+(?:fy\s*)?(\d{4})\s+(?:and|to|through)\s+(?:fy\s*)?(\d{4})",
+                r"(?:for|during|over)\s+(?:fy\s*)?(\d{4})\s+(?:and|&)\s+(?:fy\s*)?(\d{4})",
+                r"(?:fy\s*)?(\d{4})\s+(?:through|to)\s+(?:fy\s*)?(\d{4})",
+            ]
+            for pattern in patterns:
+                found = re.search(pattern, full_text, re.IGNORECASE)
+                if found:
+                    start = int(found.group(1))
+                    end = int(found.group(2))
+                    if end < start:
+                        start, end = end, start
+                    if start == end:
+                        return f"{start}"
+                    return f"{start}-{end}"
+
+            quarter_match = re.search(
+                r"(?:q[1-4]|quarter\s+[1-4])\s+(?:fy\s*)?(\d{4})", full_text, re.IGNORECASE
+            )
+            if quarter_match:
+                return str(int(quarter_match.group(1)))
+
+            years = [int(y) for y in re.findall(r"(?:fy\s*)?(20\d{2})", full_text, re.IGNORECASE)]
+            unique_years = sorted(set(years))
+            if len(unique_years) >= 2:
+                start, end = unique_years[0], unique_years[-1]
+                if start != end:
+                    return f"{start}-{end}"
+            if unique_years:
+                return str(unique_years[0])
+            return None
+
+        def _extract_quarter_phrase(full_text: str) -> Optional[tuple[int, str]]:
+            if not full_text:
+                return None
+            quarter_words = {
+                "first": "Q1",
+                "1st": "Q1",
+                "second": "Q2",
+                "2nd": "Q2",
+                "third": "Q3",
+                "3rd": "Q3",
+                "fourth": "Q4",
+                "4th": "Q4",
+            }
+
+            match = re.search(
+                r"\bQ([1-4])\s*(?:of\s+)?(?:FY\s*)?(\d{2,4})\b",
+                full_text,
+                re.IGNORECASE,
+            )
+            if match:
+                quarter = f"Q{match.group(1)}"
+                year = int(match.group(2))
+                if year < 100:
+                    year += 2000 if year < 70 else 1900
+                return (year, quarter)
+
+            match = re.search(
+                r"\b(?:FY\s*)?(\d{2,4})\s*Q([1-4])\b",
+                full_text,
+                re.IGNORECASE,
+            )
+            if match:
+                year = int(match.group(1))
+                if year < 100:
+                    year += 2000 if year < 70 else 1900
+                quarter = f"Q{match.group(2)}"
+                return (year, quarter)
+
+            match = re.search(
+                r"\b(first|second|third|fourth|1st|2nd|3rd|4th)\s+quarter\s+(?:of\s+)?(?:FY\s*)?(\d{2,4})\b",
+                full_text,
+                re.IGNORECASE,
+            )
+            if match:
+                quarter = quarter_words[match.group(1).lower()]
+                year = int(match.group(2))
+                if year < 100:
+                    year += 2000 if year < 70 else 1900
+                return (year, quarter)
+
+            return None
+
+        def _resolve_company_phrase(phrase: str) -> Optional[str]:
+            cleaned_phrase = re.sub(r"[\u2019']", " ", phrase)
+            tokens = [tok for tok in re.split(r"\s+", cleaned_phrase.strip()) if tok]
+            if not tokens:
+                return None
+            n = len(tokens)
+            for length in range(n, 0, -1):
+                for start in range(0, n - length + 1):
+                    candidate_tokens = tokens[start : start + length]
+                    candidate = " ".join(candidate_tokens)
+                    ticker = self._name_to_ticker(candidate)
+                    if ticker:
+                        return ticker.upper()
+            return None
 
         def _split_entities(value: str) -> List[str]:
             s = value.strip().strip(",")
@@ -479,6 +634,67 @@ class BenchmarkOSChatbot:
             "cagr",
         }
 
+        range_match = re.search(
+            r"(?P<company>[\w&'.-]+(?:\s+[\w&'.-]+){0,3})(?:['’]s)?\s+(?P<metric>[\w/&\-\s]+?)\s+(?:between|from)\s+(?:fy\s*)?(?P<start>\d{4})\s+(?:and|to|through)\s+(?:fy\s*)?(?P<end>\d{4})",
+            t,
+            re.IGNORECASE,
+        )
+        handled_direct = False
+        if range_match:
+            company_phrase = range_match.group("company")
+            metric_phrase = range_match.group("metric").strip()
+            start_year = int(range_match.group("start"))
+            end_year = int(range_match.group("end"))
+            if end_year < start_year:
+                start_year, end_year = end_year, start_year
+            resolved_ticker_for_range = _resolve_company_phrase(company_phrase)
+            if resolved_ticker_for_range:
+                metric_key = self._detect_fact_metric(metric_phrase) or "revenue"
+                handled_direct = True
+                return " ".join(["fact-range", resolved_ticker_for_range, f"{start_year}-{end_year}", metric_key])
+
+        if not handled_direct:
+            year_token = re.search(
+                r"(?:fy\s*)?(?P<year>\d{4})(?:\s*(?:q|quarter)\s*(?P<quarter>[1-4]))?",
+                t,
+                re.IGNORECASE,
+            )
+            if year_token:
+                year = year_token.group("year")
+                quarter = year_token.group("quarter")
+                pre_text = t[: year_token.start()]
+                post_text = t[year_token.end() :]
+
+                company_phrase_candidates = [
+                    " ".join(pre_text.split()[-6:]),
+                    " ".join(t.split()[:6]),
+                ]
+                resolved_ticker = None
+                for candidate in company_phrase_candidates:
+                    if not candidate:
+                        continue
+                    resolved_ticker = _resolve_company_phrase(candidate)
+                    if resolved_ticker:
+                        break
+
+                if resolved_ticker:
+                    metric_candidates = [
+                        " ".join(post_text.split()[:6]),
+                        " ".join(pre_text.split()[-6:]),
+                    ]
+                    metric_key = None
+                    for candidate in metric_candidates:
+                        if not candidate:
+                            continue
+                        metric_key = self._detect_fact_metric(candidate)
+                        if metric_key:
+                            break
+                    if not metric_key:
+                        metric_key = "revenue"
+
+                    period_token = f"{year}Q{quarter}" if quarter else year
+                    return " ".join(["fact", resolved_ticker, period_token, metric_key])
+
         if not any(lower.startswith(prefix) for prefix in skip_prefixes):
             detected_entities = self._detect_tickers(text)
 
@@ -519,6 +735,35 @@ class BenchmarkOSChatbot:
                     re.IGNORECASE,
                 )
                 period_token = _canon_year_span(span_match.group(0)) if span_match else None
+                if not period_token:
+                    period_token = _extract_year_phrase(t)
+
+                if (
+                    fact_metric
+                    and period_token
+                    and "-" in period_token
+                    and len(ordered_subjects) == 1
+                ):
+                    return " ".join(["fact-range", ordered_subjects[0], period_token, fact_metric])
+
+                quarter_info = _extract_quarter_phrase(t)
+                quarter_token: Optional[str] = None
+                if quarter_info:
+                    quarter_year, quarter_label = quarter_info
+                    period_token = period_token or str(quarter_year)
+                    quarter_token = f"{quarter_year}{quarter_label}"
+
+                fact_metric = self._detect_fact_metric(t)
+                if (
+                    fact_metric
+                    and period_token
+                    and "-" not in period_token
+                    and len(ordered_subjects) == 1
+                ):
+                    year_token = period_token.split("-", 1)[0]
+                    if quarter_token:
+                        return " ".join(["fact", ordered_subjects[0], quarter_token, fact_metric])
+                    return " ".join(["fact", ordered_subjects[0], year_token, fact_metric])
 
                 compare_triggers = bool(
                     re.search(r"\b(compare|versus|vs\.?|against|between|relative)\b", lower)
@@ -701,6 +946,9 @@ class BenchmarkOSChatbot:
         if lowered.startswith("fact "):
             return self._handle_fact_command(text)
 
+        if lowered.startswith("fact-range "):
+            return self._handle_fact_range_command(text)
+
         if lowered.startswith("audit "):
             return self._handle_audit_command(text)
 
@@ -821,18 +1069,27 @@ class BenchmarkOSChatbot:
     # ----------------------------------------------------------------------------------
     def _handle_fact_command(self, text: str) -> str:
         """Return detailed fact rows for the requested ticker/year."""
-        match = re.match(r"fact\s+([A-Za-z0-9.-]+)\s+(?:FY)?(\d{4})(?:\s+([A-Za-z0-9_]+))?", text, re.IGNORECASE)
+        match = re.match(
+            r"fact\s+([A-Za-z0-9.-]+)\s+(?:FY)?(\d{4})(?:\s*Q([1-4]))?(?:\s+([A-Za-z0-9_]+))?",
+            text,
+            re.IGNORECASE,
+        )
         if not match:
-            return "Usage: fact <TICKER> <YEAR> [metric]"
+            return "Usage: fact <TICKER> <YEAR>[Q#] [metric]"
         raw_ticker = match.group(1).upper()
         fiscal_year = int(match.group(2))
-        metric = match.group(3)
+        quarter_token = match.group(3)
+        quarter_label = f"Q{quarter_token}" if quarter_token else None
+        metric = match.group(4)
         metric_key = metric.lower() if metric else None
 
         resolution = self._resolve_tickers([raw_ticker])
         if resolution.missing and not resolution.available:
             return self._format_missing_message([raw_ticker], [])
         ticker = resolution.available[0] if resolution.available else raw_ticker
+        resolved_note = None
+        if resolution.available and raw_ticker not in resolution.available and ticker != raw_ticker:
+            resolved_note = f"(resolved {raw_ticker} to {ticker})"
 
         facts = self.analytics_engine.financial_facts(
             ticker=ticker,
@@ -840,19 +1097,45 @@ class BenchmarkOSChatbot:
             metric=metric_key,
             limit=20,
         )
+        if metric_key:
+            facts = [fact for fact in facts if fact.metric.lower() == metric_key]
+        if quarter_label:
+            quarter_upper = quarter_label.upper()
+            facts = [
+                fact
+                for fact in facts
+                if (
+                    (fact.fiscal_period and quarter_upper in fact.fiscal_period.upper())
+                    or (fact.period and quarter_upper in fact.period.upper())
+                )
+            ]
         if not facts:
             if metric_key:
+                if quarter_label:
+                    return (
+                        f"No {metric_key} facts stored for {ticker} in FY{fiscal_year} {quarter_label}."
+                    )
                 return (
                     f"No {metric_key} facts stored for {ticker} in FY{fiscal_year}."
                 )
+            if quarter_label:
+                return f"No financial facts stored for {ticker} in FY{fiscal_year} {quarter_label}."
             return f"No financial facts stored for {ticker} in FY{fiscal_year}."
 
         title_metric = metric_key.replace('_', ' ') if metric_key else 'financial facts'
-        lines_out = [f"{title_metric.title()} for {ticker} FY{fiscal_year}:"]
+        heading = f"{title_metric.title()} for {ticker} FY{fiscal_year}"
+        if quarter_label:
+            heading += f" {quarter_label}"
+        if resolved_note:
+            heading += f" {resolved_note}"
+        lines_out = [heading + ":"]
         for fact in facts:
             label = fact.metric.replace('_', ' ')
             value_text = self._format_fact_value(fact.value)
             parts = [f"source={fact.source}"]
+            period_hint = fact.period or fact.fiscal_period
+            if period_hint:
+                parts.append(f"period={period_hint}")
             if fact.adjusted:
                 parts.append("adjusted")
             if fact.adjustment_note:
@@ -860,6 +1143,68 @@ class BenchmarkOSChatbot:
             detail = ", ".join(parts)
             lines_out.append(f"- {label}: {value_text} ({detail})")
         return "\n".join(lines_out)
+
+    def _handle_fact_range_command(self, text: str) -> str:
+        """Return year-over-year fact series for a ticker."""
+        match = re.match(
+            r"fact-range\s+([A-Za-z0-9.-]+)\s+(\d{4})-(\d{4})(?:\s+([A-Za-z0-9_]+))?",
+            text,
+            re.IGNORECASE,
+        )
+        if not match:
+            return "Usage: fact-range <TICKER> <START-END> [metric]"
+        raw_ticker = match.group(1).upper()
+        start_year = int(match.group(2))
+        end_year = int(match.group(3))
+        if end_year < start_year:
+            start_year, end_year = end_year, start_year
+        metric = match.group(4) or "revenue"
+        metric_key = metric.lower()
+
+        resolution = self._resolve_tickers([raw_ticker])
+        if resolution.missing and not resolution.available:
+            return self._format_missing_message([raw_ticker], [])
+        ticker = resolution.available[0] if resolution.available else raw_ticker
+        resolved_note = ""
+        if resolution.available and raw_ticker not in resolution.available and ticker != raw_ticker:
+            resolved_note = f" (resolved {raw_ticker} to {ticker})"
+
+        rows: List[tuple[int, Optional[str]]] = []
+        for year in range(start_year, end_year + 1):
+            facts = self.analytics_engine.financial_facts(
+                ticker=ticker,
+                fiscal_year=year,
+                metric=metric_key,
+                limit=20,
+            )
+            if metric_key:
+                facts = [fact for fact in facts if fact.metric.lower() == metric_key]
+            value_display: Optional[str] = None
+            for fact in facts:
+                if fact.fiscal_period and fact.fiscal_period.upper().startswith("Q"):
+                    continue
+                value_display = self._format_fact_value(fact.value)
+                break
+            if value_display is None and facts:
+                value_display = self._format_fact_value(facts[0].value)
+            rows.append((year, value_display))
+
+        if not any(value for _, value in rows):
+            metric_label = metric_key.replace("_", " ")
+            return (
+                f"No {metric_label} facts stored for {ticker} between FY{start_year} and FY{end_year}."
+            )
+
+        metric_label = metric_key.replace('_', ' ')
+        lines = [
+            f"{metric_label.title()} for {ticker} FY{start_year}-{end_year}{resolved_note}:",
+            "Year | Value",
+            "-----|------",
+        ]
+        for year, value in rows:
+            value_display = value if value is not None else "n/a"
+            lines.append(f"{year} | {value_display}")
+        return "\n".join(lines)
 
     def _handle_audit_command(self, text: str) -> str:
         """Summarise audit events for a given ticker."""
@@ -1250,6 +1595,7 @@ class BenchmarkOSChatbot:
             phrase = match.strip()
             if not phrase:
                 continue
+            phrase = re.sub(r"(?:'s|’s)$", "", phrase, flags=re.IGNORECASE).strip()
             if phrase.upper() in _COMMON_WORDS:
                 continue
             ticker = self._name_to_ticker(phrase)

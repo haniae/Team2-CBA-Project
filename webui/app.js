@@ -1028,6 +1028,356 @@ async function renderKpiLibrarySection({ container } = {}) {
 
 
 
+
+
+
+
+async function fetchFilingFacts({ ticker, metric, fiscalYear, startYear, endYear, limit = 250 }) {
+  const params = new URLSearchParams();
+  params.set("ticker", ticker);
+  if (metric) {
+    params.set("metric", metric);
+  }
+  if (typeof fiscalYear === "number" && Number.isFinite(fiscalYear)) {
+    params.set("fiscal_year", String(fiscalYear));
+  }
+  if (typeof startYear === "number" && Number.isFinite(startYear)) {
+    params.set("start_year", String(startYear));
+  }
+  if (typeof endYear === "number" && Number.isFinite(endYear)) {
+    params.set("end_year", String(endYear));
+  }
+  if (limit) {
+    params.set("limit", String(limit));
+  }
+
+  const response = await fetch(`${API_BASE}/filings?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try {
+      const payload = await response.json();
+      if (payload?.detail) {
+        detail = typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail);
+      }
+    } catch (error) {
+      // ignore JSON parsing errors
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+function formatFactValueDisplay(value, unit) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return String(value);
+  }
+  const abs = Math.abs(numeric);
+  let formatted;
+  if (abs >= 1e12) {
+    formatted = `${(numeric / 1e12).toFixed(2)}T`;
+  } else if (abs >= 1e9) {
+    formatted = `${(numeric / 1e9).toFixed(2)}B`;
+  } else if (abs >= 1e6) {
+    formatted = `${(numeric / 1e6).toFixed(2)}M`;
+  } else if (abs >= 1) {
+    formatted = numeric.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  } else if (abs >= 1e3) {
+    formatted = `${(numeric / 1e3).toFixed(2)}K`;
+  } else {
+    formatted = numeric.toPrecision(3);
+  }
+  return unit ? `${formatted} ${unit}` : formatted;
+}
+
+function formatFilingDate(dateString) {
+  if (!dateString) {
+    return "—";
+  }
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+async function renderFilingViewerSection({ container } = {}) {
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="filing-viewer">
+      <section class="filing-viewer__hero">
+        <div class="filing-viewer__badge">FS</div>
+        <div class="filing-viewer__hero-copy">
+          <h3 class="filing-viewer__title">Filing Source Viewer</h3>
+          <p class="filing-viewer__subtitle">
+            Trace capital-market KPIs back to their source filings — built for audit-ready analytics.
+          </p>
+          <div class="filing-viewer__meta">
+            <div class="filing-viewer__meta-item">
+              <span class="filing-viewer__meta-label">Records</span>
+              <span class="filing-viewer__meta-value" data-role="filing-meta-records">—</span>
+            </div>
+            <div class="filing-viewer__meta-item">
+              <span class="filing-viewer__meta-label">Fiscal years</span>
+              <span class="filing-viewer__meta-value" data-role="filing-meta-years">—</span>
+            </div>
+            <div class="filing-viewer__meta-item">
+              <span class="filing-viewer__meta-label">Metrics</span>
+              <span class="filing-viewer__meta-value" data-role="filing-meta-metrics">—</span>
+            </div>
+          </div>
+        </div>
+      </section>
+      <div class="filing-viewer__status" data-role="filing-status" aria-live="polite"></div>
+      <form class="filing-viewer__form" data-role="filing-viewer-form">
+        <div class="filing-viewer__form-group">
+          <label for="filing-viewer-ticker">Ticker</label>
+          <input id="filing-viewer-ticker" name="ticker" type="text" placeholder="e.g. TSLA" required />
+        </div>
+        <div class="filing-viewer__form-group">
+          <label for="filing-viewer-metric">Metric (optional)</label>
+          <input id="filing-viewer-metric" name="metric" type="text" placeholder="e.g. revenue" />
+        </div>
+        <div class="filing-viewer__form-group">
+          <label for="filing-viewer-year">Fiscal year (optional)</label>
+          <input id="filing-viewer-year" name="year" type="number" inputmode="numeric" placeholder="e.g. 2023" />
+        </div>
+        <div class="filing-viewer__form-group">
+          <label for="filing-viewer-start">Start year (range)</label>
+          <input id="filing-viewer-start" name="start" type="number" inputmode="numeric" placeholder="e.g. 2021" />
+        </div>
+        <div class="filing-viewer__form-group">
+          <label for="filing-viewer-end">End year (range)</label>
+          <input id="filing-viewer-end" name="end" type="number" inputmode="numeric" placeholder="e.g. 2023" />
+        </div>
+        <div class="filing-viewer__form-actions">
+          <button type="submit">Fetch filings</button>
+        </div>
+      </form>
+      <div class="filing-viewer__notice">
+        <p>Pull SEC-backed facts to validate every KPI. Supply a ticker, then refine by metric or year.</p>
+      </div>
+      <div class="filing-viewer__table-wrapper">
+        <table class="filing-viewer__table">
+          <thead>
+            <tr>
+              <th scope="col">Metric</th>
+              <th scope="col">Fiscal period</th>
+              <th scope="col">Value</th>
+              <th scope="col">Filing</th>
+              <th scope="col">Source</th>
+            </tr>
+          </thead>
+          <tbody data-role="filing-table-body"></tbody>
+        </table>
+        <p class="filing-viewer__empty hidden" data-role="filing-empty">No filings match your filters yet.</p>
+      </div>
+    </div>
+  `;
+
+  const form = container.querySelector("[data-role='filing-viewer-form']");
+  const tickerInput = container.querySelector("#filing-viewer-ticker");
+  const metricInput = container.querySelector("#filing-viewer-metric");
+  const yearInput = container.querySelector("#filing-viewer-year");
+  const startInput = container.querySelector("#filing-viewer-start");
+  const endInput = container.querySelector("#filing-viewer-end");
+  const statusBox = container.querySelector("[data-role='filing-status']");
+  const metaRecords = container.querySelector("[data-role='filing-meta-records']");
+  const metaYears = container.querySelector("[data-role='filing-meta-years']");
+  const metaMetrics = container.querySelector("[data-role='filing-meta-metrics']");
+  const tableBody = container.querySelector("[data-role='filing-table-body']");
+  const emptyState = container.querySelector("[data-role='filing-empty']");
+  const submitButton = form?.querySelector("button[type='submit']");
+
+  if (tickerInput) {
+    tickerInput.value = "TSLA";
+  }
+  if (startInput) {
+    startInput.value = String(new Date().getFullYear() - 2);
+  }
+  if (endInput) {
+    endInput.value = String(new Date().getFullYear());
+  }
+
+  const resetStatus = () => {
+    if (statusBox) {
+      statusBox.textContent = "";
+      statusBox.classList.remove("error");
+    }
+  };
+
+  const setStatus = (message, tone = "info") => {
+    if (!statusBox) {
+      return;
+    }
+    statusBox.textContent = message;
+    statusBox.classList.toggle("error", tone === "error");
+  };
+
+  const setLoading = (isLoading) => {
+    if (submitButton) {
+      submitButton.disabled = isLoading;
+      submitButton.textContent = isLoading ? "Fetching…" : "Fetch filings";
+    }
+    if (isLoading) {
+      setStatus("Loading filings…", "info");
+    } else {
+      resetStatus();
+    }
+  };
+
+  const renderSummary = (summary) => {
+    if (metaRecords) {
+      metaRecords.textContent = summary && typeof summary.count === "number" ? summary.count.toLocaleString() : "—";
+    }
+    if (metaYears) {
+      metaYears.textContent = summary?.fiscal_years?.length ? summary.fiscal_years.join(", ") : "—";
+    }
+    if (metaMetrics) {
+      metaMetrics.textContent = summary?.metrics?.length ? summary.metrics.join(", ") : "—";
+    }
+  };
+
+  const renderRows = (items) => {
+    if (!tableBody || !emptyState) {
+      return;
+    }
+    tableBody.innerHTML = "";
+    if (!Array.isArray(items) || !items.length) {
+      emptyState.classList.remove("hidden");
+      return;
+    }
+    emptyState.classList.add("hidden");
+    items.forEach((item) => {
+      const row = document.createElement("tr");
+      const valueDisplay = formatFactValueDisplay(item.value, item.unit);
+      const periodText = item.period || [item.fiscal_year, item.fiscal_period].filter(Boolean).join(" ") || "—";
+      const filedText = formatFilingDate(item.filed_at);
+      const links = [];
+      if (item.sec_url) {
+        links.push(`<a href="${item.sec_url}" target="_blank" rel="noopener noreferrer">Inline</a>`);
+      }
+      if (item.archive_url) {
+        links.push(`<a href="${item.archive_url}" target="_blank" rel="noopener noreferrer">Archive</a>`);
+      }
+      const linkHtml = links.length ? `<div class="filing-viewer__links">${links.join(" · ")}</div>` : "";
+      const badges = [];
+      if (item.adjusted) {
+        badges.push('<span class="filing-viewer__badge">Adjusted</span>');
+      }
+      const detailLines = [];
+      if (item.period_start || item.period_end) {
+        detailLines.push(
+          `Period: ${item.period_start ? formatFilingDate(item.period_start) : "?"} → ${item.period_end ? formatFilingDate(item.period_end) : "?"}`
+        );
+      }
+      if (item.adjustment_note) {
+        detailLines.push(`Note: ${item.adjustment_note}`);
+      }
+      row.innerHTML = `
+        <td data-label="Metric">
+          <div class="filing-viewer__metric">${item.metric || "—"}</div>
+          ${badges.join(" ")}
+        </td>
+        <td data-label="Fiscal period">
+          <div>${periodText}</div>
+          ${filedText !== "—" ? `<div class="filing-viewer__filed">Filed ${filedText}</div>` : ""}
+        </td>
+        <td data-label="Value">
+          <div>${valueDisplay}</div>
+        </td>
+        <td data-label="Filing">
+          <div>${item.form || "—"}</div>
+          <div class="filing-viewer__accession">${item.source_filing || item.accession || "—"}</div>
+          ${linkHtml}
+        </td>
+        <td data-label="Source">
+          <div>${item.source || "—"}</div>
+          ${detailLines.length ? `<div class="filing-viewer__details">${detailLines.join("<br />")}</div>` : ""}
+        </td>
+      `;
+      tableBody.append(row);
+    });
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!form || !tickerInput) {
+      return;
+    }
+    resetStatus();
+
+    const ticker = tickerInput.value.trim().toUpperCase();
+    if (!ticker) {
+      setStatus("Ticker is required.", "error");
+      tickerInput.focus();
+      return;
+    }
+
+    const metricValue = metricInput?.value.trim();
+    const yearValue = yearInput?.value.trim();
+    const startValue = startInput?.value.trim();
+    const endValue = endInput?.value.trim();
+
+    const payload = {
+      ticker,
+      metric: metricValue || undefined,
+      fiscalYear: yearValue ? Number(yearValue) : undefined,
+      startYear: startValue ? Number(startValue) : undefined,
+      endYear: endValue ? Number(endValue) : undefined,
+      limit: 250,
+    };
+
+    if (payload.startYear && payload.endYear && payload.startYear > payload.endYear) {
+      const tmp = payload.startYear;
+      payload.startYear = payload.endYear;
+      payload.endYear = tmp;
+      if (startInput) {
+        startInput.value = String(payload.startYear);
+      }
+      if (endInput) {
+        endInput.value = String(payload.endYear);
+      }
+    }
+
+    try {
+      setLoading(true);
+      renderSummary(null);
+      renderRows([]);
+      const data = await fetchFilingFacts(payload);
+      renderSummary(data.summary || null);
+      renderRows(data.items || []);
+      setStatus(`Loaded ${data.summary?.count ?? data.items?.length ?? 0} filings for ${data.ticker}.`, "info");
+    } catch (error) {
+      console.error("Unable to load filing facts:", error);
+      renderSummary(null);
+      renderRows([]);
+      setStatus(error?.message || "Unable to load filings. Please try again.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (form) {
+    form.addEventListener("submit", handleSubmit);
+    window.queueMicrotask(() => {
+      if (tickerInput) {
+        tickerInput.focus();
+      }
+      form.requestSubmit();
+    });
+  } else if (tickerInput) {
+    window.queueMicrotask(() => tickerInput.focus());
+  }
+}
 let isSending = false;
 let conversations = loadStoredConversations();
 let activeConversation = null;
@@ -1051,15 +1401,8 @@ const UTILITY_SECTIONS = {
   },
   "filing-viewer": {
     title: "Filing Source Viewer",
-    html: `
-      <p>Trace every data point back to its original SEC filing.</p>
-      <ul>
-        <li>View raw lines extracted from 10-K and 10-Q filings alongside their accession numbers.</li>
-        <li>Jump straight to the SEC document to reconcile figures with the official report.</li>
-        <li>Build an audit trail per KPI to guarantee transparency and compliance.</li>
-      </ul>
-      <p class="panel-note">Tip: try “audit TSLA 2023” to inspect the most recent pipeline run.</p>
-    `,
+    html: `<div class="filing-viewer" data-role="filing-viewer-root"></div>`,
+    render: renderFilingViewerSection,
   },
   projects: {
     title: "Projects",
@@ -2531,7 +2874,7 @@ function openUtilityPanel(key) {
     }
   }
   setActiveNav(`open-${key}`);
-  if (["help", "kpi-library", "company-universe"].includes(key)) {
+  if (["help", "kpi-library", "company-universe", "filing-viewer"].includes(key)) {
     if (chatPanel) {
       chatPanel.classList.add("chat-panel--collapsed");
     }
@@ -3204,6 +3547,9 @@ setInterval(checkHealth, 30000);
 
 loadHelpContentOverrides();
 
-chatInput.focus();
+if (chatInput) {
+  chatInput.focus();
+}
+
 
 
