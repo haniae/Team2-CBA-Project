@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
-from pathlib import Path
 import json
 import uuid
 from datetime import datetime
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -105,6 +105,7 @@ class FilingFact(BaseModel):
     adjustment_note: Optional[str]
     sec_url: Optional[str]
     archive_url: Optional[str]
+    search_url: Optional[str]
 
 
 class FilingFactsSummary(BaseModel):
@@ -150,6 +151,31 @@ def build_bot(conversation_id: Optional[str] = None) -> BenchmarkOSChatbot:
                 {"role": msg.role, "content": msg.content} for msg in history
             ]
     return bot
+
+
+def _normalise_ticker_symbol(value: str) -> str:
+    """Return canonical ticker form used by the datastore (share classes -> dash)."""
+    symbol = (value or "").strip().upper()
+    return symbol.replace(".", "-")
+
+
+def _ticker_variants(value: str) -> List[str]:
+    """Return canonical ticker plus fallbacks for legacy dot-form symbols."""
+    original = (value or "").strip().upper()
+    primary = _normalise_ticker_symbol(value)
+    dotted = primary.replace("-", ".")
+    variants: List[str] = []
+    for candidate in (primary, original, dotted):
+        if candidate and candidate not in variants:
+            variants.append(candidate)
+    return variants
+
+
+def _display_ticker_symbol(symbol: str) -> str:
+    """Convert canonical datastore ticker to a UI-friendly representation."""
+    if "-" in symbol:
+        return symbol.replace("-", ".")
+    return symbol
 
 
 # ----- Routes -----------------------------------------------------------------
@@ -248,19 +274,39 @@ def _summarise_period(spans: Iterable[Tuple[int, int]]) -> str:
     return f"FY{start}" if start == end else f"FY{start}-FY{end}"
 
 
-def _build_filing_urls(accession: Optional[str], cik: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
-    """Generate viewer and archive URLs for a filing accession."""
+def _build_filing_urls(
+    accession: Optional[str], cik: Optional[str]
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """Generate interactive, detail, and fallback search URLs for a filing accession."""
     if not accession:
-        return None, None
-    ix_url = f"https://www.sec.gov/ixviewer/doc?action=fetch&accn={accession}"
-    archive_url = None
+        return None, None, None
+
+    search_url = None
+    interactive_url = None
+    detail_url = None
+
     if cik:
         clean_cik = cik.lstrip("0") or cik
         acc_no_dash = accession.replace("-", "")
-        archive_url = (
-            f"https://www.sec.gov/Archives/edgar/data/{clean_cik}/{acc_no_dash}/{acc_no_dash}-index.html"
+        interactive_url = (
+            "https://www.sec.gov/cgi-bin/viewer"
+            f"?action=view&cik={clean_cik}&accession_number={accession}&xbrl_type=v"
         )
-    return ix_url, archive_url
+        detail_url = (
+            f"https://www.sec.gov/Archives/edgar/data/{clean_cik}/{acc_no_dash}/{accession}-index.html"
+        )
+        search_url = (
+            f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={clean_cik}"
+        )
+    else:
+        # Fall back to accession-based browse search
+        base = accession.split("-")[0]
+        if base:
+            search_url = (
+                f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={base}"
+            )
+
+    return interactive_url, detail_url, search_url
 
 
 @app.get("/metrics", response_model=List[MetricsResponse])
@@ -270,7 +316,11 @@ def metrics(
     end_year: Optional[int] = Query(None),
 ) -> List[MetricsResponse]:
     """Return latest metric snapshots for one or more tickers."""
-    ticker_list = [ticker.strip().upper() for ticker in tickers.split(",") if ticker]
+    ticker_list = [
+        _normalise_ticker_symbol(ticker)
+        for ticker in tickers.split(",")
+        if ticker and ticker.strip()
+    ]
     if not ticker_list:
         raise HTTPException(status_code=400, detail="At least one ticker required.")
 
@@ -290,7 +340,8 @@ def metrics(
         records = engine.get_metrics(ticker, period_filters=period_filters)
         if not records:
             raise HTTPException(
-                status_code=404, detail=f"No metrics available for ticker {ticker}.",
+                status_code=404,
+                detail=f"No metrics available for ticker {_display_ticker_symbol(ticker)}.",
             )
         chosen = _select_latest_records(records, span_fn=engine._period_span)
         descriptor = _summarise_period(
@@ -298,7 +349,7 @@ def metrics(
         )
         responses.append(
             MetricsResponse(
-                ticker=ticker,
+                ticker=_display_ticker_symbol(ticker),
                 metrics={metric: rec.value for metric, rec in chosen.items()},
                 period=descriptor,
             )
@@ -318,8 +369,7 @@ def compare(
     Compare metrics across tickers using the AnalyticsEngine.
     Returns JSON: { tickers: [...], comparison: {metric -> {period -> {ticker -> value}}} }
     """
-    # normalize
-    tickers = [t.strip().upper() for t in tickers if t and t.strip()]
+    tickers = [_normalise_ticker_symbol(t) for t in tickers if t and t.strip()]
     if len(tickers) < 2:
         raise HTTPException(status_code=400, detail="Provide at least two tickers.")
 
@@ -347,7 +397,10 @@ def compare(
     if missing:
         raise HTTPException(
             status_code=400,
-            detail={"error": "Missing metrics for some tickers", "missing": missing},
+            detail={
+                "error": "Missing metrics for some tickers",
+                "missing": [_display_ticker_symbol(t) for t in missing],
+            },
         )
 
     display_tickers = list(tickers)
@@ -391,7 +444,19 @@ def compare(
     # sorted keys for stable UI rendering
     result = {m: dict(sorted(pmap.items())) for m, pmap in sorted(result.items())}
 
-    return {"tickers": display_tickers, "comparison": result}
+    display_map = {ticker: _display_ticker_symbol(ticker) for ticker in display_tickers}
+    display_tickers = [display_map[ticker] for ticker in display_tickers]
+
+    comparison: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    for metric, period_map in result.items():
+        remapped: Dict[str, Dict[str, Any]] = {}
+        for period, values in period_map.items():
+            remapped[period] = {
+                display_map.get(ticker, ticker): value for ticker, value in values.items()
+            }
+        comparison[metric] = remapped
+
+    return {"tickers": display_tickers, "comparison": comparison}
 
 
 @app.get("/facts", response_model=FactsResponse)
@@ -402,8 +467,10 @@ def facts(
 ) -> FactsResponse:
     """Expose detailed financial fact rows from the analytics store."""
     engine = get_engine()
+    ticker_clean = _normalise_ticker_symbol(ticker)
+    requested = (ticker or "").strip().upper() or ticker_clean
     facts = engine.financial_facts(
-        ticker=ticker.upper(),
+        ticker=ticker_clean,
         fiscal_year=fiscal_year,
         metric=metric.lower() if metric else None,
         limit=100,
@@ -411,7 +478,7 @@ def facts(
     if not facts:
         raise HTTPException(
             status_code=404,
-            detail=f"No financial facts for {ticker.upper()} in FY{fiscal_year}.",
+            detail=f"No financial facts for {requested} in FY{fiscal_year}.",
         )
     items = [
         {
@@ -424,7 +491,8 @@ def facts(
         }
         for fact in facts
     ]
-    return FactsResponse(ticker=ticker.upper(), fiscal_year=fiscal_year, items=items)
+    response_ticker = requested or _display_ticker_symbol(ticker_clean)
+    return FactsResponse(ticker=response_ticker, fiscal_year=fiscal_year, items=items)
 
 
 @app.get("/filings", response_model=FilingFactsResponse)
@@ -437,10 +505,6 @@ def filing_sources(
     limit: int = Query(250, ge=1, le=1000),
 ) -> FilingFactsResponse:
     """Return fact rows with filing metadata for the filing source viewer."""
-    ticker_clean = ticker.strip().upper()
-    if not ticker_clean:
-        raise HTTPException(status_code=400, detail="Ticker is required.")
-
     if (start_year is not None or end_year is not None) and fiscal_year is not None:
         raise HTTPException(
             status_code=400,
@@ -464,29 +528,40 @@ def filing_sources(
         years_to_fetch = [None]
 
     engine = get_engine()
+    variants = _ticker_variants(ticker)
+    if not variants:
+        raise HTTPException(status_code=400, detail="Ticker is required.")
     metric_key = None
     if metric:
         metric_key = metric.strip().lower().replace(" ", "_")
 
     collected: List[database.FinancialFactRecord] = []
-    for year in years_to_fetch:
-        try:
-            collected.extend(
-                engine.financial_facts(
-                    ticker=ticker_clean,
-                    fiscal_year=year,
-                    metric=metric_key,
-                    limit=(limit if year is None else None),
+    canonical_symbol: Optional[str] = None
+    for symbol in variants:
+        symbol_collected: List[database.FinancialFactRecord] = []
+        for year in years_to_fetch:
+            try:
+                symbol_collected.extend(
+                    engine.financial_facts(
+                        ticker=symbol,
+                        fiscal_year=year,
+                        metric=metric_key,
+                        limit=(limit if year is None else None),
+                    )
                 )
-            )
-        except Exception as exc:  # pragma: no cover - defensive guard
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+            except Exception as exc:  # pragma: no cover - defensive guard
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+        if symbol_collected:
+            collected = symbol_collected
+            canonical_symbol = symbol
+            break
 
     if not collected:
         raise HTTPException(
             status_code=404,
-            detail=f"No filings found for {ticker_clean}.",
+            detail=f"No filings found for {_display_ticker_symbol(variants[0])}.",
         )
+    ticker_clean = canonical_symbol or variants[0]
 
     def _sort_key(fact: database.FinancialFactRecord) -> Tuple[int, str, str]:
         year = fact.fiscal_year if fact.fiscal_year is not None else -1
@@ -511,7 +586,7 @@ def filing_sources(
         filed_at = raw_payload.get("filed")
         period_start = fact.period_start.isoformat() if fact.period_start else None
         period_end = fact.period_end.isoformat() if fact.period_end else None
-        sec_url, archive_url = _build_filing_urls(accession, getattr(fact, "cik", None))
+        sec_url, archive_url, search_url = _build_filing_urls(accession, getattr(fact, "cik", None))
         items.append(
             FilingFact(
                 ticker=fact.ticker,
@@ -532,6 +607,7 @@ def filing_sources(
                 adjustment_note=fact.adjustment_note,
                 sec_url=sec_url,
                 archive_url=archive_url,
+                search_url=search_url,
             )
         )
 
@@ -543,7 +619,8 @@ def filing_sources(
         metrics=sorted({item.metric for item in items if item.metric}),
     )
 
-    return FilingFactsResponse(ticker=ticker_clean, items=items, summary=summary)
+    display_symbol = _display_ticker_symbol(ticker_clean)
+    return FilingFactsResponse(ticker=display_symbol, items=items, summary=summary)
 
 
 @app.get("/audit", response_model=AuditEventResponse)
@@ -553,11 +630,18 @@ def audit(
 ) -> AuditEventResponse:
     """Return recorded audit trail events for a ticker."""
     engine = get_engine()
-    events = engine.audit_events(ticker.upper(), fiscal_year=fiscal_year, limit=20)
+    requested = (ticker or "").strip().upper()
+    events = None
+    canonical = None
+    for symbol in _ticker_variants(ticker):
+        events = engine.audit_events(symbol, fiscal_year=fiscal_year, limit=20)
+        if events:
+            canonical = symbol
+            break
     if not events:
         raise HTTPException(
             status_code=404,
-            detail=f"No audit events recorded for {ticker.upper()}.",
+            detail=f"No audit events recorded for {requested or _display_ticker_symbol(_normalise_ticker_symbol(ticker))}.",
         )
     payload = [
         {
@@ -569,4 +653,6 @@ def audit(
         }
         for event in events
     ]
-    return AuditEventResponse(ticker=ticker.upper(), events=payload)
+    display_symbol = requested or _display_ticker_symbol(canonical or _normalise_ticker_symbol(ticker))
+    return AuditEventResponse(ticker=display_symbol, events=payload)
+

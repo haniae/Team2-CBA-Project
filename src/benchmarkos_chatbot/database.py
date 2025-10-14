@@ -1064,9 +1064,6 @@ def lookup_ticker(
         if row:
             return row["ticker"]
 
-    return None
-
-
 def replace_metric_snapshots(
     database_path: Path,
     records: Sequence[MetricRecord],

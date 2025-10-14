@@ -19,6 +19,19 @@ if TYPE_CHECKING:  # pragma: no cover
 
 LOGGER = logging.getLogger(__name__)
 
+_MANUAL_CIK_OVERRIDES: Dict[str, str] = {
+    # SEC ticker list occasionally omits WBA; provide a known-good override.
+    "WBA": "0001618921",
+}
+
+
+def _normalise_ticker_symbol(value: str) -> str:
+    """Return the canonical ticker format used when talking to EDGAR."""
+    symbol = (value or "").strip().upper()
+    # EDGAR represents share classes using a dash (e.g., BRK-B), whereas frontends
+    # often use a dot. Normalise to the dash form for consistent lookups.
+    return symbol.replace(".", "-")
+
 
 @dataclass(frozen=True)
 class FilingRecord:
@@ -402,11 +415,14 @@ class EdgarClient:
 
     def cik_for_ticker(self, ticker: str) -> str:
         """Lookup the CIK for a supplied ticker symbol."""
+        symbol = _normalise_ticker_symbol(ticker)
         mapping = self.ticker_map()
-        try:
-            return mapping[ticker.upper()]
-        except KeyError as exc:
-            raise KeyError(f"Ticker {ticker} not recognised by EDGAR") from exc
+        if symbol in mapping:
+            return mapping[symbol]
+        override = _MANUAL_CIK_OVERRIDES.get(symbol)
+        if override:
+            return override
+        raise KeyError(f"Ticker {ticker} (normalised to {symbol}) not recognised by EDGAR")
 
     def company_submissions(self, cik: str) -> Mapping[str, Any]:
         """Fetch the list of recent SEC submissions for a company."""
@@ -434,7 +450,8 @@ class EdgarClient:
         limit: int = 50,
     ) -> List[FilingRecord]:
         """Yield filing metadata for tickers over a time range."""
-        cik = self.cik_for_ticker(ticker)
+        symbol = _normalise_ticker_symbol(ticker)
+        cik = self.cik_for_ticker(symbol)
         data = self.company_submissions(cik)
         recent = data.get("filings", {}).get("recent", {})
         filings: List[FilingRecord] = []
@@ -448,7 +465,7 @@ class EdgarClient:
             filings.append(
                 FilingRecord(
                     cik=cik,
-                    ticker=ticker.upper(),
+                    ticker=symbol,
                     accession_number=str(accession),
                     form_type=str(form),
                     filed_at=_parse_datetime(filed) or datetime.now(timezone.utc),
@@ -472,11 +489,12 @@ class EdgarClient:
         years: int = 10,
     ) -> List[FinancialFact]:
         """Yield raw fact entries for a company and metric set."""
-        cik = self.cik_for_ticker(ticker)
+        symbol = _normalise_ticker_symbol(ticker)
+        cik = self.cik_for_ticker(symbol)
         payload = self.company_facts(cik)
         entity_name = payload.get("entityName")
         if not isinstance(entity_name, str) or not entity_name.strip():
-            entity_name = ticker.upper()
+            entity_name = symbol
         taxonomy_map = payload.get("facts", {})
         cutoff_year = datetime.now(timezone.utc).year - years + 1
         concept_filter = set(concepts) if concepts else None
@@ -549,7 +567,7 @@ class EdgarClient:
                             score,
                             FinancialFact(
                                 cik=cik,
-                                ticker=ticker.upper(),
+                                ticker=symbol,
                                 company_name=entity_name,
                                 metric=metric_name,
                                 fiscal_year=fiscal_year,
