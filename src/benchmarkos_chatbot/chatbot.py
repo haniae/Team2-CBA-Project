@@ -5,17 +5,19 @@ from __future__ import annotations
 # High-level conversation orchestrator: parses intents, calls the analytics engine, handles
 # ingestion commands, and falls back to the configured language model. Used by CLI and web UI.
 
-import re
+import copy
 import json
 import logging
+import re
+import time
 import uuid
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from difflib import SequenceMatcher
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 import unicodedata
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import requests
 
@@ -28,6 +30,27 @@ from .llm_client import LLMClient, build_llm_client
 from .table_renderer import METRIC_DEFINITIONS, render_table_command
 
 LOGGER = logging.getLogger(__name__)
+
+POPULAR_TICKERS: Sequence[str] = (
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "TSLA",
+    "NVDA",
+    "META",
+    "JPM",
+    "GS",
+)
+
+
+@dataclass
+class _CachedReply:
+    """Cached assistant response for prompt reuse."""
+
+    reply: str
+    structured: Dict[str, Any]
+    created_at: float
 
 # --------------------------------------------------------------------------------------
 # Company name → ticker resolver built from SEC company_tickers.json + local aliases
@@ -382,6 +405,13 @@ SYSTEM_PROMPT = (
 class BenchmarkOSChatbot:
     """High-level interface wrapping the entire chatbot pipeline."""
 
+    _MAX_CACHE_ENTRIES = 32
+    _REPLY_CACHE_TTL_SECONDS = 300.0
+    _CONTEXT_CACHE_TTL_SECONDS = 180.0
+    _METRICS_CACHE_TTL_SECONDS = 300.0
+    _SUMMARY_CACHE_TTL_SECONDS = 600.0
+    _MAX_HISTORY_MESSAGES = 12
+
     settings: Settings
     llm_client: LLMClient
     analytics_engine: AnalyticsEngine
@@ -391,6 +421,10 @@ class BenchmarkOSChatbot:
     name_index: _CompanyNameIndex = field(default_factory=_CompanyNameIndex)
     ticker_sector_map: Dict[str, Dict[str, Optional[str]]] = field(default_factory=dict)
     last_structured_response: Dict[str, Any] = field(default_factory=dict, init=False)
+    _reply_cache: "OrderedDict[str, _CachedReply]" = field(default_factory=OrderedDict, init=False, repr=False)
+    _context_cache: "OrderedDict[str, Tuple[str, float]]" = field(default_factory=OrderedDict, init=False, repr=False)
+    _metrics_cache: "OrderedDict[Tuple[str, Tuple[Tuple[int, int], ...]], Tuple[List[database.MetricRecord], float]]" = field(default_factory=OrderedDict, init=False, repr=False)
+    _summary_cache: "OrderedDict[str, Tuple[str, float]]" = field(default_factory=OrderedDict, init=False, repr=False)
 
     def __post_init__(self) -> None:
         """Initialise mutable response state containers."""
@@ -406,6 +440,217 @@ class BenchmarkOSChatbot:
             "exports": [],
             "conclusion": "",
         }
+
+    @staticmethod
+    def _current_time() -> float:
+        """Return a monotonic timestamp for cache expiry bookkeeping."""
+        return time.monotonic()
+
+    @staticmethod
+    def _canonical_prompt(original: str, normalized: Optional[str]) -> str:
+        """Normalise prompts so cache lookups remain stable."""
+        candidate = normalized if normalized else original
+        return " ".join(candidate.strip().split()).lower()
+
+    @staticmethod
+    def _should_cache_prompt(prompt: str) -> bool:
+        """Decide whether a prompt is safe to reuse across requests."""
+        lowered = prompt.strip().lower()
+        if not lowered:
+            return False
+        allowed_prefixes = (
+            "compare",
+            "fact",
+            "fact-range",
+            "table",
+            "scenario",
+            "metric",
+            "summary",
+            "snapshot",
+            "overview",
+            "help",
+        )
+        if not any(lowered.startswith(prefix) for prefix in allowed_prefixes):
+            return False
+        skip_prefixes = (
+            "ingest",
+            "ingest status",
+            "audit",
+            "update ",
+            "refresh ",
+        )
+        return not any(lowered.startswith(prefix) for prefix in skip_prefixes)
+
+    def _get_cached_reply(self, key: str) -> Optional[_CachedReply]:
+        """Return a cached reply if still fresh."""
+        entry = self._reply_cache.get(key)
+        if not entry:
+            return None
+        if self._current_time() - entry.created_at > self._REPLY_CACHE_TTL_SECONDS:
+            self._reply_cache.pop(key, None)
+            return None
+        self._reply_cache.move_to_end(key)
+        return entry
+
+    def _store_cached_reply(self, key: str, reply: str) -> None:
+        """Persist a reply for quick re-use."""
+        snapshot = copy.deepcopy(self.last_structured_response)
+        self._reply_cache[key] = _CachedReply(
+            reply=reply,
+            structured=snapshot,
+            created_at=self._current_time(),
+        )
+        self._reply_cache.move_to_end(key)
+        while len(self._reply_cache) > self._MAX_CACHE_ENTRIES:
+            self._reply_cache.popitem(last=False)
+
+    def _get_cached_context(self, key: str) -> Optional[str]:
+        """Return cached RAG context if available."""
+        entry = self._context_cache.get(key)
+        if not entry:
+            return None
+        context, created_at = entry
+        if self._current_time() - created_at > self._CONTEXT_CACHE_TTL_SECONDS:
+            self._context_cache.pop(key, None)
+            return None
+        self._context_cache.move_to_end(key)
+        return context
+
+    def _store_cached_context(self, key: str, context: str) -> None:
+        """Cache frequently requested RAG context snippets."""
+        self._context_cache[key] = (context, self._current_time())
+        self._context_cache.move_to_end(key)
+        while len(self._context_cache) > self._MAX_CACHE_ENTRIES:
+            self._context_cache.popitem(last=False)
+
+    def _fetch_metrics_cached(
+        self,
+        ticker: str,
+        *,
+        period_filters: Optional[Sequence[tuple[int, int]]] = None,
+    ) -> List[database.MetricRecord]:
+        """Fetch metrics with a lightweight in-memory cache."""
+        normalized = ticker.upper()
+        period_key: Tuple[Tuple[int, int], ...]
+        if period_filters:
+            period_key = tuple(tuple(filter_item) for filter_item in period_filters if filter_item)
+        else:
+            period_key = tuple()
+        cache_key = (normalized, period_key)
+        entry = self._metrics_cache.get(cache_key)
+        if entry:
+            records, created_at = entry
+            if self._current_time() - created_at <= self._METRICS_CACHE_TTL_SECONDS:
+                self._metrics_cache.move_to_end(cache_key)
+                return records
+            self._metrics_cache.pop(cache_key, None)
+
+        records = self.analytics_engine.get_metrics(
+            normalized,
+            period_filters=period_filters,
+        )
+        self._metrics_cache[cache_key] = (records, self._current_time())
+        self._metrics_cache.move_to_end(cache_key)
+        while len(self._metrics_cache) > self._MAX_CACHE_ENTRIES:
+            self._metrics_cache.popitem(last=False)
+        return records
+
+    def _get_ticker_summary(self, ticker: str) -> str:
+        """Return a narrative summary for ``ticker`` with caching."""
+        normalized = ticker.upper()
+        entry = self._summary_cache.get(normalized)
+        if entry:
+            summary, created_at = entry
+            if self._current_time() - created_at <= self._SUMMARY_CACHE_TTL_SECONDS:
+                self._summary_cache.move_to_end(normalized)
+                return summary
+            self._summary_cache.pop(normalized, None)
+
+        try:
+            summary = self.analytics_engine.generate_summary(normalized)
+        except Exception:
+            LOGGER.warning("Unable to generate summary for %s", normalized, exc_info=True)
+            summary = (
+                f"No cached metrics for {normalized}. "
+                f"Run 'ingest {normalized}' to pull the latest filings."
+            )
+        else:
+            if not summary.strip():
+                summary = (
+                    f"No cached metrics for {normalized}. "
+                    f"Run 'ingest {normalized}' to pull the latest filings."
+                )
+
+        self._summary_cache[normalized] = (summary, self._current_time())
+        self._summary_cache.move_to_end(normalized)
+        while len(self._summary_cache) > self._MAX_CACHE_ENTRIES:
+            self._summary_cache.popitem(last=False)
+        return summary
+
+    def _detect_summary_target(
+        self,
+        user_input: str,
+        normalized_command: Optional[str],
+    ) -> Optional[str]:
+        """Detect if the prompt requests a quick metrics summary for a single ticker."""
+        normalized = (normalized_command or "").strip().lower()
+        lowered = user_input.strip().lower()
+        summary_prefixes = ("summary", "metrics", "snapshot", "overview")
+        summary_keywords = (
+            "summary",
+            "snapshot",
+            "overview",
+            "metrics",
+            "metric",
+            "kpi",
+            "performance",
+            "report",
+        )
+
+        should_attempt = False
+        for prefix in summary_prefixes:
+            if normalized.startswith(prefix + " "):
+                should_attempt = True
+                break
+        if not should_attempt:
+            should_attempt = any(keyword in lowered for keyword in summary_keywords)
+        if not should_attempt:
+            return None
+
+        tickers = self._detect_tickers(user_input)
+        if len(tickers) != 1:
+            return None
+        ticker = tickers[0].upper()
+        try:
+            records = self._fetch_metrics_cached(ticker)
+        except Exception:
+            return None
+        if not records:
+            return None
+        return ticker
+
+    def _prepare_llm_messages(self, rag_context: Optional[str]) -> List[Mapping[str, str]]:
+        """Trim history before sending to the LLM and append optional RAG context."""
+        history = self.conversation.as_llm_messages()
+        if not history:
+            return []
+        system_message, *chat_history = history
+        if len(chat_history) > self._MAX_HISTORY_MESSAGES:
+            chat_history = chat_history[-self._MAX_HISTORY_MESSAGES :]
+        messages: List[Mapping[str, str]] = [system_message]
+        if rag_context:
+            messages.append({"role": "system", "content": rag_context})
+        messages.extend(chat_history)
+        return messages
+
+    def _preload_popular_metrics(self) -> None:
+        """Warm cached metrics for high-traffic tickers to reduce first-response latency."""
+        for ticker in POPULAR_TICKERS:
+            try:
+                self._fetch_metrics_cached(ticker)
+                self._get_ticker_summary(ticker)
+            except Exception:  # pragma: no cover - defensive caching preload
+                LOGGER.debug("Preload for %s failed", ticker, exc_info=True)
 
     @classmethod
     def create(cls, settings: Settings) -> "BenchmarkOSChatbot":
@@ -456,7 +701,7 @@ class BenchmarkOSChatbot:
 
         sector_map = cls._load_sector_map()
 
-        return cls(
+        chatbot = cls(
             settings=settings,
             llm_client=llm_client,
             analytics_engine=analytics_engine,
@@ -464,6 +709,8 @@ class BenchmarkOSChatbot:
             name_index=index,
             ticker_sector_map=sector_map,
         )
+        chatbot._preload_popular_metrics()
+        return chatbot
 
     # ----------------------------------------------------------------------------------
     # NL → command normalization (accept natural company names)
@@ -799,7 +1046,7 @@ class BenchmarkOSChatbot:
 
             def _has_metrics(candidate: str) -> bool:
                 try:
-                    records = self.analytics_engine.get_metrics(candidate)
+                    records = self._fetch_metrics_cached(candidate)
                 except Exception:
                     return False
                 return bool(records)
@@ -976,40 +1223,38 @@ class BenchmarkOSChatbot:
         )
         self.conversation.messages.append({"role": "user", "content": user_input})
 
-        if user_input.strip().lower() == "help":
-            reply = HELP_TEXT
-            database.log_message(
-                self.settings.database_path,
-                self.conversation.conversation_id,
-                role="assistant",
-                content=reply,
-                created_at=datetime.utcnow(),
-            )
-            self.conversation.messages.append({"role": "assistant", "content": reply})
-            return reply
+        reply: Optional[str] = None
+        lowered_input = user_input.strip().lower()
+        normalized_command = self._normalize_nl_to_command(user_input)
+        canonical_prompt = self._canonical_prompt(user_input, normalized_command)
+        cacheable = self._should_cache_prompt(canonical_prompt)
+        cached_entry: Optional[_CachedReply] = (
+            self._get_cached_reply(canonical_prompt) if cacheable else None
+        )
+        if cached_entry:
+            reply = cached_entry.reply
+            self.last_structured_response = copy.deepcopy(cached_entry.structured)
 
-        # Try to normalize natural text into a concrete command first
-        normalized = self._normalize_nl_to_command(user_input)
-        if normalized and normalized.strip().lower() != user_input.strip().lower():
-            reply = self._handle_financial_intent(normalized)
-            if reply is not None:
-                database.log_message(
-                    self.settings.database_path,
-                    self.conversation.conversation_id,
-                    role="assistant",
-                    content=reply,
-                    created_at=datetime.utcnow(),
-                )
-                self.conversation.messages.append({"role": "assistant", "content": reply})
-                return reply
+        if reply is None:
+            if lowered_input == "help":
+                reply = HELP_TEXT
+            else:
+                if normalized_command and normalized_command.strip().lower() != lowered_input:
+                    reply = self._handle_financial_intent(normalized_command)
+                if reply is None:
+                    reply = self._handle_financial_intent(user_input)
+        if reply is None:
+            summary_target = self._detect_summary_target(user_input, normalized_command)
+            if summary_target:
+                reply = self._get_ticker_summary(summary_target)
 
-        reply = self._handle_financial_intent(user_input)
         if reply is None:
             context = self._build_rag_context(user_input)
-            messages = self.conversation.as_llm_messages()
-            if context:
-                messages = [messages[0], {"role": "system", "content": context}, *messages[1:]]
+            messages = self._prepare_llm_messages(context)
             reply = self.llm_client.generate_reply(messages)
+
+        if reply is None:
+            reply = "I'm not sure how to help with that yet."
 
         database.log_message(
             self.settings.database_path,
@@ -1019,6 +1264,10 @@ class BenchmarkOSChatbot:
             created_at=datetime.utcnow(),
         )
         self.conversation.messages.append({"role": "assistant", "content": reply})
+
+        if cacheable and not cached_entry and reply:
+            self._store_cached_reply(canonical_prompt, reply)
+
         return reply
 
     def history(self) -> Iterable[database.Message]:
@@ -1463,7 +1712,7 @@ class BenchmarkOSChatbot:
 
             candidate = subject.upper()
             try:
-                records = self.analytics_engine.get_metrics(candidate)
+                records = self._fetch_metrics_cached(candidate)
             except Exception:
                 records = []
             if records:
@@ -1765,7 +2014,7 @@ class BenchmarkOSChatbot:
         missing: List[str] = []
         latest_spans: Dict[str, tuple[int, int]] = {}
         for ticker in tickers:
-            records = self.analytics_engine.get_metrics(
+            records = self._fetch_metrics_cached(
                 ticker,
                 period_filters=period_filters,
             )
@@ -2017,11 +2266,16 @@ class BenchmarkOSChatbot:
         tickers = self._detect_tickers(user_input)
         if not tickers:
             return None
+        cache_key = "|".join(sorted({ticker.upper() for ticker in tickers if ticker}))
+        if cache_key:
+            cached = self._get_cached_context(cache_key)
+            if cached:
+                return cached
 
         context_sections: List[str] = []
         for ticker in tickers:
             try:
-                records = self.analytics_engine.get_metrics(ticker)
+                records = self._fetch_metrics_cached(ticker)
             except Exception:  # pragma: no cover - database path
                 continue
             if not records:
@@ -2059,7 +2313,10 @@ class BenchmarkOSChatbot:
         if not context_sections:
             return None
         combined = "\n".join(context_sections)
-        return "Financial context:\n" + combined
+        final_context = "Financial context:\n" + combined
+        if cache_key:
+            self._store_cached_context(cache_key, final_context)
+        return final_context
 
     def _detect_tickers(self, text: str) -> List[str]:
         """Best-effort ticker extraction from user text (tickers + company names)."""

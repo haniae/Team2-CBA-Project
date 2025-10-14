@@ -64,6 +64,9 @@ let shareCancelButton = null;
 let shareModalConversationId = null;
 let toastContainer = null;
 const toastTimeouts = new Map();
+const PROMPT_CACHE_LIMIT = 32;
+const PROMPT_CACHE_TTL_MS = 3 * 60 * 1000;
+const promptCache = new Map();
 let companyUniverseData = [];
 let filteredCompanyData = [];
 let companyUniverseMetrics = null;
@@ -4127,6 +4130,71 @@ function applyCompanyUniverseFilters() {
   renderCompanyUniverseTable(filteredCompanyData);
 }
 
+function cloneForCache(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    return value;
+  }
+}
+
+function cleanupPromptCache() {
+  const now = Date.now();
+  for (const [key, entry] of promptCache.entries()) {
+    if (!entry || typeof entry.timestamp !== "number") {
+      promptCache.delete(key);
+      continue;
+    }
+    if (now - entry.timestamp > PROMPT_CACHE_TTL_MS) {
+      promptCache.delete(key);
+    }
+  }
+}
+
+function canonicalisePrompt(input) {
+  if (!input) {
+    return "";
+  }
+  return input.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function getCachedPrompt(key) {
+  if (!key) {
+    return null;
+  }
+  cleanupPromptCache();
+  const entry = promptCache.get(key);
+  if (!entry) {
+    return null;
+  }
+  return {
+    reply: entry.reply,
+    artifacts: cloneForCache(entry.artifacts),
+  };
+}
+
+function setCachedPrompt(key, reply, artifacts) {
+  if (!key || !reply) {
+    return;
+  }
+  cleanupPromptCache();
+  promptCache.set(key, {
+    reply,
+    artifacts: cloneForCache(artifacts),
+    timestamp: Date.now(),
+  });
+  while (promptCache.size > PROMPT_CACHE_LIMIT) {
+    const oldest = promptCache.keys().next().value;
+    if (oldest === undefined) {
+      break;
+    }
+    promptCache.delete(oldest);
+  }
+}
+
 async function sendPrompt(prompt) {
   const payload = { prompt };
   if (activeConversation && activeConversation.remoteId) {
@@ -4164,6 +4232,7 @@ chatForm.addEventListener("submit", async (event) => {
   if (!prompt) {
     return;
   }
+  const canonicalPrompt = canonicalisePrompt(prompt);
 
   recordMessage("user", prompt);
   appendMessage("user", prompt, { forceScroll: true });
@@ -4177,7 +4246,18 @@ chatForm.addEventListener("submit", async (event) => {
   }
 
   setSending(true);
-  const pendingMessage = showAssistantTyping();
+  let pendingMessage = showAssistantTyping();
+  const cachedEntry = getCachedPrompt(canonicalPrompt);
+  if (cachedEntry && cachedEntry.reply) {
+    const resolved = resolvePendingMessage(pendingMessage, "assistant", cachedEntry.reply, {
+      forceScroll: true,
+      artifacts: cachedEntry.artifacts,
+    });
+    if (resolved) {
+      pendingMessage = resolved;
+      pendingMessage.dataset.cached = "true";
+    }
+  }
 
   try {
     const response = await sendPrompt(prompt);
@@ -4185,10 +4265,17 @@ chatForm.addEventListener("submit", async (event) => {
     const messageText = cleanReply || "(no content)";
     const artifacts = normaliseArtifacts(response);
     recordMessage("assistant", messageText, artifacts);
-    resolvePendingMessage(pendingMessage, "assistant", messageText, {
+    const resolved = resolvePendingMessage(pendingMessage, "assistant", messageText, {
       forceScroll: true,
       artifacts,
     });
+    if (resolved) {
+      pendingMessage = resolved;
+      if (pendingMessage.dataset?.cached) {
+        delete pendingMessage.dataset.cached;
+      }
+    }
+    setCachedPrompt(canonicalPrompt, messageText, artifacts);
   } catch (error) {
     const fallback = error && error.message ? error.message : "Something went wrong. Please try again.";
     recordMessage("system", fallback);
