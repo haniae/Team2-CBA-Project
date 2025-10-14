@@ -55,7 +55,7 @@ Copy-Item .env.example .env   # PowerShell
 ```
 
 ### 2. Review environment defaults
-Open `.env` and customise database paths, API keys, and provider toggles (see [Configuration reference](#configuration-reference)).
+Open `.env` and customise database paths, API keys, and provider toggles (see [Configuration reference](#configuration-reference)). Prefer not to store the OpenAI key in the repo? Drop it in `~/.config/benchmarkos-chatbot/openai_api_key` (single line, no quotes) and the loader will pick it up automatically.
 
 ### 3. Prime the datastore (optional for demos)
 The project boots with SQLite and will lazily create tables on first run. To eagerly load metrics:
@@ -92,6 +92,17 @@ uvicorn benchmarkos_chatbot.web:app --reload --port 8000
 ```
 Open http://127.0.0.1:8000 to load the single-page interface in `webui/`. The UI streams chat history, formats ASCII tables cleanly, and pings `/health` every 30 seconds to keep the status dot green.
 
+#### Rich analytics overlays
+The SPA now mirrors the institutional workflow from the CLI while adding structured artefacts:
+
+- **Highlights** call out the leading ticker for ROE, net margin, and valuation, comparing each name against the benchmark column (`S&P 500 Avg` by default).
+- **Inline Markdown table** keeps the original transcript compact and copy/paste friendly – the table you saw in earlier builds still appears inside the chat bubble.
+- **Trend cards** show revenue, net income, operating income, and free cash flow sparklines without requiring an external charting bundle.
+- **Citation drawer** lists filing metadata (form, fiscal period, SEC viewer links) for every metric rendered so auditors can jump straight to the source.
+- **Export buttons** deliver a CSV download and a print-friendly PDF preview that reuses the same structured payload returned by `/chat`.
+
+All overlays derive from the structured response captured in `bot.last_structured_response`, so integrations can read the same highlights, trends, citations, and exports that the UI renders.
+
 Key REST endpoints once the server is running:
 
 | Method | Path | Description |
@@ -101,6 +112,18 @@ Key REST endpoints once the server is running:
 | `GET` | `/facts` | Fetch the normalised financial facts backing a statement. |
 | `GET` | `/audit` | View the latest ingestion and audit events for a ticker. |
 | `GET` | `/health` | Simple heartbeat used by load balancers and the web UI. |
+
+`POST /chat` responses now include structured extras in addition to the `reply` string:
+
+| Field | Description |
+|-------|-------------|
+| `highlights` | Bullet list of headline comparisons (net margin, ROE, P/E vs benchmark). |
+| `trends` | Array of `{ticker, metric, points}` objects used by the sparkline widgets. |
+| `comparison_table` | JSON representation of the metrics table (headers, rows, descriptor). |
+| `citations` | SEC filing metadata and URLs for each metric rendered. |
+| `exports` | Lightweight descriptors for CSV download and PDF preview. |
+
+These payloads mirror what the SPA renders and are available for downstream integrations that need structured analytics.
 
 ## Data ingestion playbooks
 Ingestion can happen synchronously from the CLI, scheduled batches, or background jobs.
