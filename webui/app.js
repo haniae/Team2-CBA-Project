@@ -79,6 +79,7 @@ let companyUniverseMetaCoverage = null;
 
 const KPI_LIBRARY_PATH = "/static/data/kpi_library.json";
 const COMPANY_UNIVERSE_PATH = "/static/data/company_universe.json";
+const SETTINGS_STORAGE_KEY = "benchmarkos.userSettings.v1";
 let kpiLibraryCache = null;
 let kpiLibraryLoadPromise = null;
 let companyUniversePromise = null;
@@ -105,6 +106,60 @@ const INTENT_LABELS = {
   scenario: "Scenario Analysis",
   insight: "Insight",
 };
+
+const DEFAULT_USER_SETTINGS = {
+  apiKey: "",
+  dataSources: {
+    edgar: true,
+    yahoo: true,
+    bloomberg: false,
+  },
+  refreshSchedule: "daily",
+  aiModel: "gpt-4o-mini",
+  exportFormats: {
+    pdf: true,
+    excel: true,
+    markdown: false,
+  },
+  locale: "en-US",
+  timezone: "UTC",
+  currency: "USD",
+  compliance: "standard",
+};
+
+function loadUserSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return JSON.parse(JSON.stringify(DEFAULT_USER_SETTINGS));
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_USER_SETTINGS,
+      ...parsed,
+      dataSources: {
+        ...DEFAULT_USER_SETTINGS.dataSources,
+        ...(parsed?.dataSources || {}),
+      },
+      exportFormats: {
+        ...DEFAULT_USER_SETTINGS.exportFormats,
+        ...(parsed?.exportFormats || {}),
+      },
+    };
+  } catch (error) {
+    console.warn("Unable to load user settings from storage", error);
+    return JSON.parse(JSON.stringify(DEFAULT_USER_SETTINGS));
+  }
+}
+
+function saveUserSettings(settings) {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch (error) {
+    console.error("Unable to persist user settings", error);
+    throw error;
+  }
+}
 
 async function renderCompanyUniverseSection({ container } = {}) {
   if (!container) {
@@ -1492,6 +1547,192 @@ async function renderFilingViewerSection({ container } = {}) {
     window.queueMicrotask(() => tickerInput.focus());
   }
 }
+
+function renderSettingsSection({ container } = {}) {
+  if (!container) {
+    return;
+  }
+
+  const root = container.querySelector("[data-role='settings-root']") || container;
+  const settings = loadUserSettings();
+
+  root.innerHTML = `
+    <form class="settings-form" data-role="settings-form">
+      <section class="settings-section">
+        <h3>AI preferences</h3>
+        <p class="settings-hint">
+          The values below are stored locally in your browser so you can experiment without touching
+          the backend configuration.
+        </p>
+        <label class="settings-field">
+          <span class="settings-label">Preferred model</span>
+          <input name="aiModel" type="text" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="settings-field">
+          <span class="settings-label">Local API key (optional)</span>
+          <input name="apiKey" type="password" autocomplete="off" placeholder="Stored in this browser only" />
+        </label>
+        <label class="settings-field">
+          <span class="settings-label">Refresh cadence</span>
+          <select name="refreshSchedule">
+            <option value="hourly">Hourly</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </label>
+      </section>
+      <section class="settings-section">
+        <h3>Data sources</h3>
+        <label class="settings-toggle">
+          <input type="checkbox" name="dataSources.edgar" />
+          <span>SEC EDGAR filings</span>
+        </label>
+        <label class="settings-toggle">
+          <input type="checkbox" name="dataSources.yahoo" />
+          <span>Yahoo Finance market data</span>
+        </label>
+        <label class="settings-toggle">
+          <input type="checkbox" name="dataSources.bloomberg" />
+          <span>Bloomberg real-time quotes</span>
+        </label>
+      </section>
+      <section class="settings-section">
+        <h3>Output preferences</h3>
+        <label class="settings-field">
+          <span class="settings-label">Timezone</span>
+          <input name="timezone" type="text" autocomplete="off" placeholder="e.g. UTC" />
+        </label>
+        <label class="settings-field">
+          <span class="settings-label">Primary currency</span>
+          <input name="currency" type="text" autocomplete="off" placeholder="e.g. USD" />
+        </label>
+        <label class="settings-field">
+          <span class="settings-label">Compliance mode</span>
+          <select name="compliance">
+            <option value="standard">Standard</option>
+            <option value="restricted">Restricted</option>
+            <option value="audit">Audit</option>
+          </select>
+        </label>
+        <fieldset class="settings-checkbox-group">
+          <legend>Enable exports</legend>
+          <label class="settings-toggle">
+            <input type="checkbox" name="exportFormats.pdf" />
+            <span>PDF</span>
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" name="exportFormats.excel" />
+            <span>Excel</span>
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" name="exportFormats.markdown" />
+            <span>Markdown</span>
+          </label>
+        </fieldset>
+      </section>
+      <div class="settings-actions">
+        <button type="submit">Save settings</button>
+        <button type="button" data-role="settings-reset">Reset to defaults</button>
+      </div>
+      <p class="settings-status" data-role="settings-status" aria-live="polite"></p>
+    </form>
+  `;
+
+  const form = root.querySelector("[data-role='settings-form']");
+  if (!form) {
+    return;
+  }
+  const statusEl = root.querySelector("[data-role='settings-status']");
+  const resetButton = root.querySelector("[data-role='settings-reset']");
+
+  const fields = {
+    aiModel: form.elements.aiModel,
+    apiKey: form.elements.apiKey,
+    refreshSchedule: form.elements.refreshSchedule,
+    timezone: form.elements.timezone,
+    currency: form.elements.currency,
+    compliance: form.elements.compliance,
+    edgar: form.querySelector("[name='dataSources.edgar']"),
+    yahoo: form.querySelector("[name='dataSources.yahoo']"),
+    bloomberg: form.querySelector("[name='dataSources.bloomberg']"),
+    exportPdf: form.querySelector("[name='exportFormats.pdf']"),
+    exportExcel: form.querySelector("[name='exportFormats.excel']"),
+    exportMarkdown: form.querySelector("[name='exportFormats.markdown']"),
+  };
+
+  const applySettings = (values) => {
+    if (!values) {
+      return;
+    }
+    fields.aiModel.value = values.aiModel || "";
+    fields.apiKey.value = values.apiKey || "";
+    fields.refreshSchedule.value = values.refreshSchedule || "daily";
+    fields.timezone.value = values.timezone || "UTC";
+    fields.currency.value = values.currency || "USD";
+    fields.compliance.value = values.compliance || "standard";
+    fields.edgar.checked = Boolean(values?.dataSources?.edgar);
+    fields.yahoo.checked = Boolean(values?.dataSources?.yahoo);
+    fields.bloomberg.checked = Boolean(values?.dataSources?.bloomberg);
+    fields.exportPdf.checked = Boolean(values?.exportFormats?.pdf);
+    fields.exportExcel.checked = Boolean(values?.exportFormats?.excel);
+    fields.exportMarkdown.checked = Boolean(values?.exportFormats?.markdown);
+  };
+
+  const showStatus = (message, type = "info") => {
+    if (!statusEl) {
+      return;
+    }
+    statusEl.textContent = message;
+    statusEl.dataset.state = type;
+    if (statusEl.dataset.timeoutId) {
+      window.clearTimeout(Number(statusEl.dataset.timeoutId));
+    }
+    const id = window.setTimeout(() => {
+      statusEl.textContent = "";
+      delete statusEl.dataset.state;
+    }, 3000);
+    statusEl.dataset.timeoutId = String(id);
+  };
+
+  applySettings(settings);
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const nextSettings = {
+      ...settings,
+      apiKey: fields.apiKey.value.trim(),
+      aiModel: fields.aiModel.value.trim() || DEFAULT_USER_SETTINGS.aiModel,
+      refreshSchedule: fields.refreshSchedule.value || DEFAULT_USER_SETTINGS.refreshSchedule,
+      timezone: fields.timezone.value.trim() || DEFAULT_USER_SETTINGS.timezone,
+      currency: fields.currency.value.trim() || DEFAULT_USER_SETTINGS.currency,
+      compliance: fields.compliance.value || DEFAULT_USER_SETTINGS.compliance,
+      dataSources: {
+        ...settings.dataSources,
+        edgar: fields.edgar.checked,
+        yahoo: fields.yahoo.checked,
+        bloomberg: fields.bloomberg.checked,
+      },
+      exportFormats: {
+        ...settings.exportFormats,
+        pdf: fields.exportPdf.checked,
+        excel: fields.exportExcel.checked,
+        markdown: fields.exportMarkdown.checked,
+      },
+    };
+    saveUserSettings(nextSettings);
+    showStatus("Settings saved locally.", "success");
+  });
+
+  if (resetButton) {
+    resetButton.addEventListener("click", () => {
+      const defaults = JSON.parse(JSON.stringify(DEFAULT_USER_SETTINGS));
+      saveUserSettings(defaults);
+      applySettings(defaults);
+      showStatus("Settings reset to defaults.", "success");
+    });
+  }
+}
+
 let isSending = false;
 let conversations = loadStoredConversations();
 let activeConversation = null;
@@ -1532,23 +1773,44 @@ const UTILITY_SECTIONS = {
   },
   settings: {
     title: "Settings",
-    html: `
-      <p>Tùy chỉnh trải nghiệm BenchmarkOS cho doanh nghiệp của bạn.</p>
-      <ul>
-        <li>Quản lý API key, nguồn dữ liệu, và lịch cập nhật.</li>
-        <li>Chọn mô hình AI (GPT-4, nội bộ, hay custom fine-tune).</li>
-        <li>Thiết lập định dạng xuất bản: PDF, Excel, Markdown.</li>
-        <li>Ưu tiên về ngôn ngữ, timezone, currency, và quy tắc tuân thủ.</li>
-      </ul>
-      <p class="panel-note">Các thay đổi tại đây tác động trực tiếp tới cả web UI và CLI.</p>
-    `,
+    html: `<div class="settings-panel" data-role="settings-root"></div>`,
+    render: renderSettingsSection,
   },
 };
+
+function normaliseArtifacts(response) {
+  if (!response || typeof response !== "object") {
+    return null;
+  }
+  const artifacts = {
+    highlights: Array.isArray(response.highlights) ? response.highlights : [],
+    trends: Array.isArray(response.trends) ? response.trends : [],
+    comparisonTable: response.comparison_table || response.comparisonTable || null,
+    citations: Array.isArray(response.citations) ? response.citations : [],
+    exports: Array.isArray(response.exports) ? response.exports : [],
+  };
+  if (
+    !artifacts.highlights.length &&
+    !artifacts.trends.length &&
+    !artifacts.comparisonTable &&
+    !artifacts.citations.length &&
+    !artifacts.exports.length
+  ) {
+    return null;
+  }
+  return artifacts;
+}
 
 function appendMessage(
   role,
   text,
-  { smooth = true, forceScroll = false, isPlaceholder = false, animate = true } = {}
+  {
+    smooth = true,
+    forceScroll = false,
+    isPlaceholder = false,
+    animate = true,
+    artifacts = null,
+  } = {}
 ) {
   if (!chatLog) {
     return null;
@@ -1597,6 +1859,10 @@ function appendMessage(
     fragments.forEach((node) => body.append(node));
   }
   wrapper.append(body);
+
+  if (!isPlaceholder) {
+    renderMessageArtifacts(wrapper, artifacts);
+  }
 
   chatLog.append(wrapper);
   scrollChatToBottom({ smooth, force: forceScroll });
@@ -1661,18 +1927,432 @@ function setMessageBody(wrapper, text) {
   }
 }
 
+function renderMessageArtifacts(wrapper, artifacts) {
+  const existing = wrapper.querySelector(".message-artifacts");
+  if (existing) {
+    existing.remove();
+  }
+  if (!artifacts) {
+    return;
+  }
+  const body = wrapper.querySelector(".message-body");
+  if (!body) {
+    return;
+  }
+  const sections = [];
+  const highlightsSection = createHighlightsSection(artifacts.highlights);
+  if (highlightsSection) {
+    sections.push(highlightsSection);
+  }
+  const tableSection = createComparisonTableSection(artifacts.comparisonTable);
+  if (tableSection) {
+    sections.push(tableSection);
+  }
+  const trendsSection = createTrendSection(artifacts.trends);
+  if (trendsSection) {
+    sections.push(trendsSection);
+  }
+  const citationsSection = createCitationSection(artifacts.citations);
+  if (citationsSection) {
+    sections.push(citationsSection);
+  }
+  const exportsSection = createExportSection(artifacts.exports);
+  if (exportsSection) {
+    sections.push(exportsSection);
+  }
+  if (!sections.length) {
+    return;
+  }
+  const container = document.createElement("div");
+  container.className = "message-artifacts";
+  sections.forEach((section) => container.append(section));
+  body.append(container);
+}
+
+function createHighlightsSection(highlights) {
+  if (!Array.isArray(highlights) || !highlights.length) {
+    return null;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "artifact-section artifact-highlights";
+  const title = document.createElement("h4");
+  title.className = "artifact-title";
+  title.textContent = "Highlights";
+  wrapper.append(title);
+  const list = document.createElement("ul");
+  list.className = "artifact-list";
+  highlights.forEach((line) => {
+    const item = document.createElement("li");
+    item.textContent = line;
+    list.append(item);
+  });
+  wrapper.append(list);
+  return wrapper;
+}
+
+function createComparisonTableSection(table) {
+  if (
+    !table ||
+    table.render === false ||
+    table.render_hint === "hidden" ||
+    !Array.isArray(table.headers) ||
+    !table.headers.length
+  ) {
+    return null;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "artifact-section artifact-table";
+  if (table.title || table.descriptor) {
+    const title = document.createElement("h4");
+    title.className = "artifact-title";
+    title.textContent = table.title || "Comparison table";
+    wrapper.append(title);
+    if (table.descriptor) {
+      const subtitle = document.createElement("div");
+      subtitle.className = "artifact-subtitle";
+      subtitle.textContent = table.descriptor;
+      wrapper.append(subtitle);
+    }
+  }
+  const tableEl = document.createElement("table");
+  tableEl.className = "artifact-table__grid";
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  table.headers.forEach((header) => {
+    const cell = document.createElement("th");
+    cell.textContent = header;
+    headerRow.append(cell);
+  });
+  thead.append(headerRow);
+  tableEl.append(thead);
+  const tbody = document.createElement("tbody");
+  (table.rows || []).forEach((row) => {
+    const tr = document.createElement("tr");
+    row.forEach((value, index) => {
+      const cell = document.createElement(index === 0 ? "th" : "td");
+      if (index === 0) {
+        cell.scope = "row";
+      }
+      cell.textContent = value;
+      tr.append(cell);
+    });
+    tbody.append(tr);
+  });
+  tableEl.append(tbody);
+  wrapper.append(tableEl);
+  return wrapper;
+}
+
+function createTrendSection(trends) {
+  if (!Array.isArray(trends) || !trends.length) {
+    return null;
+  }
+  const validSeries = trends.filter(
+    (series) => Array.isArray(series.points) && series.points.length >= 2
+  );
+  if (!validSeries.length) {
+    return null;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "artifact-section artifact-trends";
+  const title = document.createElement("h4");
+  title.className = "artifact-title";
+  title.textContent = "Trend visualisations";
+  wrapper.append(title);
+  const grid = document.createElement("div");
+  grid.className = "trend-grid";
+  validSeries.forEach((series) => {
+    const card = createTrendCard(series);
+    if (card) {
+      grid.append(card);
+    }
+  });
+  wrapper.append(grid);
+  return wrapper;
+}
+
+function createTrendCard(series) {
+  const points = (series.points || []).filter(
+    (point) => point && typeof point.value === "number"
+  );
+  if (points.length < 2) {
+    return null;
+  }
+  const card = document.createElement("div");
+  card.className = "trend-card";
+  const header = document.createElement("div");
+  header.className = "trend-card__header";
+  header.textContent = `${series.ticker} · ${series.label}`;
+  card.append(header);
+  const chartContainer = document.createElement("div");
+  chartContainer.className = "trend-card__chart";
+  const chart = createTrendSparkline(points);
+  if (chart) {
+    chartContainer.append(chart);
+  }
+  card.append(chartContainer);
+  const footer = document.createElement("div");
+  footer.className = "trend-card__footer";
+  const latest = points[points.length - 1];
+  footer.textContent = `${latest.period}: ${latest.formatted_value || latest.value}`;
+  card.append(footer);
+  return card;
+}
+
+function createTrendSparkline(points) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const width = 240;
+  const height = 80;
+  const padding = 10;
+  const values = points.map((point) => Number(point.value));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const step = (width - padding * 2) / (points.length - 1 || 1);
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svg.classList.add("trend-chart");
+  const polyline = document.createElementNS(svgNS, "polyline");
+  const coords = points.map((point, index) => {
+    const x = padding + index * step;
+    const normalized = range === 0 ? 0.5 : (point.value - min) / range;
+    const y = height - padding - normalized * (height - padding * 2);
+    return `${x},${y}`;
+  });
+  polyline.setAttribute("points", coords.join(" "));
+  polyline.classList.add("trend-chart__line");
+  svg.appendChild(polyline);
+  const baseline = document.createElementNS(svgNS, "line");
+  baseline.setAttribute("x1", String(padding));
+  baseline.setAttribute("y1", String(height - padding));
+  baseline.setAttribute("x2", String(width - padding));
+  baseline.setAttribute("y2", String(height - padding));
+  baseline.classList.add("trend-chart__baseline");
+  svg.appendChild(baseline);
+  const finalPoint = points[points.length - 1];
+  const finalX = padding + (points.length - 1) * step;
+  const finalNormalized = range === 0 ? 0.5 : (finalPoint.value - min) / range;
+  const finalY = height - padding - finalNormalized * (height - padding * 2);
+  const marker = document.createElementNS(svgNS, "circle");
+  marker.setAttribute("cx", String(finalX));
+  marker.setAttribute("cy", String(finalY));
+  marker.setAttribute("r", "3.5");
+  marker.classList.add("trend-chart__marker");
+  svg.appendChild(marker);
+  return svg;
+}
+
+function createCitationSection(citations) {
+  if (!Array.isArray(citations) || !citations.length) {
+    return null;
+  }
+  const details = document.createElement("details");
+  details.className = "artifact-section artifact-citations";
+  const summary = document.createElement("summary");
+  summary.textContent = `Sources (${citations.length})`;
+  details.append(summary);
+  const list = document.createElement("ul");
+  list.className = "citation-list";
+  citations.forEach((citation) => {
+    const item = document.createElement("li");
+    const parts = [
+      `${citation.ticker} • ${citation.label}`,
+      citation.period ? citation.period : null,
+      citation.formatted_value || (typeof citation.value === "number" ? citation.value : null),
+    ].filter(Boolean);
+    const text = document.createElement("span");
+    text.textContent = parts.join(" · ");
+    item.append(text);
+    if (citation.form) {
+      const formTag = document.createElement("span");
+      formTag.className = "citation-form";
+      formTag.textContent = citation.form;
+      item.append(formTag);
+    }
+    if (citation.urls && citation.urls.detail) {
+      const link = document.createElement("a");
+      link.href = citation.urls.detail;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "View filing";
+      item.append(link);
+    } else if (citation.urls && citation.urls.interactive) {
+      const link = document.createElement("a");
+      link.href = citation.urls.interactive;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "View filing";
+      item.append(link);
+    }
+    list.append(item);
+  });
+  details.append(list);
+  return details;
+}
+
+function createExportSection(exports) {
+  if (!Array.isArray(exports) || !exports.length) {
+    return null;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "artifact-section artifact-exports";
+  const title = document.createElement("h4");
+  title.className = "artifact-title";
+  title.textContent = "Export";
+  wrapper.append(title);
+  const buttonRow = document.createElement("div");
+  buttonRow.className = "artifact-export-buttons";
+  exports.forEach((entry) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "artifact-export-button";
+    button.textContent = entry.label || entry.type.toUpperCase();
+    button.addEventListener("click", () => handleExport(entry));
+    buttonRow.append(button);
+  });
+  wrapper.append(buttonRow);
+  return wrapper;
+}
+
+function handleExport(payload) {
+  if (!payload || typeof payload !== "object") {
+    return;
+  }
+  if (payload.type === "csv") {
+    downloadCsv(payload);
+    return;
+  }
+  if (payload.type === "pdf") {
+    openPdfPreview(payload);
+  }
+}
+
+function downloadCsv(payload) {
+  const headers = Array.isArray(payload.headers) ? payload.headers : [];
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  if (!headers.length || !rows.length) {
+    return;
+  }
+  const lines = [];
+  lines.push(headers.map(formatCsvValue).join(","));
+  rows.forEach((row) => {
+    const safeRow = Array.isArray(row) ? row : [];
+    lines.push(safeRow.map(formatCsvValue).join(","));
+  });
+  if (payload.descriptor) {
+    lines.unshift(`# ${payload.descriptor}`);
+  }
+  const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  link.download = payload.filename || `benchmarkos-export-${Date.now()}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function formatCsvValue(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  const stringValue = String(value);
+  if (/[",\n]/.test(stringValue)) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
+}
+
+function openPdfPreview(payload) {
+  const headers = Array.isArray(payload.headers) ? payload.headers : [];
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  if (!headers.length || !rows.length) {
+    alert("Nothing to export yet.");
+    return;
+  }
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("Unable to open preview window. Allow pop-ups and try again.");
+    return;
+  }
+  const title = payload.title || "BenchmarkOS export";
+  const descriptor = payload.descriptor ? `<p><strong>Period:</strong> ${payload.descriptor}</p>` : "";
+  const highlights = Array.isArray(payload.highlights) && payload.highlights.length
+    ? `<ul>${payload.highlights.map((line) => `<li>${line}</li>`).join("")}</ul>`
+    : "";
+  const tableRows = rows
+    .map(
+      (row) =>
+        `<tr>${row
+          .map((value, index) =>
+            index === 0
+              ? `<th scope="row">${value}</th>`
+              : `<td>${value}</td>`
+          )
+          .join("")}</tr>`
+    )
+    .join("");
+  const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${title}</title>
+    <style>
+      body { font-family: "Segoe UI", Arial, sans-serif; margin: 24px; color: #0f172a; }
+      h1 { font-size: 20px; margin-bottom: 8px; }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th, td { border: 1px solid #cbd5f5; padding: 6px 10px; text-align: right; font-size: 13px; }
+      th:first-child, td:first-child { text-align: left; }
+      th { background: #eff6ff; }
+      ul { margin: 12px 0; padding-left: 18px; }
+      .meta { font-size: 12px; color: #475569; margin-top: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>${title}</h1>
+    ${descriptor}
+    ${highlights}
+    <table>
+      <thead>
+        <tr>${headers.map((header, index) => `<${index === 0 ? "th scope=\"col\"" : "th"}>${header}</th>`).join("")}</tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+    </table>
+    <p class="meta">Generated ${new Date().toLocaleString()}</p>
+  </body>
+</html>`;
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  try {
+    win.print();
+  } catch (error) {
+    // noop
+  }
+}
+
 function showAssistantTyping() {
   return appendMessage("assistant", "", { isPlaceholder: true, animate: false });
 }
 
-function resolvePendingMessage(wrapper, role, text, { forceScroll = false } = {}) {
+function resolvePendingMessage(
+  wrapper,
+  role,
+  text,
+  { forceScroll = false, artifacts = null } = {}
+) {
   if (!wrapper) {
-    appendMessage(role, text, { forceScroll, smooth: true });
+    appendMessage(role, text, { forceScroll, smooth: true, artifacts });
     return null;
   }
   updateMessageRole(wrapper, role);
   wrapper.classList.remove("typing");
   setMessageBody(wrapper, text);
+  renderMessageArtifacts(wrapper, artifacts);
   scrollChatToBottom({ smooth: true, force: forceScroll });
   return wrapper;
 }
@@ -2731,7 +3411,7 @@ function promoteConversation(conversation) {
   conversations = [conversation, ...conversations.filter((entry) => entry.id !== conversation.id)];
 }
 
-function recordMessage(role, text) {
+function recordMessage(role, text, metadata = null) {
   const conversation = ensureActiveConversation();
   const timestamp = new Date().toISOString();
   if (!conversations.find((entry) => entry.id === conversation.id)) {
@@ -2747,7 +3427,15 @@ function recordMessage(role, text) {
     conversation.metricLabel = summary.metric;
     conversation.archived = false;
   }
-  conversation.messages.push({ role, text, timestamp });
+  const messageEntry = { role, text, timestamp };
+  if (metadata) {
+    try {
+      messageEntry.metadata = JSON.parse(JSON.stringify(metadata));
+    } catch (error) {
+      messageEntry.metadata = metadata;
+    }
+  }
+  conversation.messages.push(messageEntry);
   if (!conversation.title && conversation.previewPrompt) {
     const summary = buildSemanticSummary(conversation.previewPrompt);
     conversation.title = summary.title;
@@ -2896,7 +3584,11 @@ function loadConversation(conversationId) {
   }
 
   conversation.messages.forEach((message) => {
-    appendMessage(message.role, message.text, { smooth: false, animate: false });
+    appendMessage(message.role, message.text, {
+      smooth: false,
+      animate: false,
+      artifacts: message.metadata || null,
+    });
   });
 
   scrollChatToBottom({ smooth: false, force: true });
@@ -3419,7 +4111,7 @@ async function sendPrompt(prompt) {
     saveConversations();
     renderConversationList();
   }
-  return data.reply;
+  return data;
 }
 
 chatForm.addEventListener("submit", async (event) => {
@@ -3448,11 +4140,15 @@ chatForm.addEventListener("submit", async (event) => {
   const pendingMessage = showAssistantTyping();
 
   try {
-    const reply = await sendPrompt(prompt);
-    const cleanReply = typeof reply === "string" ? reply.trim() : "";
+    const response = await sendPrompt(prompt);
+    const cleanReply = typeof response?.reply === "string" ? response.reply.trim() : "";
     const messageText = cleanReply || "(no content)";
-    recordMessage("assistant", messageText);
-    resolvePendingMessage(pendingMessage, "assistant", messageText, { forceScroll: true });
+    const artifacts = normaliseArtifacts(response);
+    recordMessage("assistant", messageText, artifacts);
+    resolvePendingMessage(pendingMessage, "assistant", messageText, {
+      forceScroll: true,
+      artifacts,
+    });
   } catch (error) {
     const fallback = error && error.message ? error.message : "Something went wrong. Please try again.";
     recordMessage("system", fallback);

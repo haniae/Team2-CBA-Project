@@ -153,7 +153,8 @@ $composer.addEventListener('submit', async (ev)=>{
 		const res = await fetch('/chat', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,conversation_id:currentConversation})})
 		if(!res.ok) throw new Error('chat failed')
 		const data = await res.json()
-		appendMessage({role:'bot',text:data.answer || JSON.stringify(data),ts:Date.now()})
+		const replyText = typeof data.reply === 'string' ? data.reply : (data.answer || JSON.stringify(data))
+		appendMessage({role:'bot',text:replyText,ts:Date.now()})
 		setApiStatus(true)
 	}catch(e){
 		setApiStatus(false)

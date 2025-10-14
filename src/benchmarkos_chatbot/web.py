@@ -59,10 +59,69 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
 
 
+class TrendPoint(BaseModel):
+    """Single datapoint for a trend visualisation."""
+    period: str
+    value: Optional[float]
+    formatted_value: Optional[str] = None
+
+
+class TrendSeries(BaseModel):
+    """Series describing a ticker/metric trend."""
+    ticker: str
+    metric: str
+    label: str
+    points: List[TrendPoint]
+
+
+class ComparisonTable(BaseModel):
+    """Structured representation of the benchmark comparison table."""
+    headers: List[str]
+    rows: List[List[str]]
+    descriptor: Optional[str] = None
+    tickers: List[str] = []
+    title: Optional[str] = None
+    render: Optional[bool] = True
+    render_hint: Optional[str] = None
+
+
+class Citation(BaseModel):
+    """Source metadata for numerical outputs shown to the user."""
+    ticker: str
+    metric: str
+    label: str
+    period: Optional[str] = None
+    value: Optional[float] = None
+    formatted_value: Optional[str] = None
+    source: Optional[str] = None
+    filing: Optional[str] = None
+    unit: Optional[str] = None
+    urls: Optional[Dict[str, Optional[str]]] = None
+    filed_at: Optional[str] = None
+    form: Optional[str] = None
+
+
+class ExportPayload(BaseModel):
+    """Client-side export descriptor (CSV/PDF)."""
+    type: str
+    label: str
+    filename: Optional[str] = None
+    headers: Optional[List[str]] = None
+    rows: Optional[List[List[str]]] = None
+    descriptor: Optional[str] = None
+    highlights: Optional[List[str]] = None
+    title: Optional[str] = None
+
+
 class ChatResponse(BaseModel):
     """Response returned after processing a chat prompt."""
     conversation_id: str
     reply: str
+    highlights: List[str] = []
+    trends: List[TrendSeries] = []
+    comparison_table: Optional[ComparisonTable] = None
+    citations: List[Citation] = []
+    exports: List[ExportPayload] = []
 
 
 class MetricsResponse(BaseModel):
@@ -229,9 +288,29 @@ def chat(request: ChatRequest) -> ChatResponse:
 
     bot = build_bot(request.conversation_id)
     reply = bot.ask(request.prompt)
+    structured = getattr(bot, "last_structured_response", {}) or {}
+    trends = [
+        TrendSeries(**series) for series in structured.get("trends") or []
+    ]
+    comparison_table = (
+        ComparisonTable(**structured["comparison_table"])
+        if structured.get("comparison_table")
+        else None
+    )
+    citations = [
+        Citation(**citation) for citation in structured.get("citations") or []
+    ]
+    exports = [
+        ExportPayload(**payload) for payload in structured.get("exports") or []
+    ]
     return ChatResponse(
         conversation_id=bot.conversation.conversation_id,
         reply=reply,
+        highlights=structured.get("highlights") or [],
+        trends=trends,
+        comparison_table=comparison_table,
+        citations=citations,
+        exports=exports,
     )
 
 

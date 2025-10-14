@@ -9,10 +9,11 @@ import re
 import json
 import logging
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 import requests
 
@@ -251,6 +252,12 @@ BENCHMARK_KEY_METRICS: Dict[str, str] = {
     "return_on_equity": "Return on equity",
     "pe_ratio": "P/E ratio",
 }
+TREND_METRICS: Sequence[str] = (
+    "revenue",
+    "net_income",
+    "free_cash_flow",
+    "operating_income",
+)
 
 _METRIC_LABEL_MAP: Dict[str, str] = {
     definition.name: definition.description for definition in METRIC_DEFINITIONS
@@ -348,6 +355,21 @@ class BenchmarkOSChatbot:
     conversation: Conversation = field(default_factory=Conversation)
     # new: SEC-backed index
     name_index: _CompanyNameIndex = field(default_factory=_CompanyNameIndex)
+    last_structured_response: Dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self) -> None:
+        """Initialise mutable response state containers."""
+        self._reset_structured_response()
+
+    def _reset_structured_response(self) -> None:
+        """Clear any structured payload captured during the last response."""
+        self.last_structured_response = {
+            "highlights": [],
+            "trends": [],
+            "comparison_table": None,
+            "citations": [],
+            "exports": [],
+        }
 
     @classmethod
     def create(cls, settings: Settings) -> "BenchmarkOSChatbot":
@@ -849,6 +871,7 @@ class BenchmarkOSChatbot:
     # ----------------------------------------------------------------------------------
     def ask(self, user_input: str) -> str:
         """Generate a reply and persist both sides of the exchange."""
+        self._reset_structured_response()
         timestamp = datetime.utcnow()
         database.log_message(
             self.settings.database_path,
@@ -1373,6 +1396,238 @@ class BenchmarkOSChatbot:
             "'ingest <ticker>'."
         )
 
+    def _record_span(self, record: database.MetricRecord) -> Optional[tuple[int, int]]:
+        """Best-effort extraction of a (start_year, end_year) tuple for a metric snapshot."""
+        if record.period:
+            try:
+                return self.analytics_engine._period_span(record.period)
+            except Exception:
+                pass
+        start = record.start_year or record.end_year or 0
+        end = record.end_year or record.start_year or 0
+        if not start and not end:
+            return None
+        if start and not end:
+            end = start
+        if end and not start:
+            start = end
+        return (start, end)
+
+    def _format_period_label(
+        self,
+        record: database.MetricRecord,
+        span: Optional[tuple[int, int]] = None,
+    ) -> Optional[str]:
+        """Return a human readable label for a metric snapshot period."""
+        if record.period:
+            return record.period
+        span = span or self._record_span(record)
+        if not span:
+            return None
+        start, end = span
+        if start and end and start != end:
+            return f"FY{start}-FY{end}"
+        year = end or start
+        return f"FY{year}" if year else None
+
+    def _build_trend_series(
+        self,
+        histories: Mapping[str, Sequence[database.MetricRecord]],
+        tickers: Sequence[str],
+    ) -> List[Dict[str, Any]]:
+        """Compile time series data suitable for lightweight trend visualisations."""
+        trend_series: List[Dict[str, Any]] = []
+        allowed_metrics = {metric.lower() for metric in TREND_METRICS}
+        for ticker in tickers:
+            records = histories.get(ticker)
+            if not records:
+                continue
+            metric_points: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+            for record in records:
+                metric_name = record.metric.lower()
+                if metric_name not in allowed_metrics:
+                    continue
+                if record.value is None:
+                    continue
+                span = self._record_span(record)
+                sort_key = span or (
+                    record.start_year or 0,
+                    record.end_year or 0,
+                )
+                label = self._format_period_label(record, span)
+                formatted = self._format_metric_value(
+                    metric_name,
+                    {metric_name: record},
+                )
+                metric_points[metric_name].append(
+                    {
+                        "sort": sort_key,
+                        "period": label or record.period or "",
+                        "value": record.value,
+                        "formatted": formatted,
+                    }
+                )
+            for metric_name, points in metric_points.items():
+                if not points:
+                    continue
+                points.sort(key=lambda item: (item["sort"][0], item["sort"][1]))
+                serialised_points = [
+                    {
+                        "period": point["period"],
+                        "value": point["value"],
+                        "formatted_value": point["formatted"],
+                    }
+                    for point in points
+                    if point["period"]
+                ]
+                if len(serialised_points) < 2:
+                    continue
+                trend_series.append(
+                    {
+                        "ticker": ticker,
+                        "metric": metric_name,
+                        "label": _METRIC_LABEL_MAP.get(
+                            metric_name, metric_name.replace("_", " ").title()
+                        ),
+                        "points": serialised_points,
+                    }
+                )
+        return trend_series
+
+    def _build_filing_urls(
+        self, accession: Optional[str], cik: Optional[str]
+    ) -> Dict[str, Optional[str]]:
+        """Mirror the filing URL helpers used by the FastAPI layer for reuse in chat."""
+        if not accession:
+            return {"interactive": None, "detail": None, "search": None}
+        if cik:
+            clean_cik = cik.lstrip("0") or cik
+            accession_no_dash = accession.replace("-", "")
+            interactive = (
+                "https://www.sec.gov/cgi-bin/viewer"
+                f"?action=view&cik={clean_cik}&accession_number={accession}&xbrl_type=v"
+            )
+            detail = (
+                f"https://www.sec.gov/Archives/edgar/data/{clean_cik}/"
+                f"{accession_no_dash}/{accession}-index.html"
+            )
+            search = (
+                f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={clean_cik}"
+            )
+            return {"interactive": interactive, "detail": detail, "search": search}
+        return {"interactive": None, "detail": None, "search": None}
+
+    def _build_metric_citations(
+        self,
+        metrics_per_ticker: Mapping[str, Dict[str, database.MetricRecord]],
+        tickers: Sequence[str],
+        limit: int = 24,
+    ) -> List[Dict[str, Any]]:
+        """Generate a concise list of fact sources underpinning the response."""
+        citations: List[Dict[str, Any]] = []
+        for ticker in tickers:
+            metric_map = metrics_per_ticker.get(ticker)
+            if not metric_map:
+                continue
+            for metric_name, record in metric_map.items():
+                if len(citations) >= limit:
+                    break
+                label = _METRIC_LABEL_MAP.get(
+                    metric_name, metric_name.replace("_", " ").title()
+                )
+                span = self._record_span(record)
+                period_label = self._format_period_label(record, span)
+                formatted_value = self._format_metric_value(
+                    metric_name, {metric_name: record}
+                )
+                citation: Dict[str, Any] = {
+                    "ticker": ticker,
+                    "metric": metric_name,
+                    "label": label,
+                    "period": period_label,
+                    "value": record.value,
+                    "formatted_value": formatted_value,
+                    "source": getattr(record, "source", None),
+                }
+                fiscal_year = None
+                if span and span[1]:
+                    fiscal_year = span[1]
+                elif record.end_year:
+                    fiscal_year = record.end_year
+                fact_records: Sequence[database.FinancialFactRecord] = ()
+                try:
+                    fact_records = self.analytics_engine.financial_facts(
+                        ticker=ticker,
+                        fiscal_year=fiscal_year,
+                        metric=metric_name,
+                        limit=1,
+                    )
+                except Exception:  # pragma: no cover - safety guard
+                    fact_records = ()
+                if fact_records:
+                    fact = fact_records[0]
+                    citation["filing"] = fact.source_filing
+                    citation["unit"] = fact.unit
+                    raw_payload: Any = fact.raw or {}
+                    if isinstance(raw_payload, str):
+                        try:
+                            raw_payload = json.loads(raw_payload)
+                        except Exception:
+                            raw_payload = {}
+                    accession = None
+                    if isinstance(raw_payload, dict):
+                        accession = raw_payload.get("accn") or raw_payload.get("accession")
+                        if not citation.get("filing") and raw_payload.get("filed"):
+                            citation["filed_at"] = raw_payload.get("filed")
+                        if raw_payload.get("form"):
+                            citation["form"] = raw_payload.get("form")
+                    accession = accession or fact.source_filing
+                    urls = self._build_filing_urls(accession, getattr(fact, "cik", None))
+                    citation["urls"] = urls
+                citations.append(citation)
+            if len(citations) >= limit:
+                break
+        return citations
+
+    def _build_export_payloads(
+        self,
+        table_data: Optional[Dict[str, Any]],
+        highlights: Sequence[str],
+    ) -> List[Dict[str, Any]]:
+        """Prepare lightweight export descriptors consumed by the web UI."""
+        if not table_data:
+            return []
+        headers = table_data.get("headers") or []
+        rows = table_data.get("rows") or []
+        if not headers or not rows:
+            return []
+        descriptor = table_data.get("descriptor")
+        tickers = table_data.get("tickers") or []
+        slug = "-vs-".join(ticker.lower().replace(" ", "-") for ticker in tickers if ticker)
+        if not slug:
+            slug = "metrics"
+        timestamp = datetime.utcnow().strftime("%Y%m%d")
+        base_name = f"benchmarkos-{slug}-{timestamp}"
+        csv_payload = {
+            "type": "csv",
+            "label": "Download CSV",
+            "filename": f"{base_name}.csv",
+            "headers": headers,
+            "rows": rows,
+            "descriptor": descriptor,
+        }
+        pdf_payload = {
+            "type": "pdf",
+            "label": "Download PDF",
+            "filename": f"{base_name}.pdf",
+            "headers": headers,
+            "rows": rows,
+            "descriptor": descriptor,
+            "highlights": list(highlights),
+            "title": table_data.get("title"),
+        }
+        return [csv_payload, pdf_payload]
+
     def _format_metrics_table(
         self,
         tickers: Sequence[str],
@@ -1381,6 +1636,7 @@ class BenchmarkOSChatbot:
     ) -> str:
         """Render metrics output as a table suitable for chat."""
         metrics_per_ticker: Dict[str, Dict[str, database.MetricRecord]] = {}
+        histories: Dict[str, List[database.MetricRecord]] = {}
         missing: List[str] = []
         latest_spans: Dict[str, tuple[int, int]] = {}
         for ticker in tickers:
@@ -1391,6 +1647,7 @@ class BenchmarkOSChatbot:
             if not records:
                 missing.append(ticker)
                 continue
+            histories[ticker] = list(records)
             selected = self._select_latest_records(
                 records, span_fn=self.analytics_engine._period_span
             )
@@ -1464,6 +1721,27 @@ class BenchmarkOSChatbot:
             metrics_per_ticker,
             benchmark_label=benchmark_label,
         )
+
+        table_payload = {
+            "headers": headers,
+            "rows": rows,
+            "descriptor": descriptor,
+            "tickers": display_tickers,
+            "title": f"Benchmark summary for {', '.join(ordered_tickers)}",
+            "render": False,
+        }
+        trends_payload = self._build_trend_series(histories, ordered_tickers)
+        citations_payload = self._build_metric_citations(
+            metrics_per_ticker, ordered_tickers
+        )
+        exports_payload = self._build_export_payloads(table_payload, highlights)
+        self.last_structured_response = {
+            "highlights": highlights,
+            "trends": trends_payload,
+            "comparison_table": table_payload,
+            "citations": citations_payload,
+            "exports": exports_payload,
+        }
 
         output_lines: List[str] = []
         if highlights:
