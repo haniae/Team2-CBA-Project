@@ -1788,6 +1788,7 @@ function normaliseArtifacts(response) {
     comparisonTable: response.comparison_table || response.comparisonTable || null,
     citations: Array.isArray(response.citations) ? response.citations : [],
     exports: Array.isArray(response.exports) ? response.exports : [],
+    conclusion: typeof response.conclusion === "string" ? response.conclusion.trim() : "",
   };
   if (
     !artifacts.highlights.length &&
@@ -1948,6 +1949,10 @@ function renderMessageArtifacts(wrapper, artifacts) {
   if (tableSection) {
     sections.push(tableSection);
   }
+  const conclusionSection = createConclusionSection(artifacts.conclusion);
+  if (conclusionSection) {
+    sections.push(conclusionSection);
+  }
   const trendsSection = createTrendSection(artifacts.trends);
   if (trendsSection) {
     sections.push(trendsSection);
@@ -1967,6 +1972,9 @@ function renderMessageArtifacts(wrapper, artifacts) {
   container.className = "message-artifacts";
   sections.forEach((section) => container.append(section));
   body.append(container);
+  if (artifacts.comparisonTable) {
+    body.querySelectorAll(".message-table").forEach((tableNode) => tableNode.remove());
+  }
 }
 
 function createHighlightsSection(highlights) {
@@ -1990,6 +1998,22 @@ function createHighlightsSection(highlights) {
   return wrapper;
 }
 
+function createConclusionSection(conclusion) {
+  if (!conclusion) {
+    return null;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "artifact-section artifact-conclusion";
+  const title = document.createElement("h4");
+  title.className = "artifact-title";
+  title.textContent = "Summary & next steps";
+  const text = document.createElement("p");
+  text.className = "artifact-conclusion__text";
+  text.textContent = conclusion;
+  wrapper.append(title, text);
+  return wrapper;
+}
+
 function createComparisonTableSection(table) {
   if (
     !table ||
@@ -2003,23 +2027,35 @@ function createComparisonTableSection(table) {
   const wrapper = document.createElement("div");
   wrapper.className = "artifact-section artifact-table";
   if (table.title || table.descriptor) {
-    const title = document.createElement("h4");
-    title.className = "artifact-title";
-    title.textContent = table.title || "Comparison table";
-    wrapper.append(title);
-    if (table.descriptor) {
-      const subtitle = document.createElement("div");
-      subtitle.className = "artifact-subtitle";
-      subtitle.textContent = table.descriptor;
-      wrapper.append(subtitle);
+    const header = document.createElement("div");
+    header.className = "artifact-table__header";
+    if (table.title) {
+      const title = document.createElement("h3");
+      title.className = "artifact-table__title";
+      title.textContent = table.title;
+      header.append(title);
     }
+    if (table.descriptor) {
+      const descriptor = document.createElement("div");
+      descriptor.className = "artifact-table__descriptor";
+      descriptor.textContent = table.descriptor;
+      header.append(descriptor);
+    }
+    wrapper.append(header);
   }
+
+  const surface = document.createElement("div");
+  surface.className = "artifact-table__surface";
+
   const tableEl = document.createElement("table");
   tableEl.className = "artifact-table__grid";
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
-  table.headers.forEach((header) => {
+  table.headers.forEach((header, index) => {
     const cell = document.createElement("th");
+    if (index === 0) {
+      cell.classList.add("artifact-table__metric");
+    }
     cell.textContent = header;
     headerRow.append(cell);
   });
@@ -2032,6 +2068,9 @@ function createComparisonTableSection(table) {
       const cell = document.createElement(index === 0 ? "th" : "td");
       if (index === 0) {
         cell.scope = "row";
+        cell.classList.add("artifact-table__metric");
+      } else {
+        cell.classList.add("artifact-table__value");
       }
       cell.textContent = value;
       tr.append(cell);
@@ -2039,7 +2078,8 @@ function createComparisonTableSection(table) {
     tbody.append(tr);
   });
   tableEl.append(tbody);
-  wrapper.append(tableEl);
+  surface.append(tableEl);
+  wrapper.append(surface);
   return wrapper;
 }
 

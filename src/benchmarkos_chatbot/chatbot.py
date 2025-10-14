@@ -9,10 +9,12 @@ import re
 import json
 import logging
 import uuid
-from collections import defaultdict
+from collections import Counter, defaultdict
+from difflib import SequenceMatcher
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+import unicodedata
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 import requests
@@ -39,7 +41,8 @@ class _CompanyNameIndex:
 
     @staticmethod
     def _normalize(s: str) -> str:
-        s = s.lower().strip()
+        s = unicodedata.normalize("NFKD", s.lower().strip())
+        s = "".join(ch for ch in s if not unicodedata.combining(ch))
         s = re.sub(r"[^a-z0-9 &\-]", " ", s)
         s = re.sub(r"\s+", " ", s).strip()
         parts = [p for p in s.split(" ") if p]
@@ -206,6 +209,37 @@ class _CompanyNameIndex:
                 best, best_score = tic, score
         return best
 
+    def resolve_fuzzy(
+        self,
+        phrase: str,
+        *,
+        n: int = 3,
+        cutoff: float = 0.65,
+    ) -> List[tuple[str, float]]:
+        """Return fuzzy ticker matches ranked by similarity score."""
+        norm = self._normalize(phrase)
+        if not norm:
+            return []
+
+        scored: List[tuple[str, float]] = []
+        for name, ticker in self.rows:
+            if not name:
+                continue
+            score = SequenceMatcher(None, norm, name).ratio()
+            if score >= cutoff:
+                scored.append((ticker, score))
+        scored.sort(key=lambda item: item[1], reverse=True)
+        unique: List[tuple[str, float]] = []
+        seen = set()
+        for ticker, score in scored:
+            if ticker in seen:
+                continue
+            unique.append((ticker, score))
+            seen.add(ticker)
+            if len(unique) >= n:
+                break
+        return unique
+
 
 # --------------------------------------------------------------------------------------
 # Metric formatting categories mirrored from analytics_engine.generate_summary
@@ -355,6 +389,7 @@ class BenchmarkOSChatbot:
     conversation: Conversation = field(default_factory=Conversation)
     # new: SEC-backed index
     name_index: _CompanyNameIndex = field(default_factory=_CompanyNameIndex)
+    ticker_sector_map: Dict[str, Dict[str, Optional[str]]] = field(default_factory=dict)
     last_structured_response: Dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self) -> None:
@@ -369,6 +404,7 @@ class BenchmarkOSChatbot:
             "comparison_table": None,
             "citations": [],
             "exports": [],
+            "conclusion": "",
         }
 
     @classmethod
@@ -418,12 +454,15 @@ class BenchmarkOSChatbot:
 
         LOGGER.info("Final name->ticker index size: %d", len(index.by_exact))
 
+        sector_map = cls._load_sector_map()
+
         return cls(
             settings=settings,
             llm_client=llm_client,
             analytics_engine=analytics_engine,
             ingestion_report=ingestion_report,
             name_index=index,
+            ticker_sector_map=sector_map,
         )
 
     # ----------------------------------------------------------------------------------
@@ -456,7 +495,45 @@ class BenchmarkOSChatbot:
         if tk:
             return tk.upper()
 
+        fuzzy = self.name_index.resolve_fuzzy(t, cutoff=0.7)
+        if fuzzy:
+            return fuzzy[0][0].upper()
+
         return None
+
+    @staticmethod
+    def _load_sector_map() -> Dict[str, Dict[str, Optional[str]]]:
+        """Load sector and sub-industry metadata for tickers."""
+        path = Path(__file__).resolve().parents[2] / "webui" / "data" / "company_universe.json"
+        if not path.exists():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:  # pragma: no cover - defensive guard
+            LOGGER.warning("Unable to load company universe metadata: %s", exc)
+            return {}
+
+        mapping: Dict[str, Dict[str, Optional[str]]] = {}
+        for entry in payload:
+            ticker = str(entry.get("ticker", "")).strip().upper()
+            if not ticker:
+                continue
+            mapping[ticker] = {
+                "sector": entry.get("sector"),
+                "sub_industry": entry.get("sub_industry") or entry.get("subIndustry"),
+            }
+        return mapping
+
+    def _sector_label(self, ticker: str) -> Optional[str]:
+        """Return a combined sector/sub-industry label for `ticker`."""
+        info = self.ticker_sector_map.get(ticker.upper())
+        if not info:
+            return None
+        sector = (info.get("sector") or "").strip()
+        sub = (info.get("sub_industry") or "").strip()
+        if sector and sub:
+            return f"{sector} – {sub}"
+        return sector or sub or None
 
     def _detect_fact_metric(self, text: str) -> Optional[str]:
         """Identify if the prompt references a specific fact metric."""
@@ -822,11 +899,28 @@ class BenchmarkOSChatbot:
             yr = None
             myr = re.search(r"(\d{4})\s*$", body)
             if myr:
-                yr = myr.group(1); body = body[: myr.start()].strip()
-            parts = re.split(r"\s*(?:,|&|/|\s+vs\.?\s+|\s+versus\s+|\s+against\s+|\s+and\s+)\s*", body, maxsplit=1, flags=re.IGNORECASE)
-            if len(parts) == 2 and parts[0] and parts[1]:
-                a, b = _to_ticker(parts[0]), _to_ticker(parts[1])
-                return " ".join(filter(None, ["compare", a, b, yr]))
+                yr = myr.group(1)
+                body = body[: myr.start()].strip()
+            normalized_body = re.sub(r"\s+(?:vs\.?|versus|against)\s+", ",", body, flags=re.IGNORECASE)
+            normalized_body = re.sub(r"[&/]", ",", normalized_body)
+            raw_entities: List[str] = []
+            for chunk in re.split(r",|\band\b", normalized_body, flags=re.IGNORECASE):
+                chunk = chunk.strip()
+                if not chunk:
+                    continue
+                raw_entities.extend(_split_entities(chunk))
+            if len(raw_entities) <= 1:
+                raw_entities = [part for part in body.split() if part]
+            tickers = []
+            for entity in raw_entities:
+                ticker = _to_ticker(entity)
+                if ticker and ticker not in tickers:
+                    tickers.append(ticker)
+            if len(tickers) >= 2:
+                parts = ["compare", *tickers]
+                if yr:
+                    parts.append(yr)
+                return " ".join(parts)
 
         # FACTS
         m = re.match(r'^(?:show|get|give me)?\s*(?:fact|facts?)\s+(?:for\s+)?(?P<e>.+?)\s+(?:fy)?(?P<y>\d{4})(?:\s+(?P<mtr>[A-Za-z0-9_]+))?\s*$', t, re.IGNORECASE)
@@ -1376,6 +1470,12 @@ class BenchmarkOSChatbot:
                 if candidate not in available:
                     available.append(candidate)
                 continue
+            suggestions = self._suggest_tickers([subject], limit=1)
+            if suggestions:
+                suggestion = suggestions[0].upper()
+                if suggestion not in available:
+                    available.append(suggestion)
+                continue
             missing.append(subject)
         return BenchmarkOSChatbot._TickerResolution(available=available, missing=missing)
 
@@ -1384,8 +1484,14 @@ class BenchmarkOSChatbot:
     ) -> str:
         """Build a friendly message for unresolved tickers."""
         missing = [ticker for ticker in requested if ticker.upper() not in available]
-        hint = ", ".join(sorted(set(available))) if available else None
-        if hint:
+        suggestions = self._suggest_tickers(missing)
+        hint_parts: List[str] = []
+        if available:
+            hint_parts.extend(sorted({ticker.upper() for ticker in available}))
+        if suggestions:
+            hint_parts.extend(suggestions)
+        if hint_parts:
+            hint = ", ".join(dict.fromkeys(hint_parts))
             return (
                 "Unable to resolve one or more tickers. Try specifying: "
                 f"{hint}."
@@ -1395,6 +1501,25 @@ class BenchmarkOSChatbot:
             f"Unable to resolve: {missing_list}. Ingest the data first using "
             "'ingest <ticker>'."
         )
+
+    def _suggest_tickers(
+        self,
+        subjects: Sequence[str],
+        limit: int = 5,
+    ) -> List[str]:
+        """Offer fuzzy ticker suggestions for unresolved names."""
+        suggestions: List[str] = []
+        seen = set()
+        for subject in subjects:
+            for ticker, score in self.name_index.resolve_fuzzy(subject, n=limit, cutoff=0.6):
+                ticker = ticker.upper()
+                if ticker in seen:
+                    continue
+                suggestions.append(ticker)
+                seen.add(ticker)
+                if len(suggestions) >= limit:
+                    return suggestions
+        return suggestions
 
     def _record_span(self, record: database.MetricRecord) -> Optional[tuple[int, int]]:
         """Best-effort extraction of a (start_year, end_year) tuple for a metric snapshot."""
@@ -1728,33 +1853,32 @@ class BenchmarkOSChatbot:
             "descriptor": descriptor,
             "tickers": display_tickers,
             "title": f"Benchmark summary for {', '.join(ordered_tickers)}",
-            "render": False,
         }
         trends_payload = self._build_trend_series(histories, ordered_tickers)
         citations_payload = self._build_metric_citations(
             metrics_per_ticker, ordered_tickers
         )
         exports_payload = self._build_export_payloads(table_payload, highlights)
+        conclusion = self._build_benchmark_conclusion(
+            highlights,
+            ordered_tickers,
+            descriptor,
+            benchmark_label=benchmark_label,
+        )
         self.last_structured_response = {
             "highlights": highlights,
             "trends": trends_payload,
             "comparison_table": table_payload,
             "citations": citations_payload,
             "exports": exports_payload,
+            "conclusion": conclusion,
         }
 
         output_lines: List[str] = []
-        if highlights:
-            bullet_points = "\n".join(f"- {line}" for line in highlights)
-            output_lines.append(
-                f"Benchmark summary for {', '.join(ordered_tickers)} ({descriptor}):\n{bullet_points}\n"
-            )
-        else:
-            output_lines.append(
-                f"Benchmark results for {', '.join(ordered_tickers)} ({descriptor})."
-            )
-
         output_lines.append(self._render_table(headers, rows))
+        if conclusion:
+            output_lines.append("")
+            output_lines.append(conclusion)
         if missing:
             context = (
                 self._describe_period_filters(period_filters)
@@ -1779,6 +1903,88 @@ class BenchmarkOSChatbot:
             else:
                 labels.append(f"FY{start}-FY{end}")
         return ", ".join(labels) if labels else "the requested periods"
+
+    def _build_benchmark_conclusion(
+        self,
+        highlights: Sequence[str],
+        tickers: Sequence[str],
+        descriptor: str,
+        benchmark_label: Optional[str],
+    ) -> str:
+        """Derive a short narrative summary and action prompt from highlight bullets."""
+        if not highlights:
+            return ""
+
+        leadership_counter: Counter[str] = Counter()
+        summary_fragments: List[str] = []
+        sector_labels: Dict[str, Optional[str]] = {}
+
+        def _format_ticker(ticker: str) -> str:
+            label = sector_labels.get(ticker)
+            if label is None:
+                label = self._sector_label(ticker)
+                sector_labels[ticker] = label
+            return f"{ticker} ({label})" if label else ticker
+
+        for entry in highlights:
+            if ":" not in entry:
+                continue
+            metric_label, remainder = entry.split(":", 1)
+            remainder = remainder.strip()
+            best_segment = remainder.split(" vs ")[0]
+            tokens = best_segment.split()
+            if not tokens:
+                continue
+            best_ticker = tokens[0]
+            leadership_counter[best_ticker] += 1
+            value_tokens = " ".join(tokens[1:]).strip().rstrip(",")
+            headline = f"{metric_label.strip()} leadership from {_format_ticker(best_ticker)}"
+            if value_tokens:
+                headline = f"{headline} {value_tokens}"
+            summary_fragments.append(headline)
+
+        if not summary_fragments:
+            return ""
+
+        total = len(summary_fragments)
+        summary_sentence = "Summary: " + "; ".join(summary_fragments) + "."
+
+        action_sentence = ""
+        if leadership_counter:
+            max_count = max(leadership_counter.values())
+            if max_count > 0:
+                leaders = [ticker for ticker, count in leadership_counter.items() if count == max_count]
+                if len(leaders) == 1:
+                    leader = leaders[0]
+                    others = [ticker for ticker in tickers if ticker != leader]
+                    action_sentence = (
+                        f"{_format_ticker(leader)} leads {max_count} of {total} highlighted KPIs"
+                    )
+                    if benchmark_label:
+                        action_sentence += f" relative to {benchmark_label}"
+                    if others:
+                        action_sentence += (
+                            ". Consider tilting exposure toward the leader while monitoring "
+                            + ", ".join(_format_ticker(t) for t in others)
+                            + " for catalysts."
+                        )
+                    else:
+                        action_sentence += (
+                            ". Consider tilting exposure toward the leader while monitoring macro risks."
+                        )
+                else:
+                    leader_text = ", ".join(_format_ticker(t) for t in leaders)
+                    sectors = {sector_labels.get(t) or self._sector_label(t) for t in leaders}
+                    sectors.discard(None)
+                    sector_clause = ""
+                    if len(sectors) == 1:
+                        only_sector = sectors.pop()
+                        sector_clause = f" (shared exposure to {only_sector})"
+                    action_sentence = (
+                        f"Leadership is split across {leader_text}{sector_clause}; keep positions balanced and watch the next catalysts closely."
+                    )
+
+        return " ".join(filter(None, [summary_sentence, action_sentence]))
 
     def _select_latest_records(
         self,

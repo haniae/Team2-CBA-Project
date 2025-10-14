@@ -162,7 +162,11 @@ body {
   gap: 10px;
   overflow-y: auto;
   padding-right: 6px;
-  max-height: 320px;
+  min-height: 0;
+  max-height: none;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable both-edges;
 }
 
 .sidebar-section h2 {
@@ -279,8 +283,9 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 24px 36px 32px;
+  gap: 32px;
+  padding: 32px 48px 36px;
+  align-items: stretch;
 }
 
 .chat-panel--collapsed {
@@ -368,21 +373,25 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 24px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  gap: 24px;
+  padding: 24px 0 120px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable both-edges;
 }
 
 .message {
   display: grid;
-  gap: 8px;
-  padding: 16px 18px;
-  border-radius: 16px;
-  max-width: min(720px, 85%);
+  gap: 12px;
+  padding: 20px 28px;
+  border-radius: 18px;
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
   line-height: 1.55;
   font-size: 15px;
   color: var(--text-primary);
@@ -392,7 +401,9 @@ body {
 }
 
 .message.user {
+  width: min(75%, 720px);
   margin-left: auto;
+  align-self: flex-end;
   background: var(--user-bg);
   color: var(--user-text);
   border-color: rgba(37, 99, 235, 0.35);
@@ -781,13 +792,16 @@ body {
     align-items: flex-start;
   }
 
-  .top-bar,
-  .chat-panel {
+  .top-bar {
     padding: 20px;
   }
 
+  .chat-panel {
+    padding: 24px 16px 28px;
+  }
+
   .chat-log {
-    padding: 16px;
+    padding: 16px 0 96px;
   }
 
   .chat-intro {
@@ -2560,4 +2574,111 @@ body {
   background: rgba(37, 99, 235, 0.22);
   border-color: rgba(37, 99, 235, 0.55);
   transform: translateY(-1px);
+}
+.artifact-section.artifact-table {
+  background: linear-gradient(160deg, rgba(241, 246, 255, 0.95), rgba(219, 234, 254, 0.78));
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  border-radius: 24px;
+  padding: 28px 32px;
+  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.artifact-table__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.artifact-table__title {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(30, 64, 175, 0.82);
+}
+
+.artifact-table__descriptor {
+  font-size: 13px;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.artifact-table__surface {
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.artifact-table__grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.artifact-table__grid thead th {
+  padding: 14px 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.18), rgba(59, 130, 246, 0.05));
+  color: rgba(30, 64, 175, 0.9);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.artifact-table__grid tbody th,
+.artifact-table__grid tbody td {
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.artifact-table__grid tbody tr:nth-child(even) th,
+.artifact-table__grid tbody tr:nth-child(even) td {
+  background: rgba(237, 242, 255, 0.72);
+}
+
+.artifact-table__metric {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 220px;
+}
+
+.artifact-table__value {
+  text-align: right;
+  color: rgba(15, 23, 42, 0.78);
+}
+
+@media (max-width: 768px) {
+  .artifact-section.artifact-table {
+    padding: 22px 18px;
+  }
+
+  .artifact-table__grid thead th,
+  .artifact-table__grid tbody th,
+  .artifact-table__grid tbody td {
+    padding: 12px 14px;
+  }
+}
+.artifact-section.artifact-conclusion {
+  background: linear-gradient(150deg, rgba(236, 252, 203, 0.75), rgba(217, 249, 157, 0.6));
+  border: 1px solid rgba(132, 204, 22, 0.3);
+  border-radius: 20px;
+  padding: 20px 24px;
+  box-shadow: 0 18px 40px rgba(77, 124, 15, 0.18);
+}
+
+.artifact-conclusion__text {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: rgba(54, 83, 20, 0.95);
 }
