@@ -986,10 +986,124 @@ function buildKpiLibraryView(data) {
   container.className = "kpi-library";
   container.append(buildKpiLibraryHero(data));
 
-  const categories = buildCategoriesSection(data.kpis);
-  if (categories) {
-    container.append(categories);
+  const state = {
+    all: Array.isArray(data?.kpis) ? data.kpis.slice() : [],
+    filtered: [],
+    search: "",
+    category: "",
+    direction: "",
+  };
+
+  const controls = document.createElement("div");
+  controls.className = "kpi-library__filters";
+
+  const searchGroup = document.createElement("div");
+  searchGroup.className = "kpi-library__filter kpi-library__filter--search";
+  const searchInput = document.createElement("input");
+  searchInput.type = "search";
+  searchInput.placeholder = "Search KPI by name, formula, or ID";
+  searchInput.autocomplete = "off";
+  searchInput.className = "kpi-library__search";
+  searchGroup.append(searchInput);
+  controls.append(searchGroup);
+
+  const categoryGroup = document.createElement("div");
+  categoryGroup.className = "kpi-library__filter";
+  const categorySelect = document.createElement("select");
+  categorySelect.className = "kpi-library__select";
+  categorySelect.innerHTML = `<option value="">All categories</option>`;
+  const categories = Array.from(
+    new Set(state.all.map((kpi) => kpi.category || "").filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+  categories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category;
+    option.textContent = category;
+    categorySelect.append(option);
+  });
+  categoryGroup.append(categorySelect);
+  controls.append(categoryGroup);
+
+  const directionGroup = document.createElement("div");
+  directionGroup.className = "kpi-library__filter";
+  const directionSelect = document.createElement("select");
+  directionSelect.className = "kpi-library__select";
+  directionSelect.innerHTML = `<option value="">Any direction</option>`;
+  const directions = Array.from(
+    new Set(state.all.map((kpi) => kpi.directionality || "").filter(Boolean))
+  );
+  directions
+    .map((direction) => ({ raw: direction, label: formatDirectionality(direction) }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .forEach(({ raw, label }) => {
+      const option = document.createElement("option");
+      option.value = raw;
+      option.textContent = label;
+      directionSelect.append(option);
+    });
+  directionGroup.append(directionSelect);
+  controls.append(directionGroup);
+
+  container.append(controls);
+
+  const content = document.createElement("div");
+  content.className = "kpi-library__content";
+  container.append(content);
+
+  const emptyState = document.createElement("div");
+  emptyState.className = "kpi-library__empty hidden";
+  emptyState.textContent = "No KPIs match your filters.";
+  container.append(emptyState);
+
+  function applyFilters() {
+    const term = state.search;
+    const category = state.category;
+    const direction = state.direction;
+
+    state.filtered = state.all.filter((kpi) => {
+      const matchesTerm =
+        !term ||
+        [kpi.display_name, kpi.kpi_id, kpi.category, kpi.formula_text]
+          .filter(Boolean)
+          .some((field) => field.toLowerCase().includes(term));
+      const matchesCategory = !category || kpi.category === category;
+      const matchesDirection = !direction || kpi.directionality === direction;
+      return matchesTerm && matchesCategory && matchesDirection;
+    });
+
+    renderContent();
   }
+
+  function renderContent() {
+    content.innerHTML = "";
+    if (!state.filtered.length) {
+      emptyState.classList.remove("hidden");
+      return;
+    }
+    emptyState.classList.add("hidden");
+    const section = buildCategoriesSection(state.filtered);
+    if (section) {
+      content.append(section);
+    }
+  }
+
+  searchInput.addEventListener("input", (event) => {
+    state.search = event.target.value.trim().toLowerCase();
+    applyFilters();
+  });
+
+  categorySelect.addEventListener("change", (event) => {
+    state.category = event.target.value;
+    applyFilters();
+  });
+
+  directionSelect.addEventListener("change", (event) => {
+    state.direction = event.target.value;
+    applyFilters();
+  });
+
+  // initial render
+  applyFilters();
 
   return container;
 }
@@ -3139,74 +3253,7 @@ function renderCompanyUniverseMetrics(data) {
   });
 
   companyUniverseMetrics.innerHTML = "";
-
-  const coverageTotal = complete + partial + missing;
-  const coveragePercent =
-    coverageTotal > 0 ? Math.round((complete / coverageTotal) * 100) : null;
-
-  const cards = [];
-
-  if (filteredCount > 0) {
-    cards.push({
-      label: "Companies in view",
-      value: filteredCount.toLocaleString(),
-      detail: sectors.size
-        ? `${sectors.size} sector${sectors.size === 1 ? "" : "s"}`
-        : "No sector tags",
-    });
-
-    cards.push({
-      label: "Coverage mix",
-      value: coveragePercent !== null ? `${coveragePercent}% complete` : "-",
-      detail: `${complete} complete | ${partial} partial | ${missing} missing`,
-    });
-
-    cards.push({
-      label: "Latest filing ingested",
-      value: mostRecent ? formatDateHuman(mostRecent.latest_filing) : "-",
-      detail: mostRecent?.ticker || "",
-    });
-  } else {
-    cards.push({
-      label: "Companies in view",
-      value: "0",
-      detail: "Adjust filters to rediscover the universe.",
-    });
-    cards.push({
-      label: "Coverage mix",
-      value: "-",
-      detail: "Complete 0 | Partial 0 | Missing 0",
-    });
-    cards.push({
-      label: "Latest filing ingested",
-      value: "-",
-      detail: "",
-    });
-  }
-
-  cards.forEach((card) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "company-universe__metric";
-
-    const label = document.createElement("span");
-    label.className = "company-universe__metric-label";
-    label.textContent = card.label;
-    wrapper.append(label);
-
-    const value = document.createElement("span");
-    value.className = "company-universe__metric-value";
-    value.textContent = card.value;
-    wrapper.append(value);
-
-    if (card.detail) {
-      const detail = document.createElement("span");
-      detail.className = "company-universe__metric-detail";
-      detail.textContent = card.detail;
-      wrapper.append(detail);
-    }
-
-    companyUniverseMetrics.append(wrapper);
-  });
+  companyUniverseMetrics.classList.add("hidden");
 }
 function formatMarketCap(rawValue, displayValue) {
   if (displayValue) {
@@ -3550,6 +3597,4 @@ loadHelpContentOverrides();
 if (chatInput) {
   chatInput.focus();
 }
-
-
 
