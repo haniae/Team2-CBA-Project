@@ -1,128 +1,109 @@
 ﻿<!DOCTYPE html>
+
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BenchmarkOS Copilot</title>
-    <link rel="stylesheet" href="/static/styles.css" />
-  </head>
-  <body>
-    <div class="layout">
-      <aside class="sidebar">
-        <div class="sidebar-brand-zone">
-          <div class="brand-identity">
-            <div class="brand-badge" aria-hidden="true">BO</div>
-            <div class="brand-text">
-              <span class="brand-name">BenchmarkOS</span>
-            </div>
-          </div>
-          <div class="brand-status">
-            <div class="status-connection">
-              <span class="status-dot" id="api-status"></span>
-              <span id="status-message">Checking API...</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="sidebar-divider" role="presentation"></div>
-
-        <nav class="sidebar-nav" aria-label="Analyst navigation">
-          <button class="nav-item" data-action="new-analysis">
-            <span class="nav-icon" aria-hidden="true">🔍</span>
-            <span class="nav-label">New Analysis</span>
-          </button>
-          <button class="nav-item" data-action="saved-reports">
-            <span class="nav-icon" aria-hidden="true">📁</span>
-            <span class="nav-label">Saved Reports</span>
-          </button>
-          <button class="nav-item" data-action="open-kpi-library">
-            <span class="nav-icon" aria-hidden="true">📊</span>
-            <span class="nav-label">KPI Library</span>
-          </button>
-          <button class="nav-item" data-action="open-company-universe">
-            <span class="nav-icon" aria-hidden="true">🏢</span>
-            <span class="nav-label">Company Universe</span>
-          </button>
-          <button class="nav-item" data-action="open-filing-viewer">
-            <span class="nav-icon" aria-hidden="true">📚</span>
-            <span class="nav-label">Filing Source Viewer</span>
-          </button>
-          <button class="nav-item" data-action="open-help">
-            <span class="nav-icon" aria-hidden="true">🆘</span>
-            <span class="nav-label">Help Center</span>
-          </button>
-        </nav>
-
-        <div class="sidebar-divider" role="presentation"></div>
-
-        <nav class="sidebar-nav secondary" aria-label="Workspace navigation">
-          <button class="nav-item" data-action="open-settings">
-            <span class="nav-icon" aria-hidden="true">⚙️</span>
-            <span class="nav-label">Settings</span>
-          </button>
-        </nav>
-
-        <section class="sidebar-section saved-reports" aria-labelledby="saved-reports-heading">
-          <div class="section-header">
-            <h2 id="saved-reports-heading">Saved Reports</h2>
-            <button class="section-action" data-action="search-saved">
-              <span aria-hidden="true">🔎</span>
-              <span class="section-action-label">Search</span>
-            </button>
-          </div>
-          <div class="sidebar-search hidden" id="chat-search" role="search">
-            <label class="sr-only" for="chat-search-input">Search saved conversations</label>
-            <input
-              type="search"
-              id="chat-search-input"
-              placeholder="Filter reports..."
-              autocomplete="off"
-            />
-            <button type="button" id="chat-search-clear" class="search-clear" aria-label="Clear search">&times;</button>
-          </div>
-          <div class="conversation-list" id="conversation-list" role="list">
-            <p class="empty-state">Saved analyses will appear here.</p>
-          </div>
-        </section>
-
-        <footer class="sidebar-footer">
-          <p>Grounded by BenchmarkOS analytics &mdash; audit-ready by design.</p>
-        </footer>
-      </aside>
-
-      <main class="main-panel">
-        <header class="top-bar">
-          <div class="hero-copy">
-            <h1>BenchmarkOS Analyst Copilot</h1>
-            <p>Ask capital-markets questions grounded in your analytics store.</p>
-          </div>
-        </header>
-
-        <section class="utility-panel hidden" id="utility-panel" aria-live="polite">
-          <div class="utility-panel-header">
-            <h2 id="utility-title"></h2>
-          </div>
-          <div class="utility-content" id="utility-content"></div>
-        </section>
-
-        <section class="chat-panel">
-          <div id="chat-log" class="chat-log" aria-live="polite"></div>
-
-          <form id="chat-form" class="chat-form" autocomplete="off">
-            <textarea
-              id="chat-input"
-              rows="3"
-              placeholder="Ask anything about tickers, metrics, or scenarios..."
-              required
-            ></textarea>
-            <div class="chat-actions">
-              <span class="hint">Press Enter to send - Shift+Enter for a new line</span>
-              <button id="send-button" type="submit">Send</button>
-            </div>
-          </form>
-        </section>
-      </main>
-    </div>
-    <script src="/static/app.js?v=20241014" defer></script>
-  </body>
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>BenchmarkOS Copilot</title>
+<link href="/static/styles.css" rel="stylesheet"/>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+<div class="sidebar-brand-zone">
+<div class="brand-identity">
+<div aria-hidden="true" class="brand-badge">BO</div>
+<div class="brand-text">
+<span class="brand-name">BenchmarkOS</span>
+</div>
+</div>
+<div class="brand-status">
+<div class="status-connection">
+<span class="status-dot" id="api-status"></span>
+<span id="status-message">Checking API...</span>
+</div>
+</div>
+</div>
+<div class="sidebar-divider" role="presentation"></div>
+<nav aria-label="Analyst navigation" class="sidebar-nav">
+<button class="nav-item" data-action="new-analysis">
+<span aria-hidden="true" class="nav-icon">🔍</span>
+<span class="nav-label">New Analysis</span>
+</button>
+<button class="nav-item" data-action="saved-reports">
+<span aria-hidden="true" class="nav-icon">📁</span>
+<span class="nav-label">Saved Reports</span>
+</button>
+<button class="nav-item" data-action="open-kpi-library">
+<span aria-hidden="true" class="nav-icon">📊</span>
+<span class="nav-label">KPI Library</span>
+</button>
+<button class="nav-item" data-action="open-company-universe">
+<span aria-hidden="true" class="nav-icon">🏢</span>
+<span class="nav-label">Company Universe</span>
+</button>
+<button class="nav-item" data-action="open-filing-viewer">
+<span aria-hidden="true" class="nav-icon">📚</span>
+<span class="nav-label">Filing Source Viewer</span>
+</button>
+<button class="nav-item" data-action="open-help">
+<span aria-hidden="true" class="nav-icon">🆘</span>
+<span class="nav-label">Help Center</span>
+</button>
+</nav>
+<div class="sidebar-divider" role="presentation"></div>
+<nav aria-label="Workspace navigation" class="sidebar-nav secondary">
+<button class="nav-item" data-action="open-settings">
+<span aria-hidden="true" class="nav-icon">⚙️</span>
+<span class="nav-label">Settings</span>
+</button>
+</nav>
+<section aria-labelledby="saved-reports-heading" class="sidebar-section saved-reports">
+<div class="section-header">
+<h2 id="saved-reports-heading">Saved Reports</h2>
+<button class="section-action" data-action="search-saved">
+<span aria-hidden="true">🔎</span>
+<span class="section-action-label">Search</span>
+</button>
+</div>
+<div class="sidebar-search hidden" id="chat-search" role="search">
+<label class="sr-only" for="chat-search-input">Search saved conversations</label>
+<input autocomplete="off" id="chat-search-input" placeholder="Filter reports..." type="search"/>
+<button aria-label="Clear search" class="search-clear" id="chat-search-clear" type="button">×</button>
+</div>
+<div class="conversation-list" id="conversation-list" role="list">
+<p class="empty-state">Saved analyses will appear here.</p>
+</div>
+</section>
+<footer class="sidebar-footer">
+<p>Grounded by BenchmarkOS analytics — audit-ready by design.</p>
+</footer>
+</aside>
+<main class="main-panel">
+<div class="content-container"><header class="top-bar top-bar--center">
+<div class="hero-copy">
+<h1>Analyst Copilot</h1>
+</div>
+<span class="top-bar__microtag" aria-label="by BenchmarkOS">by BenchmarkOS</span>
+</header></div>
+<div class="content-container"><section aria-live="polite" class="utility-panel hidden" id="utility-panel">
+<div class="utility-panel-header">
+<h2 id="utility-title"></h2>
+</div>
+<div class="utility-content" id="utility-content"></div>
+</section></div>
+<div class="content-container"><section class="chat-panel">
+<div aria-live="polite" class="chat-log" id="chat-log"></div>
+<form autocomplete="off" class="chat-form" id="chat-form">
+<textarea id="chat-input" placeholder="Ask anything about tickers, metrics, or scenarios..." required="" rows="3"></textarea>
+<div class="chat-actions">
+<span class="hint">Press Enter to send - Shift+Enter for a new line</span>
+<button id="send-button" type="submit">Send</button>
+</div>
+</form>
+</section></div>
+</main>
+</div>
+<script defer="" src="/static/app.js?v=20241014"></script>
+</body>
 </html>

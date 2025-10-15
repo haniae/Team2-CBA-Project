@@ -232,7 +232,8 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--surface-alt);
-  max-width: 100%;
+  padding: 0 48px 48px;
+  width: 100%;
 }
 
 .top-bar {
@@ -240,20 +241,35 @@ body {
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  padding: 28px 48px 24px 48px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-glass);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+  padding: 32px 0 16px;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+  background: transparent;
+  position: relative;
 }
-@media (min-width: 1600px) {
-  .top-bar {
-    justify-content: center;
-  }
-  .top-bar > * {
-    max-width: 1200px;
-    width: 100%;
-  }
+
+.top-bar--center {
+  justify-content: center;
+  text-align: center;
+}
+
+.top-bar--left {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.top-bar::after {
+  content: "BO";
+  position: absolute;
+  top: 12px;
+  right: 10%;
+  font-size: clamp(120px, 18vw, 180px);
+  font-weight: 700;
+  letter-spacing: -0.08em;
+  color: var(--navy);
+  opacity: 0.025;
+  pointer-events: none;
+  user-select: none;
+  transform: translateY(-20%);
 }
 
 .hero-copy {
@@ -261,12 +277,45 @@ body {
   flex-direction: column;
   gap: 8px;
   max-width: 720px;
+  text-align: inherit;
 }
 
 .top-bar h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: clamp(28px, 4vw, 36px);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-weight: 600;
   color: var(--text-primary);
+  text-align: inherit;
+}
+
+.top-bar__microtag {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.55);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .top-bar__microtag {
+    position: static;
+    transform: none;
+    text-align: center;
+    margin-top: 12px;
+    letter-spacing: 0.12em;
+  }
+  .top-bar::after {
+    right: 50%;
+    transform: translate(50%, -10%);
+    font-size: 120px;
+  }
 }
 
 .top-bar p {
