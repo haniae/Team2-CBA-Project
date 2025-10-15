@@ -68,6 +68,52 @@ const PROMPT_CACHE_LIMIT = 32;
 const PROMPT_CACHE_TTL_MS = 3 * 60 * 1000;
 const promptCache = new Map();
 const topBar = document.querySelector(".top-bar");
+const PROGRESS_POLL_INTERVAL_MS = 750;
+const progressTrackers = new Map();
+const COMPLETE_STAGE_HINTS = [
+  "_complete",
+  "_ready",
+  "cache_hit",
+  "cache_miss",
+  "cache_store",
+  "cache_skip",
+  "help_complete",
+  "complete",
+];
+const PROGRESS_BLUEPRINT = [
+  {
+    key: "intent",
+    label: "Understand request",
+    matches(stage) {
+      return (
+        stage.startsWith("intent") ||
+        stage === "help_lookup" ||
+        stage === "help_complete"
+      );
+    },
+  },
+  {
+    key: "cache",
+    label: "Check recent answers",
+    matches(stage) {
+      return stage.startsWith("cache");
+    },
+  },
+  {
+    key: "context",
+    label: "Gather context",
+    matches(stage) {
+      return stage.startsWith("context") || stage.startsWith("summary");
+    },
+  },
+  {
+    key: "compose",
+    label: "Compose explanation",
+    matches(stage) {
+      return stage.startsWith("llm") || stage === "fallback" || stage === "complete";
+    },
+  },
+];
 let companyUniverseData = [];
 let filteredCompanyData = [];
 let companyUniverseMetrics = null;
@@ -164,6 +210,43 @@ function saveUserSettings(settings) {
     console.error("Unable to persist user settings", error);
     throw error;
   }
+}
+
+function generateRequestId() {
+  if (window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  return `req_${Date.now().toString(16)}_${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function createProgressSteps() {
+  return PROGRESS_BLUEPRINT.map(({ key, label }) => ({
+    key,
+    label,
+    status: "pending",
+    detail: "",
+  }));
+}
+
+function stepStatusFromStage(stage) {
+  if (!stage) {
+    return "pending";
+  }
+  if (stage === "error") {
+    return "error";
+  }
+  if (stage === "complete" || COMPLETE_STAGE_HINTS.some((hint) => stage.includes(hint))) {
+    return "complete";
+  }
+  return "active";
+}
+
+function findStepKeyForStage(stage) {
+  if (!stage) {
+    return null;
+  }
+  const match = PROGRESS_BLUEPRINT.find((entry) => entry.matches(stage));
+  return match ? match.key : null;
 }
 
 async function renderCompanyUniverseSection({ container } = {}) {
@@ -2427,6 +2510,174 @@ function openPdfPreview(payload) {
   }
 }
 
+function ensureMessageProgress(wrapper) {
+  if (!wrapper) {
+    return null;
+  }
+  const body = wrapper.querySelector(".message-body");
+  if (!body) {
+    return null;
+  }
+  let container = body.querySelector(".message-progress");
+  if (!container) {
+    container = document.createElement("div");
+    container.className = "message-progress";
+    const title = document.createElement("div");
+    title.className = "message-progress-title";
+    title.textContent = "Preparing analysis...";
+    container.append(title);
+    const list = document.createElement("ul");
+    list.className = "message-progress-list";
+    container.append(list);
+    body.append(container);
+  }
+  return {
+    container,
+    list: container.querySelector(".message-progress-list"),
+    title: container.querySelector(".message-progress-title"),
+  };
+}
+
+function pushProgressEventsInternal(tracker, events) {
+  if (!tracker || !Array.isArray(events) || !events.length) {
+    return;
+  }
+  const container = tracker.container;
+  container.classList.add("active");
+  container.classList.remove("pending");
+  const typingIndicator = tracker.wrapper?.querySelector(".typing-indicator");
+  if (typingIndicator && !tracker.progressStarted) {
+    typingIndicator.classList.add("with-progress");
+    tracker.progressStarted = true;
+  }
+  const freshEvents = events
+    .filter(
+      (event) =>
+        event &&
+        typeof event.sequence === "number" &&
+        !tracker.seen.has(event.sequence)
+    )
+    .sort((a, b) => a.sequence - b.sequence);
+  if (!freshEvents.length) {
+    return;
+  }
+  freshEvents.forEach((event) => {
+    tracker.seen.add(event.sequence);
+    tracker.lastSequence = Math.max(tracker.lastSequence, event.sequence);
+    updateProgressTrackerWithEvent(tracker, event);
+  });
+  tracker.render();
+}
+
+function startProgressTracking(requestId, wrapper) {
+  if (!requestId || !wrapper) {
+    return null;
+  }
+  const progressElements = ensureMessageProgress(wrapper);
+  if (!progressElements || !progressElements.list) {
+    return null;
+  }
+  const { container, list, title } = progressElements;
+  container.classList.add("active", "pending");
+  wrapper.dataset.requestId = requestId;
+  const tracker = {
+    requestId,
+    wrapper,
+    list,
+    container,
+    title,
+    steps: createProgressSteps(),
+    seen: new Set(),
+    lastSequence: 0,
+    timer: null,
+    pending: false,
+    complete: false,
+    progressStarted: false,
+    events: [],
+    render() {
+      renderProgressTracker(this);
+    },
+  };
+
+  if (tracker.steps.length) {
+    tracker.steps[0].status = "active";
+  }
+
+  const poll = async () => {
+    if (tracker.pending) {
+      return;
+    }
+    tracker.pending = true;
+    try {
+      const sinceParam = tracker.lastSequence > 0 ? `?since=${tracker.lastSequence}` : "";
+      const res = await fetch(`${API_BASE}/progress/${requestId}${sinceParam}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error(`Progress status ${res.status}`);
+      }
+      const data = await res.json();
+      if (Array.isArray(data?.events)) {
+        pushProgressEventsInternal(tracker, data.events);
+      }
+      if (data?.complete) {
+        tracker.complete = true;
+      }
+      if (data?.error && tracker.title) {
+        tracker.title.textContent = data.error;
+        list.parentElement?.classList.add("error");
+      }
+    } catch (error) {
+      tracker.lastError = error;
+    } finally {
+      tracker.pending = false;
+      if (tracker.complete && tracker.timer) {
+        window.clearInterval(tracker.timer);
+        tracker.timer = null;
+      }
+    }
+  };
+
+  tracker.poll = poll;
+  progressTrackers.set(requestId, tracker);
+  tracker.render();
+  tracker.poll().catch(() => {});
+  tracker.timer = window.setInterval(() => {
+    tracker.poll().catch(() => {});
+  }, PROGRESS_POLL_INTERVAL_MS);
+  return tracker;
+}
+
+async function stopProgressTracking(requestId, { flush = false } = {}) {
+  const tracker = progressTrackers.get(requestId);
+  if (!tracker) {
+    return;
+  }
+  if (tracker.timer) {
+    window.clearInterval(tracker.timer);
+    tracker.timer = null;
+  }
+  if (flush) {
+    try {
+      await tracker.poll();
+    } catch (error) {
+      // ignore polling failure when winding down
+    }
+  }
+  tracker.container?.classList.remove("pending");
+  tracker.render();
+  renderProgressSummary(tracker);
+  progressTrackers.delete(requestId);
+}
+
+function pushProgressEvents(requestId, events) {
+  const tracker = progressTrackers.get(requestId);
+  if (!tracker) {
+    return;
+  }
+  pushProgressEventsInternal(tracker, events);
+}
+
 function showAssistantTyping() {
   return appendMessage("assistant", "", { isPlaceholder: true, animate: false });
 }
@@ -4310,8 +4561,11 @@ function setCachedPrompt(key, reply, artifacts) {
   }
 }
 
-async function sendPrompt(prompt) {
+async function sendPrompt(prompt, requestId) {
   const payload = { prompt };
+  if (requestId) {
+    payload.request_id = requestId;
+  }
   if (activeConversation && activeConversation.remoteId) {
     payload.conversation_id = activeConversation.remoteId;
   }
@@ -4361,6 +4615,7 @@ chatForm.addEventListener("submit", async (event) => {
   }
 
   setSending(true);
+  const requestId = generateRequestId();
   let pendingMessage = showAssistantTyping();
   const cachedEntry = getCachedPrompt(canonicalPrompt);
   if (cachedEntry && cachedEntry.reply) {
@@ -4374,11 +4629,16 @@ chatForm.addEventListener("submit", async (event) => {
     }
   }
 
+  if (pendingMessage && pendingMessage.classList.contains("typing")) {
+    startProgressTracking(requestId, pendingMessage);
+  }
+
   try {
-    const response = await sendPrompt(prompt);
+    const response = await sendPrompt(prompt, requestId);
     const cleanReply = typeof response?.reply === "string" ? response.reply.trim() : "";
     const messageText = cleanReply || "(no content)";
     const artifacts = normaliseArtifacts(response);
+    pushProgressEvents(requestId, response?.progress_events || []);
     recordMessage("assistant", messageText, artifacts);
     const resolved = resolvePendingMessage(pendingMessage, "assistant", messageText, {
       forceScroll: true,
@@ -4396,6 +4656,7 @@ chatForm.addEventListener("submit", async (event) => {
     recordMessage("system", fallback);
     resolvePendingMessage(pendingMessage, "system", fallback, { forceScroll: true });
   } finally {
+    await stopProgressTracking(requestId, { flush: true });
     setSending(false);
     chatInput.focus();
   }
@@ -4534,4 +4795,165 @@ loadHelpContentOverrides();
 
 if (chatInput) {
   chatInput.focus();
+}
+
+function updateProgressTrackerWithEvent(tracker, event) {
+  if (!tracker || !event) {
+    return;
+  }
+  tracker.events.push(event);
+  const stage = event.stage || "";
+  const statusHint = stepStatusFromStage(stage);
+
+  if (stage === "error") {
+    tracker.container.classList.remove("pending");
+    tracker.container.classList.remove("complete");
+    tracker.container.classList.add("error");
+    if (tracker.title) {
+      tracker.title.textContent = "Something went wrong";
+    }
+    return;
+  }
+
+  if (stage === "complete") {
+    tracker.steps.forEach((step) => {
+      step.status = "complete";
+      if (!step.detail && event.detail) {
+        step.detail = event.detail;
+      }
+    });
+    tracker.container.classList.remove("pending");
+    tracker.container.classList.remove("error");
+    tracker.container.classList.add("complete");
+    if (tracker.title) {
+      tracker.title.textContent = "Analysis ready";
+    }
+    return;
+  }
+
+  const matchedKey = findStepKeyForStage(stage);
+  if (!matchedKey) {
+    return;
+  }
+  const index = tracker.steps.findIndex((step) => step.key === matchedKey);
+  if (index === -1) {
+    return;
+  }
+
+  tracker.steps.forEach((step, idx) => {
+    if (idx < index) {
+      if (step.status !== "complete") {
+        step.status = "complete";
+      }
+    }
+  });
+
+  const currentStep = tracker.steps[index];
+  currentStep.status = statusHint;
+  if (event.detail) {
+    currentStep.detail = event.detail;
+  }
+
+  tracker.steps.forEach((step, idx) => {
+    if (idx > index && step.status !== "complete") {
+      step.status = "pending";
+    }
+  });
+
+  tracker.container.classList.remove("error");
+  if (statusHint === "complete" && index === tracker.steps.length - 1) {
+    tracker.container.classList.add("complete");
+  } else {
+    tracker.container.classList.remove("complete");
+  }
+
+  if (!tracker.steps.some((step) => step.status === "active")) {
+    const nextPending = tracker.steps.find((step) => step.status === "pending");
+    if (nextPending) {
+      nextPending.status = "active";
+    }
+  }
+
+  const activeStep = tracker.steps.find((step) => step.status === "active");
+  if (tracker.title) {
+    tracker.title.textContent = activeStep?.label || "Analysis ready";
+  }
+}
+
+function renderProgressTracker(tracker) {
+  if (!tracker?.list) {
+    return;
+  }
+  tracker.list.textContent = "";
+  tracker.steps.forEach((step) => {
+    const item = document.createElement("li");
+    item.className = `progress-step ${step.status}`;
+    item.dataset.key = step.key;
+
+    const indicator = document.createElement("span");
+    indicator.className = "progress-indicator";
+    item.append(indicator);
+
+    const copy = document.createElement("div");
+    copy.className = "progress-copy";
+    const label = document.createElement("div");
+    label.className = "progress-label";
+    label.textContent = step.label;
+    copy.append(label);
+    if (step.detail) {
+      const detail = document.createElement("div");
+      detail.className = "progress-detail";
+      detail.textContent = step.detail;
+      copy.append(detail);
+    }
+    item.append(copy);
+    tracker.list.append(item);
+  });
+}
+
+function renderProgressSummary(tracker) {
+  if (!tracker?.events?.length) {
+    return;
+  }
+  if (!tracker?.wrapper) {
+    return;
+  }
+  const body = tracker.wrapper.querySelector(".message-body");
+  if (!body) {
+    return;
+  }
+  let summary = body.querySelector(".processing-timeline");
+  if (summary) {
+    summary.remove();
+  }
+  summary = document.createElement("div");
+  summary.className = "processing-timeline";
+  const heading = document.createElement("h4");
+  heading.textContent = "Processing timeline";
+  summary.append(heading);
+  const list = document.createElement("ol");
+  list.className = "processing-timeline-list";
+  tracker.steps.forEach((step) => {
+    const item = document.createElement("li");
+    item.className = `timeline-step ${step.status}`;
+    const status = document.createElement("span");
+    status.className = "timeline-indicator";
+    item.append(status);
+    const content = document.createElement("div");
+    content.className = "timeline-copy";
+    const label = document.createElement("div");
+    label.className = "timeline-label";
+    label.textContent = step.label;
+    content.append(label);
+    if (step.detail) {
+      const detail = document.createElement("div");
+      detail.className = "timeline-detail";
+      detail.textContent = step.detail;
+      content.append(detail);
+    }
+    item.append(content);
+    list.append(item);
+  });
+  summary.append(list);
+  body.prepend(summary);
 }

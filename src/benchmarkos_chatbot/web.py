@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -53,10 +55,32 @@ elif PACKAGE_STATIC.exists():
 
 # ----- Schemas ----------------------------------------------------------------
 
+class ProgressEvent(BaseModel):
+    """Single progress update emitted while building a chatbot response."""
+
+    sequence: int
+    stage: str
+    label: str
+    detail: str
+    timestamp: str
+
+
+class ProgressStatus(BaseModel):
+    """Snapshot of progress emitted for an in-flight chat request."""
+
+    request_id: str
+    conversation_id: Optional[str] = None
+    events: List[ProgressEvent] = []
+    complete: bool = False
+    error: Optional[str] = None
+
+
 class ChatRequest(BaseModel):
     """Payload expected by the /chat endpoint when posting a prompt."""
+
     prompt: str
     conversation_id: Optional[str] = None
+    request_id: Optional[str] = None
 
 
 class TrendPoint(BaseModel):
@@ -117,11 +141,13 @@ class ChatResponse(BaseModel):
     """Response returned after processing a chat prompt."""
     conversation_id: str
     reply: str
+    request_id: Optional[str] = None
     highlights: List[str] = []
     trends: List[TrendSeries] = []
     comparison_table: Optional[ComparisonTable] = None
     citations: List[Citation] = []
     exports: List[ExportPayload] = []
+    progress_events: List[ProgressEvent] = []
 
 
 class MetricsResponse(BaseModel):
@@ -212,6 +238,152 @@ def build_bot(conversation_id: Optional[str] = None) -> BenchmarkOSChatbot:
     return bot
 
 
+_PROGRESS_LOCK = threading.Lock()
+_PROGRESS_STATE: Dict[str, Dict[str, Any]] = {}
+_PROGRESS_RETENTION_SECONDS = 120.0
+_PROGRESS_MAX_EVENTS = 200
+_PROGRESS_STAGE_LABELS: Dict[str, str] = {
+    "start": "Startup",
+    "message_logged": "Conversation",
+    "cache_lookup": "Cache",
+    "cache_hit": "Cache",
+    "cache_miss": "Cache",
+    "cache_skip": "Cache",
+    "cache_store": "Cache",
+    "help_lookup": "Help",
+    "help_complete": "Help",
+    "intent_normalised": "Intent",
+    "intent_attempt": "Intent",
+    "intent_complete": "Intent",
+    "summary_attempt": "Summary",
+    "summary_complete": "Summary",
+    "context_build_start": "Context",
+    "context_build_ready": "Context",
+    "llm_query_start": "LLM",
+    "llm_query_complete": "LLM",
+    "fallback": "Fallback",
+    "finalize": "Finalising",
+    "complete": "Done",
+    "error": "Error",
+}
+
+
+def _progress_timestamp() -> str:
+    """Return an ISO8601 timestamp with explicit UTC marker."""
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _cleanup_progress_locked(current_time: float) -> None:
+    """Remove completed trackers that have exceeded the retention window."""
+    stale_keys = [
+        key
+        for key, state in _PROGRESS_STATE.items()
+        if state.get("expires_at") is not None and state["expires_at"] <= current_time
+    ]
+    for key in stale_keys:
+        _PROGRESS_STATE.pop(key, None)
+
+
+def _start_progress_tracking(request_id: str, conversation_id: Optional[str]) -> None:
+    """Initialise a progress tracker for a new chat request."""
+    now = time.monotonic()
+    with _PROGRESS_LOCK:
+        _cleanup_progress_locked(now)
+        _PROGRESS_STATE[request_id] = {
+            "conversation_id": conversation_id,
+            "events": [],
+            "complete": False,
+            "error": None,
+            "next_sequence": 1,
+            "expires_at": None,
+        }
+
+
+def _label_for_stage(stage: str) -> str:
+    """Return a user-friendly label for the given stage."""
+    return _PROGRESS_STAGE_LABELS.get(stage, stage.replace("_", " ").title())
+
+
+def _record_progress_event(request_id: str, stage: str, detail: str) -> None:
+    """Append a progress event for downstream polling."""
+    timestamp = _progress_timestamp()
+    with _PROGRESS_LOCK:
+        state = _PROGRESS_STATE.get(request_id)
+        if state is None:
+            state = {
+                "conversation_id": None,
+                "events": [],
+                "complete": False,
+                "error": None,
+                "next_sequence": 1,
+                "expires_at": None,
+            }
+            _PROGRESS_STATE[request_id] = state
+        sequence = state["next_sequence"]
+        state["next_sequence"] += 1
+        state["events"].append(
+            {
+                "sequence": sequence,
+                "stage": stage,
+                "label": _label_for_stage(stage),
+                "detail": detail,
+                "timestamp": timestamp,
+            }
+        )
+        if len(state["events"]) > _PROGRESS_MAX_EVENTS:
+            state["events"] = state["events"][-_PROGRESS_MAX_EVENTS :]
+
+
+def _complete_progress_tracking(request_id: str, *, error: Optional[str] = None) -> None:
+    """Mark a progress tracker as complete and schedule cleanup."""
+    now = time.monotonic()
+    with _PROGRESS_LOCK:
+        state = _PROGRESS_STATE.get(request_id)
+        if state is None:
+            return
+        if error:
+            state["error"] = error
+            sequence = state["next_sequence"]
+            state["next_sequence"] += 1
+            state["events"].append(
+                {
+                    "sequence": sequence,
+                    "stage": "error",
+                    "label": _label_for_stage("error"),
+                    "detail": error,
+                    "timestamp": _progress_timestamp(),
+                }
+            )
+        state["complete"] = True
+        state["expires_at"] = now + _PROGRESS_RETENTION_SECONDS
+
+
+def _progress_snapshot(request_id: str, since: Optional[int] = None) -> ProgressStatus:
+    """Return the current progress state for a request."""
+    now = time.monotonic()
+    with _PROGRESS_LOCK:
+        _cleanup_progress_locked(now)
+        state = _PROGRESS_STATE.get(request_id)
+        if state is None:
+            return ProgressStatus(
+                request_id=request_id,
+                conversation_id=None,
+                events=[],
+                complete=False,
+                error=None,
+            )
+        events = state["events"]
+        if since is not None:
+            events = [event for event in events if event["sequence"] > since]
+        return ProgressStatus(
+            request_id=request_id,
+            conversation_id=state.get("conversation_id"),
+            events=[ProgressEvent(**event) for event in events],
+            complete=bool(state.get("complete")),
+            error=state.get("error"),
+        )
+
+
 def _normalise_ticker_symbol(value: str) -> str:
     """Return canonical ticker form used by the datastore (share classes -> dash)."""
     symbol = (value or "").strip().upper()
@@ -261,11 +433,15 @@ def chat(request: ChatRequest) -> ChatResponse:
     if not request.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty.")
 
+    request_id = request.request_id or str(uuid.uuid4())
     prompt = request.prompt.strip()
     lowered = prompt.lower()
     if lowered == "help":
         settings = get_settings()
         conversation_id = request.conversation_id or str(uuid.uuid4())
+        _start_progress_tracking(request_id, conversation_id)
+        _record_progress_event(request_id, "start", "Processing your request")
+        _record_progress_event(request_id, "help_lookup", "Loading help content")
         timestamp = datetime.utcnow()
         database.log_message(
             settings.database_path,
@@ -281,13 +457,34 @@ def chat(request: ChatRequest) -> ChatResponse:
             content=HELP_TEXT,
             created_at=datetime.utcnow(),
         )
+        _record_progress_event(request_id, "help_complete", "Help content ready")
+        _record_progress_event(request_id, "complete", "Response ready")
+        _complete_progress_tracking(request_id)
+        progress_snapshot = _progress_snapshot(request_id)
         return ChatResponse(
             conversation_id=conversation_id,
             reply=HELP_TEXT,
+            request_id=request_id,
+            progress_events=progress_snapshot.events,
         )
 
     bot = build_bot(request.conversation_id)
-    reply = bot.ask(request.prompt)
+    conversation_id = bot.conversation.conversation_id
+    _start_progress_tracking(request_id, conversation_id)
+
+    def _progress_hook(stage: str, detail: str) -> None:
+        _record_progress_event(request_id, stage, detail)
+
+    try:
+        reply = bot.ask(request.prompt, progress_callback=_progress_hook)
+    except Exception as exc:  # pragma: no cover - defensive relay
+        _complete_progress_tracking(request_id, error=str(exc))
+        _progress_snapshot(request_id)  # ensure cleanup scheduling
+        raise
+    else:
+        _complete_progress_tracking(request_id)
+
+    progress_snapshot = _progress_snapshot(request_id)
     structured = getattr(bot, "last_structured_response", {}) or {}
     trends = [
         TrendSeries(**series) for series in structured.get("trends") or []
@@ -306,11 +503,13 @@ def chat(request: ChatRequest) -> ChatResponse:
     return ChatResponse(
         conversation_id=bot.conversation.conversation_id,
         reply=reply,
+        request_id=request_id,
         highlights=structured.get("highlights") or [],
         trends=trends,
         comparison_table=comparison_table,
         citations=citations,
         exports=exports,
+        progress_events=progress_snapshot.events,
     )
 
 
@@ -318,6 +517,18 @@ def chat(request: ChatRequest) -> ChatResponse:
 def help_content() -> Dict[str, Any]:
     """Expose help metadata for the web UI."""
     return get_help_metadata()
+
+
+@app.get("/progress/{request_id}", response_model=ProgressStatus)
+def progress_status(
+    request_id: str,
+    since: Optional[int] = Query(
+        None,
+        description="Only return events whose sequence exceeds this value.",
+    ),
+) -> ProgressStatus:
+    """Allow the UI to poll for in-flight chatbot progress updates."""
+    return _progress_snapshot(request_id, since)
 
 
 def _select_latest_records(

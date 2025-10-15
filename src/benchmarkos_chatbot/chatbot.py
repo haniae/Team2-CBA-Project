@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 import unicodedata
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import requests
 
@@ -1210,9 +1210,24 @@ class BenchmarkOSChatbot:
     # ----------------------------------------------------------------------------------
     # Public API
     # ----------------------------------------------------------------------------------
-    def ask(self, user_input: str) -> str:
+    def ask(
+        self,
+        user_input: str,
+        *,
+        progress_callback: Optional[Callable[[str, str], None]] = None,
+    ) -> str:
         """Generate a reply and persist both sides of the exchange."""
+
+        def emit(stage: str, detail: str) -> None:
+            if progress_callback is None:
+                return
+            try:
+                progress_callback(stage, detail)
+            except Exception:  # pragma: no cover - progress hooks are best-effort
+                LOGGER.debug("Progress callback raised an exception", exc_info=True)
+
         self._reset_structured_response()
+        emit("start", "Working on your request")
         timestamp = datetime.utcnow()
         database.log_message(
             self.settings.database_path,
@@ -1222,40 +1237,70 @@ class BenchmarkOSChatbot:
             created_at=timestamp,
         )
         self.conversation.messages.append({"role": "user", "content": user_input})
+        emit("message_logged", "Chat history updated")
 
         reply: Optional[str] = None
         lowered_input = user_input.strip().lower()
         normalized_command = self._normalize_nl_to_command(user_input)
         canonical_prompt = self._canonical_prompt(user_input, normalized_command)
         cacheable = self._should_cache_prompt(canonical_prompt)
-        cached_entry: Optional[_CachedReply] = (
-            self._get_cached_reply(canonical_prompt) if cacheable else None
-        )
-        if cached_entry:
-            reply = cached_entry.reply
-            self.last_structured_response = copy.deepcopy(cached_entry.structured)
+
+        cached_entry: Optional[_CachedReply] = None
+        if cacheable:
+            emit("cache_lookup", "Checking recent answers")
+            cached_entry = self._get_cached_reply(canonical_prompt)
+            if cached_entry:
+                emit("cache_hit", "Reusing earlier answer from cache")
+                reply = cached_entry.reply
+                self.last_structured_response = copy.deepcopy(cached_entry.structured)
+            else:
+                emit("cache_miss", "No reusable answer found")
+        else:
+            emit("cache_skip", "Skipping cache for bespoke request")
 
         if reply is None:
             if lowered_input == "help":
+                emit("help_lookup", "Retrieving help guide")
                 reply = HELP_TEXT
+                emit("help_complete", "Help guide ready")
             else:
+                attempted_intent = False
                 if normalized_command and normalized_command.strip().lower() != lowered_input:
+                    emit("intent_normalised", "Detected structured financial intent")
                     reply = self._handle_financial_intent(normalized_command)
+                    attempted_intent = True
                 if reply is None:
+                    emit("intent_attempt", "Parsing prompt for analytics workflow")
                     reply = self._handle_financial_intent(user_input)
+                    attempted_intent = True
+                if attempted_intent and reply is not None:
+                    emit("intent_complete", "Analytics intent resolved")
+
         if reply is None:
             summary_target = self._detect_summary_target(user_input, normalized_command)
             if summary_target:
+                emit("summary_attempt", f"Compiling snapshot for {summary_target}")
                 reply = self._get_ticker_summary(summary_target)
+                if reply:
+                    emit("summary_complete", "Snapshot prepared")
 
         if reply is None:
+            emit("context_build_start", "Gathering financial context")
             context = self._build_rag_context(user_input)
+            emit(
+                "context_build_ready",
+                "Context compiled" if context else "Context not required",
+            )
             messages = self._prepare_llm_messages(context)
+            emit("llm_query_start", "Composing explanation")
             reply = self.llm_client.generate_reply(messages)
+            emit("llm_query_complete", "Explanation drafted")
 
         if reply is None:
+            emit("fallback", "Using fallback reply")
             reply = "I'm not sure how to help with that yet."
 
+        emit("finalize", "Finalising response")
         database.log_message(
             self.settings.database_path,
             self.conversation.conversation_id,
@@ -1266,8 +1311,10 @@ class BenchmarkOSChatbot:
         self.conversation.messages.append({"role": "assistant", "content": reply})
 
         if cacheable and not cached_entry and reply:
+            emit("cache_store", "Caching response for future reuse")
             self._store_cached_reply(canonical_prompt, reply)
 
+        emit("complete", "Response ready")
         return reply
 
     def history(self) -> Iterable[database.Message]:
