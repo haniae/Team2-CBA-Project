@@ -77,6 +77,12 @@ const COMPLETE_STAGE_HINTS = [
   "cache_miss",
   "cache_store",
   "cache_skip",
+  "summary_cache_hit",
+  "summary_build_complete",
+  "context_sources_ready",
+  "context_sources_empty",
+  "summary_unavailable",
+  "finalize",
   "help_complete",
   "complete",
 ];
@@ -85,6 +91,9 @@ const PROGRESS_BLUEPRINT = [
     key: "intent",
     label: "Understand request",
     matches(stage) {
+      if (!stage) {
+        return false;
+      }
       return (
         stage.startsWith("intent") ||
         stage === "help_lookup" ||
@@ -96,6 +105,9 @@ const PROGRESS_BLUEPRINT = [
     key: "cache",
     label: "Check recent answers",
     matches(stage) {
+      if (!stage) {
+        return false;
+      }
       return stage.startsWith("cache");
     },
   },
@@ -103,14 +115,30 @@ const PROGRESS_BLUEPRINT = [
     key: "context",
     label: "Gather context",
     matches(stage) {
-      return stage.startsWith("context") || stage.startsWith("summary");
+      if (!stage) {
+        return false;
+      }
+      return (
+        stage.startsWith("context") ||
+        stage.startsWith("summary") ||
+        stage.startsWith("metrics") ||
+        stage.startsWith("ticker")
+      );
     },
   },
   {
     key: "compose",
     label: "Compose explanation",
     matches(stage) {
-      return stage.startsWith("llm") || stage === "fallback" || stage === "complete";
+      if (!stage) {
+        return false;
+      }
+      return (
+        stage.startsWith("llm") ||
+        stage === "fallback" ||
+        stage === "finalize" ||
+        stage === "complete"
+      );
     },
   },
 ];
@@ -219,12 +247,26 @@ function generateRequestId() {
   return `req_${Date.now().toString(16)}_${Math.random().toString(16).slice(2, 10)}`;
 }
 
+function formatElapsed(milliseconds) {
+  if (typeof milliseconds !== "number" || Number.isNaN(milliseconds)) {
+    return null;
+  }
+  if (milliseconds < 1000) {
+    return `${Math.max(0, milliseconds).toFixed(0)} ms`;
+  }
+  if (milliseconds < 10000) {
+    return `${(milliseconds / 1000).toFixed(1)} s`;
+  }
+  return `${Math.round(milliseconds / 1000)} s`;
+}
+
 function createProgressSteps() {
   return PROGRESS_BLUEPRINT.map(({ key, label }) => ({
     key,
     label,
     status: "pending",
     detail: "",
+    messages: [],
   }));
 }
 
@@ -2564,6 +2606,7 @@ function pushProgressEventsInternal(tracker, events) {
   freshEvents.forEach((event) => {
     tracker.seen.add(event.sequence);
     tracker.lastSequence = Math.max(tracker.lastSequence, event.sequence);
+    tracker.events.push(event);
     updateProgressTrackerWithEvent(tracker, event);
   });
   tracker.render();
@@ -2594,6 +2637,7 @@ function startProgressTracking(requestId, wrapper) {
     complete: false,
     progressStarted: false,
     events: [],
+    startedAt: Number.NaN,
     render() {
       renderProgressTracker(this);
     },
@@ -4801,14 +4845,53 @@ function updateProgressTrackerWithEvent(tracker, event) {
   if (!tracker || !event) {
     return;
   }
-  tracker.events.push(event);
   const stage = event.stage || "";
   const statusHint = stepStatusFromStage(stage);
+  const timestamp = event.timestamp ? Date.parse(event.timestamp) : Number.NaN;
+  if (Number.isFinite(timestamp) && !Number.isFinite(tracker.startedAt)) {
+    tracker.startedAt = timestamp;
+  }
+  const elapsedMs =
+    Number.isFinite(timestamp) && Number.isFinite(tracker.startedAt)
+      ? Math.max(0, timestamp - tracker.startedAt)
+      : null;
+
+  const ensureMessages = (step) => {
+    if (!step) {
+      return [];
+    }
+    if (!Array.isArray(step.messages)) {
+      step.messages = [];
+    }
+    return step.messages;
+  };
+
+  const pushMessage = (step, text) => {
+    if (!step) {
+      return;
+    }
+    const messages = ensureMessages(step);
+    const messageText = text || event.detail || event.label || stage.replace(/_/g, " ").trim();
+    messages.push({
+      text: messageText,
+      stage,
+      elapsedMs,
+      timestamp: event.timestamp || null,
+    });
+    if (messages.length > 6) {
+      messages.splice(0, messages.length - 6);
+    }
+    if (text) {
+      step.detail = text;
+    }
+  };
 
   if (stage === "error") {
     tracker.container.classList.remove("pending");
     tracker.container.classList.remove("complete");
     tracker.container.classList.add("error");
+    const activeStep = tracker.steps.find((step) => step.status === "active") || tracker.steps[tracker.steps.length - 1];
+    pushMessage(activeStep, event.detail || "An unexpected error occurred");
     if (tracker.title) {
       tracker.title.textContent = "Something went wrong";
     }
@@ -4825,6 +4908,8 @@ function updateProgressTrackerWithEvent(tracker, event) {
     tracker.container.classList.remove("pending");
     tracker.container.classList.remove("error");
     tracker.container.classList.add("complete");
+    const finalStep = tracker.steps[tracker.steps.length - 1];
+    pushMessage(finalStep, event.detail || "Analysis ready");
     if (tracker.title) {
       tracker.title.textContent = "Analysis ready";
     }
@@ -4841,10 +4926,8 @@ function updateProgressTrackerWithEvent(tracker, event) {
   }
 
   tracker.steps.forEach((step, idx) => {
-    if (idx < index) {
-      if (step.status !== "complete") {
-        step.status = "complete";
-      }
+    if (idx < index && step.status !== "complete") {
+      step.status = "complete";
     }
   });
 
@@ -4853,6 +4936,7 @@ function updateProgressTrackerWithEvent(tracker, event) {
   if (event.detail) {
     currentStep.detail = event.detail;
   }
+  pushMessage(currentStep, event.detail);
 
   tracker.steps.forEach((step, idx) => {
     if (idx > index && step.status !== "complete") {
@@ -4900,7 +4984,29 @@ function renderProgressTracker(tracker) {
     label.className = "progress-label";
     label.textContent = step.label;
     copy.append(label);
-    if (step.detail) {
+
+    const messages = Array.isArray(step.messages) ? step.messages : [];
+    if (messages.length) {
+      const logList = document.createElement("ul");
+      logList.className = "progress-log";
+      messages.slice(-3).forEach((log) => {
+        const logItem = document.createElement("li");
+        const textSpan = document.createElement("span");
+        textSpan.textContent = log.text;
+        logItem.append(textSpan);
+        if (log.elapsedMs != null) {
+          const timeSpan = document.createElement("span");
+          timeSpan.className = "progress-timestamp";
+          const formatted = formatElapsed(log.elapsedMs);
+          if (formatted) {
+            timeSpan.textContent = formatted;
+            logItem.append(timeSpan);
+          }
+        }
+        logList.append(logItem);
+      });
+      copy.append(logList);
+    } else if (step.detail) {
       const detail = document.createElement("div");
       detail.className = "progress-detail";
       detail.textContent = step.detail;
@@ -4912,7 +5018,7 @@ function renderProgressTracker(tracker) {
 }
 
 function renderProgressSummary(tracker) {
-  if (!tracker?.events?.length) {
+  if (!Array.isArray(tracker?.steps) || !tracker.steps.length) {
     return;
   }
   if (!tracker?.wrapper) {
@@ -4943,9 +5049,32 @@ function renderProgressSummary(tracker) {
     content.className = "timeline-copy";
     const label = document.createElement("div");
     label.className = "timeline-label";
-    label.textContent = step.label;
+    const lastLog = Array.isArray(step.messages) && step.messages.length ? step.messages[step.messages.length - 1] : null;
+    const duration = lastLog?.elapsedMs != null ? formatElapsed(lastLog.elapsedMs) : null;
+    label.textContent = duration ? `${step.label} (${duration})` : step.label;
     content.append(label);
-    if (step.detail) {
+    const messages = Array.isArray(step.messages) ? step.messages : [];
+    if (messages.length) {
+      const timelineList = document.createElement("ul");
+      timelineList.className = "timeline-log";
+      messages.forEach((log) => {
+        const logItem = document.createElement("li");
+        const textSpan = document.createElement("span");
+        textSpan.textContent = log.text;
+        logItem.append(textSpan);
+        if (log.elapsedMs != null) {
+          const timeSpan = document.createElement("span");
+          timeSpan.className = "timeline-timestamp";
+          const formatted = formatElapsed(log.elapsedMs);
+          if (formatted) {
+            timeSpan.textContent = formatted;
+            logItem.append(timeSpan);
+          }
+        }
+        timelineList.append(logItem);
+      });
+      content.append(timelineList);
+    } else if (step.detail) {
       const detail = document.createElement("div");
       detail.className = "timeline-detail";
       detail.textContent = step.detail;

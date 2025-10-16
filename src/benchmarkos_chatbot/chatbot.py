@@ -425,6 +425,7 @@ class BenchmarkOSChatbot:
     _context_cache: "OrderedDict[str, Tuple[str, float]]" = field(default_factory=OrderedDict, init=False, repr=False)
     _metrics_cache: "OrderedDict[Tuple[str, Tuple[Tuple[int, int], ...]], Tuple[List[database.MetricRecord], float]]" = field(default_factory=OrderedDict, init=False, repr=False)
     _summary_cache: "OrderedDict[str, Tuple[str, float]]" = field(default_factory=OrderedDict, init=False, repr=False)
+    _active_progress_callback: Optional[Callable[[str, str], None]] = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         """Initialise mutable response state containers."""
@@ -440,6 +441,16 @@ class BenchmarkOSChatbot:
             "exports": [],
             "conclusion": "",
         }
+
+    def _progress(self, stage: str, detail: str) -> None:
+        """Dispatch progress events to the active callback, if any."""
+        callback = getattr(self, "_active_progress_callback", None)
+        if not callback:
+            return
+        try:
+            callback(stage, detail)
+        except Exception:  # pragma: no cover - progress hooks are best-effort
+            LOGGER.debug("Progress callback raised an exception", exc_info=True)
 
     @staticmethod
     def _current_time() -> float:
@@ -563,9 +574,11 @@ class BenchmarkOSChatbot:
             summary, created_at = entry
             if self._current_time() - created_at <= self._SUMMARY_CACHE_TTL_SECONDS:
                 self._summary_cache.move_to_end(normalized)
+                self._progress("summary_cache_hit", f"Using cached snapshot for {normalized}")
                 return summary
             self._summary_cache.pop(normalized, None)
 
+        self._progress("summary_build_start", f"Generating snapshot for {normalized}")
         try:
             summary = self.analytics_engine.generate_summary(normalized)
         except Exception:
@@ -581,6 +594,7 @@ class BenchmarkOSChatbot:
                     f"Run 'ingest {normalized}' to pull the latest filings."
                 )
 
+        self._progress("summary_build_complete", f"Snapshot generated for {normalized}")
         self._summary_cache[normalized] = (summary, self._current_time())
         self._summary_cache.move_to_end(normalized)
         while len(self._summary_cache) > self._MAX_CACHE_ENTRIES:
@@ -1218,104 +1232,117 @@ class BenchmarkOSChatbot:
     ) -> str:
         """Generate a reply and persist both sides of the exchange."""
 
+        previous_callback = getattr(self, "_active_progress_callback", None)
+        self._active_progress_callback = progress_callback
+
         def emit(stage: str, detail: str) -> None:
-            if progress_callback is None:
-                return
-            try:
-                progress_callback(stage, detail)
-            except Exception:  # pragma: no cover - progress hooks are best-effort
-                LOGGER.debug("Progress callback raised an exception", exc_info=True)
+            self._progress(stage, detail)
 
-        self._reset_structured_response()
-        emit("start", "Working on your request")
-        timestamp = datetime.utcnow()
-        database.log_message(
-            self.settings.database_path,
-            self.conversation.conversation_id,
-            role="user",
-            content=user_input,
-            created_at=timestamp,
-        )
-        self.conversation.messages.append({"role": "user", "content": user_input})
-        emit("message_logged", "Chat history updated")
-
-        reply: Optional[str] = None
-        lowered_input = user_input.strip().lower()
-        normalized_command = self._normalize_nl_to_command(user_input)
-        canonical_prompt = self._canonical_prompt(user_input, normalized_command)
-        cacheable = self._should_cache_prompt(canonical_prompt)
-
-        cached_entry: Optional[_CachedReply] = None
-        if cacheable:
-            emit("cache_lookup", "Checking recent answers")
-            cached_entry = self._get_cached_reply(canonical_prompt)
-            if cached_entry:
-                emit("cache_hit", "Reusing earlier answer from cache")
-                reply = cached_entry.reply
-                self.last_structured_response = copy.deepcopy(cached_entry.structured)
-            else:
-                emit("cache_miss", "No reusable answer found")
-        else:
-            emit("cache_skip", "Skipping cache for bespoke request")
-
-        if reply is None:
-            if lowered_input == "help":
-                emit("help_lookup", "Retrieving help guide")
-                reply = HELP_TEXT
-                emit("help_complete", "Help guide ready")
-            else:
-                attempted_intent = False
-                if normalized_command and normalized_command.strip().lower() != lowered_input:
-                    emit("intent_normalised", "Detected structured financial intent")
-                    reply = self._handle_financial_intent(normalized_command)
-                    attempted_intent = True
-                if reply is None:
-                    emit("intent_attempt", "Parsing prompt for analytics workflow")
-                    reply = self._handle_financial_intent(user_input)
-                    attempted_intent = True
-                if attempted_intent and reply is not None:
-                    emit("intent_complete", "Analytics intent resolved")
-
-        if reply is None:
-            summary_target = self._detect_summary_target(user_input, normalized_command)
-            if summary_target:
-                emit("summary_attempt", f"Compiling snapshot for {summary_target}")
-                reply = self._get_ticker_summary(summary_target)
-                if reply:
-                    emit("summary_complete", "Snapshot prepared")
-
-        if reply is None:
-            emit("context_build_start", "Gathering financial context")
-            context = self._build_rag_context(user_input)
-            emit(
-                "context_build_ready",
-                "Context compiled" if context else "Context not required",
+        try:
+            self._reset_structured_response()
+            emit("start", "Working on your request")
+            timestamp = datetime.utcnow()
+            database.log_message(
+                self.settings.database_path,
+                self.conversation.conversation_id,
+                role="user",
+                content=user_input,
+                created_at=timestamp,
             )
-            messages = self._prepare_llm_messages(context)
-            emit("llm_query_start", "Composing explanation")
-            reply = self.llm_client.generate_reply(messages)
-            emit("llm_query_complete", "Explanation drafted")
+            self.conversation.messages.append({"role": "user", "content": user_input})
+            emit("message_logged", "Chat history updated")
 
-        if reply is None:
-            emit("fallback", "Using fallback reply")
-            reply = "I'm not sure how to help with that yet."
+            reply: Optional[str] = None
+            lowered_input = user_input.strip().lower()
+            emit("intent_analysis_start", "Analyzing prompt phrasing")
+            normalized_command = self._normalize_nl_to_command(user_input)
+            canonical_prompt = self._canonical_prompt(user_input, normalized_command)
+            if normalized_command:
+                emit("intent_analysis_complete", f"Intent candidate: {normalized_command}")
+            else:
+                emit("intent_analysis_complete", "Proceeding with natural language handling")
+            cacheable = self._should_cache_prompt(canonical_prompt)
 
-        emit("finalize", "Finalising response")
-        database.log_message(
-            self.settings.database_path,
-            self.conversation.conversation_id,
-            role="assistant",
-            content=reply,
-            created_at=datetime.utcnow(),
-        )
-        self.conversation.messages.append({"role": "assistant", "content": reply})
+            cached_entry: Optional[_CachedReply] = None
+            if cacheable:
+                emit("cache_lookup", "Checking recent answers")
+                cached_entry = self._get_cached_reply(canonical_prompt)
+                if cached_entry:
+                    emit("cache_hit", "Reusing earlier answer from cache")
+                    reply = cached_entry.reply
+                    self.last_structured_response = copy.deepcopy(cached_entry.structured)
+                else:
+                    emit("cache_miss", "No reusable answer found")
+            else:
+                emit("cache_skip", "Skipping cache for bespoke request")
 
-        if cacheable and not cached_entry and reply:
-            emit("cache_store", "Caching response for future reuse")
-            self._store_cached_reply(canonical_prompt, reply)
+            if reply is None:
+                if lowered_input == "help":
+                    emit("help_lookup", "Retrieving help guide")
+                    reply = HELP_TEXT
+                    emit("help_complete", "Help guide ready")
+                else:
+                    attempted_intent = False
+                    if normalized_command and normalized_command.strip().lower() != lowered_input:
+                        emit("intent_normalised", "Detected structured financial intent")
+                        emit("intent_routed_structured", f"Executing structured command: {normalized_command}")
+                        reply = self._handle_financial_intent(normalized_command)
+                        attempted_intent = True
+                    if reply is None:
+                        emit("intent_routed_natural", "Falling back to natural-language resolver")
+                        reply = self._handle_financial_intent(user_input)
+                        attempted_intent = True
+                    if attempted_intent:
+                        if reply is not None:
+                            emit("intent_complete", "Analytics intent resolved")
+                        else:
+                            emit("intent_complete", "Intent routing completed with no direct answer")
 
-        emit("complete", "Response ready")
-        return reply
+            if reply is None:
+                summary_target = self._detect_summary_target(user_input, normalized_command)
+                if summary_target:
+                    emit("summary_attempt", f"Compiling snapshot for {summary_target}")
+                    reply = self._get_ticker_summary(summary_target)
+                    if reply:
+                        emit("summary_complete", f"Snapshot prepared for {summary_target}")
+                    else:
+                        emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
+
+            if reply is None:
+                emit("context_build_start", "Gathering financial context")
+                context = self._build_rag_context(user_input)
+                emit(
+                    "context_build_ready",
+                    "Context compiled" if context else "Context not required",
+                )
+                messages = self._prepare_llm_messages(context)
+                emit("llm_query_start", "Composing explanation")
+                reply = self.llm_client.generate_reply(messages)
+                emit("llm_query_complete", "Explanation drafted")
+
+            if reply is None:
+                emit("fallback", "Using fallback reply")
+                reply = "I'm not sure how to help with that yet."
+
+            emit("finalize", "Finalising response")
+            database.log_message(
+                self.settings.database_path,
+                self.conversation.conversation_id,
+                role="assistant",
+                content=reply,
+                created_at=datetime.utcnow(),
+            )
+            self.conversation.messages.append({"role": "assistant", "content": reply})
+
+            if cacheable and not cached_entry and reply:
+                emit("cache_store", "Caching response for future reuse")
+                self._store_cached_reply(canonical_prompt, reply)
+
+            emit("complete", "Response ready")
+            return reply
+        finally:
+            self._active_progress_callback = previous_callback
+
 
     def history(self) -> Iterable[database.Message]:
         """Return the stored conversation from the database."""
@@ -1334,11 +1361,18 @@ class BenchmarkOSChatbot:
         """Handle natural-language requests that map to metrics workflows."""
         metrics_request = self._parse_metrics_request(text)
         if metrics_request is not None:
+            tickers_summary = ", ".join(metrics_request.tickers) if metrics_request.tickers else ""
+            if tickers_summary:
+                self._progress("intent_metrics_detected", f"Metrics request for {tickers_summary}")
+            else:
+                self._progress("intent_metrics_missing", "Metrics request detected without tickers")
             if not metrics_request.tickers:
                 return "Provide at least one ticker for metrics."
             resolution = self._resolve_tickers(metrics_request.tickers)
             if resolution.missing:
+                self._progress("intent_metrics_missing", f"Missing tickers: {', '.join(resolution.missing)}")
                 return self._format_missing_message(metrics_request.tickers, resolution.available)
+            self._progress("metrics_dispatch", f"Dispatching metrics workflow for {', '.join(resolution.available)}")
             return self._dispatch_metrics_request(
                 resolution.available, metrics_request.period_filters
         )
@@ -1734,10 +1768,15 @@ class BenchmarkOSChatbot:
 
     def _resolve_tickers(self, subjects: Sequence[str]) -> "BenchmarkOSChatbot._TickerResolution":
         """Resolve tickers against the dataset, recording missing entries."""
+        subjects_list = list(subjects)
+        if subjects_list:
+            joined = ", ".join(subjects_list)
+            self._progress("ticker_resolution_start", f"Resolving tickers: {joined}")
+
         available: List[str] = []
         missing: List[str] = []
         lookup = getattr(self.analytics_engine, "lookup_ticker", None)
-        for subject in subjects:
+        for subject in subjects_list:
             resolved: Optional[str] = None
             if callable(lookup):
                 try:
@@ -1773,6 +1812,18 @@ class BenchmarkOSChatbot:
                     available.append(suggestion)
                 continue
             missing.append(subject)
+
+        if subjects_list:
+            if available:
+                detail = f"Resolved: {', '.join(available)}"
+                if missing:
+                    detail += f" | Missing: {', '.join(missing)}"
+            elif missing:
+                detail = f"Unable to resolve: {', '.join(missing)}"
+            else:
+                detail = "No tickers provided"
+            self._progress("ticker_resolution_complete", detail)
+
         return BenchmarkOSChatbot._TickerResolution(available=available, missing=missing)
 
     def _format_missing_message(
@@ -2061,12 +2112,14 @@ class BenchmarkOSChatbot:
         missing: List[str] = []
         latest_spans: Dict[str, tuple[int, int]] = {}
         for ticker in tickers:
+            self._progress("metrics_fetch_start", f"Fetching metrics for {ticker}")
             records = self._fetch_metrics_cached(
                 ticker,
                 period_filters=period_filters,
             )
             if not records:
                 missing.append(ticker)
+                self._progress("metrics_fetch_missing", f"No metrics available for {ticker}")
                 continue
             histories[ticker] = list(records)
             selected = self._select_latest_records(
@@ -2083,11 +2136,23 @@ class BenchmarkOSChatbot:
                 )
                 latest_spans[ticker] = span
 
+            self._progress("metrics_fetch_progress", f"Loaded {len(records)} rows for {ticker}")
+
         if not metrics_per_ticker:
+            if missing:
+                missing_detail = ", ".join(missing)
+                self._progress("metrics_fetch_notice", f"Metrics unavailable for {missing_detail}")
             if period_filters:
                 desc = self._describe_period_filters(period_filters)
                 return f"No metrics available for {', '.join(tickers)} in {desc}."
             return "No metrics available for the requested tickers."
+
+        if metrics_per_ticker:
+            prepared = ", ".join(metrics_per_ticker.keys())
+            self._progress("metrics_fetch_complete", f"Prepared metrics for {prepared}")
+        if missing and metrics_per_ticker:
+            missing_detail = ", ".join(missing)
+            self._progress("metrics_fetch_notice", f"Metrics unavailable for {missing_detail}")
 
         benchmark_label: Optional[str] = None
         compute_benchmark = getattr(self.analytics_engine, "compute_benchmark_metrics", None)
@@ -2313,10 +2378,24 @@ class BenchmarkOSChatbot:
         tickers = self._detect_tickers(user_input)
         if not tickers:
             return None
-        cache_key = "|".join(sorted({ticker.upper() for ticker in tickers if ticker}))
+        normalized_tickers: List[str] = []
+        seen_tickers: set[str] = set()
+        for ticker in tickers:
+            if not ticker:
+                continue
+            upper = ticker.upper()
+            if upper in seen_tickers:
+                continue
+            seen_tickers.add(upper)
+            normalized_tickers.append(upper)
+        if normalized_tickers:
+            self._progress("context_sources_scan", f"Scanning context for {', '.join(normalized_tickers)}")
+        tickers = normalized_tickers or tickers
+        cache_key = "|".join(sorted(normalized_tickers)) if normalized_tickers else None
         if cache_key:
             cached = self._get_cached_context(cache_key)
             if cached:
+                self._progress("context_cache_hit", "Reusing cached context bundle")
                 return cached
 
         context_sections: List[str] = []
@@ -2358,9 +2437,11 @@ class BenchmarkOSChatbot:
                 context_sections.append(lines_text)
 
         if not context_sections:
+            self._progress("context_sources_empty", "No supplemental context located")
             return None
         combined = "\n".join(context_sections)
         final_context = "Financial context:\n" + combined
+        self._progress("context_sources_ready", f"Added {len(context_sections)} context sections")
         if cache_key:
             self._store_cached_context(cache_key, final_context)
         return final_context
