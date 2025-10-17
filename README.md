@@ -45,7 +45,8 @@ BenchmarkOS blends deterministic analytics with retrieval-augmented generation s
 - **Alias generation pipeline** – `scripts/generate_aliases.py` rebuilds `src/benchmarkos_chatbot/parsing/aliases.json` from the latest S&P 500 universe. It normalises company names, applies manual overrides, and emits coverage stats that feed the parser.
 - **Structured parsing** – `src/benchmarkos_chatbot/parsing/alias_builder.py`, `parse.py`, and `time_grammar.py` resolve tickers, metrics, and time horizons into a clean intent payload. Parser accuracy is guarded by `tests/test_alias_resolution.py`, `tests/test_time_grammar.py`, and `tests/test_nl_parser.py`.
 - **Retrieval layer** – parsed intents hydrate the analytics engine (`analytics_engine.py`), which fetches filings, KPI snapshots, and audit trails from the datastore. These artefacts become RAG context passed to the LLM via `llm_client.py`.
-- **Generation guardrails** – the chatbot caches structured outputs on `conversation.last_structured_response`, ensuring that downstream renderers (CLI tables, web UI) only display values that were retrieved from storage first.
+- **Generation guardrails** - the chatbot caches structured outputs on `conversation.last_structured_response`, ensuring that downstream renderers (CLI tables, web UI) only display values that were retrieved from storage first.
+- **Model choice** - `llm_client.py` defaults to a deterministic “local echo” client for development and tests, and can be switched to OpenAI (or another provider implementing the same interface) for production dialogue. This isolates machine-learning interactions behind a single abstraction.
 
 Use the parser scripts/tests whenever you add new tickers or metric synonyms so the natural-language layer stays aligned with the data warehouse.
 
