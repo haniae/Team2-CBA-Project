@@ -6,6 +6,8 @@ Institutional-grade analytics tooling for finance teams who need a conversationa
 - [Overview](#overview)
 - [Core capabilities](#core-capabilities)
 - [Architecture map](#architecture-map)
+- [Retrieval & RAG internals](#retrieval--rag-internals)
+- [Datastore architecture](#datastore-architecture)
 - [Quick start](#quick-start)
 - [Running the chatbot](#running-the-chatbot)
 - [Data ingestion playbooks](#data-ingestion-playbooks)
@@ -36,6 +38,26 @@ The repository doubles as coursework and reference material: every module is hea
 
 ## Architecture map
 See [`docs/architecture.md`](docs/architecture.md) for the high-level component diagram that accompanies this README. The doc highlights how the CLI, FastAPI service, analytics core, and ingestion pipelines collaborate.
+
+## Retrieval & RAG internals
+BenchmarkOS blends deterministic analytics with retrieval-augmented generation so model responses stay grounded in the metrics warehouse.
+
+- **Alias generation pipeline** – `scripts/generate_aliases.py` rebuilds `src/benchmarkos_chatbot/parsing/aliases.json` from the latest S&P 500 universe. It normalises company names, applies manual overrides, and emits coverage stats that feed the parser.
+- **Structured parsing** – `src/benchmarkos_chatbot/parsing/alias_builder.py`, `parse.py`, and `time_grammar.py` resolve tickers, metrics, and time horizons into a clean intent payload. Parser accuracy is guarded by `tests/test_alias_resolution.py`, `tests/test_time_grammar.py`, and `tests/test_nl_parser.py`.
+- **Retrieval layer** – parsed intents hydrate the analytics engine (`analytics_engine.py`), which fetches filings, KPI snapshots, and audit trails from the datastore. These artefacts become RAG context passed to the LLM via `llm_client.py`.
+- **Generation guardrails** – the chatbot caches structured outputs on `conversation.last_structured_response`, ensuring that downstream renderers (CLI tables, web UI) only display values that were retrieved from storage first.
+
+Use the parser scripts/tests whenever you add new tickers or metric synonyms so the natural-language layer stays aligned with the data warehouse.
+
+## Datastore architecture
+The default SQLite database (or PostgreSQL, when configured) keeps every conversational artefact auditable.
+
+- **Core tables** – `database.py` defines conversations, messages, cached replies, audit events, financial facts, metric snapshots, and ingestion runs. Schema migrations run automatically at startup.
+- **Ingestion records** – `data_ingestion.py` and the scripts under `scripts/ingestion/` populate facts (`financial_fact`), computed metrics (`metric_snapshot`), and audit trails (`audit_event`). Yahoo and optional Bloomberg quotes land in price tables that power valuation ratios.
+- **Refresh workflows** – `AnalyticsEngine.refresh_metrics()` materialises the latest KPI frames, while `scripts/ingestion/load_prices_yfinance.py` and `scripts/ingestion/load_prices_stooq.py` keep price-derived ratios current.
+- **Testing hooks** – integration tests such as `tests/test_ingestion_perf.py` and `tests/test_kpi_backfill.py` assert that bulk loads stay within SLA and that downstream metrics recompute correctly.
+
+Point `DATABASE_TYPE=postgresql` in `.env` when you outgrow SQLite; the same schema and analytics layer work across both engines.
 
 ## Quick start
 These steps assume Python 3.10+ and Git are installed.
@@ -232,6 +254,7 @@ Project/
 | `scripts/ingestion/ingest_universe.py` | Parameterised batch ingester with resume support; calls `AnalyticsEngine` to refresh snapshots after each chunk. |
 | `scripts/ingestion/ingest_frames.py` | Synchronously downloads SEC data frames for a fixed set of tags and writes them to Postgres for benchmarking. |
 | `scripts/ingestion/load_prices_stooq.py` | Imports historical price data from Stooq into Postgres, providing a fallback when Yahoo limits are hit. |
+| `scripts/generate_aliases.py` | Rebuilds the ticker alias universe, emitting coverage metrics consumed by the parser and RAG layer. |
 | `requirements.txt` | Runtime dependency pinning for local development and deployment targets. |
 | `pyproject.toml` | Project metadata, dependency list, and pytest configuration (adds `src/` to `PYTHONPATH`). |
 
@@ -275,6 +298,11 @@ Project/
 | `tests/test_analytics.py` | End-to-end chatbot scenarios covering prompts, ingestion triggers, and responses. |
 | `tests/test_cli_tables.py` | Ensures the ASCII table renderer formats rows/columns as expected. |
 | `tests/test_data_ingestion.py` | Validates ingestion workflows, audit event recording, and error handling. |
+| `tests/test_alias_resolution.py` | Confirms ticker alias normalisation, manual overrides, and fuzzy matching stay aligned with the alias corpus. |
+| `tests/test_time_grammar.py` | Covers year ranges, quarter syntax, and natural phrasing supported by the temporal grammar. |
+| `tests/test_nl_parser.py` | Exercises end-to-end prompt parsing to guarantee structured intents stay stable. |
+| `tests/test_ingestion_perf.py` | Guardrail for ingestion throughput and batching performance characteristics. |
+| `tests/test_kpi_backfill.py` | Verifies KPI calculations and backfill jobs recompute metrics correctly after ingestion. |
 
 ### Quick module guide
 | Goal | Primary file(s) | Notes |
@@ -297,6 +325,8 @@ Project/
 - `scripts/ingestion/load_ticker_cik.py` â€“ populate the ticker â†’ CIK lookup table; rerun whenever SEC publishes new mappings.
 - `scripts/ingestion/batch_ingest.py` â€“ example of orchestrating a curated watch list with retry/backoff, suitable for cron jobs.
 - `docs/ticker_names.md` â€“ generated companion file enumerating the current coverage universe (see section below for how it is produced).
+
+- `scripts/generate_aliases.py` �?" regenerate the parser alias corpus (`parsing/aliases.json`) after adding new tickers or correcting company names.
 
 ### Price data refresh in practice
 Use this workflow to keep price-driven ratios (P/E, EV/EBITDA, dividend yield, TSR, buyback intensity) current without rerunning the full SEC ingestion:
