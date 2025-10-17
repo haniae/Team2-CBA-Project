@@ -49,6 +49,20 @@ BenchmarkOS blends deterministic analytics with retrieval-augmented generation s
 
 Use the parser scripts/tests whenever you add new tickers or metric synonyms so the natural-language layer stays aligned with the data warehouse.
 
+**End-to-end flow at runtime**
+
+1. **Intent understanding** – `BenchmarkOSChatbot.ask()` streams parser events, captures ticker/metric candidates, and records warnings so the UI can surface unresolved aliases before any generation takes place.
+2. **Evidence gathering** – `AnalyticsEngine.fetch_metrics_cached()` and related helpers resolve the final ticker list, pull the latest metric snapshots, and stage tabular artefacts (comparison tables, scenario deltas, audit trails) in memory. Every fact is traceable back to `database.financial_fact`.
+3. **Context packaging** – `BenchmarkOSChatbot._build_rag_context()` renders a deterministic “context” system message that includes metrics, trend highlights, and filing references. No free-form generation happens until this payload exists.
+4. **LLM composition** – `llm_client.py` sends the user prompt together with the curated context. The default OpenAI client is stateless; switching providers only requires a new `LLMClient` implementation.
+5. **Post-processing** – structured artefacts are persisted to `conversation.last_structured_response` and `database.log_message`, enabling later refreshes, streaming transcripts, and downstream exports (CSV/PDF).
+
+**Why it is safe**
+
+- The model never sees raw SQL or secrets—`analytics_engine.py` feeds it pre-filtered metrics and plain-English descriptors only.
+- Cached replies (`_CachedReply`) carry both the message and structured artefacts, preventing the RAG layer from serving stale numbers.
+- Parser and ingestion tests double as regression checks for the RAG path; failures mean a new alias/metric is unaccounted for before any model call is made.
+
 ## Datastore architecture
 The default SQLite database (or PostgreSQL, when configured) keeps every conversational artefact auditable.
 
