@@ -12,6 +12,7 @@ Institutional-grade analytics tooling for finance teams who need a conversationa
 - [Running the chatbot](#running-the-chatbot)
 - [Data ingestion playbooks](#data-ingestion-playbooks)
 - [Configuration reference](#configuration-reference)
+- [Database schema](#database-schema)
 - [Project layout](#project-layout)
 - [File reference](#file-reference)
 - [Quality and testing](#quality-and-testing)
@@ -201,6 +202,23 @@ All scripts honour the configuration loaded via `load_settings()` (where applica
 | `OPENAI_API_KEY` | unset | Optional: looks in env, then keyring, then `~/.config/benchmarkos-chatbot/openai_api_key`. |
 
 Secrets belong in your `.env` (never commit it). For Windows developers, `keyring` support means you can store the OpenAI key securely outside the repo.
+
+## Database schema
+BenchmarkOS ships with SQLite by default (see `DATABASE_PATH` above) but the helper layer in `src/benchmarkos_chatbot/database.py` targets both SQLite and PostgreSQL. The key tables are:
+
+| Table | Purpose | Notable columns |
+|-------|---------|-----------------|
+| `conversations` | Stores chat turn history for resumable threads. | `conversation_id`, `role`, `content`, `created_at` |
+| `cached_prompts` | De-duplicates prompt payloads so identical requests reuse responses. | `prompt_hash`, `payload`, `created_at`, `reply` |
+| `metric_snapshots` | Persisted analytics output consumed by the chatbot/UI. | `ticker`, `metric`, `period`, `value`, `start_year`, `end_year`, `updated_at`, `source` |
+| `company_filings` | Metadata for SEC filings pulled during ingestion. | `ticker`, `accession_number`, `form_type`, `filed_at`, `data` |
+| `financial_facts` | Normalised SEC fact rows (revenues, margins, etc.). | `ticker`, `metric`, `fiscal_year`, `period`, `value`, `unit`, `source_filing`, `raw` |
+| `market_quotes` | Latest market data from Yahoo/Bloomberg/Stooq. | `ticker`, `price`, `currency`, `timestamp`, `source` |
+| `kpi_values` | KPI backfill overrides used to smooth metrics. | `ticker`, `fiscal_year`, `fiscal_quarter`, `metric_id`, `value`, `method`, `warning` |
+| `audit_events` | Traceability for ingestion, scenario runs, and errors. | `ticker`, `event_type`, `entity_id`, `details`, `created_at` |
+| `ticker_aliases` | Maps tickers to CIK/company names to speed up ingestion. | `ticker`, `cik`, `company_name`, `updated_at` |
+
+During startup `database.initialise()` applies schema migrations idempotently and enforces pragmatic SQLite PRAGMAs (`WAL`, `NORMAL` synchronous, in-memory temp store, larger cache). When running on PostgreSQL the same helper functions target the `metric_snapshots`, `financial_facts`, and `audit_events` tables using standard SQL; set `DATABASE_TYPE=postgresql` and the corresponding DSN variables to switch.
 
 ## Project layout
 ```
