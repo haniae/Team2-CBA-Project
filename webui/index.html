@@ -93,12 +93,24 @@
 <div class="utility-content" id="utility-content"></div>
 </section></div>
 <div class="content-container"><section class="chat-panel">
+<section class="chat-intro" id="chat-intro"></section>
 <div aria-live="polite" class="chat-log" id="chat-log"></div>
+
+<button id="scrollBtn" title="Jump to latest" class="scroll-btn" aria-hidden="true" aria-label="Scroll to latest messages">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+  <span class="sr-only">Jump to latest</span>
+  </button>
 <form autocomplete="off" class="chat-form" id="chat-form">
-<textarea id="chat-input" placeholder="Ask anything about tickers, metrics, or scenarios..." required="" rows="3"></textarea>
+<textarea id="chat-input" placeholder="Ask anything about tickers or metrics…" required="" rows="1"></textarea>
 <div class="chat-actions">
-<span class="hint">Press Enter to send - Shift+Enter for a new line</span>
-<button id="send-button" type="submit">Send</button>
+<button id="send-button" type="submit" aria-label="Send message" title="Send">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 2L11 13"/>
+    <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
+  </svg>
+  </button>
 </div>
 </form>
 </section></div>

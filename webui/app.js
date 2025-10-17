@@ -5,6 +5,7 @@ const chatLog = document.getElementById("chat-log");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const sendButton = document.getElementById("send-button");
+const scrollBtn = document.getElementById("scrollBtn");
 const statusDot = document.getElementById("api-status");
 const statusMessage = document.getElementById("status-message");
 const conversationList = document.getElementById("conversation-list");
@@ -70,6 +71,62 @@ const promptCache = new Map();
 const topBar = document.querySelector(".top-bar");
 const PROGRESS_POLL_INTERVAL_MS = 750;
 const progressTrackers = new Map();
+
+// Rotating placeholder for hero (no chips)
+const PLACEHOLDERS = [
+  "Ask anything about tickers or metrics…",
+  "Compare two companies…",
+  "Request a KPI table or explain a metric…",
+];
+let placeholderTimer = null;
+let placeholderIndex = 0;
+let hasNewSinceScroll = false;
+
+function startPlaceholderRotation() {
+  stopPlaceholderRotation();
+  if (!chatInput) {
+    return;
+  }
+  chatInput.placeholder = PLACEHOLDERS[0];
+  placeholderTimer = window.setInterval(() => {
+    if (!chatInput) {
+      return;
+    }
+    if (document.activeElement === chatInput) {
+      return; // don't rotate while typing/focused
+    }
+    if (chatInput.value && chatInput.value.trim().length > 0) {
+      return; // keep when user has typed
+    }
+    placeholderIndex = (placeholderIndex + 1) % PLACEHOLDERS.length;
+    chatInput.placeholder = PLACEHOLDERS[placeholderIndex];
+  }, 5000);
+}
+
+function stopPlaceholderRotation() {
+  if (placeholderTimer) {
+    window.clearInterval(placeholderTimer);
+    placeholderTimer = null;
+  }
+}
+
+// Textarea auto-grow: up to 4 lines, cap at 6 lines then scroll
+function autoResizeTextarea() {
+  if (!chatInput) return;
+  const style = window.getComputedStyle(chatInput);
+  const lineHeight = parseFloat(style.lineHeight) || 22;
+  const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  const minHeight = 48;
+  const maxAutoLines = 4;
+  const maxLines = 6;
+  chatInput.style.height = "auto";
+  const content = chatInput.scrollHeight;
+  const maxAuto = maxAutoLines * lineHeight + paddingY;
+  const hardMax = maxLines * lineHeight + paddingY;
+  const next = Math.min(Math.max(content, minHeight), hardMax);
+  chatInput.style.height = `${next}px`;
+  chatInput.style.overflowY = next >= hardMax ? "auto" : "hidden";
+}
 const COMPLETE_STAGE_HINTS = [
   "_complete",
   "_ready",
@@ -2043,7 +2100,12 @@ function appendMessage(
   }
 
   chatLog.append(wrapper);
-  scrollChatToBottom({ smooth, force: forceScroll });
+  if (forceScroll || isNearBottom(120)) {
+    scrollChatToBottom({ smooth });
+    hasNewSinceScroll = false;
+  } else {
+    hasNewSinceScroll = true;
+  }
   return wrapper;
 }
 
@@ -2740,7 +2802,12 @@ function resolvePendingMessage(
   wrapper.classList.remove("typing");
   setMessageBody(wrapper, text);
   renderMessageArtifacts(wrapper, artifacts);
-  scrollChatToBottom({ smooth: true, force: forceScroll });
+  if (forceScroll || isNearBottom(120)) {
+    scrollChatToBottom({ smooth: true });
+    hasNewSinceScroll = false;
+  } else {
+    hasNewSinceScroll = true;
+  }
   return wrapper;
 }
 
@@ -2952,11 +3019,58 @@ function scrollChatToBottom({ smooth = true } = {}) {
   });
 }
 
+function isNearBottom(thresholdPx = 120) {
+  if (!chatLog) {
+    return true;
+  }
+  const distanceFromBottom = chatLog.scrollHeight - chatLog.clientHeight - chatLog.scrollTop;
+  return distanceFromBottom <= thresholdPx;
+}
+
+function updateScrollBtnOffset() {
+  if (!scrollBtn || !chatLog) {
+    return;
+  }
+  const offset = 20; // 16–20px as spec above composer
+  const btnSize = 40;
+  const extra = 8;
+  // Because the button is positioned inside .chat-log, which ends at the top of the composer,
+  // we only need the offset from the bottom of .chat-log (not composer height).
+  scrollBtn.style.bottom = `${offset}px`;
+  // Add enough padding only when the button is visible; otherwise keep a small baseline.
+  const pad = scrollBtn.classList.contains("show") ? (btnSize + offset + extra) : 16;
+  chatLog.style.paddingBottom = `${pad}px`;
+}
+
+function refreshScrollButton() {
+  if (!scrollBtn || !chatLog) {
+    return;
+  }
+  if (!isNearBottom(120)) {
+    scrollBtn.classList.add("show");
+    scrollBtn.setAttribute("aria-hidden", "false");
+  } else {
+    scrollBtn.classList.remove("show");
+    scrollBtn.setAttribute("aria-hidden", "true");
+  }
+  updateScrollBtnOffset();
+}
+
 function hideIntroPanel() {
   if (!introPanel) {
     return;
   }
   introPanel.classList.add("hidden");
+  if (chatPanel) {
+    chatPanel.classList.remove("is-hero");
+  }
+  if (chatLog) {
+    chatLog.classList.remove("hidden");
+  }
+  if (chatFormContainer) {
+    chatFormContainer.classList.remove("chat-form--hero");
+  }
+  stopPlaceholderRotation();
 }
 
 function showIntroPanel() {
@@ -2964,6 +3078,16 @@ function showIntroPanel() {
     return;
   }
   introPanel.classList.remove("hidden");
+  if (chatPanel) {
+    chatPanel.classList.add("is-hero");
+  }
+  if (chatLog) {
+    chatLog.classList.add("hidden");
+  }
+  if (chatFormContainer) {
+    chatFormContainer.classList.add("chat-form--hero");
+  }
+  startPlaceholderRotation();
 }
 
 function setupReportMenus() {
@@ -3436,9 +3560,9 @@ function copyShareLink() {
 
 function setSending(state) {
   isSending = state;
-  sendButton.disabled = state;
-  chatInput.disabled = state;
-  sendButton.textContent = state ? "Sending..." : "Send";
+  sendButton.disabled = state; // block double-submit
+  chatInput.disabled = false;  // still allow typing while processing
+  // keep icon-only; don't swap label
 }
 
 function loadStoredConversations() {
@@ -4712,6 +4836,76 @@ chatInput.addEventListener("keydown", (event) => {
     chatForm.requestSubmit();
   }
 });
+
+// Disable Send when empty
+if (chatInput && sendButton) {
+  const updateSendDisabled = () => {
+    const hasText = !!chatInput.value && chatInput.value.trim().length > 0;
+    sendButton.disabled = !hasText;
+  };
+  chatInput.addEventListener("input", updateSendDisabled);
+  chatInput.addEventListener("input", autoResizeTextarea);
+  window.addEventListener("load", autoResizeTextarea);
+  updateSendDisabled();
+}
+
+// Near-bottom detection and Jump-to-latest button
+if (chatLog) {
+  chatLog.addEventListener("scroll", () => {
+    if (!scrollBtn) {
+      return;
+    }
+    if (!isNearBottom(120)) {
+      scrollBtn.classList.add("show");
+      scrollBtn.setAttribute("aria-hidden", "false");
+      updateScrollBtnOffset();
+    } else {
+      hasNewSinceScroll = false;
+      scrollBtn.classList.remove("show");
+      scrollBtn.setAttribute("aria-hidden", "true");
+      updateScrollBtnOffset();
+    }
+  });
+}
+
+if (scrollBtn) {
+  scrollBtn.addEventListener("click", () => {
+    scrollChatToBottom({ smooth: true });
+    hasNewSinceScroll = false;
+    scrollBtn.classList.remove("show");
+    scrollBtn.setAttribute("aria-hidden", "true");
+    updateScrollBtnOffset();
+  });
+}
+
+// Keep Jump button offset in sync with composer height
+function observeComposerResize() {
+  if (!chatFormContainer) {
+    return;
+  }
+  updateScrollBtnOffset();
+  const ro = new (window.ResizeObserver || window.MutationObserver)(() => updateScrollBtnOffset());
+  if (ro.observe) {
+    ro.observe(chatFormContainer);
+  } else if (ro) {
+    // Fallback for MutationObserver: listen to textarea input
+    const ta = document.getElementById("chat-input");
+    if (ta) {
+      ta.addEventListener("input", updateScrollBtnOffset);
+    }
+  }
+  window.addEventListener("resize", updateScrollBtnOffset);
+}
+
+observeComposerResize();
+
+// Ensure button lives inside messages container for correct z-index/positioning
+if (scrollBtn && chatLog && scrollBtn.parentElement !== chatLog) {
+  chatLog.appendChild(scrollBtn);
+}
+
+// Initial visibility on load
+refreshScrollButton();
 
 function wirePromptChips() {
   document.querySelectorAll(".prompt-chip").forEach((chip) => {

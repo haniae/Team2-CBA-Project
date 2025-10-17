@@ -13,6 +13,11 @@ const $newChatBtn = document.getElementById('newChatBtn')
 let currentConversation = null
 let isTyping = false
 
+function isNearBottom(thresholdPx = 120) {
+    const distanceFromBottom = $messages.scrollHeight - $messages.clientHeight - $messages.scrollTop
+    return distanceFromBottom <= thresholdPx
+}
+
 function setApiStatus(online){
 	$apiDot.classList.toggle('online', !!online)
 	$apiDot.classList.toggle('offline', !online)
@@ -176,10 +181,13 @@ function createMessageElement(msg) {
 }
 
 function appendMessage(msg){
-	const el = createMessageElement(msg)
-	$messages.appendChild(el)
-	scrollToBottom(true)
-	return el
+    const shouldAutoScroll = isNearBottom(120)
+    const el = createMessageElement(msg)
+    $messages.appendChild(el)
+    if (shouldAutoScroll) {
+        scrollToBottom(true)
+    }
+    return el
 }
 
 function showTypingIndicator() {
@@ -224,19 +232,39 @@ function scrollToBottom(smooth=true){
 	}
 }
 
+function updateScrollBtnOffset(){
+	if(!$scrollBtn || !$messages) return
+	const offset = 20
+	const btnSize = 40
+	const extra = 8
+	$scrollBtn.style.bottom = `${offset}px`
+	if ($scrollBtn.classList.contains('show')) {
+		$messages.style.paddingBottom = `${btnSize + offset + extra}px`
+	} else {
+		$messages.style.paddingBottom = `16px`
+	}
+}
+
 // show/hide scroll button
 $messages.addEventListener('scroll', ()=>{
-	const threshold = $messages.scrollHeight - $messages.clientHeight - $messages.scrollTop
-	if($messages.scrollTop + $messages.clientHeight < $messages.scrollHeight - 60){
+	if(!isNearBottom(120)){
 		$scrollBtn.classList.add('show')
 		$scrollBtn.setAttribute('aria-hidden','false')
 	} else {
 		$scrollBtn.classList.remove('show')
 		$scrollBtn.setAttribute('aria-hidden','true')
 	}
+	updateScrollBtnOffset()
 })
 
-$scrollBtn.addEventListener('click', ()=> scrollToBottom(true))
+$scrollBtn.addEventListener('click', ()=> { scrollToBottom(true); updateScrollBtnOffset() })
+
+if ($scrollBtn && $messages && $scrollBtn.parentElement !== $messages) {
+	$messages.appendChild($scrollBtn)
+}
+
+window.addEventListener('resize', updateScrollBtnOffset)
+updateScrollBtnOffset()
 
 $composer.addEventListener('submit', async (ev)=>{
 	ev.preventDefault()
