@@ -3055,7 +3055,6 @@ function refreshScrollButton() {
   }
   updateScrollBtnOffset();
 }
-
 function hideIntroPanel() {
   if (!introPanel) {
     return;
@@ -4906,7 +4905,6 @@ if (scrollBtn && chatLog && scrollBtn.parentElement !== chatLog) {
 
 // Initial visibility on load
 refreshScrollButton();
-
 function wirePromptChips() {
   document.querySelectorAll(".prompt-chip").forEach((chip) => {
     chip.addEventListener("click", () => {

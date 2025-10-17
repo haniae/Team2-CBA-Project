@@ -246,6 +246,7 @@ function updateScrollBtnOffset(){
 }
 
 // show/hide scroll button
+
 $messages.addEventListener('scroll', ()=>{
 	if(!isNearBottom(120)){
 		$scrollBtn.classList.add('show')
