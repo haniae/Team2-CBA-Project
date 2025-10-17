@@ -243,12 +243,14 @@ Secrets belong in your local `.env`. Windows developers can rely on `keyring` so
 ---
 
 ## Database schema
-BenchmarkOS intentionally supports two storage backends:
+BenchmarkOS intentionally supports two storage backends, but your deployment uses **only one** at a time—by default it’s SQLite:
 
-1. **SQLite (default)** – ships in the repo, requires zero setup, and is perfect for local development, demos, and CI. All data—conversations, metrics, audit events—lives in a single file specified by `DATABASE_PATH`. SQLite is fast enough for single-user workloads, and the helper applies pragmatic PRAGMAs (`WAL`, `synchronous=NORMAL`, `temp_store=MEMORY`, `cache_size=-16000`) so it feels snappy even with frequent writes.
-2. **PostgreSQL (optional)** – recommended for shared deployments where multiple analysts or services hit the chatbot concurrently. Set `DATABASE_TYPE=postgresql` together with the `POSTGRES_*` environment variables and the exact same helper functions in `database.py` will target Postgres tables. Using Postgres unlocks row-level concurrency, easier backups, replication, and integration with enterprise data stacks.
+1. **SQLite (default / implied in this repo)** – shipping the database as a file keeps setup frictionless for development, tests, and CI. All conversations, metrics, and audit events live in the path defined by `DATABASE_PATH`. For this reason, the stock `.env` (and most tests such as `test_ingestion_perf.py`) run purely on SQLite. It was chosen because it “just works”: no external server to provision, a trivial backup story, and fast enough for single-user workflows. PRAGMAs (`WAL`, `synchronous=NORMAL`, `temp_store=MEMORY`, `cache_size=-16000`) are applied automatically so sustained writes remain smooth.
+2. **PostgreSQL (optional)** – the same helper module can target Postgres when you set `DATABASE_TYPE=postgresql` and supply the `POSTGRES_*` DSN variables. Teams switch to Postgres when chat sessions are shared across analysts, when concurrency or replication matters, or when governance requires managed backups. If you haven’t changed those settings, Postgres is unused.
 
-Under the hood both backends share the same schema. SQLite is convenient during development; PostgreSQL scales when you harden the system.
+In other words, you are currently using a single database—SQLite—because it was selected for simplicity and portability. The PostgreSQL path is documented for teams that choose to run BenchmarkOS in a multi-user/shared environment later.
+
+Regardless of backend, both share the same schema:
 
 Key tables:
 
