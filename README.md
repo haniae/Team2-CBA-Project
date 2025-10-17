@@ -243,7 +243,14 @@ Secrets belong in your local `.env`. Windows developers can rely on `keyring` so
 ---
 
 ## Database schema
-SQLite is the out-of-the-box store (`DATABASE_PATH` above), but every helper in `database.py` also targets PostgreSQL when `DATABASE_TYPE=postgresql` is set. Key tables include:
+BenchmarkOS intentionally supports two storage backends:
+
+1. **SQLite (default)** – ships in the repo, requires zero setup, and is perfect for local development, demos, and CI. All data—conversations, metrics, audit events—lives in a single file specified by `DATABASE_PATH`. SQLite is fast enough for single-user workloads, and the helper applies pragmatic PRAGMAs (`WAL`, `synchronous=NORMAL`, `temp_store=MEMORY`, `cache_size=-16000`) so it feels snappy even with frequent writes.
+2. **PostgreSQL (optional)** – recommended for shared deployments where multiple analysts or services hit the chatbot concurrently. Set `DATABASE_TYPE=postgresql` together with the `POSTGRES_*` environment variables and the exact same helper functions in `database.py` will target Postgres tables. Using Postgres unlocks row-level concurrency, easier backups, replication, and integration with enterprise data stacks.
+
+Under the hood both backends share the same schema. SQLite is convenient during development; PostgreSQL scales when you harden the system.
+
+Key tables:
 
 | Table | Purpose | Notable columns |
 |-------|---------|-----------------|
@@ -257,7 +264,7 @@ SQLite is the out-of-the-box store (`DATABASE_PATH` above), but every helper in 
 | `audit_events` | Traceability for ingestion and scenario runs. | `ticker`, `event_type`, `entity_id`, `details`, `created_at` |
 | `ticker_aliases` | Maps tickers to CIK/company names to speed ingestion. | `ticker`, `cik`, `company_name`, `updated_at` |
 
-On startup `database.initialise()` applies schema migrations idempotently. SQLite connections are opened with pragmatic PRAGMAs (`WAL`, `synchronous=NORMAL`, `temp_store=MEMORY`, `cache_size=-16000`). Switching to Postgres only requires setting the DSN variables; the same helpers operate on the shared tables.
+On startup `database.initialise()` applies schema migrations idempotently. When running in SQLite mode the PRAGMAs mentioned above are applied automatically; switching to Postgres only requires setting the DSN variables—the rest of the code paths remain identical.
 
 ---
 
