@@ -451,16 +451,17 @@ body {
   border: 1px solid var(--border-light);
 	overflow: hidden;
 	transition: all var(--transition-base);
+  position: relative; /* allow absolute suffix button */
 }
 
 .composer:focus-within {
-	border-color: var(--primary-blue);
-	box-shadow: var(--shadow-lg), 0 0 0 3px rgba(0, 102, 255, 0.1);
+  border-color: var(--border-light); /* keep hairline only */
+  box-shadow: none; /* remove blue glow */
 }
 
 .composer input {
 	flex: 1;
-	padding: 16px 20px;
+	padding: 16px 56px 16px 20px; /* ensure ≥48px right padding for suffix button */
 	border: none;
 	background: transparent;
 	font-size: 15px;
@@ -473,27 +474,37 @@ body {
 	color: var(--text-muted);
 }
 
+.composer input:focus,
+.composer input:focus-visible { outline: none; }
+
 .composer button {
-	padding: 16px 24px;
-	border: none;
-	background: linear-gradient(135deg, var(--primary-blue) 0%, var(--sky-blue) 100%);
-	color: #FFFFFF;
-	font-weight: 600;
-	font-size: 14px;
-	cursor: pointer;
-	transition: all var(--transition-base);
-	border-radius: 12px;
-	margin: 6px;
+  position: absolute; /* suffix inside composer */
+  right: 12px; /* spec: right = 12px */
+  top: 50%; /* vertically centered */
+  transform: translateY(-50%);
+  width: 32px; /* spec: 32x32px circle */
+  height: 32px; /* spec: 32x32px circle */
+  border-radius: 50%;
+  padding: 0; /* do not affect layout height */
+  margin: 0; /* avoid extra spacing */
+  border: none; /* no double border */
+  background: rgba(15, 23, 42, 0.06); /* subtle circular background */
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: none;
 }
 
-.composer button:hover {
-	transform: translateY(-2px);
-	box-shadow: var(--shadow-md), var(--shadow-glow);
-}
+.composer button:hover { background: rgba(0, 102, 255, 0.10); }
 
-.composer button:active {
-	transform: translateY(0);
-}
+.composer button:active { background: rgba(0, 102, 255, 0.20); }
+
+.composer button:focus-visible { outline: 2px solid rgba(0,102,255,0.5); outline-offset: 2px; }
+
+.composer button:disabled { background: rgba(15, 23, 42, 0.06); opacity: 0.9; cursor: default; }
+.composer button:disabled svg { stroke: #94a3b8; } /* neutral 400 */
 
 /* ========================================
    Metrics Table - Financial data display
@@ -659,12 +670,10 @@ body {
   }
 
   .composer input {
-    padding: 12px 14px;
+    padding: 12px 56px 12px 14px; /* keep ≥48px right padding on desktop */
   }
 
-  .composer button {
-    margin: 0;
-  }
+  .composer button { margin: 0; }
 
   /* Reading width and gutter */
   .chat-panel { padding: 0 24px 24px; }

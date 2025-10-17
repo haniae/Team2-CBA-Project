@@ -11,7 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -441,6 +441,23 @@ def root() -> FileResponse:
     if PACKAGE_STATIC.exists():
         return FileResponse(PACKAGE_STATIC / "index.html")
     raise HTTPException(status_code=404, detail="Frontend assets are not available.")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    """Serve a favicon; prefer project webui asset, fall back to packaged static.
+
+    Browsers request /favicon.ico by default; we serve our SVG for simplicity.
+    """
+    candidates = []
+    if FRONTEND_DIR.exists():
+        candidates.append(FRONTEND_DIR / "favicon.svg")
+    if PACKAGE_STATIC.exists():
+        candidates.append(PACKAGE_STATIC / "favicon.svg")
+    for path in candidates:
+        if path.exists():
+            return FileResponse(path, media_type="image/svg+xml")
+    raise HTTPException(status_code=404, detail="Favicon not found")
 
 
 @app.get("/health")
