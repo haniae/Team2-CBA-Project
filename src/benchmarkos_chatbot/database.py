@@ -18,7 +18,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:  # pragma: no cover
     from .data_sources import AuditEvent, FilingRecord, FinancialFact, MarketQuote
@@ -47,6 +47,23 @@ class MetricRecord:
     updated_at: datetime
     start_year: Optional[int]
     end_year: Optional[int]
+
+
+@dataclass(frozen=True)
+class KpiValueRecord:
+    """Value persisted by the KPI backfill pipeline with provenance metadata."""
+
+    ticker: str
+    fiscal_year: Optional[int]
+    fiscal_quarter: Optional[int]
+    metric_id: str
+    value: Optional[float]
+    unit: Optional[str]
+    method: str
+    source: str
+    source_ref: Optional[str]
+    warning: Optional[str]
+    updated_at: datetime
 
 
 @dataclass(frozen=True)
@@ -146,6 +163,8 @@ def _connect(database_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(database_path)
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA temp_store=MEMORY;")
+    conn.execute("PRAGMA cache_size=-16000;")
     conn.execute("PRAGMA foreign_keys=ON;")
     return conn
 
@@ -219,6 +238,15 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
         _ensure_column(connection, "metric_snapshots", "end_year", "INTEGER")
         _ensure_column(connection, "metric_snapshots", "source", "TEXT NOT NULL DEFAULT 'edgar'")
         _ensure_column(connection, "metric_snapshots", "updated_at", "TEXT")
+
+    # kpi_values provenance upgrades
+    if "kpi_values" in tables:
+        _ensure_column(connection, "kpi_values", "unit", "TEXT")
+        _ensure_column(connection, "kpi_values", "method", "TEXT NOT NULL DEFAULT 'derived'")
+        _ensure_column(connection, "kpi_values", "source", "TEXT NOT NULL DEFAULT 'SEC'")
+        _ensure_column(connection, "kpi_values", "source_ref", "TEXT")
+        _ensure_column(connection, "kpi_values", "warning", "TEXT")
+        _ensure_column(connection, "kpi_values", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
         connection.execute("""
             UPDATE metric_snapshots
             SET updated_at = NULLIF(updated_at, '')
@@ -366,6 +394,24 @@ def initialise(database_path: Path) -> None:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS kpi_values (
+                ticker TEXT NOT NULL,
+                fiscal_year INTEGER,
+                fiscal_quarter INTEGER,
+                metric_id TEXT NOT NULL,
+                value REAL,
+                unit TEXT,
+                method TEXT NOT NULL DEFAULT 'derived',
+                source TEXT NOT NULL DEFAULT 'SEC',
+                source_ref TEXT,
+                warning TEXT,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (ticker, fiscal_year, fiscal_quarter, metric_id)
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS ticker_aliases (
                 ticker TEXT PRIMARY KEY,
                 cik TEXT NOT NULL,
@@ -393,6 +439,12 @@ def initialise(database_path: Path) -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_metric_snapshots_ticker
             ON metric_snapshots (ticker, metric)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_kpi_values_lookup
+            ON kpi_values (ticker, metric_id, fiscal_year, fiscal_quarter)
             """
         )
         connection.execute(
@@ -1151,6 +1203,196 @@ def fetch_metric_snapshots(
             )
         )
     return results
+
+
+# -----------------------------
+# KPI values
+# -----------------------------
+
+
+def upsert_kpi_value(
+    database_path: Path,
+    ticker: str,
+    fiscal_year: Optional[int],
+    fiscal_quarter: Optional[int],
+    metric_id: str,
+    value: Optional[float],
+    unit: Optional[str],
+    method: str,
+    source: str,
+    source_ref: Optional[str],
+    warning: Optional[str] = None,
+) -> None:
+    """Insert or update a KPI backfill value with provenance metadata."""
+    timestamp = _iso_utc(datetime.now(timezone.utc))
+    with _connect(database_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO kpi_values (
+                ticker, fiscal_year, fiscal_quarter, metric_id,
+                value, unit, method, source, source_ref, warning, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(ticker, fiscal_year, fiscal_quarter, metric_id) DO UPDATE SET
+                value      = excluded.value,
+                unit       = excluded.unit,
+                method     = excluded.method,
+                source     = excluded.source,
+                source_ref = excluded.source_ref,
+                warning    = excluded.warning,
+                updated_at = excluded.updated_at
+            """,
+            (
+                _normalize_ticker(ticker),
+                fiscal_year,
+                fiscal_quarter,
+                metric_id,
+                value,
+                unit,
+                method,
+                source,
+                source_ref,
+                warning,
+                timestamp,
+            ),
+        )
+        connection.commit()
+
+
+def fetch_kpi_values(
+    database_path: Path,
+    ticker: str,
+    *,
+    fiscal_year: Optional[int] = None,
+    fiscal_quarter: Optional[int] = None,
+) -> List[KpiValueRecord]:
+    """Return KPI backfill entries for ``ticker`` optionally filtered by period."""
+    sql = [
+        "SELECT ticker, fiscal_year, fiscal_quarter, metric_id, value, unit, method, source, source_ref, warning, updated_at",
+        "FROM kpi_values",
+        "WHERE ticker = ?",
+    ]
+    params: List[Any] = [_normalize_ticker(ticker)]
+    if fiscal_year is not None:
+        sql.append("AND fiscal_year = ?")
+        params.append(fiscal_year)
+    if fiscal_quarter is not None:
+        sql.append("AND fiscal_quarter = ?")
+        params.append(fiscal_quarter)
+    sql.append("ORDER BY metric_id ASC")
+
+    query = "\n".join(sql)
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(query, params).fetchall()
+
+    results: List[KpiValueRecord] = []
+    for row in rows:
+        updated_at = _parse_dt(row["updated_at"]) or datetime(1970, 1, 1, tzinfo=timezone.utc)
+        results.append(
+            KpiValueRecord(
+                ticker=row["ticker"],
+                fiscal_year=row["fiscal_year"],
+                fiscal_quarter=row["fiscal_quarter"],
+                metric_id=row["metric_id"],
+                value=row["value"],
+                unit=row["unit"],
+                method=row["method"],
+                source=row["source"],
+                source_ref=row["source_ref"],
+                warning=row["warning"],
+                updated_at=updated_at,
+            )
+        )
+    return results
+
+
+# -----------------------------
+# Convenience wrapper
+# -----------------------------
+
+
+class Database:
+    """Lightweight helper providing object-oriented access to database helpers."""
+
+    def __init__(self, database_path: Union[str, Path]) -> None:
+        self.path = Path(database_path)
+
+    def fetch_metric_snapshots(
+        self,
+        ticker: str,
+        *,
+        period_filters: Optional[Sequence[Tuple[int, int]]] = None,
+    ) -> List[MetricRecord]:
+        return fetch_metric_snapshots(self.path, ticker, period_filters=period_filters)
+
+    def fetch_financial_facts(
+        self,
+        ticker: str,
+        *,
+        fiscal_year: Optional[int] = None,
+        metric: Optional[str] = None,
+        limit: Optional[int] = None,
+    ) -> List[FinancialFactRecord]:
+        return fetch_financial_facts(
+            self.path,
+            ticker,
+            fiscal_year=fiscal_year,
+            metric=metric,
+            limit=limit,
+        )
+
+    def fetch_kpi_values(
+        self,
+        ticker: str,
+        *,
+        fiscal_year: Optional[int] = None,
+        fiscal_quarter: Optional[int] = None,
+    ) -> List[KpiValueRecord]:
+        return fetch_kpi_values(
+            self.path,
+            ticker,
+            fiscal_year=fiscal_year,
+            fiscal_quarter=fiscal_quarter,
+        )
+
+    def upsert_kpi(
+        self,
+        ticker: str,
+        fiscal_year: Optional[int],
+        fiscal_quarter: Optional[int],
+        metric_id: str,
+        value: Optional[float],
+        unit: Optional[str],
+        method: str,
+        source: str,
+        source_ref: Optional[str],
+        warning: Optional[str] = None,
+    ) -> None:
+        upsert_kpi_value(
+            self.path,
+            ticker,
+            fiscal_year,
+            fiscal_quarter,
+            metric_id,
+            value,
+            unit,
+            method,
+            source,
+            source_ref,
+            warning,
+        )
+
+    def fetch_latest_quote(self, ticker: str) -> Optional[Dict[str, Any]]:
+        return fetch_latest_quote(self.path, ticker)
+
+    def fetch_quote_on_or_before(
+        self,
+        ticker: str,
+        *,
+        before: datetime,
+    ) -> Optional[Dict[str, Any]]:
+        return fetch_quote_on_or_before(self.path, ticker, before=before)
+
 
 # -----------------------------
 # Scenario results

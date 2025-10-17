@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import re
 import string
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .analytics_engine import (
     AGGREGATE_METRICS,
@@ -156,9 +157,9 @@ def render_table_command(user_input: str, engine: AnalyticsEngine) -> Optional[s
     tokens = raw_tokens[1:]
 
     try:
-        remaining, period_filters, layout = _parse_year_filters(tokens)
+        remaining, period_filters, layout, period_specs = _parse_year_filters(tokens)
     except ValueError:
-        return "Invalid year filter. Use year=YYYY or years=YYYY-YYYY."
+        return "Invalid period filter. Use 2024, 2024Q1, year=YYYY, or years=YYYY-YYYY."
 
     try:
         tickers, metrics, period_filters, layout_mode = _resolve_metrics_and_tickers(
@@ -186,6 +187,10 @@ def render_table_command(user_input: str, engine: AnalyticsEngine) -> Optional[s
             else:
                 benchmark_label = getattr(engine, "BENCHMARK_LABEL", "Benchmark")
             records_by_ticker[benchmark_label] = list(aggregated.values())
+
+    if period_specs:
+        for ticker, records in list(records_by_ticker.items()):
+            records_by_ticker[ticker] = _filter_records_by_period(records, period_specs)
 
     display_tickers = list(tickers)
     if benchmark_label:
@@ -232,24 +237,30 @@ def render_table_command(user_input: str, engine: AnalyticsEngine) -> Optional[s
 # -- Helper functions -----------------------------------------------------
 
 
-def _parse_year_filters(tokens: Sequence[str]) -> Tuple[List[str], Optional[List[Tuple[int, int]]], Optional[str]]:
-    """Parse tokens describing fiscal year ranges or lists."""
-    period_filters: List[Tuple[int, int]] = []
-    layout: Optional[str] = None
+def _parse_year_filters(
+    tokens: Sequence[str],
+) -> Tuple[List[str], Optional[List[Tuple[int, int]]], Optional[str], List[Dict[str, Any]]]:
+    """Parse tokens describing fiscal year/quarter ranges or lists."""
     remaining: List[str] = []
+    layout: Optional[str] = None
+    specs: List[Dict[str, Any]] = []
+    seen_specs: set[Tuple[int, int, Optional[str]]] = set()
 
     for token in tokens:
-        cleaned = token.strip()
+        cleaned = token.strip().rstrip(",")
         if not cleaned:
             continue
-        if cleaned.lower().startswith("year="):
-            year = _coerce_int(cleaned.split("=", 1)[1])
+        lower = cleaned.lower()
+        if lower.startswith("layout="):
+            layout = lower.split("=", 1)[1]
+            continue
+        if lower.startswith("year="):
+            year = _coerce_int(lower.split("=", 1)[1])
             if year is None:
                 raise ValueError
-            period_filters.append((year, year))
-            continue
-        if cleaned.lower().startswith("years="):
-            bounds = cleaned.split("=", 1)[1].split("-", 1)
+            spec = {"start": year, "end": year, "quarter": None}
+        elif lower.startswith("years=") and "-" in lower:
+            bounds = lower.split("=", 1)[1].split("-", 1)
             if len(bounds) != 2:
                 raise ValueError
             start = _coerce_int(bounds[0])
@@ -258,14 +269,22 @@ def _parse_year_filters(tokens: Sequence[str]) -> Tuple[List[str], Optional[List
                 raise ValueError
             if end < start:
                 start, end = end, start
-            period_filters.append((start, end))
-            continue
-        if cleaned.lower().startswith("layout="):
-            layout = cleaned.split("=", 1)[1].lower()
-            continue
-        remaining.append(cleaned)
+            spec = {"start": start, "end": end, "quarter": None}
+        else:
+            parsed = _parse_period_token(cleaned)
+            if parsed is None:
+                remaining.append(cleaned)
+                continue
+            spec = parsed
 
-    return remaining, (period_filters or None), layout
+        key = (spec["start"], spec["end"], spec.get("quarter"))
+        if key not in seen_specs:
+            seen_specs.add(key)
+            specs.append(spec)
+
+    sorted_specs = sorted(seen_specs, key=lambda item: (item[0], item[1], item[2] or ""))
+    period_filters = [(start, end) for (start, end, _quarter) in sorted_specs]
+    return remaining, (period_filters or None), layout, specs
 
 
 # Additional helpers (_resolve_metrics_and_tickers, _split_tickers_and_periods, etc.) will follow.
@@ -284,14 +303,14 @@ def _resolve_metrics_and_tickers(
     if command == "table":
         if "metrics" not in lowered:
             raise ValueError(
-                "Usage: table <tickers...> metrics <metrics...> [year=YYYY | years=YYYY-YYYY]"
+                "Usage: table <tickers...> metrics <metrics...> [2024 | 2024Q1 | year=YYYY | years=YYYY-YYYY]"
             )
         split_index = lowered.index("metrics")
         tickers = _extract_tickers(tokens[:split_index])
         raw_metrics = tokens[split_index + 1 :]
         if not tickers or not raw_metrics:
             raise ValueError(
-                "Usage: table <tickers...> metrics <metrics...> [year=YYYY | years=YYYY-YYYY]"
+                "Usage: table <tickers...> metrics <metrics...> [2024 | 2024Q1 | year=YYYY | years=YYYY-YYYY]"
             )
         metrics = _expand_metrics(raw_metrics)
         return tickers, metrics, period_filters, layout_mode
@@ -358,59 +377,79 @@ def _expand_metrics(raw_metrics: Sequence[str]) -> List[str]:
     return ordered
 
 
-def _parse_year_filters(tokens: Sequence[str]) -> Tuple[List[str], Optional[List[Tuple[int, int]]], Optional[str]]:
-    """Parse tokens describing fiscal year ranges or lists."""
-    remaining: List[str] = []
-    period_filters: List[Tuple[int, int]] = []
-    layout: Optional[str] = None
-
-    for token in tokens:
-        cleaned = token.strip()
-        lower = cleaned.lower()
-        if lower.startswith("year="):
-            year = _coerce_int(lower.split("=", 1)[1])
-            if year is None:
-                raise ValueError
-            period_filters.append((year, year))
-            continue
-        if lower.startswith("years=") and "-" in lower:
-            bounds = lower.split("=", 1)[1].split("-", 1)
-            if len(bounds) != 2:
-                raise ValueError
-            start = _coerce_int(bounds[0])
-            end = _coerce_int(bounds[1])
-            if start is None or end is None:
-                raise ValueError
-            if end < start:
-                start, end = end, start
-            period_filters.append((start, end))
-            continue
-        if lower.startswith("layout="):
-            layout = lower.split("=", 1)[1]
-            continue
-        remaining.append(cleaned)
-
-    return remaining, (period_filters or None), layout
+_QUARTER_PATTERN = re.compile(r"^(?:fy)?(?P<year>\d{4})(?:q(?P<quarter>[1-4]))?$")
 
 
-def _parse_period_token(token: str) -> Optional[Tuple[int, int]]:
-    """Interpret period tokens (e.g. FY2020) for filtering."""
+def _parse_period_token(token: str) -> Optional[Dict[str, Any]]:
+    """Interpret year/quarter tokens (e.g. 2020, FY2020Q1) for filtering."""
     cleaned = token.strip().lower()
-    if cleaned.startswith("fy") and cleaned[2:].isdigit():
-        year = int(cleaned[2:])
-        return (year, year)
-    if cleaned.isdigit() and len(cleaned) == 4:
-        year = int(cleaned)
-        if 1900 <= year <= 2100:
-            return (year, year)
+    if not cleaned:
+        return None
     if "-" in cleaned:
         left, right = cleaned.split("-", 1)
-        if left.isdigit() and right.isdigit():
-            start = int(left)
-            end = int(right)
-            if end < start:
-                start, end = end, start
-            return (start, end)
+        if left and right:
+            left = left.removeprefix("fy")
+            right = right.removeprefix("fy")
+            if left.isdigit() and right.isdigit():
+                start = int(left)
+                end = int(right)
+                if end < start:
+                    start, end = end, start
+                if 1900 <= start <= 2100 and 1900 <= end <= 2100:
+                    return {"start": start, "end": end, "quarter": None}
+    match = _QUARTER_PATTERN.match(cleaned)
+    if match:
+        year = int(match.group("year"))
+        if 1900 <= year <= 2100:
+            quarter = match.group("quarter")
+            quarter_label = f"Q{quarter}" if quarter else None
+            return {"start": year, "end": year, "quarter": quarter_label}
+    return None
+
+
+def _filter_records_by_period(records: Sequence, specs: Sequence[Dict[str, Any]]) -> List:
+    """Filter metric records to the requested period specifications."""
+    records_list = list(records)
+    if not records_list or not specs:
+        return records_list
+    matched: List = []
+    seen: set[Tuple[str, str, Optional[str]]] = set()
+    for spec in specs:
+        for record in records_list:
+            if _record_matches_spec(record, spec):
+                key = (
+                    getattr(record, "metric", ""),
+                    getattr(record, "period", "") or "",
+                    getattr(record, "source", None),
+                )
+                if key not in seen:
+                    seen.add(key)
+                    matched.append(record)
+    return matched if matched else records_list
+
+
+def _record_matches_spec(record: Any, spec: Dict[str, Any]) -> bool:
+    """Return True when a metric record aligns with the requested period spec."""
+    start = spec["start"]
+    end = spec["end"]
+    quarter = spec.get("quarter")
+    year = getattr(record, "end_year", None) or getattr(record, "start_year", None)
+    if year is None:
+        year = _infer_year_from_period(getattr(record, "period", "") or "")
+    if year is None or not (start <= year <= end):
+        return False
+    if quarter:
+        period_label = (getattr(record, "period", "") or "").upper()
+        if quarter not in period_label:
+            return False
+    return True
+
+
+def _infer_year_from_period(period: str) -> Optional[int]:
+    """Best-effort extraction of a fiscal year from a period label."""
+    match = re.search(r"(19|20)\d{2}", period)
+    if match:
+        return int(match.group(0))
     return None
 
 

@@ -27,6 +27,7 @@ from .config import Settings
 from .data_ingestion import IngestionReport, ingest_financial_data
 from .help_content import HELP_TEXT
 from .llm_client import LLMClient, build_llm_client
+from .parsing.parse import parse_to_structured
 from .table_renderer import METRIC_DEFINITIONS, render_table_command
 
 LOGGER = logging.getLogger(__name__)
@@ -440,6 +441,7 @@ class BenchmarkOSChatbot:
             "citations": [],
             "exports": [],
             "conclusion": "",
+            "parser": {},
         }
 
     def _progress(self, stage: str, detail: str) -> None:
@@ -1359,6 +1361,13 @@ class BenchmarkOSChatbot:
     # ----------------------------------------------------------------------------------
     def _handle_financial_intent(self, text: str) -> Optional[str]:
         """Handle natural-language requests that map to metrics workflows."""
+        structured = parse_to_structured(text)
+        self.last_structured_response["parser"] = structured
+
+        structured_reply = self._handle_structured_metrics(structured)
+        if structured_reply:
+            return structured_reply
+
         metrics_request = self._parse_metrics_request(text)
         if metrics_request is not None:
             tickers_summary = ", ".join(metrics_request.tickers) if metrics_request.tickers else ""
@@ -1375,7 +1384,7 @@ class BenchmarkOSChatbot:
             self._progress("metrics_dispatch", f"Dispatching metrics workflow for {', '.join(resolution.available)}")
             return self._dispatch_metrics_request(
                 resolution.available, metrics_request.period_filters
-        )
+            )
 
         lowered = text.strip().lower()
         if lowered == "help":
@@ -1443,6 +1452,63 @@ class BenchmarkOSChatbot:
             tickers,
             period_filters=period_filters,
         )
+
+    def _handle_structured_metrics(self, structured: Dict[str, Any]) -> Optional[str]:
+        """Handle parsed structured intents without relying on legacy commands."""
+        tickers = structured.get("tickers") or []
+        unique_tickers: List[str] = []
+        for entry in tickers:
+            ticker = entry.get("ticker")
+            if ticker and ticker not in unique_tickers:
+                unique_tickers.append(ticker)
+
+        if not unique_tickers:
+            return None
+
+        resolution = self._resolve_tickers(unique_tickers)
+        if resolution.missing and not resolution.available:
+            return self._format_missing_message(unique_tickers, resolution.available)
+
+        resolved_tickers = resolution.available if resolution.available else unique_tickers
+        period_filters = self._periods_to_filters(structured.get("periods", {}))
+
+        intent = structured.get("intent")
+        if intent == "compare" and len(resolved_tickers) >= 2:
+            return self._format_metrics_table(resolved_tickers, period_filters=period_filters)
+
+        if intent in {"lookup", "trend", "rank"}:
+            return self._dispatch_metrics_request(resolved_tickers, period_filters)
+
+        return None
+
+    @staticmethod
+    def _periods_to_filters(periods: Dict[str, Any]) -> Optional[List[tuple[int, int]]]:
+        """Convert parsed period metadata into fiscal year filters."""
+        if not periods:
+            return None
+        items = periods.get("items") or []
+        if periods.get("type") == "range" and len(items) >= 2:
+            start = items[0].get("fy")
+            end = items[-1].get("fy")
+            if start is not None and end is not None:
+                if end < start:
+                    start, end = end, start
+                return [(start, end)]
+
+        years: List[int] = []
+        for item in items:
+            year = item.get("fy")
+            if year is None or year in years:
+                continue
+            years.append(year)
+
+        if not years:
+            return None
+
+        years_sorted = sorted(years)
+        if periods.get("type") == "multi":
+            return [(year, year) for year in years_sorted]
+        return [(years_sorted[0], years_sorted[-1])]
 
     def _handle_ingest_command(self, text: str) -> str:
         """Execute ingestion commands issued by the user."""
@@ -2109,6 +2175,7 @@ class BenchmarkOSChatbot:
         """Render metrics output as a table suitable for chat."""
         metrics_per_ticker: Dict[str, Dict[str, database.MetricRecord]] = {}
         histories: Dict[str, List[database.MetricRecord]] = {}
+        kpi_overrides: Dict[str, Dict[str, Tuple[database.KpiValueRecord, bool]]] = {}
         missing: List[str] = []
         latest_spans: Dict[str, tuple[int, int]] = {}
         for ticker in tickers:
@@ -2135,6 +2202,40 @@ class BenchmarkOSChatbot:
                     key=lambda value: value[1],
                 )
                 latest_spans[ticker] = span
+                fiscal_end = span[1]
+                if fiscal_end:
+                    overrides: Dict[str, Tuple[database.KpiValueRecord, bool]] = {}
+                    try:
+                        kpi_rows = database.fetch_kpi_values(
+                            self.settings.database_path,
+                            ticker,
+                            fiscal_year=fiscal_end,
+                        )
+                    except Exception:
+                        kpi_rows = []
+                    for kpi_record in kpi_rows:
+                        used_override = False
+                        existing = selected.get(kpi_record.metric_id)
+                        if existing is None or existing.value is None:
+                            period_label = (
+                                f"FY{kpi_record.fiscal_year}"
+                                if kpi_record.fiscal_year
+                                else f"FY{fiscal_end}"
+                            )
+                            selected[kpi_record.metric_id] = database.MetricRecord(
+                                ticker=ticker,
+                                metric=kpi_record.metric_id,
+                                period=period_label,
+                                value=kpi_record.value,
+                                source=f"kpi:{kpi_record.method}",
+                                updated_at=kpi_record.updated_at,
+                                start_year=kpi_record.fiscal_year,
+                                end_year=kpi_record.fiscal_year,
+                            )
+                            used_override = True
+                        overrides[kpi_record.metric_id] = (kpi_record, used_override)
+                    if overrides:
+                        kpi_overrides[ticker] = overrides
 
             self._progress("metrics_fetch_progress", f"Loaded {len(records)} rows for {ticker}")
 
@@ -2181,15 +2282,31 @@ class BenchmarkOSChatbot:
             display_tickers.append(benchmark_label)
         headers = ["Metric"] + display_tickers
         rows: List[List[str]] = []
+        cell_metadata: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        metric_keys: List[str] = []
         for definition in METRIC_DEFINITIONS:
             label = definition.description
+            metric_keys.append(definition.name)
             row = [label]
             for ticker in display_tickers:
-                row.append(
-                    self._format_metric_value(
-                        definition.name, metrics_per_ticker[ticker]
-                    )
+                formatted_value = self._format_metric_value(
+                    definition.name, metrics_per_ticker[ticker]
                 )
+                row.append(formatted_value)
+                override_entry = kpi_overrides.get(ticker, {}).get(definition.name)
+                if override_entry:
+                    record, used_override = override_entry
+                    if record.value is not None and (used_override or record.method == "external"):
+                        meta_bucket = cell_metadata.setdefault(definition.name, {})
+                        meta_bucket[ticker] = {
+                            "method": record.method,
+                            "source": record.source,
+                            "source_ref": record.source_ref,
+                            "warning": record.warning,
+                            "unit": record.unit,
+                            "updated_at": record.updated_at.isoformat(),
+                            "used_override": used_override,
+                        }
             rows.append(row)
 
         descriptor_filters: List[tuple[int, int]]
@@ -2214,6 +2331,8 @@ class BenchmarkOSChatbot:
             "descriptor": descriptor,
             "tickers": display_tickers,
             "title": f"Benchmark summary for {', '.join(ordered_tickers)}",
+            "cell_metadata": cell_metadata,
+            "metric_keys": metric_keys,
         }
         trends_payload = self._build_trend_series(histories, ordered_tickers)
         citations_payload = self._build_metric_citations(

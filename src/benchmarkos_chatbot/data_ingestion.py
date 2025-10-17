@@ -3,10 +3,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import List, Optional, Sequence
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+import pandas as pd
 
 from . import database
 from .config import Settings
@@ -23,6 +28,83 @@ from .data_sources import (
 from .sec_bulk import CompanyFactsBulkCache
 
 LOGGER = logging.getLogger(__name__)
+
+DEFAULT_CONCURRENCY = 8
+_FACT_CACHE: Dict[str, Tuple[List[FilingRecord], List[FinancialFact]]] = {}
+SECTOR_CODES = {
+    "Information Technology": 45.0,
+    "Consumer Staples": 30.0,
+    "Industrials": 20.0,
+    "Health Care": 35.0,
+    "Energy": 40.0,
+    "Financials": 55.0,
+    "Consumer Discretionary": 25.0,
+    "Communication Services": 50.0,
+}
+
+
+async def _fetch_ticker_data(
+    ticker: str,
+    years: int,
+    edgar: EdgarClient,
+    edgar_forms: Optional[Sequence[str]],
+    concepts: Sequence[str],
+    semaphore: asyncio.Semaphore,
+) -> Dict[str, Any]:
+    """Fetch filings and facts for a single ticker with bounded concurrency."""
+    if ticker in _FACT_CACHE:
+        cached_filings, cached_facts = _FACT_CACHE[ticker]
+        return {
+            "ticker": ticker,
+            "filings": list(cached_filings),
+            "facts": list(cached_facts),
+            "fetch_ms": 0,
+            "error": None,
+        }
+
+    async with semaphore:
+        start = time.perf_counter()
+        try:
+            filings, facts = await asyncio.to_thread(
+                _blocking_fetch_edgar,
+                edgar,
+                ticker,
+                years,
+                edgar_forms,
+                concepts,
+            )
+        except Exception as exc:  # pragma: no cover - network dependent
+            fetch_ms = int((time.perf_counter() - start) * 1000)
+            return {
+                "ticker": ticker,
+                "filings": [],
+                "facts": [],
+                "fetch_ms": fetch_ms,
+                "error": str(exc),
+            }
+        fetch_ms = int((time.perf_counter() - start) * 1000)
+
+    _FACT_CACHE[ticker] = (list(filings), list(facts))
+    return {
+        "ticker": ticker,
+        "filings": list(filings),
+        "facts": list(facts),
+        "fetch_ms": fetch_ms,
+        "error": None,
+    }
+
+
+def _blocking_fetch_edgar(
+    edgar: EdgarClient,
+    ticker: str,
+    years: int,
+    edgar_forms: Optional[Sequence[str]],
+    concepts: Sequence[str],
+) -> Tuple[List[FilingRecord], List[FinancialFact]]:
+    """Blocking helper executed inside a worker thread."""
+    filings = edgar.fetch_filings(ticker, forms=edgar_forms)
+    facts = edgar.fetch_facts(ticker, concepts=concepts, years=years)
+    return filings, facts
 
 
 @dataclass(frozen=True)
@@ -130,27 +212,41 @@ def ingest_live_tickers(
     else:
         bloomberg = bloomberg_client  # allow explicit override
 
-    filings: List[FilingRecord] = []
-    facts: List[FinancialFact] = []
-    audit_events: List[AuditEvent] = []
-    errors: List[str] = []
-    alias_records: List[database.TickerAliasRecord] = []
-
     concepts = tuple(fact_concepts or DEFAULT_FACT_CONCEPTS)
     year_buffer = max(1, getattr(settings, "ingestion_year_buffer", 2))
     current_year = _now().year
-
+    fetch_plans: List[Tuple[str, int]] = []
     for ticker in unique_tickers:
         existing_year = database.latest_fiscal_year(settings.database_path, ticker)
         years_to_fetch = years
         if existing_year is not None:
             delta_years = max(1, current_year - existing_year + year_buffer)
             years_to_fetch = max(year_buffer, min(years, delta_years))
-        try:
-            new_filings = edgar.fetch_filings(ticker, forms=edgar_forms)
-            new_facts = edgar.fetch_facts(ticker, concepts=concepts, years=years_to_fetch)
-        except Exception as exc:  # pragma: no cover - exercised in live ingestion
-            message = f"{ticker}: {exc}"
+        fetch_plans.append((ticker, years_to_fetch))
+
+    async def _gather_fetches() -> List[Dict[str, Any]]:
+        concurrency = max(1, getattr(settings, "ingestion_concurrency", DEFAULT_CONCURRENCY))
+        semaphore = asyncio.Semaphore(concurrency)
+        tasks = [
+            _fetch_ticker_data(plan_ticker, plan_years, edgar, edgar_forms, concepts, semaphore)
+            for plan_ticker, plan_years in fetch_plans
+        ]
+        return await asyncio.gather(*tasks)
+
+    fetch_results = asyncio.run(_gather_fetches())
+
+    filings: List[FilingRecord] = []
+    facts: List[FinancialFact] = []
+    audit_events: List[AuditEvent] = []
+    errors: List[str] = []
+    alias_records: List[database.TickerAliasRecord] = []
+
+    for result in fetch_results:
+        ticker = result["ticker"]
+        fetch_ms = result["fetch_ms"]
+        normalize_start = time.perf_counter()
+        if result["error"]:
+            message = f"{ticker}: {result['error']}"
             LOGGER.error("Failed to ingest %s", ticker, exc_info=True)
             errors.append(message)
             audit_events.append(
@@ -158,15 +254,19 @@ def ingest_live_tickers(
                     ticker=ticker,
                     event_type="ingestion.failed",
                     entity_id=None,
-                    details={"error": str(exc)},
+                    details={"error": result["error"]},
                     created_at=_now(),
                     created_by="data_ingestion",
                 )
             )
+            LOGGER.debug("ingest.timing %s fetch_ms=%d normalize_ms=%d", ticker, fetch_ms, 0)
             continue
 
+        new_filings: List[FilingRecord] = result["filings"]
+        new_facts: List[FinancialFact] = result["facts"]
         filings.extend(new_filings)
         facts.extend(new_facts)
+
         if new_facts:
             alias_timestamp = _now()
             alias_records.append(
@@ -177,10 +277,10 @@ def ingest_live_tickers(
                     updated_at=alias_timestamp,
                 )
             )
-        if new_facts and new_facts[0].fiscal_year is not None:
-            entity_id = f"{ticker}-FY{new_facts[0].fiscal_year}"
+            entity_id = f"{ticker}-FY{new_facts[0].fiscal_year}" if new_facts[0].fiscal_year else ticker
         else:
             entity_id = ticker
+
         audit_events.append(
             AuditEvent(
                 ticker=ticker,
@@ -194,7 +294,12 @@ def ingest_live_tickers(
                 created_by="data_ingestion",
             )
         )
+        normalize_ms = int((time.perf_counter() - normalize_start) * 1000)
+        LOGGER.debug("ingest.timing %s fetch_ms=%d normalize_ms=%d", ticker, fetch_ms, normalize_ms)
 
+    write_start = time.perf_counter()
+    filings_loaded = 0
+    facts_loaded = 0
     with database.temporary_connection(settings.database_path) as connection:
         filings_loaded = database.bulk_upsert_company_filings(
             settings.database_path, filings, connection=connection
@@ -209,6 +314,8 @@ def ingest_live_tickers(
             database.upsert_ticker_aliases(
                 settings.database_path, alias_records, connection=connection
             )
+    write_ms = int((time.perf_counter() - write_start) * 1000)
+    LOGGER.debug("ingest.write_ms=%d", write_ms)
 
     quotes_loaded = 0
     stooq_quotes_loaded = 0

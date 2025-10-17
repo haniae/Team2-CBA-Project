@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from . import database
 from .config import Settings
 from .data_sources import YahooFinanceClient
+from .kpi_backfill import fill_missing_kpis, reset_external_snapshot_cache
 from .secdb import SecPostgresStore
 from .ticker_universe import load_ticker_universe
 
@@ -395,6 +396,8 @@ class AnalyticsEngine:
         """Compute or refresh metric snapshots using the latest financial facts."""
 
         database.initialise(self.settings.database_path)
+        db_iface = database.Database(self.settings.database_path)
+        reset_external_snapshot_cache()
         rows = self._fetch_base_fact_rows()
 
         per_year: Dict[Tuple[str, int], Dict[str, Tuple[Optional[float], datetime]]] = {}
@@ -482,6 +485,7 @@ class AnalyticsEngine:
                 metrics[metric_name] = (numeric_value, updated_at)
 
         aggregate_records: List[database.MetricRecord] = []
+        fill_targets: List[Tuple[str, int]] = []
         for ticker, year_metrics in ticker_year_map.items():
             years = sorted(year_metrics)
             if not years:
@@ -638,12 +642,21 @@ class AnalyticsEngine:
                 intensity = abs(share_repurchases) / market_cap
                 _add_metric("share_buyback_intensity", intensity)
 
+            fill_targets.append((ticker, last_year))
+
         derived_records.extend(aggregate_records)
         all_records = metric_records + derived_records
         if not all_records:
             LOGGER.info("No financial facts available to compute metrics.")
             return
         database.replace_metric_snapshots(self.settings.database_path, all_records)
+        for ticker, fiscal_year in fill_targets:
+            try:
+                added = fill_missing_kpis(db_iface, ticker, fiscal_year, allow_external=self.settings.enable_external_backfill)
+                if added:
+                    LOGGER.debug("Backfilled %d KPI values for %s FY%s", added, ticker, fiscal_year)
+            except Exception:  # pragma: no cover - defensive safeguard
+                LOGGER.exception("KPI backfill pipeline failed for %s FY%s", ticker, fiscal_year)
         LOGGER.info(
             "Updated %d metric snapshots (%d base, %d derived)",
             len(all_records),
@@ -1155,3 +1168,4 @@ def _compute_derived_metrics(
         derived["free_cash_flow"] = free_cash_flow
 
     return {name: value for name, value in derived.items() if name in DERIVED_METRICS}
+

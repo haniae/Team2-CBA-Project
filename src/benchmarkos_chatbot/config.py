@@ -8,7 +8,7 @@ components.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -77,28 +77,29 @@ class Settings:
         Connection details for a Bloomberg Session (if enabled).
     """
 
-    database_type: DatabaseType
-    database_path: Path
-    postgres_host: Optional[str]
-    postgres_port: Optional[int]
-    postgres_database: Optional[str]
-    postgres_user: Optional[str]
-    postgres_password: Optional[str]
-    postgres_schema: str
-    llm_provider: LLMProvider
-    openai_model: str
-    sec_api_user_agent: str
-    edgar_base_url: str
-    yahoo_quote_url: str
-    yahoo_quote_batch_size: int
-    http_request_timeout: float
-    max_ingestion_workers: int
-    cache_dir: Path
-    enable_bloomberg: bool
-    bloomberg_host: Optional[str]
-    bloomberg_port: Optional[int]
-    bloomberg_timeout: float
-    disable_quote_refresh: bool
+    database_type: DatabaseType = "sqlite"
+    database_path: Path = field(default_factory=lambda: Path("benchmarkos_chatbot.sqlite3"))
+    postgres_host: Optional[str] = None
+    postgres_port: Optional[int] = None
+    postgres_database: Optional[str] = None
+    postgres_user: Optional[str] = None
+    postgres_password: Optional[str] = None
+    postgres_schema: str = "sec"
+    llm_provider: LLMProvider = "local"
+    openai_model: str = "gpt-4o-mini"
+    sec_api_user_agent: str = "BenchmarkOSBot/1.0 (support@benchmarkos.com)"
+    edgar_base_url: str = "https://data.sec.gov"
+    yahoo_quote_url: str = "https://query1.finance.yahoo.com/v7/finance/quote"
+    yahoo_quote_batch_size: int = 50
+    http_request_timeout: float = 30.0
+    max_ingestion_workers: int = 8
+    cache_dir: Path = field(default_factory=lambda: Path.cwd() / "cache")
+    enable_bloomberg: bool = False
+    bloomberg_host: Optional[str] = None
+    bloomberg_port: Optional[int] = None
+    bloomberg_timeout: float = 30.0
+    disable_quote_refresh: bool = False
+    enable_external_backfill: bool = False
     use_companyfacts_bulk: bool = False
     companyfacts_bulk_url: str = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
     companyfacts_bulk_refresh_hours: int = 24
@@ -314,6 +315,7 @@ def load_settings() -> Settings:
         bloomberg_port=bloomberg_port,
         bloomberg_timeout=bloomberg_timeout,
         disable_quote_refresh=_env_flag("DISABLE_QUOTE_REFRESH", default=False),
+        enable_external_backfill=_env_flag("ENABLE_EXTERNAL_BACKFILL", default=False),
         use_companyfacts_bulk=use_companyfacts_bulk,
         companyfacts_bulk_url=companyfacts_bulk_url,
         companyfacts_bulk_refresh_hours=companyfacts_bulk_refresh_hours,
@@ -328,3 +330,6 @@ def load_settings() -> Settings:
 # The module-level import of os happens at the bottom to keep the public API
 # obvious when scanning from the top of the file.
 import os  # noqa: E402  (placed at end intentionally)
+
+
+
