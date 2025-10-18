@@ -768,6 +768,19 @@ def compare(
             m = r.metric
             p = str(r.period)
             v = r.value
+            
+            # Format percentage metrics for display
+            if v is not None and isinstance(v, (int, float)):
+                # Percentage metrics (multiply by 100)
+                percentage_metrics = [
+                    'revenue_cagr', 'eps_cagr', 'ebitda_growth', 'dividend_yield', 
+                    'ebitda_margin', 'profit_margin', 'operating_margin', 'net_margin', 
+                    'return_on_assets', 'return_on_equity', 'return_on_invested_capital', 
+                    'free_cash_flow_margin', 'tsr'
+                ]
+                if m in percentage_metrics:
+                    v = v * 100
+            
             result.setdefault(m, {}).setdefault(p, {})[t] = v
 
     # sorted keys for stable UI rendering

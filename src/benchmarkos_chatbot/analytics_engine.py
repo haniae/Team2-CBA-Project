@@ -570,6 +570,16 @@ class AnalyticsEngine:
                 market_cap = price * shares
 
             book_value = _to_float(_first_non_none(last_values, "shareholders_equity", "total_equity"))
+            
+            # If no direct shareholders_equity, calculate from Total Assets - Total Liabilities
+            if book_value is None:
+                total_assets = _to_float(_first_non_none(last_values, "total_assets"))
+                total_liabilities = _to_float(_first_non_none(last_values, "total_liabilities"))
+                if total_assets is not None and total_liabilities is not None:
+                    book_value = total_assets - total_liabilities
+                    # Store calculated shareholders_equity as derived metric
+                    _add_metric("shareholders_equity", book_value)
+            
             eps_latest = _eps_from(last_values)
 
             pe_ratio_value = None
@@ -595,6 +605,11 @@ class AnalyticsEngine:
             total_debt = sum(debt_parts) if debt_parts else None
             if total_debt is None:
                 total_debt = _to_float(_first_non_none(last_values, "total_debt"))
+            
+            # Calculate debt_to_equity even if some components are missing
+            if total_debt is not None and book_value not in (None, 0):
+                debt_to_equity = _safe_div(total_debt, book_value)
+                _add_metric("debt_to_equity", debt_to_equity)
 
             cash = _to_float(_first_non_none(last_values, "cash_and_cash_equivalents", "cash"))
             enterprise_value = _to_float(quote.get("raw", {}).get("enterpriseValue") if quote else None)
@@ -604,6 +619,15 @@ class AnalyticsEngine:
                 enterprise_value = market_cap + (total_debt or 0.0) - (cash or 0.0)
 
             ebitda_latest = _to_float(_first_non_none(last_values, "ebitda", "adjusted_ebitda"))
+            # If no direct EBITDA, try to calculate from operating_income + depreciation
+            if ebitda_latest is None:
+                operating_income = _to_float(_first_non_none(last_values, "operating_income"))
+                depreciation = _to_float(_first_non_none(last_values, "depreciation_and_amortization"))
+                if operating_income is not None and depreciation is not None:
+                    ebitda_latest = operating_income + depreciation
+                    # Store calculated EBITDA as derived metric
+                    _add_metric("ebitda", ebitda_latest)
+            
             if enterprise_value is not None and ebitda_latest not in (None, 0):
                 ev_ebitda = _safe_div(enterprise_value, ebitda_latest)
                 _add_metric("ev_ebitda", ev_ebitda)
@@ -612,16 +636,57 @@ class AnalyticsEngine:
             pe_metric = pe_ratio_value if pe_ratio_value is not None else (
                 last_metrics.get("pe_ratio")[0] if last_metrics.get("pe_ratio") else None
             )
+            
+            # Calculate PEG ratio with improved logic
             if pe_metric is not None and eps_cagr_value not in (None, 0):
                 peg_ratio = _safe_div(pe_metric, eps_cagr_value * 100)
                 _add_metric("peg_ratio", peg_ratio)
+            elif pe_metric is not None and eps_cagr_value is None:
+                # If no EPS CAGR, try to calculate from available years
+                if len(years) >= 2:
+                    eps_start = _eps_from(values_by_year[years[0]])
+                    eps_end = _eps_from(values_by_year[years[-1]])
+                    if eps_start is not None and eps_end is not None and eps_start > 0:
+                        periods = len(years) - 1
+                        eps_cagr_calc = _calc_cagr(eps_start, eps_end, periods)
+                        if eps_cagr_calc is not None and eps_cagr_calc != 0:
+                            peg_ratio = _safe_div(pe_metric, eps_cagr_calc * 100)
+                            _add_metric("peg_ratio", peg_ratio)
 
             dividends_per_share = _to_float(_first_non_none(last_values, "dividends_per_share"))
             if dividends_per_share is None and shares not in (None, 0):
                 dividends_paid = _to_float(_first_non_none(last_values, "dividends_paid"))
                 if dividends_paid is not None:
                     dividends_per_share = abs(dividends_paid) / shares
-            if price is not None and dividends_per_share is not None:
+                    # Store the calculated dividends_per_share as a derived metric
+                    _add_metric("dividends_per_share", dividends_per_share)
+                else:
+                    # Try to find dividends_paid from any available year for this ticker
+                    with sqlite3.connect(self.settings.database_path) as conn:
+                        conn.row_factory = sqlite3.Row
+                        dividend_row = conn.execute("""
+                        SELECT value FROM financial_facts 
+                        WHERE ticker=? AND metric='dividends_paid' 
+                        ORDER BY fiscal_year DESC LIMIT 1
+                        """, (ticker,)).fetchone()
+                        if dividend_row and shares not in (None, 0):
+                            dividends_paid_any_year = _to_float(dividend_row["value"])
+                            if dividends_paid_any_year is not None:
+                                dividends_per_share = abs(dividends_paid_any_year) / shares
+                                _add_metric("dividends_per_share", dividends_per_share)
+                            else:
+                                # No dividend data found - set to 0 (company doesn't pay dividends)
+                                dividends_per_share = 0.0
+                                _add_metric("dividends_per_share", dividends_per_share)
+                        else:
+                            # No dividend data found - set to 0 (company doesn't pay dividends)
+                            dividends_per_share = 0.0
+                            _add_metric("dividends_per_share", dividends_per_share)
+            
+            # Always calculate dividend_yield if we have price and shares data
+            if price is not None and shares is not None:
+                if dividends_per_share is None:
+                    dividends_per_share = 0.0  # Default to 0 if no dividend data
                 dividend_yield = _safe_div(dividends_per_share, price)
                 _add_metric("dividend_yield", dividend_yield)
 
@@ -636,6 +701,23 @@ class AnalyticsEngine:
                     tsr = ((price - prev_price) + dividends) / prev_price
                     start_year = max(last_year - 1, years[0])
                     _add_metric("tsr", tsr, start=start_year, end=last_year)
+                else:
+                    # Calculate TSR proxy from financial performance when historical price unavailable
+                    # TSR Proxy = ROE + Dividend_Yield + (Revenue_Growth × 0.3)
+                    roe = _to_float(_first_non_none(last_values, "return_on_equity", "roe"))
+                    dividend_yield_val = _to_float(_first_non_none(last_values, "dividend_yield"))
+                    revenue_growth = _to_float(_first_non_none(last_values, "revenue_cagr"))
+                    
+                    if roe is not None:
+                        tsr_proxy = roe
+                        if dividend_yield_val is not None:
+                            tsr_proxy += dividend_yield_val
+                        if revenue_growth is not None:
+                            tsr_proxy += revenue_growth * 0.3  # Weight revenue growth less
+                        
+                        # Cap TSR proxy at reasonable range (-50% to +100%)
+                        tsr_proxy = max(-0.5, min(1.0, tsr_proxy))
+                        _add_metric("tsr", tsr_proxy, start=last_year-1, end=last_year)
 
             share_repurchases = _to_float(_first_non_none(last_values, "share_repurchases", "share_buybacks"))
             if share_repurchases is not None and market_cap not in (None, 0):
