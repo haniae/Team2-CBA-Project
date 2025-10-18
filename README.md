@@ -4,7 +4,25 @@ BenchmarkOS is an institutional-grade copilot for finance teams. It pairs determ
 
 ---
 
+## Practicum context
+This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing BenchmarkOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
+
+### Team
+- Hania A.
+- Van Nhi Vuong
+- Malcolm Muoriyarwa
+- Devarsh Patel
+- Supervising faculty: Professor Patrick Hall (The George Washington University)
+
+### Project focus
+- Translate classroom techniques into a production-grade analytics assistant that blends deterministic KPI calculations with auditable LLM experiences.
+- Stand up KPI coverage pipelines that stay resilient when market data lags or filing assumptions drift.
+- Deliver practitioner-ready documentation, including deployment runbooks and testing strategies, so stakeholders can re-create the practicum outcomes after the semester concludes.
+
+---
+
 ## Table of contents
+- [Practicum context](#practicum-context)
 - [Overview](#overview)
 - [Core capabilities](#core-capabilities)
 - [Architecture map](#architecture-map)
