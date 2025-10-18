@@ -2248,6 +2248,14 @@ function renderMessageArtifacts(wrapper, artifacts) {
   if (!body) {
     return;
   }
+  const dashboard = createDashboardLayout(artifacts);
+  if (dashboard) {
+    body.append(dashboard);
+    if (artifacts.comparisonTable) {
+      body.querySelectorAll(".message-table").forEach((tableNode) => tableNode.remove());
+    }
+    return;
+  }
   const sections = [];
   const highlightsSection = createHighlightsSection(artifacts.highlights);
   if (highlightsSection) {
@@ -2283,6 +2291,415 @@ function renderMessageArtifacts(wrapper, artifacts) {
   if (artifacts.comparisonTable) {
     body.querySelectorAll(".message-table").forEach((tableNode) => tableNode.remove());
   }
+}
+
+function createDashboardLayout(artifacts) {
+  const hasComparison =
+    artifacts?.comparisonTable &&
+    Array.isArray(artifacts.comparisonTable.rows) &&
+    artifacts.comparisonTable.rows.length > 0;
+  const hasHighlights = Array.isArray(artifacts?.highlights) && artifacts.highlights.length > 0;
+  const hasTrends = Array.isArray(artifacts?.trends) && artifacts.trends.length > 0;
+  const hasConclusion = typeof artifacts?.conclusion === "string" && artifacts.conclusion.trim();
+  const hasCitations = Array.isArray(artifacts?.citations) && artifacts.citations.length > 0;
+  const hasExports = Array.isArray(artifacts?.exports) && artifacts.exports.length > 0;
+  if (!(hasComparison || hasHighlights || hasTrends)) {
+    return null;
+  }
+  const wrapper = document.createElement("section");
+  wrapper.className = "financial-dashboard";
+  if (hasComparison) {
+    const header = createDashboardHeader(artifacts.comparisonTable);
+    if (header) {
+      wrapper.append(header);
+    }
+    const ribbon = createDashboardRibbon(artifacts);
+    if (ribbon) {
+      wrapper.append(ribbon);
+    }
+  } else {
+    const header = document.createElement("header");
+    header.className = "financial-dashboard__header";
+    const title = document.createElement("h3");
+    title.className = "financial-dashboard__title";
+    title.textContent = "Financial model dashboard";
+    header.append(title);
+    wrapper.append(header);
+  }
+  if (hasHighlights) {
+    const highlightsSection = createDashboardHighlights(artifacts.highlights);
+    if (highlightsSection) {
+      wrapper.append(highlightsSection);
+    }
+  }
+  if (hasComparison) {
+    const summary = createDashboardSummary(artifacts.comparisonTable);
+    if (summary) {
+      wrapper.append(summary);
+    }
+    const comparison = createDashboardTable(artifacts.comparisonTable);
+    if (comparison) {
+      wrapper.append(comparison);
+    }
+  }
+  if (hasTrends) {
+    const charts = createDashboardTrends(artifacts.trends);
+    if (charts) {
+      wrapper.append(charts);
+    }
+  }
+  if (hasConclusion || hasCitations || hasExports) {
+    const footer = createDashboardFooter({
+      conclusion: artifacts.conclusion,
+      citations: artifacts.citations,
+      exports: artifacts.exports,
+    });
+    if (footer) {
+      wrapper.append(footer);
+    }
+  }
+  return wrapper;
+}
+
+function createDashboardHeader(table) {
+  if (!table) {
+    return null;
+  }
+  const header = document.createElement("header");
+  header.className = "financial-dashboard__header";
+  const title = document.createElement("h3");
+  title.className = "financial-dashboard__title";
+  title.textContent = table.title || "Financial model dashboard";
+  header.append(title);
+  if (table.descriptor) {
+    const descriptor = document.createElement("p");
+    descriptor.className = "financial-dashboard__descriptor";
+    descriptor.textContent = table.descriptor;
+    header.append(descriptor);
+  }
+  if (Array.isArray(table.tickers) && table.tickers.length) {
+    const tickers = document.createElement("div");
+    tickers.className = "financial-dashboard__tickers";
+    table.tickers.forEach((ticker) => {
+      const badge = document.createElement("span");
+      badge.className = "financial-dashboard__ticker";
+      badge.textContent = ticker;
+      tickers.append(badge);
+    });
+    header.append(tickers);
+  }
+  return header;
+}
+
+function createDashboardRibbon(artifacts) {
+  const items = deriveRibbonItems(artifacts);
+  if (!items.length) {
+    return null;
+  }
+  const ribbon = document.createElement("section");
+  ribbon.className = "financial-dashboard__ribbon";
+  items.forEach((item) => {
+    const entry = document.createElement("article");
+    entry.className = "financial-dashboard__ribbon-item";
+    const label = document.createElement("span");
+    label.className = "financial-dashboard__ribbon-label";
+    label.textContent = item.label;
+    const value = document.createElement("span");
+    value.className = "financial-dashboard__ribbon-value";
+    value.textContent = item.value;
+    entry.append(label, value);
+    ribbon.append(entry);
+  });
+  return ribbon;
+}
+
+function deriveRibbonItems({ highlights, comparisonTable, conclusion }) {
+  const items = [];
+  if (comparisonTable?.tickers?.length) {
+    items.push({
+      label: comparisonTable.tickers.length > 1 ? "Peer set" : "Company",
+      value: comparisonTable.tickers.join(" vs "),
+    });
+  }
+  if (comparisonTable?.descriptor) {
+    items.push({
+      label: "Coverage window",
+      value: comparisonTable.descriptor,
+    });
+  }
+  if (Array.isArray(highlights)) {
+    highlights.forEach((entry) => {
+      if (items.length >= 5) {
+        return;
+      }
+      const parsed = parseHighlightPair(entry);
+      if (parsed) {
+        items.push(parsed);
+      }
+    });
+  }
+  if (items.length < 4 && typeof conclusion === "string" && conclusion.trim()) {
+    items.push({
+      label: "Narrative",
+      value: truncateText(conclusion.trim(), 90),
+    });
+  }
+  return items.slice(0, 5);
+}
+
+function parseHighlightPair(text) {
+  if (typeof text !== "string") {
+    return null;
+  }
+  const colonIndex = text.indexOf(":");
+  if (colonIndex > -1) {
+    return {
+      label: text.slice(0, colonIndex).trim(),
+      value: text.slice(colonIndex + 1).trim(),
+    };
+  }
+  const dashIndex = text.indexOf("-");
+  if (dashIndex > -1) {
+    return {
+      label: text.slice(0, dashIndex).trim(),
+      value: text.slice(dashIndex + 1).trim(),
+    };
+  }
+  return null;
+}
+
+function truncateText(text, maxLength) {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength - 1).trim()}…`;
+}
+
+function createDashboardSummary(table) {
+  const headers = Array.isArray(table?.headers) ? table.headers.slice(1) : [];
+  const rows = Array.isArray(table?.rows) ? table.rows : [];
+  if (!headers.length || !rows.length) {
+    return null;
+  }
+  const summaryRows = rows
+    .filter((row) => Array.isArray(row) && row.length === headers.length + 1)
+    .slice(0, 4);
+  if (!summaryRows.length) {
+    return null;
+  }
+  const section = document.createElement("section");
+  section.className = "financial-dashboard__summary";
+  headers.forEach((ticker, index) => {
+    const card = document.createElement("article");
+    card.className = "financial-dashboard__stat-card";
+    const heading = document.createElement("h4");
+    heading.className = "financial-dashboard__stat-title";
+    heading.textContent = ticker;
+    card.append(heading);
+    const list = document.createElement("dl");
+    list.className = "financial-dashboard__stat-list";
+    summaryRows.forEach((row) => {
+      const dt = document.createElement("dt");
+      dt.textContent = row[0];
+      const dd = document.createElement("dd");
+      dd.textContent = row[index + 1] ?? "—";
+      list.append(dt, dd);
+    });
+    card.append(list);
+    section.append(card);
+  });
+  return section;
+}
+
+function createDashboardHighlights(highlights) {
+  if (!Array.isArray(highlights) || !highlights.length) {
+    return null;
+  }
+  const section = document.createElement("section");
+  section.className = "financial-dashboard__highlights";
+  const heading = document.createElement("h4");
+  heading.className = "financial-dashboard__section-title";
+  heading.textContent = "Key takeaways";
+  section.append(heading);
+  const list = document.createElement("ul");
+  list.className = "financial-dashboard__highlight-list";
+  highlights.slice(0, 6).forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    list.append(li);
+  });
+  section.append(list);
+  return section;
+}
+
+function createDashboardTable(table) {
+  if (!table || !Array.isArray(table.headers) || !table.headers.length) {
+    return null;
+  }
+  const section = document.createElement("section");
+  section.className = "financial-dashboard__table";
+  const head = document.createElement("div");
+  head.className = "financial-dashboard__table-head";
+  const heading = document.createElement("h4");
+  heading.className = "financial-dashboard__section-title";
+  heading.textContent = "Key financials";
+  head.append(heading);
+  if (table.descriptor) {
+    const descriptor = document.createElement("span");
+    descriptor.className = "financial-dashboard__table-descriptor";
+    descriptor.textContent = table.descriptor;
+    head.append(descriptor);
+  }
+  section.append(head);
+  const surface = document.createElement("div");
+  surface.className = "financial-dashboard__table-surface";
+  const tableEl = document.createElement("table");
+  tableEl.className = "financial-dashboard__grid";
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  table.headers.forEach((label, index) => {
+    const cell = document.createElement("th");
+    cell.textContent = label;
+    if (index === 0) {
+      cell.classList.add("is-metric");
+    }
+    headerRow.append(cell);
+  });
+  thead.append(headerRow);
+  tableEl.append(thead);
+  const tbody = document.createElement("tbody");
+  (table.rows || []).forEach((row) => {
+    if (!Array.isArray(row) || !row.length) {
+      return;
+    }
+    const tr = document.createElement("tr");
+    row.forEach((value, index) => {
+      const cell = document.createElement(index === 0 ? "th" : "td");
+      if (index === 0) {
+        cell.scope = "row";
+        cell.classList.add("is-metric");
+      } else {
+        cell.classList.add("is-value");
+      }
+      cell.textContent = value;
+      tr.append(cell);
+    });
+    tbody.append(tr);
+  });
+  tableEl.append(tbody);
+  surface.append(tableEl);
+  section.append(surface);
+  return section;
+}
+
+function createDashboardTrends(trends) {
+  const seriesList = Array.isArray(trends)
+    ? trends.filter((series) => Array.isArray(series.points) && series.points.length >= 2)
+    : [];
+  if (!seriesList.length) {
+    return null;
+  }
+  const section = document.createElement("section");
+  section.className = "financial-dashboard__charts";
+  const heading = document.createElement("h4");
+  heading.className = "financial-dashboard__section-title";
+  heading.textContent = "Trend snapshots";
+  section.append(heading);
+  const grid = document.createElement("div");
+  grid.className = "financial-dashboard__chart-grid";
+  seriesList.slice(0, 3).forEach((series) => {
+    const card = createTrendCard(series);
+    if (card) {
+      card.classList.add("financial-dashboard__chart-card");
+      grid.append(card);
+    }
+  });
+  section.append(grid);
+  return section;
+}
+
+function createDashboardFooter({ conclusion, citations, exports }) {
+  const hasConclusion = typeof conclusion === "string" && conclusion.trim().length > 0;
+  const hasCitations = Array.isArray(citations) && citations.length > 0;
+  const hasExports = Array.isArray(exports) && exports.length > 0;
+  if (!hasConclusion && !hasCitations && !hasExports) {
+    return null;
+  }
+  const section = document.createElement("section");
+  section.className = "financial-dashboard__footnotes";
+  if (hasConclusion) {
+    const summary = document.createElement("article");
+    summary.className = "financial-dashboard__conclusion";
+    const heading = document.createElement("h4");
+    heading.className = "financial-dashboard__section-title";
+    heading.textContent = "Analyst summary";
+    summary.append(heading);
+    const copy = document.createElement("p");
+    copy.textContent = conclusion.trim();
+    summary.append(copy);
+    section.append(summary);
+  }
+  if (hasCitations) {
+    const citeBlock = document.createElement("article");
+    citeBlock.className = "financial-dashboard__citations";
+    const heading = document.createElement("h4");
+    heading.className = "financial-dashboard__section-title";
+    heading.textContent = `Sources (${citations.length})`;
+    citeBlock.append(heading);
+    const list = document.createElement("ul");
+    list.className = "financial-dashboard__citation-list";
+    citations.forEach((entry) => {
+      const item = document.createElement("li");
+      const parts = [];
+      if (entry.ticker) {
+        parts.push(entry.ticker);
+      }
+      if (entry.label) {
+        parts.push(entry.label);
+      }
+      if (entry.period) {
+        parts.push(entry.period);
+      }
+      if (entry.formatted_value) {
+        parts.push(entry.formatted_value);
+      } else if (typeof entry.value === "number") {
+        parts.push(String(entry.value));
+      }
+      item.textContent = parts.join(" • ");
+      if (entry.urls && (entry.urls.detail || entry.urls.interactive)) {
+        const link = document.createElement("a");
+        link.href = entry.urls.detail || entry.urls.interactive;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = "View filing";
+        item.append(link);
+      }
+      list.append(item);
+    });
+    citeBlock.append(list);
+    section.append(citeBlock);
+  }
+  if (hasExports) {
+    const exportsBlock = document.createElement("article");
+    exportsBlock.className = "financial-dashboard__exports";
+    const heading = document.createElement("h4");
+    heading.className = "financial-dashboard__section-title";
+    heading.textContent = "Exports";
+    exportsBlock.append(heading);
+    const buttons = document.createElement("div");
+    buttons.className = "financial-dashboard__export-buttons";
+    exports.forEach((entry) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "financial-dashboard__export-button";
+      button.textContent = entry.label || entry.type.toUpperCase();
+      button.addEventListener("click", () => handleExport(entry));
+      buttons.append(button);
+    });
+    exportsBlock.append(buttons);
+    section.append(exportsBlock);
+  }
+  return section;
 }
 
 function createHighlightsSection(highlights) {
