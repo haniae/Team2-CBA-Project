@@ -938,14 +938,36 @@ function formatTechnicalInput(input) {
   return segments.join(" ").trim();
 }
 
-function createMetaBadge(label, value) {
+function createMetaBadge(label, value, directionality = null) {
   if (!value) {
     return null;
   }
   const badge = document.createElement("span");
   badge.className = "kpi-library__meta-pill";
+  
+  // Add color coding for directionality
+  if (label === "Direction" && directionality) {
+    const colorClass = getDirectionalityColor(directionality);
+    badge.classList.add(colorClass);
+  }
+  
   badge.textContent = `${label}: ${value}`;
   return badge;
+}
+
+function getDirectionalityColor(directionality) {
+  switch (directionality) {
+    case "higher_is_better":
+      return "kpi-library__meta-pill--positive";
+    case "lower_is_better":
+      return "kpi-library__meta-pill--negative";
+    case "depends":
+      return "kpi-library__meta-pill--neutral";
+    case "neutral":
+      return "kpi-library__meta-pill--neutral";
+    default:
+      return "";
+  }
 }
 
 function createDocSection(label, content, options = {}) {
@@ -1119,12 +1141,20 @@ function buildKpiCard(kpi) {
   const card = document.createElement("article");
   card.className = "kpi-library__doc-card";
 
+  // Header with title and meta
   const header = document.createElement("header");
   header.className = "kpi-library__doc-header";
 
   const title = document.createElement("h5");
   title.className = "kpi-library__doc-title";
-  title.textContent = kpi.display_name || formatTagName(kpi.kpi_id);
+  
+  // Add category icon
+  const categoryIcon = getCategoryIcon(kpi.category);
+  if (categoryIcon) {
+    title.innerHTML = `<span class="category-icon">${categoryIcon}</span> ${kpi.display_name || formatTagName(kpi.kpi_id)}`;
+  } else {
+    title.textContent = kpi.display_name || formatTagName(kpi.kpi_id);
+  }
   header.append(title);
 
   if (kpi.kpi_id) {
@@ -1137,7 +1167,7 @@ function buildKpiCard(kpi) {
   const meta = document.createElement("div");
   meta.className = "kpi-library__doc-meta";
   const unitsBadge = createMetaBadge("Units", humaniseLabel(kpi.units));
-  const directionBadge = createMetaBadge("Direction", formatDirectionality(kpi.directionality));
+  const directionBadge = createMetaBadge("Direction", formatDirectionality(kpi.directionality), kpi.directionality);
   if (unitsBadge) {
     meta.append(unitsBadge);
   }
@@ -1150,74 +1180,113 @@ function buildKpiCard(kpi) {
 
   card.append(header);
 
+  // Basic info (always visible)
   const body = document.createElement("div");
   body.className = "kpi-library__doc-body";
 
-  const definitionSection = createDocSection("Definition", kpi.definition_short || kpi.definition_long);
-  if (definitionSection) {
+  // Definition (short)
+  if (kpi.definition_short) {
+    const definitionSection = createDocSection("📘 Definition", kpi.definition_short);
     body.append(definitionSection);
   }
 
-  const categorySection = createDocSection("Category", kpi.category);
-  if (categorySection) {
-    body.append(categorySection);
-  }
-
-  const formulaSection = createDocSection("Formula", kpi.formula_text, { type: "code" });
-  if (formulaSection) {
+  // Formula
+  if (kpi.formula_text) {
+    const formulaSection = createDocSection("📊 Formula", kpi.formula_text, { type: "code" });
     body.append(formulaSection);
   }
 
-  const friendlyInputs = (kpi.inputs || [])
-    .map(formatFriendlyInput)
-    .filter(Boolean);
-  const inputsSection = createDocSection("Inputs", friendlyInputs);
-  if (inputsSection) {
-    body.append(inputsSection);
-  }
-
-  const computationSection = createDocSection("Computation Notes", kpi.computation || []);
-  if (computationSection) {
-    body.append(computationSection);
-  }
-
-  const periods = (kpi.supports_periods || []).map(formatPeriodLabel);
-  const periodsSection = createDocSection("Supported Periods", periods);
-  if (periodsSection) {
-    body.append(periodsSection);
-  }
-
-  const interpretationSource =
-    (kpi.definition_long && kpi.definition_long !== kpi.definition_short
-      ? kpi.definition_long
-      : null) || kpi.notes;
-  const interpretationSection = createDocSection("Interpretation", interpretationSource);
-  if (interpretationSection) {
+  // Interpretation
+  if (kpi.interpretation) {
+    const interpretationSection = createDocSection("✅ Interpretation", kpi.interpretation);
     body.append(interpretationSection);
-  }
-
-  if (Array.isArray(kpi.edge_cases) && kpi.edge_cases.length) {
-    const edgeSection = createDocSection("Edge Cases", kpi.edge_cases);
-    if (edgeSection) {
-      body.append(edgeSection);
-    }
-  }
-
-  if (kpi.quality_notes && !interpretationSource) {
-    const qualitySection = createDocSection("Quality Notes", kpi.quality_notes);
-    if (qualitySection) {
-      body.append(qualitySection);
-    }
   }
 
   card.append(body);
 
-  const technicalDetails = buildTechnicalDetails(kpi);
-  if (technicalDetails) {
-    card.append(technicalDetails);
+  // Advanced info (collapsible)
+  const hasAdvancedInfo = kpi.view_more && (
+    kpi.view_more.related_metrics?.length ||
+    kpi.view_more.data_source_hint?.length ||
+    kpi.view_more.natural_language_examples?.length ||
+    kpi.view_more.limitations
+  );
+
+  if (hasAdvancedInfo) {
+    const advancedSection = buildAdvancedInfo(kpi);
+    card.append(advancedSection);
   }
 
   return card;
+}
+
+function getCategoryIcon(category) {
+  const icons = {
+    "Growth Metrics": "📈",
+    "Profitability Metrics": "💰", 
+    "Valuation Metrics": "📊",
+    "Leverage Metrics": "⚖️",
+    "Liquidity Metrics": "💧",
+    "Dividend Metrics": "💸",
+    "Share Metrics": "📋",
+    "Balance Sheet Metrics": "📄",
+    "Income Statement Metrics": "📋",
+    "Cash Flow Metrics": "💸",
+    "Per-Share Metrics": "📊"
+  };
+  return icons[category] || "";
+}
+
+function buildAdvancedInfo(kpi) {
+  const advancedSection = document.createElement("div");
+  advancedSection.className = "kpi-library__advanced";
+
+  const toggle = document.createElement("button");
+  toggle.className = "kpi-library__advanced-toggle";
+  toggle.innerHTML = "🔽 <span>View More</span>";
+  toggle.addEventListener("click", () => {
+    const isOpen = toggle.classList.contains("is-open");
+    const content = advancedSection.querySelector(".kpi-library__advanced-content");
+    
+    if (isOpen) {
+      toggle.classList.remove("is-open");
+      toggle.innerHTML = "🔽 <span>View More</span>";
+      content.style.display = "none";
+    } else {
+      toggle.classList.add("is-open");
+      toggle.innerHTML = "🔼 <span>View Less</span>";
+      content.style.display = "block";
+    }
+  });
+
+  const content = document.createElement("div");
+  content.className = "kpi-library__advanced-content";
+  content.style.display = "none";
+
+  if (kpi.view_more?.related_metrics?.length) {
+    const relatedSection = createDocSection("🔗 Related Metrics", kpi.view_more.related_metrics.join(", "));
+    content.append(relatedSection);
+  }
+
+  if (kpi.view_more?.data_source_hint?.length) {
+    const sourceSection = createDocSection("📂 Data Sources", kpi.view_more.data_source_hint.join(", "));
+    content.append(sourceSection);
+  }
+
+  if (kpi.view_more?.natural_language_examples?.length) {
+    const examplesSection = createDocSection("💬 Example Queries", kpi.view_more.natural_language_examples.join(", "));
+    content.append(examplesSection);
+  }
+
+  if (kpi.view_more?.limitations) {
+    const limitationsSection = createDocSection("⚠️ Limitations", kpi.view_more.limitations);
+    content.append(limitationsSection);
+  }
+
+  advancedSection.append(toggle);
+  advancedSection.append(content);
+
+  return advancedSection;
 }
 
 function buildCategoriesSection(kpis) {

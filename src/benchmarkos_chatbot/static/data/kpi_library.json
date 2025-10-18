@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "library_name": "BenchmarkOS KPI Library",
-  "last_updated": "2025-10-12",
+  "last_updated": "2025-01-27",
   "global_conventions": {
     "periods_supported": ["FY", "Quarter", "TTM", "LTM", "YTD"],
     "currency_policy": "Report in company reporting currency unless user requests normalization.",
@@ -13,75 +13,116 @@
       "Market data provider (prices/dividends)",
       "Vendor fallback (if enabled)"
     ],
-    "missing_data_strategy": "If a preferred tag is missing, use listed fallbacks; otherwise mark KPI as partial and set quality_flag=LOW."
+    "missing_data_strategy": "If a preferred tag is missing, use listed fallbacks; otherwise mark KPI as partial and set quality_flag=LOW.",
+    "calculation_notes": [
+      "CAGR is always calculated on an annualized basis. If quarterly data is available, convert to annual.",
+      "ROE/ROA/ROIC should use average assets or equity to reduce discrepancies.",
+      "EV/EBITDA and PEG are usually only meaningful when comparing companies within the same industry.",
+      "Cash Conversion Cycle requires sufficient data on inventory turnover, accounts receivable, and accounts payable."
+    ]
   },
   "kpis": [
     {
-      "kpi_id": "gross_margin_pct",
-      "display_name": "Gross Margin (%)",
-      "category": "Profitability",
-      "definition_short": "Percent of revenue retained after direct costs of goods/services.",
-      "definition_long": "Measures pricing power and production efficiency by comparing gross profit to revenue.",
-      "formula_text": "(Revenue - CostOfGoodsSold) / Revenue * 100",
-      "inputs": [
-        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"},
-        {"source": "us-gaap", "tag": "CostOfGoodsAndServicesSold", "statement": "IncomeStatement", "fallbacks": ["CostOfRevenue"]}
-      ],
-      "computation": [
-        "gross_profit = Revenues - (COGS_or_CostOfRevenue)",
-        "gross_margin_pct = (gross_profit / Revenues) * 100"
-      ],
+      "kpi_id": "revenue_cagr",
+      "display_name": "Revenue CAGR",
+      "category": "Growth Metrics",
+      "definition_short": "Compound annual growth rate of total revenue over a specified period.",
+      "formula_text": "(Revenue_end / Revenue_start)^(1/n) - 1",
+      "interpretation": "Higher revenue CAGR indicates strong top-line growth over time.",
       "units": "percent",
       "directionality": "higher_is_better",
-      "default_period": "FY",
-      "supports_periods": ["FY", "Quarter", "TTM"],
-      "dimensions_supported": ["company", "peer_group", "time"],
-      "edge_cases": [
-        "If Revenues == 0 -> return null, quality_flag=LOW",
-        "If both COGS and CostOfRevenue missing -> return null"
-      ],
-      "presentation": {"number_format": "percentage", "decimals": 1, "show_trend": true, "show_rank": true}
-    },
-    {
-      "kpi_id": "operating_margin_pct",
-      "display_name": "Operating Margin (%)",
-      "category": "Profitability",
-      "definition_short": "Profitability from core operations before interest and taxes.",
-      "definition_long": "Indicates the efficiency and scalability of operations excluding financing and tax effects.",
-      "formula_text": "OperatingIncome / Revenue * 100",
+      "supports_periods": ["multi-year"],
+      "parameters": {"min_years": 3, "default_years": 3},
       "inputs": [
-        {"source": "us-gaap", "tag": "OperatingIncomeLoss", "statement": "IncomeStatement"},
         {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
       ],
-      "computation": ["operating_margin_pct = OperatingIncomeLoss / Revenues * 100"],
-      "units": "percent",
-      "directionality": "higher_is_better",
-      "default_period": "FY",
-      "supports_periods": ["FY", "Quarter", "TTM"],
+      "computation": [
+        "Require N+1 years of Revenues.",
+        "cagr = pow(Revenues[n] / Revenues[0], 1/n) - 1",
+        "revenue_cagr_pct = cagr * 100"
+      ],
+      "view_more": {
+        "related_metrics": ["eps_cagr", "ebitda_growth"],
+        "data_source_hint": ["Income Statement - Total Revenue"],
+        "natural_language_examples": [
+          "What is Apple's revenue CAGR over the past 5 years?",
+          "Compare revenue CAGR between AAPL and MSFT."
+        ],
+        "limitations": "Does not reflect profitability or cash flow quality."
+      },
       "presentation": {"number_format": "percentage", "decimals": 1, "show_trend": true}
     },
     {
-      "kpi_id": "net_profit_margin_pct",
-      "display_name": "Net Profit Margin (%)",
-      "category": "Profitability",
-      "definition_short": "Bottom-line profitability after all expenses, interest, and taxes.",
-      "formula_text": "NetIncome / Revenue * 100",
-      "inputs": [
-        {"source": "us-gaap", "tag": "NetIncomeLoss", "statement": "IncomeStatement"},
-        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
-      ],
-      "computation": ["net_profit_margin_pct = NetIncomeLoss / Revenues * 100"],
+      "kpi_id": "eps_cagr",
+      "display_name": "EPS CAGR",
+      "category": "Growth Metrics",
+      "definition_short": "Compound annual growth rate of earnings per share over a given period.",
+      "formula_text": "(EPS_end / EPS_start)^(1/n) - 1",
+      "interpretation": "A higher EPS CAGR reflects strong earnings growth, which often leads to stock price appreciation.",
       "units": "percent",
       "directionality": "higher_is_better",
-      "supports_periods": ["FY", "Quarter", "TTM"],
+      "supports_periods": ["multi-year"],
+      "parameters": {"min_years": 3, "default_years": 3},
+      "inputs": [
+        {"source": "us-gaap", "tag": "EarningsPerShareBasic", "statement": "IncomeStatement", "fallbacks": ["EarningsPerShareDiluted"]}
+      ],
+      "computation": [
+        "Use Diluted if available; else Basic.",
+        "cagr = pow(EPS[n] / EPS[0], 1/n) - 1",
+        "eps_cagr_pct = cagr * 100"
+      ],
+      "edge_cases": ["If EPS_0 <= 0 or sign changes -> return null, quality_flag=LOW"],
+      "view_more": {
+        "related_metrics": ["revenue_cagr", "pe_ratio"],
+        "data_source_hint": ["Income Statement - Net Income", "Weighted Avg Shares"],
+        "natural_language_examples": [
+          "What is EPS CAGR of Microsoft in the last 3 years?",
+          "How fast is AAPL growing its EPS?"
+        ],
+        "limitations": "Affected by share buybacks or dilution."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1, "show_trend": true}
+    },
+    {
+      "kpi_id": "ebitda_growth",
+      "display_name": "EBITDA Growth",
+      "category": "Growth Metrics",
+      "definition_short": "Year-over-year growth of earnings before interest, tax, depreciation, and amortization.",
+      "formula_text": "(EBITDA_current - EBITDA_previous) / EBITDA_previous",
+      "interpretation": "Higher EBITDA growth shows improving operational performance.",
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "TTM"],
+      "inputs": [
+        {"source": "derived", "tag": "EBITDA"}
+      ],
+      "computation": [
+        "ebitda_current = EBITDA_t",
+        "ebitda_previous = EBITDA_t-1",
+        "ebitda_growth_yoy_pct = (ebitda_current - ebitda_previous) / abs(ebitda_previous) * 100"
+      ],
+      "edge_cases": ["If EBITDA_previous = 0 -> return null, quality_flag=LOW"],
+      "view_more": {
+        "related_metrics": ["ebitda_margin", "operating_income"],
+        "data_source_hint": ["Income Statement - EBITDA"],
+        "natural_language_examples": [
+          "What is the EBITDA growth of Tesla?",
+          "EBITDA growth for NVDA in 2024?"
+        ],
+        "limitations": "Does not account for capital structure or cash flow."
+      },
       "presentation": {"number_format": "percentage", "decimals": 1}
     },
     {
-      "kpi_id": "ebitda_margin_pct",
-      "display_name": "EBITDA Margin (%)",
-      "category": "Profitability",
-      "definition_short": "Earnings before interest, taxes, depreciation, and amortization as a % of revenue.",
-      "formula_text": "EBITDA / Revenue * 100",
+      "kpi_id": "ebitda_margin",
+      "display_name": "EBITDA Margin",
+      "category": "Profitability Metrics",
+      "definition_short": "EBITDA divided by total revenue, showing operating profitability before non-cash charges.",
+      "formula_text": "EBITDA / Revenue",
+      "interpretation": "A higher margin indicates efficient operations.",
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
       "inputs": [
         {"source": "derived", "tag": "EBITDA", "components": ["NetIncomeLoss", "InterestExpense", "IncomeTaxExpenseBenefit", "DepreciationAndAmortization"]},
         {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
@@ -91,36 +132,80 @@
         "EBITDA = NetIncomeLoss + InterestExpense + IncomeTaxExpenseBenefit + DandA",
         "ebitda_margin_pct = EBITDA / Revenues * 100"
       ],
+      "edge_cases": ["If any component missing, compute with available parts and set quality_flag=MEDIUM"],
+      "view_more": {
+        "related_metrics": ["operating_margin", "net_margin"],
+        "data_source_hint": ["Income Statement - EBITDA", "Total Revenue"],
+        "natural_language_examples": [
+          "What is Amazon's EBITDA margin?",
+          "Compare EBITDA margins of tech companies."
+        ],
+        "limitations": "Ignores capital expenditures and financing costs."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1, "show_trend": true}
+    },
+    {
+      "kpi_id": "operating_margin",
+      "display_name": "Operating Margin",
+      "category": "Profitability Metrics",
+      "definition_short": "Operating income divided by total revenue, measuring profitability from core operations.",
+      "formula_text": "Operating_Income / Revenue",
+      "interpretation": "Higher operating margin shows better cost control and pricing power.",
       "units": "percent",
       "directionality": "higher_is_better",
       "supports_periods": ["FY", "Quarter", "TTM"],
-      "edge_cases": ["If any component missing, compute with available parts and set quality_flag=MEDIUM"]
+      "inputs": [
+        {"source": "us-gaap", "tag": "OperatingIncomeLoss", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
+      ],
+      "computation": ["operating_margin_pct = OperatingIncomeLoss / Revenues * 100"],
+      "view_more": {
+        "related_metrics": ["ebitda_margin", "net_margin"],
+        "data_source_hint": ["Income Statement - Operating Income", "Total Revenue"],
+        "natural_language_examples": [
+          "What is Apple's operating margin?",
+          "How has Meta's operating margin changed year-over-year?"
+        ],
+        "limitations": "Excludes financing and tax impacts."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1, "show_trend": true}
     },
     {
-      "kpi_id": "roe_pct",
-      "display_name": "Return on Equity (ROE)",
-      "category": "Profitability",
-      "definition_short": "Net income relative to average shareholder equity.",
-      "formula_text": "NetIncome / Average(EquityBeginning, EquityEnding) * 100",
+      "kpi_id": "net_margin",
+      "display_name": "Net Profit Margin",
+      "category": "Profitability Metrics",
+      "definition_short": "Net income divided by total revenue, indicating overall profitability after all expenses.",
+      "formula_text": "Net_Income / Revenue",
+      "interpretation": "Higher net margin means more profit per dollar of revenue.",
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
       "inputs": [
         {"source": "us-gaap", "tag": "NetIncomeLoss", "statement": "IncomeStatement"},
-        {"source": "us-gaap", "tag": "StockholdersEquity", "statement": "BalanceSheet"}
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
       ],
-      "computation": [
-        "avg_equity = average(Equity_t, Equity_t_minus_1)",
-        "roe_pct = NetIncomeLoss / avg_equity * 100"
-      ],
+      "computation": ["net_profit_margin_pct = NetIncomeLoss / Revenues * 100"],
+      "view_more": {
+        "related_metrics": ["operating_margin", "roa"],
+        "data_source_hint": ["Income Statement - Net Income", "Total Revenue"],
+        "natural_language_examples": [
+          "What is the net profit margin of Microsoft?",
+          "Compare net margins for Apple and Google."
+        ],
+        "limitations": "Can be distorted by one-time gains or tax effects."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1}
+    },
+    {
+      "kpi_id": "roa",
+      "display_name": "Return on Assets (ROA)",
+      "category": "Profitability Metrics",
+      "definition_short": "Net income divided by average total assets, indicating efficiency of asset use.",
+      "formula_text": "Net_Income / Average_Total_Assets",
+      "interpretation": "Higher ROA shows more profit generated per dollar of assets.",
       "units": "percent",
       "directionality": "higher_is_better",
       "supports_periods": ["FY", "TTM"],
-      "edge_cases": ["If avg_equity <= 0 -> set quality_flag=LOW; consider using TotalEquityIncludingNoncontrollingInterest as fallback"]
-    },
-    {
-      "kpi_id": "roa_pct",
-      "display_name": "Return on Assets (ROA)",
-      "category": "Profitability",
-      "definition_short": "Net income relative to average total assets.",
-      "formula_text": "NetIncome / Average(TotalAssets) * 100",
       "inputs": [
         {"source": "us-gaap", "tag": "NetIncomeLoss", "statement": "IncomeStatement"},
         {"source": "us-gaap", "tag": "Assets", "statement": "BalanceSheet"}
@@ -129,217 +214,92 @@
         "avg_assets = average(Assets_t, Assets_t_minus_1)",
         "roa_pct = NetIncomeLoss / avg_assets * 100"
       ],
+      "view_more": {
+        "related_metrics": ["roe", "roic"],
+        "data_source_hint": ["Income Statement - Net Income", "Balance Sheet - Total Assets"],
+        "natural_language_examples": [
+          "What is ROA of Alphabet?",
+          "Compare ROA between Apple and Intel."
+        ],
+        "limitations": "Varies across industries with different asset intensities."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1}
+    },
+    {
+      "kpi_id": "roe",
+      "display_name": "Return on Equity (ROE)",
+      "category": "Profitability Metrics",
+      "definition_short": "Net income divided by average shareholders' equity, measuring return to shareholders.",
+      "formula_text": "Net_Income / Average_Shareholders_Equity",
+      "interpretation": "Higher ROE means more efficient use of equity capital.",
       "units": "percent",
-      "directionality": "higher_is_better",
-      "supports_periods": ["FY", "TTM"]
-    },
-    {
-      "kpi_id": "revenue_cagr_pct",
-      "display_name": "Revenue CAGR (%)",
-      "category": "Growth",
-      "definition_short": "Compound annual growth rate of revenue over N years.",
-      "formula_text": "((Revenue_n / Revenue_0)^(1/n) - 1) * 100",
-      "inputs": [{"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}],
-      "computation": [
-        "Require N+1 years of Revenues.",
-        "cagr = pow(Revenues[n] / Revenues[0], 1/n) - 1",
-        "revenue_cagr_pct = cagr * 100"
-      ],
-      "units": "percent",
-      "directionality": "higher_is_better",
-      "supports_periods": ["multi-year"],
-      "parameters": {"min_years": 3, "default_years": 3}
-    },
-    {
-      "kpi_id": "eps_cagr_pct",
-      "display_name": "EPS CAGR (%)",
-      "category": "Growth",
-      "definition_short": "Compound annual growth rate of earnings per share.",
-      "formula_text": "((EPS_n / EPS_0)^(1/n) - 1) * 100",
-      "inputs": [
-        {"source": "us-gaap", "tag": "EarningsPerShareBasic", "statement": "IncomeStatement", "fallbacks": ["EarningsPerShareDiluted"]}
-      ],
-      "computation": [
-        "Use Diluted if available; else Basic.",
-        "cagr = pow(EPS[n] / EPS[0], 1/n) - 1",
-        "eps_cagr_pct = cagr * 100"
-      ],
-      "units": "percent",
-      "directionality": "higher_is_better",
-      "parameters": {"min_years": 3, "default_years": 3},
-      "edge_cases": ["If EPS_0 <= 0 or sign changes -> return null, quality_flag=LOW"]
-    },
-    {
-      "kpi_id": "fcf_growth_yoy_pct",
-      "display_name": "Free Cash Flow Growth (YoY) (%)",
-      "category": "Growth",
-      "definition_short": "Year-over-year growth rate of free cash flow.",
-      "formula_text": "(FCF_t - FCF_t-1) / |FCF_t-1| * 100",
-      "inputs": [
-        {"source": "us-gaap", "tag": "NetCashProvidedByUsedInOperatingActivities", "statement": "CashFlow"},
-        {"source": "us-gaap", "tag": "PaymentsToAcquirePropertyPlantAndEquipment", "statement": "CashFlow", "fallbacks": ["CapitalExpenditures"]}
-      ],
-      "computation": [
-        "fcf_t = CFO_t - CapEx_t",
-        "fcf_prev = CFO_t-1 - CapEx_t-1",
-        "fcf_growth_yoy_pct = (fcf_t - fcf_prev) / abs(fcf_prev) * 100"
-      ],
-      "units": "percent",
-      "directionality": "higher_is_better",
-      "supports_periods": ["FY", "TTM"]
-    },
-    {
-      "kpi_id": "free_cash_flow",
-      "display_name": "Free Cash Flow (FCF)",
-      "category": "Cash Flow & Liquidity",
-      "definition_short": "Cash generated after capital expenditures.",
-      "formula_text": "OperatingCashFlow - CapitalExpenditures",
-      "inputs": [
-        {"source": "us-gaap", "tag": "NetCashProvidedByUsedInOperatingActivities", "statement": "CashFlow"},
-        {"source": "us-gaap", "tag": "PaymentsToAcquirePropertyPlantAndEquipment", "statement": "CashFlow", "fallbacks": ["CapitalExpenditures"]}
-      ],
-      "computation": ["fcf = CFO - CapEx"],
-      "units": "currency",
-      "directionality": "higher_is_better",
-      "supports_periods": ["FY", "Quarter", "TTM"]
-    },
-    {
-      "kpi_id": "operating_cash_flow_ratio",
-      "display_name": "Operating Cash Flow Ratio",
-      "category": "Cash Flow & Liquidity",
-      "definition_short": "Ability to cover short-term liabilities with operating cash flow.",
-      "formula_text": "OperatingCashFlow / CurrentLiabilities",
-      "inputs": [
-        {"source": "us-gaap", "tag": "NetCashProvidedByUsedInOperatingActivities", "statement": "CashFlow"},
-        {"source": "us-gaap", "tag": "LiabilitiesCurrent", "statement": "BalanceSheet"}
-      ],
-      "computation": ["ocf_ratio = CFO / CurrentLiabilities"],
-      "units": "ratio",
-      "directionality": "higher_is_better",
-      "supports_periods": ["FY", "TTM"]
-    },
-    {
-      "kpi_id": "current_ratio",
-      "display_name": "Current Ratio",
-      "category": "Cash Flow & Liquidity",
-      "definition_short": "Short-term solvency measure.",
-      "formula_text": "CurrentAssets / CurrentLiabilities",
-      "inputs": [
-        {"source": "us-gaap", "tag": "AssetsCurrent", "statement": "BalanceSheet"},
-        {"source": "us-gaap", "tag": "LiabilitiesCurrent", "statement": "BalanceSheet"}
-      ],
-      "computation": ["current_ratio = AssetsCurrent / LiabilitiesCurrent"],
-      "units": "ratio",
-      "directionality": "higher_is_better",
-      "supports_periods": ["FY", "Quarter"]
-    },
-    {
-      "kpi_id": "quick_ratio",
-      "display_name": "Quick Ratio",
-      "category": "Cash Flow & Liquidity",
-      "definition_short": "Near-cash liquidity excluding inventory.",
-      "formula_text": "(CurrentAssets - Inventory) / CurrentLiabilities",
-      "inputs": [
-        {"source": "us-gaap", "tag": "AssetsCurrent", "statement": "BalanceSheet"},
-        {"source": "us-gaap", "tag": "InventoryNet", "statement": "BalanceSheet"},
-        {"source": "us-gaap", "tag": "LiabilitiesCurrent", "statement": "BalanceSheet"}
-      ],
-      "computation": ["quick_ratio = (AssetsCurrent - InventoryNet) / LiabilitiesCurrent"],
-      "units": "ratio",
-      "directionality": "higher_is_better",
-      "supports_periods": ["FY", "Quarter"]
-    },
-    {
-      "kpi_id": "debt_to_equity",
-      "display_name": "Debt-to-Equity",
-      "category": "Capital Efficiency & Leverage",
-      "definition_short": "Total liabilities relative to shareholders' equity.",
-      "formula_text": "TotalLiabilities / StockholdersEquity",
-      "inputs": [
-        {"source": "us-gaap", "tag": "Liabilities", "statement": "BalanceSheet"},
-        {"source": "us-gaap", "tag": "StockholdersEquity", "statement": "BalanceSheet", "fallbacks": ["StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"]}
-      ],
-      "computation": ["de_ratio = Liabilities / Equity"],
-      "units": "ratio",
-      "directionality": "lower_is_better",
-      "supports_periods": ["FY", "Quarter"],
-      "edge_cases": ["If Equity <= 0 -> return null, quality_flag=LOW"]
-    },
-    {
-      "kpi_id": "debt_to_assets",
-      "display_name": "Debt-to-Assets",
-      "category": "Capital Efficiency & Leverage",
-      "definition_short": "Portion of assets financed by liabilities.",
-      "formula_text": "TotalLiabilities / TotalAssets",
-      "inputs": [
-        {"source": "us-gaap", "tag": "Liabilities", "statement": "BalanceSheet"},
-        {"source": "us-gaap", "tag": "Assets", "statement": "BalanceSheet"}
-      ],
-      "computation": ["da_ratio = Liabilities / Assets"],
-      "units": "ratio",
-      "directionality": "lower_is_better",
-      "supports_periods": ["FY", "Quarter"]
-    },
-    {
-      "kpi_id": "interest_coverage",
-      "display_name": "Interest Coverage",
-      "category": "Capital Efficiency & Leverage",
-      "definition_short": "Ability to cover interest expense with EBIT.",
-      "formula_text": "EBIT / InterestExpense",
-      "inputs": [
-        {"source": "derived", "tag": "EBIT", "components": ["OperatingIncomeLoss", "NonOperatingIncomeExpenseNet"]},
-        {"source": "us-gaap", "tag": "InterestExpense", "statement": "IncomeStatement", "fallbacks": ["InterestExpenseDebt", "InterestAndDebtExpense"]}
-      ],
-      "computation": [
-        "Approx EBIT = OperatingIncomeLoss (fallback: PretaxIncome + InterestExpense)",
-        "interest_coverage = EBIT / InterestExpense"
-      ],
-      "units": "ratio",
       "directionality": "higher_is_better",
       "supports_periods": ["FY", "TTM"],
-      "edge_cases": ["If InterestExpense ~ 0 -> return large cap value but set quality_flag=MEDIUM"]
-    },
-    {
-      "kpi_id": "asset_turnover",
-      "display_name": "Asset Turnover",
-      "category": "Capital Efficiency & Leverage",
-      "definition_short": "Revenue generated per dollar of assets.",
-      "formula_text": "Revenue / Average(TotalAssets)",
       "inputs": [
-        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"},
-        {"source": "us-gaap", "tag": "Assets", "statement": "BalanceSheet"}
+        {"source": "us-gaap", "tag": "NetIncomeLoss", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "StockholdersEquity", "statement": "BalanceSheet"}
       ],
       "computation": [
-        "avg_assets = average(Assets_t, Assets_t_minus_1)",
-        "asset_turnover = Revenues / avg_assets"
+        "avg_equity = average(Equity_t, Equity_t_minus_1)",
+        "roe_pct = NetIncomeLoss / avg_equity * 100"
       ],
-      "units": "ratio",
-      "directionality": "higher_is_better",
-      "supports_periods": ["FY", "TTM"]
+      "edge_cases": ["If avg_equity <= 0 -> set quality_flag=LOW; consider using TotalEquityIncludingNoncontrollingInterest as fallback"],
+      "view_more": {
+        "related_metrics": ["roa", "roic"],
+        "data_source_hint": ["Income Statement - Net Income", "Balance Sheet - Equity"],
+        "natural_language_examples": [
+          "What is ROE of Tesla?",
+          "Compare ROE of NVDA and AMD."
+        ],
+        "limitations": "Can be inflated by high leverage."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1}
     },
     {
-      "kpi_id": "eps_basic",
-      "display_name": "Earnings per Share (Basic)",
-      "category": "Market Performance",
-      "definition_short": "Net income per basic share.",
-      "formula_text": "NetIncomeAvailableToCommon / WeightedAverageBasicShares",
+      "kpi_id": "roic",
+      "display_name": "Return on Invested Capital (ROIC)",
+      "category": "Profitability Metrics",
+      "definition_short": "NOPAT divided by invested capital, showing return on all capital used.",
+      "formula_text": "NOPAT / Invested_Capital",
+      "interpretation": "Higher ROIC means capital is being used efficiently to generate returns.",
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "TTM"],
       "inputs": [
-        {"source": "us-gaap", "tag": "EarningsPerShareBasic", "statement": "IncomeStatement"},
-        {"source": "us-gaap", "tag": "WeightedAverageNumberOfSharesOutstandingBasic", "statement": "IncomeStatement"}
+        {"source": "us-gaap", "tag": "OperatingIncomeLoss", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "IncomeTaxExpenseBenefit", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "Assets", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "AssetsCurrent", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "LiabilitiesCurrent", "statement": "BalanceSheet"}
       ],
       "computation": [
-        "Prefer reported EPSBasic; if missing, compute: NetIncomeCommon / WA_Shares_Basic"
+        "tax_rate = IncomeTaxExpenseBenefit / (OperatingIncomeLoss + IncomeTaxExpenseBenefit)",
+        "nopat = OperatingIncomeLoss * (1 - tax_rate)",
+        "invested_capital = Assets - AssetsCurrent + LiabilitiesCurrent",
+        "roic_pct = nopat / invested_capital * 100"
       ],
-      "units": "per_share",
-      "directionality": "higher_is_better",
-      "supports_periods": ["FY", "Quarter", "TTM"]
+      "edge_cases": ["If invested_capital <= 0 -> return null, quality_flag=LOW"],
+      "view_more": {
+        "related_metrics": ["roa", "roe"],
+        "data_source_hint": ["Income Statement - EBIT", "Balance Sheet - Invested Capital"],
+        "natural_language_examples": [
+          "What is ROIC of Apple?",
+          "How does Amazon's ROIC compare to industry peers?"
+        ],
+        "limitations": "Sensitive to capital structure assumptions."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1}
     },
     {
       "kpi_id": "pe_ratio",
       "display_name": "Price-to-Earnings (P/E)",
-      "category": "Market Performance",
-      "definition_short": "Share price relative to earnings per share.",
-      "formula_text": "PricePerShare / EPS (TTM preferred)",
+      "category": "Valuation Metrics",
+      "definition_short": "Stock price divided by earnings per share, showing how much investors pay for $1 of earnings.",
+      "formula_text": "Price_per_Share / EPS",
+      "interpretation": "Higher P/E suggests growth expectations; lower P/E may suggest undervaluation.",
+      "units": "ratio",
+      "directionality": "depends",
+      "supports_periods": ["PointInTime"],
       "inputs": [
         {"source": "market", "tag": "PricePerShare", "freq": "daily_close"},
         {"source": "derived", "tag": "EPS_TTM", "components": ["EarningsPerShareDiluted"]}
@@ -348,16 +308,27 @@
         "eps_ttm = sum(last_4_quarters(EPS_Diluted or EPS_Basic))",
         "pe_ratio = PricePerShare / eps_ttm"
       ],
-      "units": "ratio",
-      "directionality": "lower_is_better",
-      "supports_periods": ["PointInTime"]
+      "view_more": {
+        "related_metrics": ["peg_ratio", "eps_cagr"],
+        "data_source_hint": ["Market Data - Share Price", "Income Statement - EPS"],
+        "natural_language_examples": [
+          "What is the P/E ratio of AAPL?",
+          "Compare P/E ratios of Amazon and Alphabet."
+        ],
+        "limitations": "Affected by accounting earnings quality."
+      },
+      "presentation": {"number_format": "number", "decimals": 1}
     },
     {
       "kpi_id": "pb_ratio",
       "display_name": "Price-to-Book (P/B)",
-      "category": "Market Performance",
-      "definition_short": "Market capitalization relative to book equity.",
-      "formula_text": "MarketCap / BookValueOfEquity",
+      "category": "Valuation Metrics",
+      "definition_short": "Stock price divided by book value per share, showing how the market values the company's net assets.",
+      "formula_text": "Price_per_Share / (Shareholders_Equity / Shares_Outstanding)",
+      "interpretation": "A higher P/B ratio indicates higher market expectations for future growth.",
+      "units": "ratio",
+      "directionality": "depends",
+      "supports_periods": ["PointInTime"],
       "inputs": [
         {"source": "market", "tag": "SharesOutstanding"},
         {"source": "market", "tag": "PricePerShare"},
@@ -367,111 +338,27 @@
         "market_cap = SharesOutstanding * PricePerShare",
         "pb_ratio = market_cap / StockholdersEquity"
       ],
-      "units": "ratio",
-      "directionality": "depends",
-      "supports_periods": ["PointInTime"],
-      "notes": "Interpret in context - high P/B suggests growth/intangibles; low P/B may indicate undervaluation."
-    },
-    {
-      "kpi_id": "tsr_pct",
-      "display_name": "Total Shareholder Return (%)",
-      "category": "Market Performance",
-      "definition_short": "Price appreciation plus dividends over a period.",
-      "formula_text": "((P1 - P0 + Dividends) / P0) * 100",
-      "inputs": [
-        {"source": "market", "tag": "AdjClosePriceSeries"},
-        {"source": "market", "tag": "DividendsCashSeries"}
-      ],
-      "computation": [
-        "Use adjusted close to incorporate splits.",
-        "tsr_pct = (adj_close_end - adj_close_start + sum(dividends)) / adj_close_start * 100"
-      ],
-      "units": "percent",
-      "directionality": "higher_is_better",
-      "supports_periods": ["custom_range"]
-    },
-    {
-      "kpi_id": "dividend_yield_pct",
-      "display_name": "Dividend Yield (%)",
-      "category": "Market Performance",
-      "definition_short": "Annual cash dividends per share divided by price.",
-      "formula_text": "AnnualDividendsPerShare / PricePerShare * 100",
-      "inputs": [
-        {"source": "market", "tag": "DividendsTTMPerShare"},
-        {"source": "market", "tag": "PricePerShare"}
-      ],
-      "computation": ["dividend_yield_pct = Dividends_TTM / PricePerShare * 100"],
-      "units": "percent",
-      "directionality": "higher_is_better",
-      "supports_periods": ["PointInTime"]
-    },
-    {
-      "kpi_id": "rd_intensity_pct",
-      "display_name": "R&D Intensity (%)",
-      "category": "Operational Efficiency",
-      "definition_short": "R&D expense as a percentage of revenue.",
-      "formula_text": "ResearchAndDevelopment / Revenue * 100",
-      "inputs": [
-        {"source": "us-gaap", "tag": "ResearchAndDevelopmentExpense", "statement": "IncomeStatement"},
-        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
-      ],
-      "computation": ["rd_intensity_pct = ResearchAndDevelopmentExpense / Revenues * 100"],
-      "units": "percent",
-      "directionality": "depends",
-      "supports_periods": ["FY", "TTM"]
-    },
-    {
-      "kpi_id": "sga_ratio_pct",
-      "display_name": "SG&A Ratio (%)",
-      "category": "Operational Efficiency",
-      "definition_short": "Selling, General & Administrative expense as % of revenue.",
-      "formula_text": "SGA / Revenue * 100",
-      "inputs": [
-        {"source": "us-gaap", "tag": "SellingGeneralAndAdministrativeExpense", "statement": "IncomeStatement"},
-        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
-      ],
-      "computation": ["sga_ratio_pct = SellingGeneralAndAdministrativeExpense / Revenues * 100"],
-      "units": "percent",
-      "directionality": "lower_is_better",
-      "supports_periods": ["FY", "TTM"]
-    },
-    {
-      "kpi_id": "capex_to_revenue_pct",
-      "display_name": "CapEx-to-Revenue (%)",
-      "category": "Operational Efficiency",
-      "definition_short": "Capital expenditures relative to revenue.",
-      "formula_text": "CapEx / Revenue * 100",
-      "inputs": [
-        {"source": "us-gaap", "tag": "PaymentsToAcquirePropertyPlantAndEquipment", "statement": "CashFlow"},
-        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
-      ],
-      "computation": ["capex_to_revenue_pct = CapEx / Revenues * 100"],
-      "units": "percent",
-      "directionality": "depends",
-      "supports_periods": ["FY", "TTM"]
-    },
-    {
-      "kpi_id": "revenue_per_employee",
-      "display_name": "Revenue per Employee",
-      "category": "Operational Efficiency",
-      "definition_short": "Revenue generated per employee.",
-      "formula_text": "Revenue / Employees",
-      "inputs": [
-        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"},
-        {"source": "company", "tag": "Employees", "statement": "10-K front matter or company website"}
-      ],
-      "computation": ["rev_per_employee = Revenues / Employees"],
-      "units": "currency_per_employee",
-      "directionality": "higher_is_better",
-      "supports_periods": ["FY"],
-      "edge_cases": ["If Employees not disclosed in period, use latest available and flag quality_flag=MEDIUM"]
+      "view_more": {
+        "related_metrics": ["pe_ratio", "roe"],
+        "data_source_hint": ["Market Data - Share Price", "Balance Sheet - Shareholders' Equity"],
+        "natural_language_examples": [
+          "What is the P/B ratio of JPMorgan?",
+          "Compare P/B ratios across banks."
+        ],
+        "limitations": "Not meaningful for companies with large intangible assets."
+      },
+      "presentation": {"number_format": "number", "decimals": 1}
     },
     {
       "kpi_id": "ev_ebitda",
       "display_name": "EV/EBITDA",
-      "category": "Valuation",
-      "definition_short": "Enterprise value relative to EBITDA.",
-      "formula_text": "(MarketCap + TotalDebt - CashAndEquivalents) / EBITDA",
+      "category": "Valuation Metrics",
+      "definition_short": "Enterprise value divided by EBITDA, showing how the market values the company's operating earnings.",
+      "formula_text": "Enterprise_Value / EBITDA",
+      "interpretation": "Lower EV/EBITDA suggests the company may be undervalued relative to peers.",
+      "units": "multiple",
+      "directionality": "lower_is_better",
+      "supports_periods": ["PointInTime with trailing EBITDA (TTM)"],
       "inputs": [
         {"source": "market", "tag": "SharesOutstanding"},
         {"source": "market", "tag": "PricePerShare"},
@@ -486,62 +373,593 @@
         "EV = market_cap + total_debt - CashAndCashEquivalents",
         "ev_ebitda = EV / EBITDA"
       ],
-      "units": "multiple",
-      "directionality": "lower_is_better",
-      "supports_periods": ["PointInTime with trailing EBITDA (TTM)"]
-    },
-    {
-      "kpi_id": "ev_sales",
-      "display_name": "EV/Sales",
-      "category": "Valuation",
-      "definition_short": "Enterprise value relative to revenue.",
-      "formula_text": "EV / Revenue (TTM)",
-      "inputs": [
-        {"source": "derived", "tag": "EnterpriseValue"},
-        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
-      ],
-      "computation": [
-        "Use EV from ev_ebitda inputs.",
-        "revenue_ttm = sum(last_4_quarters(Revenues))",
-        "ev_sales = EV / revenue_ttm"
-      ],
-      "units": "multiple",
-      "directionality": "lower_is_better",
-      "supports_periods": ["PointInTime"]
+      "view_more": {
+        "related_metrics": ["pe_ratio", "ebitda_margin"],
+        "data_source_hint": ["Market Data - EV", "Income Statement - EBITDA"],
+        "natural_language_examples": [
+          "What is EV/EBITDA for Meta?",
+          "Compare EV/EBITDA across the semiconductor sector."
+        ],
+        "limitations": "Does not capture growth potential or capital structure."
+      },
+      "presentation": {"number_format": "number", "decimals": 1}
     },
     {
       "kpi_id": "peg_ratio",
       "display_name": "PEG Ratio",
-      "category": "Valuation",
-      "definition_short": "P/E adjusted for EPS growth rate.",
-      "formula_text": "PE / EPS_Growth (annualized)",
+      "category": "Valuation Metrics",
+      "definition_short": "Price-to-earnings ratio divided by EPS growth rate, showing valuation adjusted for growth.",
+      "formula_text": "PE_Ratio / EPS_Growth_Rate",
+      "interpretation": "A PEG near 1 is often seen as fairly valued; above 1 may indicate overvaluation.",
+      "units": "ratio",
+      "directionality": "lower_is_better",
+      "supports_periods": ["PointInTime"],
       "inputs": [
         {"source": "derived", "tag": "PE"},
         {"source": "derived", "tag": "EPS_CAGR"}
       ],
       "computation": ["peg_ratio = pe_ratio / max(eps_growth_rate, 0.0001)"],
-      "units": "ratio",
-      "directionality": "lower_is_better",
-      "edge_cases": ["Negative or zero growth -> return null, quality_flag=LOW"]
+      "edge_cases": ["Negative or zero growth -> return null, quality_flag=LOW"],
+      "view_more": {
+        "related_metrics": ["pe_ratio", "eps_cagr"],
+        "data_source_hint": ["Market Data - P/E", "Income Statement - EPS Growth"],
+        "natural_language_examples": [
+          "What is PEG ratio of Amazon?",
+          "Is Tesla overvalued based on PEG?"
+        ],
+        "limitations": "Requires reliable growth estimates, which are often uncertain."
+      },
+      "presentation": {"number_format": "number", "decimals": 1}
     },
     {
-      "kpi_id": "carbon_intensity_per_revenue",
-      "display_name": "Carbon Intensity (tCO2e / $ Revenue)",
-      "category": "ESG",
-      "definition_short": "Greenhouse gas emissions per dollar of revenue.",
-      "formula_text": "tCO2e / Revenue",
+      "kpi_id": "debt_to_equity",
+      "display_name": "Debt-to-Equity Ratio",
+      "category": "Leverage Metrics",
+      "definition_short": "Measures the proportion of debt to shareholders' equity.",
+      "formula_text": "Total_Debt / Shareholders_Equity",
+      "interpretation": "Higher ratios indicate higher leverage and financial risk.",
+      "units": "ratio",
+      "directionality": "lower_is_better",
+      "supports_periods": ["FY", "Quarter"],
       "inputs": [
-        {"source": "esg", "tag": "GHGEmissionsScope1And2", "statement": "SustainabilityReport"},
+        {"source": "us-gaap", "tag": "DebtCurrent", "statement": "BalanceSheet", "fallbacks": ["ShortTermBorrowings"]},
+        {"source": "us-gaap", "tag": "LongTermDebtNoncurrent", "statement": "BalanceSheet", "fallbacks": ["LongTermDebt"]},
+        {"source": "us-gaap", "tag": "StockholdersEquity", "statement": "BalanceSheet", "fallbacks": ["StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"]}
+      ],
+      "computation": [
+        "total_debt = DebtCurrent + LongTermDebtNoncurrent",
+        "de_ratio = total_debt / StockholdersEquity"
+      ],
+      "edge_cases": ["If Equity <= 0 -> return null, quality_flag=LOW"],
+      "view_more": {
+        "related_metrics": ["roa", "roe"],
+        "data_source_hint": ["Balance Sheet - Total Debt", "Shareholders' Equity"],
+        "natural_language_examples": [
+          "What is Apple's debt-to-equity ratio?",
+          "Compare leverage levels across companies."
+        ],
+        "limitations": "Can vary significantly by industry norms."
+      },
+      "presentation": {"number_format": "number", "decimals": 1}
+    },
+    {
+      "kpi_id": "cash_conversion_cycle",
+      "display_name": "Cash Conversion Cycle",
+      "category": "Liquidity Metrics",
+      "definition_short": "Measures how long it takes a company to convert investments in inventory and other resources into cash flows.",
+      "formula_text": "Days_Inventory + Days_Receivable - Days_Payable",
+      "interpretation": "A shorter cash conversion cycle indicates more efficient working capital management.",
+      "units": "days",
+      "directionality": "lower_is_better",
+      "supports_periods": ["FY", "TTM"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "InventoryNet", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "AccountsReceivableNetCurrent", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "AccountsPayableCurrent", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "CostOfGoodsAndServicesSold", "statement": "IncomeStatement", "fallbacks": ["CostOfRevenue"]}
+      ],
+      "computation": [
+        "inventory_turnover = CostOfGoodsAndServicesSold / InventoryNet",
+        "days_inventory = 365 / inventory_turnover",
+        "receivables_turnover = Revenues / AccountsReceivableNetCurrent",
+        "days_receivable = 365 / receivables_turnover",
+        "payables_turnover = CostOfGoodsAndServicesSold / AccountsPayableCurrent",
+        "days_payable = 365 / payables_turnover",
+        "cash_conversion_cycle = days_inventory + days_receivable - days_payable"
+      ],
+      "edge_cases": ["If any turnover calculation results in division by zero -> return null, quality_flag=LOW"],
+      "view_more": {
+        "related_metrics": ["working_capital", "free_cash_flow"],
+        "data_source_hint": ["Financial Notes - Working Capital Metrics"],
+        "natural_language_examples": [
+          "What is Amazon's cash conversion cycle?",
+          "Compare CCC between Walmart and Target."
+        ],
+        "limitations": "Not meaningful for service-based businesses."
+      },
+      "presentation": {"number_format": "number", "decimals": 0}
+    },
+    {
+      "kpi_id": "dividend_yield",
+      "display_name": "Dividend Yield",
+      "category": "Dividend Metrics",
+      "definition_short": "Annual dividends per share divided by the current stock price.",
+      "formula_text": "Annual_Dividend_per_Share / Price_per_Share",
+      "interpretation": "Higher yields provide more income to shareholders but may signal slower growth.",
+      "units": "percent",
+      "directionality": "depends",
+      "supports_periods": ["PointInTime"],
+      "inputs": [
+        {"source": "market", "tag": "DividendsTTMPerShare"},
+        {"source": "market", "tag": "PricePerShare"}
+      ],
+      "computation": ["dividend_yield_pct = Dividends_TTM / PricePerShare * 100"],
+      "view_more": {
+        "related_metrics": ["dps", "tsr"],
+        "data_source_hint": ["Cash Flow Statement - Dividends Paid", "Market Data - Share Price"],
+        "natural_language_examples": [
+          "What is Coca-Cola's dividend yield?",
+          "Which S&P 500 stocks have the highest dividend yield?"
+        ],
+        "limitations": "Can be distorted by temporary stock price changes."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1}
+    },
+    {
+      "kpi_id": "dividends_per_share",
+      "display_name": "Dividends Per Share (DPS)",
+      "category": "Dividend Metrics",
+      "definition_short": "Total dividends paid divided by weighted average shares outstanding.",
+      "formula_text": "Total_Dividends / Weighted_Avg_Shares",
+      "interpretation": "Shows how much dividend each share receives.",
+      "units": "per_share",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "DividendsCash", "statement": "CashFlow"},
+        {"source": "us-gaap", "tag": "WeightedAverageNumberOfSharesOutstandingBasic", "statement": "IncomeStatement"}
+      ],
+      "computation": [
+        "dps = DividendsCash / WeightedAverageNumberOfSharesOutstandingBasic"
+      ],
+      "view_more": {
+        "related_metrics": ["dividend_yield", "tsr"],
+        "data_source_hint": ["Cash Flow Statement - Dividends Paid", "Share Count"],
+        "natural_language_examples": [
+          "What is DPS of Apple?",
+          "Compare DPS of dividend-paying stocks."
+        ],
+        "limitations": "May not reflect future dividend policy."
+      },
+      "presentation": {"number_format": "currency", "decimals": 2}
+    },
+    {
+      "kpi_id": "total_dividends_paid",
+      "display_name": "Total Dividends Paid",
+      "category": "Dividend Metrics",
+      "definition_short": "Total cash paid to shareholders as dividends over a period.",
+      "formula_text": "Sum(Dividends)",
+      "interpretation": "Indicates the scale of cash returned to shareholders.",
+      "units": "currency",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "DividendsCash", "statement": "CashFlow"}
+      ],
+      "computation": ["total_dividends = DividendsCash"],
+      "view_more": {
+        "related_metrics": ["dividends_per_share", "dividend_yield"],
+        "data_source_hint": ["Cash Flow Statement - Dividends Paid"],
+        "natural_language_examples": [
+          "How much dividends did Microsoft pay last year?",
+          "Trend of total dividends paid by Apple over 5 years."
+        ],
+        "limitations": "Does not indicate sustainability."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0}
+    },
+    {
+      "kpi_id": "tsr",
+      "display_name": "Total Shareholder Return (TSR)",
+      "category": "Share Metrics",
+      "definition_short": "Measures the total return shareholders receive from capital gains and dividends relative to the initial share price.",
+      "formula_text": "((P1 - P0) + D) / P0",
+      "interpretation": "Higher TSR means the company generated more shareholder value.",
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["custom_range"],
+      "inputs": [
+        {"source": "market", "tag": "AdjClosePriceSeries"},
+        {"source": "market", "tag": "DividendsCashSeries"}
+      ],
+      "computation": [
+        "Use adjusted close to incorporate splits.",
+        "tsr_pct = (adj_close_end - adj_close_start + sum(dividends)) / adj_close_start * 100"
+      ],
+      "view_more": {
+        "related_metrics": ["dividend_yield", "eps_cagr"],
+        "data_source_hint": ["Market Data - Price History", "Dividends"],
+        "natural_language_examples": [
+          "TSR of Apple over the last 5 years",
+          "Compare TSR of AAPL and S&P 500."
+        ],
+        "limitations": "Heavily influenced by market conditions."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1}
+    },
+    {
+      "kpi_id": "share_buyback_intensity",
+      "display_name": "Share Buyback Intensity",
+      "category": "Share Metrics",
+      "definition_short": "The proportion of outstanding shares repurchased over a period.",
+      "formula_text": "Shares_Repurchased / Shares_Outstanding_Start",
+      "interpretation": "Higher values indicate aggressive capital return through buybacks.",
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "PaymentsForRepurchaseOfCommonStock", "statement": "CashFlow"},
+        {"source": "market", "tag": "SharesOutstanding"}
+      ],
+      "computation": [
+        "shares_repurchased = PaymentsForRepurchaseOfCommonStock / PricePerShare",
+        "buyback_rate_pct = shares_repurchased / SharesOutstanding * 100"
+      ],
+      "view_more": {
+        "related_metrics": ["tsr", "shares_outstanding"],
+        "data_source_hint": ["Cash Flow Statement - Share Repurchases"],
+        "natural_language_examples": [
+          "What is Apple's share buyback intensity?",
+          "Which companies repurchased the most shares?"
+        ],
+        "limitations": "Can artificially boost EPS without improving fundamentals."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1}
+    },
+    {
+      "kpi_id": "shares_outstanding",
+      "display_name": "Shares Outstanding",
+      "category": "Share Metrics",
+      "definition_short": "The total number of shares held by all shareholders.",
+      "formula_text": "Shares_Outstanding",
+      "interpretation": "Used in EPS, market cap, and valuation calculations.",
+      "units": "shares",
+      "directionality": "neutral",
+      "supports_periods": ["PointInTime"],
+      "inputs": [
+        {"source": "market", "tag": "SharesOutstanding"}
+      ],
+      "computation": ["shares_outstanding = SharesOutstanding"],
+      "view_more": {
+        "related_metrics": ["eps_diluted", "market_cap"],
+        "data_source_hint": ["Balance Sheet - Share Count"],
+        "natural_language_examples": [
+          "How many shares does Apple have outstanding?",
+          "Track change in shares outstanding over time."
+        ],
+        "limitations": "Changes with buybacks or new issuance."
+      },
+      "presentation": {"number_format": "number", "decimals": 0}
+    },
+    {
+      "kpi_id": "total_assets",
+      "display_name": "Total Assets",
+      "category": "Balance Sheet Metrics",
+      "definition_short": "The sum of all assets owned by a company.",
+      "formula_text": "Total_Assets",
+      "interpretation": "Shows the total resources controlled by the company.",
+      "units": "currency",
+      "directionality": "neutral",
+      "supports_periods": ["FY", "Quarter"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "Assets", "statement": "BalanceSheet"}
+      ],
+      "computation": ["total_assets = Assets"],
+      "view_more": {
+        "related_metrics": ["total_liabilities", "shareholders_equity"],
+        "data_source_hint": ["Balance Sheet - Total Assets"],
+        "natural_language_examples": [
+          "What are Apple's total assets?",
+          "Compare total assets across the Big 5 tech companies."
+        ],
+        "limitations": "Does not indicate asset quality or utilization."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0}
+    },
+    {
+      "kpi_id": "total_liabilities",
+      "display_name": "Total Liabilities",
+      "category": "Balance Sheet Metrics",
+      "definition_short": "The total obligations a company owes to outside parties.",
+      "formula_text": "Total_Liabilities",
+      "interpretation": "Shows the total debt and obligations the company must repay.",
+      "units": "currency",
+      "directionality": "lower_is_better",
+      "supports_periods": ["FY", "Quarter"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "Liabilities", "statement": "BalanceSheet"}
+      ],
+      "computation": ["total_liabilities = Liabilities"],
+      "view_more": {
+        "related_metrics": ["total_assets", "shareholders_equity"],
+        "data_source_hint": ["Balance Sheet - Total Liabilities"],
+        "natural_language_examples": [
+          "What are Amazon's total liabilities?",
+          "Compare liabilities across sectors."
+        ],
+        "limitations": "Does not reflect timing or structure of liabilities."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0}
+    },
+    {
+      "kpi_id": "shareholders_equity",
+      "display_name": "Shareholders' Equity",
+      "category": "Balance Sheet Metrics",
+      "definition_short": "The residual interest in assets after deducting liabilities.",
+      "formula_text": "Total_Assets - Total_Liabilities",
+      "interpretation": "Represents owners' claim on company assets.",
+      "units": "currency",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "StockholdersEquity", "statement": "BalanceSheet", "fallbacks": ["StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"]}
+      ],
+      "computation": ["shareholders_equity = StockholdersEquity"],
+      "view_more": {
+        "related_metrics": ["roe", "pb_ratio"],
+        "data_source_hint": ["Balance Sheet - Equity"],
+        "natural_language_examples": [
+          "What is shareholders' equity for Meta?",
+          "Track equity growth over 5 years."
+        ],
+        "limitations": "May not reflect market value of equity."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0}
+    },
+    {
+      "kpi_id": "working_capital",
+      "display_name": "Working Capital",
+      "category": "Balance Sheet Metrics",
+      "definition_short": "Current assets minus current liabilities, showing short-term liquidity.",
+      "formula_text": "Current_Assets - Current_Liabilities",
+      "interpretation": "Positive working capital indicates liquidity; negative suggests potential cash constraints.",
+      "units": "currency",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "AssetsCurrent", "statement": "BalanceSheet"},
+        {"source": "us-gaap", "tag": "LiabilitiesCurrent", "statement": "BalanceSheet"}
+      ],
+      "computation": ["working_capital = AssetsCurrent - LiabilitiesCurrent"],
+      "view_more": {
+        "related_metrics": ["cash_conversion_cycle", "free_cash_flow"],
+        "data_source_hint": ["Balance Sheet - Current Assets & Liabilities"],
+        "natural_language_examples": [
+          "What is Apple's working capital?",
+          "Is Tesla's working capital positive?"
+        ],
+        "limitations": "Can fluctuate seasonally and may not reflect cash availability."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0}
+    },
+    {
+      "kpi_id": "revenue",
+      "display_name": "Total Revenue",
+      "category": "Income Statement Metrics",
+      "definition_short": "Total amount of money generated by the sale of goods or services.",
+      "formula_text": "Revenue",
+      "interpretation": "Top-line indicator of business scale.",
+      "units": "currency",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "inputs": [
         {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
       ],
-      "computation": ["carbon_intensity = EmissionsScope1and2 / Revenues"],
-      "units": "tCO2e_per_currency",
-      "directionality": "lower_is_better",
-      "supports_periods": ["FY"],
-      "quality_notes": "ESG disclosure varies; unit harmonization may be required."
+      "computation": ["total_revenue = Revenues"],
+      "view_more": {
+        "related_metrics": ["revenue_cagr", "ebitda_margin"],
+        "data_source_hint": ["Income Statement - Revenue"],
+        "natural_language_examples": [
+          "What is Amazon's total revenue?",
+          "Compare revenue of Apple vs Samsung."
+        ],
+        "limitations": "Does not indicate profitability."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0, "show_trend": true}
+    },
+    {
+      "kpi_id": "gross_profit",
+      "display_name": "Gross Profit",
+      "category": "Income Statement Metrics",
+      "definition_short": "Revenue minus cost of goods sold (COGS).",
+      "formula_text": "Revenue - COGS",
+      "interpretation": "Shows profit after direct production costs.",
+      "units": "currency",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"},
+        {"source": "us-gaap", "tag": "CostOfGoodsAndServicesSold", "statement": "IncomeStatement", "fallbacks": ["CostOfRevenue"]}
+      ],
+      "computation": ["gross_profit = Revenues - CostOfGoodsAndServicesSold"],
+      "view_more": {
+        "related_metrics": ["gross_margin", "operating_income"],
+        "data_source_hint": ["Income Statement - Gross Profit"],
+        "natural_language_examples": [
+          "What is Apple's gross profit?",
+          "How does gross profit compare across peers?"
+        ],
+        "limitations": "Excludes operating and overhead costs."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0}
+    },
+    {
+      "kpi_id": "operating_income",
+      "display_name": "Operating Income (EBIT)",
+      "category": "Income Statement Metrics",
+      "definition_short": "Profit from core operations before interest and taxes.",
+      "formula_text": "Gross_Profit - Operating_Expenses",
+      "interpretation": "Measures core profitability.",
+      "units": "currency",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "OperatingIncomeLoss", "statement": "IncomeStatement"}
+      ],
+      "computation": ["operating_income = OperatingIncomeLoss"],
+      "view_more": {
+        "related_metrics": ["operating_margin", "ebitda"],
+        "data_source_hint": ["Income Statement - Operating Income"],
+        "natural_language_examples": [
+          "What is Meta's operating income?",
+          "Compare EBIT across the Big 5 tech companies."
+        ],
+        "limitations": "Does not include non-operating items."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0}
+    },
+    {
+      "kpi_id": "net_income",
+      "display_name": "Net Income",
+      "category": "Income Statement Metrics",
+      "definition_short": "Total profit after all expenses, taxes, and interest.",
+      "formula_text": "Revenue - Total_Expenses",
+      "interpretation": "Represents the bottom line profitability.",
+      "units": "currency",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "NetIncomeLoss", "statement": "IncomeStatement"}
+      ],
+      "computation": ["net_income = NetIncomeLoss"],
+      "view_more": {
+        "related_metrics": ["eps_diluted", "roe"],
+        "data_source_hint": ["Income Statement - Net Income"],
+        "natural_language_examples": [
+          "What is Apple's net income?",
+          "How has net income changed over time?"
+        ],
+        "limitations": "Can be volatile due to one-time items."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0}
+    },
+    {
+      "kpi_id": "free_cash_flow",
+      "display_name": "Free Cash Flow (FCF)",
+      "category": "Cash Flow Metrics",
+      "definition_short": "Cash remaining after capital expenditures, available to return to shareholders or invest.",
+      "formula_text": "Operating_Cash_Flow - Capital_Expenditures",
+      "interpretation": "Positive and growing FCF indicates strong financial flexibility.",
+      "units": "currency",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "NetCashProvidedByUsedInOperatingActivities", "statement": "CashFlow"},
+        {"source": "us-gaap", "tag": "PaymentsToAcquirePropertyPlantAndEquipment", "statement": "CashFlow", "fallbacks": ["CapitalExpenditures"]}
+      ],
+      "computation": ["fcf = CFO - CapEx"],
+      "view_more": {
+        "related_metrics": ["free_cash_flow_margin", "dividends_paid"],
+        "data_source_hint": ["Cash Flow Statement - Operating CF & CapEx"],
+        "natural_language_examples": [
+          "What is Amazon's free cash flow?",
+          "Does Microsoft have positive FCF?"
+        ],
+        "limitations": "CapEx timing can cause fluctuations."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0}
+    },
+    {
+      "kpi_id": "free_cash_flow_margin",
+      "display_name": "Free Cash Flow Margin",
+      "category": "Cash Flow Metrics",
+      "definition_short": "Free cash flow as a percentage of revenue.",
+      "formula_text": "Free_Cash_Flow / Revenue",
+      "interpretation": "Higher FCF margin indicates strong cash generation from sales.",
+      "units": "percent",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "inputs": [
+        {"source": "derived", "tag": "FreeCashFlow"},
+        {"source": "us-gaap", "tag": "Revenues", "statement": "IncomeStatement"}
+      ],
+      "computation": [
+        "fcf_margin_pct = FreeCashFlow / Revenues * 100"
+      ],
+      "view_more": {
+        "related_metrics": ["free_cash_flow", "operating_cash_flow"],
+        "data_source_hint": ["Cash Flow Statement", "Income Statement"],
+        "natural_language_examples": [
+          "What is Microsoft's FCF margin?",
+          "Compare FCF margins across peers."
+        ],
+        "limitations": "Volatile due to CapEx timing."
+      },
+      "presentation": {"number_format": "percentage", "decimals": 1}
+    },
+    {
+      "kpi_id": "capital_expenditures",
+      "display_name": "Capital Expenditures (CapEx)",
+      "category": "Cash Flow Metrics",
+      "definition_short": "Cash spent on acquiring or maintaining physical assets.",
+      "formula_text": "CapEx",
+      "interpretation": "Higher CapEx may indicate growth investment but can reduce free cash flow.",
+      "units": "currency",
+      "directionality": "neutral",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "PaymentsToAcquirePropertyPlantAndEquipment", "statement": "CashFlow", "fallbacks": ["CapitalExpenditures"]}
+      ],
+      "computation": ["capex = PaymentsToAcquirePropertyPlantAndEquipment"],
+      "view_more": {
+        "related_metrics": ["free_cash_flow", "working_capital"],
+        "data_source_hint": ["Cash Flow Statement - Investing Activities"],
+        "natural_language_examples": [
+          "What is Apple's CapEx?",
+          "Compare CapEx intensity across industries."
+        ],
+        "limitations": "Can vary widely year-to-year based on investment plans."
+      },
+      "presentation": {"number_format": "currency", "decimals": 0}
+    },
+    {
+      "kpi_id": "eps_diluted",
+      "display_name": "Diluted EPS",
+      "category": "Per-Share Metrics",
+      "definition_short": "Net income available to common shareholders divided by weighted average diluted shares.",
+      "formula_text": "(Net_Income - Preferred_Dividends) / Weighted_Avg_Diluted_Shares",
+      "interpretation": "Shows earnings per share considering dilution from stock options and convertible securities.",
+      "units": "per_share",
+      "directionality": "higher_is_better",
+      "supports_periods": ["FY", "Quarter", "TTM"],
+      "inputs": [
+        {"source": "us-gaap", "tag": "EarningsPerShareDiluted", "statement": "IncomeStatement"}
+      ],
+      "computation": ["eps_diluted = EarningsPerShareDiluted"],
+      "view_more": {
+        "related_metrics": ["pe_ratio", "eps_cagr"],
+        "data_source_hint": ["Income Statement - EPS"],
+        "natural_language_examples": [
+          "What is Apple's diluted EPS?",
+          "Compare diluted EPS of AAPL and MSFT."
+        ],
+        "limitations": "Affected by share buybacks and dilution."
+      },
+      "presentation": {"number_format": "currency", "decimals": 2}
     }
   ],
   "rendering_guidelines": {
+    "default_display": {
+      "lines": 3,
+      "fields": ["display_name", "formula_text", "definition_short", "interpretation"],
+      "format": "compact"
+    },
+    "view_more": {
+      "trigger": "user_interaction",
+      "fields": ["related_metrics", "data_source_hint", "natural_language_examples", "limitations"],
+      "format": "detailed"
+    },
     "insight_card_fields": ["display_name", "value", "period", "company", "formula_text", "source_note", "interpretation_hint", "peer_rank"],
     "table_defaults": {"decimals": 1, "show_peer_rank": true, "color_scale": "auto-by-directionality"},
     "quality_flags": ["HIGH", "MEDIUM", "LOW"]
@@ -550,6 +968,14 @@
     "Compare ROE of AAPL, MSFT, GOOGL from 2021-2023",
     "Show TTM EBITDA margin for NVDA",
     "What's EV/EBITDA for AMZN today?",
-    "Explain FCF and show YoY growth for META"
+    "Explain FCF and show YoY growth for META",
+    "Show Cash Conversion Cycle for TSLA",
+    "Compare ROIC across tech companies",
+    "Display dividend metrics for JNJ and PG",
+    "Show working capital changes for AAPL",
+    "Calculate buyback rates for MSFT and GOOGL",
+    "What is Apple's revenue CAGR over the past 5 years?",
+    "Compare P/E ratios of Amazon and Alphabet",
+    "Show total assets across the Big 5 tech companies"
   ]
 }
