@@ -19,6 +19,9 @@ This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washin
 - Stand up KPI coverage pipelines that stay resilient when market data lags or filing assumptions drift.
 - Deliver practitioner-ready documentation, including deployment runbooks and testing strategies, so stakeholders can re-create the practicum outcomes after the semester concludes.
 
+### User story and pain points
+Picture a Monday 8 a.m. stand-up in GW’s practicum lab. Hania, acting as the analytics lead at a mid-sized asset manager, receives an urgent request from Van Nhi, who plays the portfolio strategist responsible for deciding which industrial names to overweight this quarter. Malcolm, the risk officer, wants to confirm that every metric driving the recommendation can be traced back to a filing or price feed, while Devarsh, modeling the compliance analyst, needs evidence that no unvetted prompt will expose sensitive data. Before BenchmarkOS, the team burned hours stitching CSVs from EDGAR, refreshing brittle spreadsheets, and copy-pasting numbers into chat threads—introducing latency, version drift, and audit nightmares. With the chatbot, they ask “Compare RTX and LMT revenue trajectories post-2022” and receive deterministic KPIs, lineage breadcrumbs, and warnings when data freshness slips. The story mirrors the real stakeholders we observed during practicum interviews: analysts juggling multiple tickers, risk partners demanding reproducibility, and compliance leaders seeking transparent guardrails. BenchmarkOS exists to calm that Monday chaos by fusing reliable data pipelines with an explainable conversational layer.
+
 ---
 
 ## Table of contents
