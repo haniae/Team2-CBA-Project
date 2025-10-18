@@ -12,6 +12,7 @@ BenchmarkOS is an institutional-grade copilot for finance teams. It pairs determ
 - [Quick start](#quick-start)
 - [Running the chatbot](#running-the-chatbot)
 - [Data ingestion playbooks](#data-ingestion-playbooks)
+- [Ingest and quote loading (English quick guide)](#ingest-and-quote-loading-english-quick-guide)
 - [Configuration reference](#configuration-reference)
 - [Database schema](#database-schema)
 - [Project layout](#project-layout)
@@ -179,6 +180,111 @@ PY
 ```
 Restart `serve_chatbot.py` afterwards so the SPA sees the refreshed metrics.
 
+---
+
+## Ingest and quote loading (English quick guide)
+
+### Prerequisites
+- Python 3.10+
+- Create/activate venv and install deps:
+```bash
+python -m venv .venv
+source .venv/bin/activate  # PowerShell: .\\.venv\\Scripts\\Activate.ps1
+pip install -r requirements.txt
+pip install -e .
+```
+- Optional but recommended for SEC: set a descriptive User-Agent (not a token):
+```bash
+export SEC_API_USER_AGENT="BenchmarkOSBot/1.0 (you@example.com)"
+```
+
+### Ingest the S&P 500 into SQLite
+SQLite path defaults to `data/sqlite/benchmarkos_chatbot.sqlite3` (configurable via `DATABASE_PATH`).
+
+Pick one of the following forms (both equivalent if you ran `pip install -e .`).
+- Module form:
+```bash
+python -m scripts.ingestion.ingest_universe --universe sp500 --years 10 --chunk-size 25 --sleep 2
+```
+- Script path form:
+```bash
+python scripts/ingestion/ingest_universe.py --universe sp500 --years 10 --chunk-size 25 --sleep 2
+```
+
+Notes:
+- `--years 10` pulls the most recent 10 fiscal years (cutoff = current_year - years + 1).
+- The job uses a progress file `.ingestion_progress.json` so re-runs can `--resume` where they left off.
+- If you see "Nothing to do" but the DB is empty, delete the progress file and re-run:
+```bash
+rm -f .ingestion_progress.json
+```
+
+Verify counts:
+```bash
+python - <<'PY'
+import sqlite3, json
+p='data/sqlite/benchmarkos_chatbot.sqlite3'
+con=sqlite3.connect(p)
+print(json.dumps({t: con.execute('select count(*) from '+t).fetchone()[0] for t in [
+  'financial_facts','company_filings','market_quotes','metric_snapshots','audit_events','ticker_aliases'
+]}, indent=2))
+PY
+```
+
+### Load market quotes (so price-based ratios populate)
+Load via Yahoo Finance in batches to avoid rate limits. Example: load all tickers already present in the DB, 50 per batch:
+```bash
+python - <<'PY'
+import os, time, sqlite3, subprocess
+db='data/sqlite/benchmarkos_chatbot.sqlite3'
+con=sqlite3.connect(db)
+tickers=[r[0] for r in con.execute("SELECT DISTINCT ticker FROM financial_facts ORDER BY ticker")]
+BATCH=50
+for i in range(0,len(tickers),BATCH):
+    os.environ['SEC_TICKERS']=",".join(tickers[i:i+BATCH])
+    subprocess.run(['python','-m','scripts.ingestion.load_prices_yfinance'], check=False)
+    time.sleep(1)
+print('Done.')
+PY
+```
+
+Then refresh analytics snapshots to recalculate P/E, EV/EBITDA, dividend yield, TSR, etc. with the latest prices:
+```bash
+python - <<'PY'
+from benchmarkos_chatbot.config import load_settings
+from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+AnalyticsEngine(load_settings()).refresh_metrics(force=True)
+print('Refreshed metric_snapshots.')
+PY
+```
+
+Check the latest quote timestamp:
+```bash
+python - <<'PY'
+import sqlite3
+con=sqlite3.connect('data/sqlite/benchmarkos_chatbot.sqlite3')
+print('quotes=',con.execute('select count(*) from market_quotes').fetchone()[0])
+print('latest=',con.execute('select max(quote_time) from market_quotes').fetchone()[0])
+PY
+```
+
+### Windows notes (PowerShell)
+- Activate: ` .\\.venv\\Scripts\\Activate.ps1`
+- Use the script path variant if `python -m` complains about imports:
+```powershell
+python scripts/ingestion/ingest_universe.py --universe sp500 --years 10 --chunk-size 25 --sleep 2
+```
+- If you see `ModuleNotFoundError: benchmarkos_chatbot`, ensure you ran `pip install -e .` or set:
+```powershell
+$env:PYTHONPATH = (Resolve-Path .\src).Path
+```
+
+### Common issues
+- "Nothing to do" with `--resume`: delete `.ingestion_progress.json` and re-run.
+- Yahoo 429: reduce batch size (env `YAHOO_QUOTE_BATCH_SIZE`) and add small sleeps; retry.
+- DB path: override with `DATABASE_PATH` if you don’t want the default under `data/sqlite/`.
+
+---
 ### Coverage universe
 `docs/ticker_names.md` lists every tracked company (482 tickers at generation time). Regenerate it—and keep the parser aligned—whenever the universe changes:
 ```powershell
