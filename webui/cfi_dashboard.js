@@ -1,12 +1,19 @@
 (function(){
+  const COLORS = {
+    navy: "#0B2E59",
+    accent: "#1C7ED6",
+    orange: "#FF7F0E",
+    slate: "#5B6B82"
+  };
   const BASE_LAYOUT = {
-    paper_bgcolor: "white",
-    plot_bgcolor: "white",
-    font: { family: "Inter, Open Sans, Roboto", color: "#003366", size: 12 },
-    xaxis: { gridcolor: "#E6E9EF", zeroline: false, tickfont: { size: 11 } },
-    yaxis: { gridcolor: "#E6E9EF", zeroline: false, tickfont: { size: 11 } },
-    legend: { orientation: "h", y: 1.16, x: 1.0, xanchor: "right", font: { size: 10 } },
-    margin: { l: 40, r: 32, t: 24, b: 32 }
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
+    font: { family: "Inter, Open Sans, Roboto", color: COLORS.navy, size: 12 },
+    xaxis: { gridcolor: "#E1E8F5", zeroline: false, tickfont: { size: 11 } },
+    yaxis: { gridcolor: "#E1E8F5", zeroline: false, tickfont: { size: 11 } },
+    legend: { orientation: "h", y: 1.12, x: 1.0, xanchor: "right", font: { size: 10 } },
+    margin: { l: 40, r: 32, t: 26, b: 34 },
+    hoverlabel: { bgcolor: "#fff", bordercolor: "#d5def0", font: { family: "Inter, Open Sans, Roboto", size: 11 } }
   };
   const CONFIG = { displayModeBar: false, responsive: true };
 
@@ -24,7 +31,23 @@
     return `${sign}$${text}${unit}`;
   }
 
-  const formatPercent = (value) => (isNumber(value) ? `${Number(value).toFixed(1)}%` : "—");
+  function formatCurrency(value) {
+    if (!isNumber(value)) return "—";
+    const number = Number(value);
+    const abs = Math.abs(number);
+    const decimals = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
+    return `$${number.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    })}`;
+  }
+
+  const formatPercent = (value) => {
+    if (!isNumber(value)) return "—";
+    const percent = Number(value) * 100;
+    const decimals = Math.abs(percent) >= 10 ? 1 : 2;
+    return `${percent.toFixed(decimals)}%`;
+  };
   const formatMultiple = (value) => (isNumber(value) ? `${Number(value).toFixed(1)}×` : "—");
   const formatInteger = (value) => (isNumber(value) ? Number(value).toLocaleString() : "—");
 
@@ -44,6 +67,15 @@
     if (typeof value === "string") return value;
     const lower = String(label || "").toLowerCase();
     if (lower.includes("margin") || lower.includes("growth") || lower.includes("pct") || lower.includes("%")) return formatPercent(value);
+    if (
+      lower.includes("share price") ||
+      lower.includes("target price") ||
+      lower.includes("current price") ||
+      lower.includes("52-week") ||
+      lower.includes("hi/lo")
+    ) {
+      return formatCurrency(value);
+    }
     if (lower.includes("multiple") || lower.includes("ev/") || lower.includes("turnover")) return formatMultiple(value);
     if (lower.includes("employee") || lower.includes("shares") || lower.includes("count")) return formatInteger(value);
     if (
@@ -91,8 +123,10 @@
       if (!label) return;
       const tr = document.createElement("tr");
       const left = document.createElement("td");
+      left.className = "kv-label";
       left.textContent = String(label).replace(/_/g, " ");
       const right = document.createElement("td");
+      right.className = "kv-value";
       right.textContent = formatValue(label, value);
       tr.append(left, right);
       tbody.appendChild(tr);
@@ -125,10 +159,12 @@
     rows.forEach((row) => {
       const tr = document.createElement("tr");
       const labelCell = document.createElement("td");
+      labelCell.className = "kv-label";
       labelCell.textContent = row.Label || row.label || "";
       tr.appendChild(labelCell);
       columns.forEach((field) => {
         const td = document.createElement("td");
+        td.className = "kv-value";
         td.textContent = formatValue(field, row[field]);
         tr.appendChild(td);
       });
@@ -216,7 +252,7 @@
         x: data.Year,
         y: data.Revenue,
         name: "Revenue ($M)",
-        marker: { color: "#003366" },
+        marker: { color: COLORS.navy, line: { color: "#052142", width: 1 } },
         hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>"
       }
     ];
@@ -229,8 +265,8 @@
         y: multiples,
         name: "EV/Revenue (×)",
         yaxis: "y2",
-        line: { color: "#FF7F0E", width: 2 },
-        marker: { size: 5, color: "#FF7F0E" },
+        line: { color: COLORS.accent, width: 2 },
+        marker: { size: 5, color: COLORS.accent },
         hovertemplate: "FY %{x}: %{y:.2f}×<extra></extra>"
       });
     }
@@ -238,7 +274,8 @@
       ...BASE_LAYOUT,
       title: { text: "Revenue vs EV/Revenue", x: 0.01, y: 0.99, font: { size: 14 } },
       yaxis: { ...BASE_LAYOUT.yaxis, title: "Revenue ($M)", tickprefix: "$", separatethousands: true },
-      yaxis2: { title: "EV/Revenue (×)", overlaying: "y", side: "right", showgrid: false, ticksuffix: "×" }
+      yaxis2: { title: "EV/Revenue (×)", overlaying: "y", side: "right", showgrid: false, ticksuffix: "×" },
+      bargap: 0.3
     };
     Plotly.newPlot(node, traces, layout, CONFIG);
   }
@@ -256,7 +293,7 @@
         x: data.Year,
         y: data.EBITDA,
         name: "EBITDA ($M)",
-        marker: { color: "#003366" },
+        marker: { color: COLORS.navy, line: { color: "#052142", width: 1 } },
         hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>"
       }
     ];
@@ -269,8 +306,8 @@
         y: multiples,
         name: "EV/EBITDA (×)",
         yaxis: "y2",
-        line: { color: "#FF7F0E", width: 2 },
-        marker: { size: 5, color: "#FF7F0E" },
+        line: { color: COLORS.accent, width: 2 },
+        marker: { size: 5, color: COLORS.accent },
         hovertemplate: "FY %{x}: %{y:.2f}×<extra></extra>"
       });
     }
@@ -278,7 +315,8 @@
       ...BASE_LAYOUT,
       title: { text: "EBITDA vs EV/EBITDA", x: 0.01, y: 0.99, font: { size: 14 } },
       yaxis: { ...BASE_LAYOUT.yaxis, title: "EBITDA ($M)", tickprefix: "$", separatethousands: true },
-      yaxis2: { title: "EV/EBITDA (×)", overlaying: "y", side: "right", showgrid: false, ticksuffix: "×" }
+      yaxis2: { title: "EV/EBITDA (×)", overlaying: "y", side: "right", showgrid: false, ticksuffix: "×" },
+      bargap: 0.3
     };
     Plotly.newPlot(node, traces, layout, CONFIG);
   }
@@ -292,9 +330,9 @@
     }
     const traces = [];
     [
-      ["Bull", "#003366", "solid"],
-      ["Base", "#FF7F0E", "dash"],
-      ["Bear", "#6B7A90", "dot"]
+      ["Bull", COLORS.navy, "solid"],
+      ["Base", COLORS.accent, "dash"],
+      ["Bear", COLORS.slate, "dot"]
     ].forEach(([key, color, dash]) => {
       if (Array.isArray(data[key])) {
         traces.push({
@@ -303,7 +341,7 @@
           x: data.Year,
           y: data[key],
           name: key,
-          line: { color, dash, width: 2 },
+          line: { color, dash, width: 2.4 },
           hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>"
         });
       }
@@ -333,7 +371,7 @@
         x: data.Case,
         y: data.Value,
         name: "Value",
-        marker: { color: "#003366" },
+        marker: { color: COLORS.navy, line: { color: "#052142", width: 1 } },
         text: data.Value.map((v) => formatMoney(v)),
         textposition: "outside",
         cliponaxis: false,
@@ -342,8 +380,8 @@
     ];
     const { current, average } = meta || {};
     const referenceLines = [
-      ["Current", current, "#6B7A90", "dot"],
-      ["Average", average, "#FF7F0E", "dash"]
+      ["Current", current, COLORS.slate, "dot"],
+      ["Average", average, COLORS.orange, "dash"]
     ].filter(([, value]) => isNumber(value));
     referenceLines.forEach(([label, value, color, dash]) => {
       traces.push({
@@ -360,29 +398,73 @@
       ...BASE_LAYOUT,
       title: { text: "Valuation Summary — Equity Value per Share ($)", x: 0.01, y: 0.99, font: { size: 14 } },
       margin: { l: 40, r: 24, t: 24, b: 40 },
-      yaxis: { ...BASE_LAYOUT.yaxis, title: "$/Share", tickprefix: "$", separatethousands: true }
+      yaxis: { ...BASE_LAYOUT.yaxis, title: "$/Share", tickprefix: "$", separatethousands: true },
+      bargap: 0.32
     };
     Plotly.newPlot(node, traces, layout, CONFIG);
   }
 
   function renderMeta(meta = {}) {
+    const company = meta.company || "";
+    const ticker = meta.ticker ? String(meta.ticker).toUpperCase() : "";
+    const brand = meta.brand || company.split(" ")[0] || ticker || "";
+
+    const brandNode = document.getElementById("cfi-brand");
+    if (brandNode) brandNode.textContent = brand ? brand.toLowerCase() : "";
+
     const companyNode = document.getElementById("cfi-company");
-    if (companyNode) {
-      const ticker = meta.ticker ? String(meta.ticker).toUpperCase() : "";
-      companyNode.textContent = ticker ? `${meta.company || ""} (${ticker})`.trim() : meta.company || ticker || "";
+    if (companyNode) companyNode.textContent = company;
+
+    const tickerNode = document.getElementById("cfi-ticker");
+    if (tickerNode) {
+      const explicit = meta.ticker_label || meta.ticker_display;
+      if (explicit) tickerNode.textContent = explicit;
+      else {
+        const exchange = meta.exchange ? String(meta.exchange).toUpperCase() : "";
+        const label = [exchange, ticker].filter(Boolean).join(": ");
+        tickerNode.textContent = label || ticker;
+      }
     }
+
     const recNode = document.getElementById("cfi-rec");
-    if (recNode) recNode.textContent = meta.recommendation || "";
+    if (recNode) recNode.textContent = meta.recommendation || "—";
+
     const targetNode = document.getElementById("cfi-target");
-    if (targetNode) targetNode.textContent = isNumber(meta.target_price) ? `Target: ${formatMoney(meta.target_price)}` : "";
+    if (targetNode) targetNode.textContent = isNumber(meta.target_price) ? formatCurrency(meta.target_price) : meta.target_price || "—";
+
+    const scenarioNode = document.getElementById("cfi-scenario");
+    if (scenarioNode) scenarioNode.textContent = meta.scenario || meta.live_scenario || meta.case || "Consensus";
+
     const dateNode = document.getElementById("cfi-date");
     if (dateNode) dateNode.textContent = meta.date || "";
+
+    const websiteNode = document.getElementById("cfi-website");
+    if (websiteNode) {
+      const value = meta.website || meta.url || "";
+      websiteNode.textContent = value;
+      websiteNode.style.display = value ? "" : "none";
+    }
+
+    const tagNode = document.getElementById("cfi-report-tag");
+    if (tagNode) {
+      const value = meta.report_tag || meta.report || "";
+      tagNode.textContent = value;
+      tagNode.style.display = value ? "" : "none";
+    }
   }
 
   window.CFI = {
     render(payload) {
       if (!payload) return;
-      renderMeta(payload.meta);
+      const meta = { ...(payload.meta || {}) };
+      const priceTicker = payload.price?.Ticker || payload.price?.ticker || payload.price?.symbol;
+      if (!meta.ticker_label && priceTicker) meta.ticker_label = String(priceTicker);
+      if (!meta.ticker && typeof priceTicker === "string" && priceTicker.includes(":")) {
+        const [exchangePart, tickerPart] = priceTicker.split(":").map((part) => part.trim());
+        meta.exchange = meta.exchange || exchangePart;
+        meta.ticker = meta.ticker || tickerPart;
+      }
+      renderMeta(meta);
       const priceSource = payload.price || payload.overview?.price || payload.overview || null;
       renderPairsTable("cfi-price-table", priceSource);
       const keyStatsSource = payload.key_stats || payload.overview?.key_stats || null;

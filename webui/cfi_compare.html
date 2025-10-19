@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>CFI Compare — BenchmarkOS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="cfi_compare.css"/>
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+</head>
+<body>
+  <div id="cfix-root" class="cfix-grid">
+    <!-- Header -->
+    <div class="panel header" data-area="header">
+      <h1>Financial Model Dashboard — Compare</h1>
+      <div class="meta">
+        <span id="cfix-peerset"></span>
+        <span id="cfix-date"></span>
+      </div>
+    </div>
+
+    <!-- Row 2: compact KPI cards (A, B, C, Benchmark) -->
+    <div class="panel" data-area="kpiA"><div class="strip">Company A</div><div id="kpiA" class="body tight kv"></div></div>
+    <div class="panel" data-area="kpiB"><div class="strip">Company B</div><div id="kpiB" class="body tight kv"></div></div>
+    <div class="panel" data-area="kpiC"><div class="strip">Company C</div><div id="kpiC" class="body tight kv"></div></div>
+    <div class="panel" data-area="benchmark"><div class="strip">Benchmark (S&P 500 Avg)</div><div id="kpiBench" class="body tight kv"></div></div>
+
+    <!-- Row 3: dense compare table + football field (latest valuation) -->
+    <div class="panel" data-area="compareTable">
+      <div class="strip">Key Financials — Side by Side</div>
+      <div id="compareTable" class="body tight"></div>
+    </div>
+    <div class="panel" data-area="compareFootball">
+      <div class="strip">Valuation Ranges — Football Field</div>
+      <div id="compareFootball" class="body tight plot"></div>
+    </div>
+
+    <!-- Row 4: time-series trends -->
+    <div class="panel" data-area="revTrend"><div class="strip">Revenue — Multi-Company Trend</div><div id="revTrend" class="body tight plot"></div></div>
+    <div class="panel" data-area="ebitdaTrend"><div class="strip">EBITDA — Multi-Company Trend</div><div id="ebitdaTrend" class="body tight plot"></div></div>
+
+    <!-- Row 5: peer scatter + valuation summary -->
+    <div class="panel" data-area="marginVsPeers"><div class="strip">Net Margin vs ROE — Peer Map</div><div id="marginVsPeers" class="body tight plot"></div></div>
+    <div class="panel" data-area="valuationSummary"><div class="strip">Valuation Summary — Equity Value per Share ($)</div><div id="valuationSummary" class="body tight plot"></div></div>
+  </div>
+
+  <script src="cfi_compare.js"></script>
+
+  <!-- Self-test demo (open file to view) -->
+  <script>
+    (function demo(){
+      if (!window.CFIX) return;
+      const payload = {
+        meta: { date: "2025-10-19", peerset: "AAPL vs MSFT vs AMZN vs S&P500 Avg" },
+        cards: {             // KPI cards (compact)
+          AAPL: { "Price": 226.1, "Revenue (FY23 $B)": 383.3, "Net margin": 28.6, "ROE": 126.6, "P/E": 45.3 },
+          MSFT: { "Price": 420.5, "Revenue (FY23 $B)": 211.9, "Net margin": 35.3, "ROE": 47.2,  "P/E": 43.7 },
+          AMZN: { "Price": 175.5, "Revenue (FY23 $B)": 574.8, "Net margin": 5.3,  "ROE": 11.6,  "P/E": 112.0 },
+          SP500:{ "Price": null,  "Revenue (Avg $B)": 18.3,    "Net margin": 12.3, "ROE": 17.6,  "P/E": 22.0 }
+        },
+        table: {             // dense compare table (rows × companies; years optional)
+          columns: ["Metric","AAPL","MSFT","AMZN","S&P 500 Avg"],
+          rows: [
+            {label:"Revenue (FY23 $B)", AAPL:383.3, MSFT:211.9, AMZN:574.8, SPX:18.3, type:"moneyB"},
+            {label:"EBITDA margin",     AAPL:31.6,  MSFT:41.8,  AMZN:17.6,  SPX:22.0, type:"pct"},
+            {label:"Net margin",        AAPL:28.6,  MSFT:41.6,  AMZN:12.3,  SPX:12.3, type:"pct"},
+            {label:"ROE",               AAPL:126.6, MSFT:42.7,  AMZN:4.8,   SPX:17.6, type:"pct"},
+            {label:"P/E (ttm)",         AAPL:45.3,  MSFT:43.7,  AMZN:112.0, SPX:22.0, type:"x"},
+            {label:"EV/EBITDA (ttm)",   AAPL:37.0,  MSFT:43.0,  AMZN:56.0,  SPX:11.5, type:"x"},
+            {label:"Debt/Equity",       AAPL:5.0,   MSFT:1.0,   AMZN:3.0,   SPX:1.3,  type:"x"}
+          ]
+        },
+        football: [          // football field (per company ranges)
+          {ticker:"AAPL", ranges:[{name:"DCF",lo:135,hi:210},{name:"Comps",lo:160,hi:220},{name:"Market",lo:226,hi:226}]},
+          {ticker:"MSFT", ranges:[{name:"DCF",lo:350,hi:480},{name:"Comps",lo:380,hi:460},{name:"Market",lo:420,hi:420}]},
+          {ticker:"AMZN", ranges:[{name:"DCF",lo:160,hi:240},{name:"Comps",lo:170,hi:230},{name:"Market",lo:176,hi:176}]}
+        ],
+        series: {            // time-series for line charts
+          years:[2019,2020,2021,2022,2023],
+          revenue:{AAPL:[260,274,366,394,383], MSFT:[126,143,168,211,212], AMZN:[281,386,470,514,575]},
+          ebitda:{AAPL:[31,35,43,47,46], MSFT:[57,73,95,112,118], AMZN:[37,48,56,61,72]}
+        },
+        scatter: [           // peer map points
+          {ticker:"AAPL", x:28.6, y:126.6, size:383.3},
+          {ticker:"MSFT", x:41.6, y:47.2, size:211.9},
+          {ticker:"AMZN", x:12.3, y:11.6, size:574.8},
+          {ticker:"S&P Avg", x:12.3, y:17.6, size:18.3}
+        ],
+        valSummary: {        // bars by method per company (latest $/share)
+          case:["DCF-Bull","DCF-Base","DCF-Bear","Comps","Market"],
+          AAPL:[250,210,180,225,226],
+          MSFT:[520,460,400,480,420],
+          AMZN:[240,200,160,210,176]
+        }
+      };
+      CFIX.render(payload);
+    })();
+  </script>
+</body>
+</html>

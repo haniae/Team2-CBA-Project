@@ -1,0 +1,54 @@
+:root{ --navy:#003366; --orange:#FF7F0E; --grid:#E6E9EF; --bg:#fff; --muted:#6B7A90; }
+*{ box-sizing:border-box; }
+body{ margin:0; background:var(--bg); font:12px "Inter","Open Sans",Roboto,Arial,sans-serif; color:var(--navy); }
+.cfix-grid{
+  max-width:1280px; margin:0 auto; padding:12px;
+  display:grid; grid-gap:8px; grid-template-columns:repeat(12,1fr);
+  grid-template-rows:64px 140px 360px 260px 260px;
+  grid-template-areas:
+    "header header header header header header header header header header header header"
+    "kpiA kpiA kpiA kpiB kpiB kpiB kpiC kpiC kpiC benchmark benchmark benchmark"
+    "compareTable compareTable compareTable compareTable compareTable compareTable compareTable compareTable compareFootball compareFootball compareFootball compareFootball"
+    "revTrend revTrend revTrend revTrend revTrend revTrend ebitdaTrend ebitdaTrend ebitdaTrend ebitdaTrend ebitdaTrend ebitdaTrend"
+    "marginVsPeers marginVsPeers marginVsPeers marginVsPeers marginVsPeers marginVsPeers valuationSummary valuationSummary valuationSummary valuationSummary valuationSummary valuationSummary";
+}
+.panel{ background:#fff; border:1px solid var(--grid); border-radius:6px; overflow:hidden; }
+.panel[data-area="header"]{ grid-area:header; display:flex; align-items:center; justify-content:space-between; padding:0 12px; }
+.panel[data-area="kpiA"]{ grid-area:kpiA; } .panel[data-area="kpiB"]{ grid-area:kpiB; }
+.panel[data-area="kpiC"]{ grid-area:kpiC; } .panel[data-area="benchmark"]{ grid-area:benchmark; }
+.panel[data-area="compareTable"]{ grid-area:compareTable; } .panel[data-area="compareFootball"]{ grid-area:compareFootball; }
+.panel[data-area="revTrend"]{ grid-area:revTrend; } .panel[data-area="ebitdaTrend"]{ grid-area:ebitdaTrend; }
+.panel[data-area="marginVsPeers"]{ grid-area:marginVsPeers; } .panel[data-area="valuationSummary"]{ grid-area:valuationSummary; }
+.strip{ height:24px; background:var(--navy); color:#fff; font:700 11px/24px "Inter","Open Sans",Roboto; text-transform:uppercase; letter-spacing:.3px; padding:0 8px; }
+.body{ padding:8px 10px; } .tight{ padding:6px 8px; }
+.header h1{ margin:0; font:700 20px/24px "Inter","Open Sans",Roboto; letter-spacing:.2px; text-align:center; width:100%; }
+.header .meta{ min-width:420px; text-align:right; font:600 11px/16px "Inter","Open Sans",Roboto; color:var(--muted); }
+
+/* compact KV cards */
+.kv{ display:grid; grid-template-columns:1fr auto; grid-row-gap:4px; column-gap:12px; }
+.kv div:nth-child(odd){ color:#4d5a70; } .kv div:nth-child(even){ text-align:right; font-variant-numeric:tabular-nums; }
+
+/* dense compare table */
+.cfix-table{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font:500 12px/22px "Inter","Open Sans",Roboto; }
+.cfix-table thead th{ position:sticky; top:0; z-index:2; background:#f7f9ff; color:var(--navy); height:26px; border-bottom:1px solid var(--grid); font:700 11px/26px "Inter","Open Sans",Roboto; }
+.cfix-table tbody td{ height:22px; border-bottom:1px solid #f0f2f7; padding:0 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cfix-table tbody tr:nth-child(even){ background:#FAFBFE; }
+.cfix-table .metric{ font-weight:600; color:#26354b; } .cfix-table .num{ text-align:right; font-variant-numeric:tabular-nums lining-nums; }
+
+/* plots */
+.plot{ width:100%; height:220px; }
+
+/* responsive (2 cols then 1) */
+@media (max-width:1100px){
+  .cfix-grid{
+    grid-template-rows:auto;
+    grid-template-areas:
+      "header header header header header header header header header header header header"
+      "kpiA kpiA kpiA kpiB kpiB kpiB kpiC kpiC kpiC benchmark benchmark benchmark"
+      "compareTable compareTable compareTable compareTable compareTable compareTable compareTable compareTable compareTable compareTable compareTable compareTable"
+      "compareFootball compareFootball compareFootball compareFootball compareFootball compareFootball compareFootball compareFootball compareFootball compareFootball compareFootball compareFootball"
+      "revTrend revTrend revTrend revTrend revTrend revTrend ebitdaTrend ebitdaTrend ebitdaTrend ebitdaTrend ebitdaTrend ebitdaTrend"
+      "marginVsPeers marginVsPeers marginVsPeers marginVsPeers marginVsPeers marginVsPeers valuationSummary valuationSummary valuationSummary valuationSummary valuationSummary valuationSummary";
+  }
+  .plot{ height:200px; }
+}

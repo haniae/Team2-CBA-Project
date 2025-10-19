@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>CFI Compare Dashboard — Standalone</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+:root{ --navy:#003366; --orange:#FF7F0E; --grid:#E6E9EF; --bg:#fff; --muted:#6B7A90; }
+*{ box-sizing:border-box; }
+html,body{ margin:0; background:var(--bg); color:var(--navy);
+  font:12px "Inter","Open Sans",Roboto,Arial,sans-serif; }
+.cfix-grid{
+  max-width:1280px; margin:0 auto; padding:12px;
+  display:grid; grid-gap:8px; grid-template-columns:repeat(12,1fr);
+  grid-template-rows:64px 140px 360px 260px 260px;
+  grid-template-areas:
+    "header header header header header header header header header header header header"
+    "kpiA kpiA kpiA kpiB kpiB kpiB kpiC kpiC kpiC bench bench bench"
+    "table table table table table table table table foot foot foot foot"
+    "rev rev rev rev rev rev ebitda ebitda ebitda ebitda ebitda ebitda"
+    "scatter scatter scatter scatter scatter scatter vals vals vals vals vals vals";
+}
+.panel{ background:#fff; border:1px solid var(--grid); border-radius:6px; overflow:hidden; }
+.panel[data-area="header"]{ grid-area:header; display:flex; align-items:center; justify-content:space-between; padding:0 12px; }
+.panel[data-area="kpiA"]{ grid-area:kpiA } .panel[data-area="kpiB"]{ grid-area:kpiB }
+.panel[data-area="kpiC"]{ grid-area:kpiC } .panel[data-area="bench"]{ grid-area:bench }
+.panel[data-area="table"]{ grid-area:table } .panel[data-area="foot"]{ grid-area:foot }
+.panel[data-area="rev"]{ grid-area:rev } .panel[data-area="ebitda"]{ grid-area:ebitda }
+.panel[data-area="scatter"]{ grid-area:scatter } .panel[data-area="vals"]{ grid-area:vals }
+.strip{ height:24px; background:var(--navy); color:#fff; font:700 11px/24px "Inter","Open Sans",Roboto; text-transform:uppercase; letter-spacing:.3px; padding:0 8px; }
+.body{ padding:8px 10px } .tight{ padding:6px 8px }
+.header h1{ margin:0; font:700 20px/24px "Inter","Open Sans",Roboto; text-align:center; width:100% }
+.header .meta{ min-width:420px; text-align:right; font:600 11px/16px "Inter","Open Sans",Roboto; color:var(--muted) }
+
+/* compact KV cards */
+.kv{ display:grid; grid-template-columns:1fr auto; grid-row-gap:4px; column-gap:12px }
+.kv div:nth-child(odd){ color:#4d5a70 } .kv div:nth-child(even){ text-align:right; font-variant-numeric:tabular-nums }
+
+/* dense side-by-side table */
+.cfix-table{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font:500 12px/22px "Inter","Open Sans",Roboto }
+.cfix-table thead th{ position:sticky; top:0; z-index:2; background:#f7f9ff; color:var(--navy); height:26px; border-bottom:1px solid var(--grid); font:700 11px/26px "Inter","Open Sans",Roboto }
+.cfix-table tbody td{ height:22px; border-bottom:1px solid #f0f2f7; padding:0 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.cfix-table tbody tr:nth-child(even){ background:#FAFBFE }
+.cfix-table .metric{ font-weight:600; color:#26354b } .cfix-table .num{ text-align:right; font-variant-numeric:tabular-nums lining-nums }
+
+/* plots */
+.plot{ width:100%; height:220px }
+
+/* responsive (2 cols then 1) */
+@media (max-width:1100px){
+  .cfix-grid{
+    grid-template-rows:auto;
+    grid-template-areas:
+      "header header header header header header header header header header header header"
+      "kpiA kpiA kpiA kpiB kpiB kpiB kpiC kpiC kpiC bench bench bench"
+      "table table table table table table table table table table table table"
+      "foot foot foot foot foot foot foot foot foot foot foot foot"
+      "rev rev rev rev rev rev ebitda ebitda ebitda ebitda ebitda ebitda"
+      "scatter scatter scatter scatter scatter scatter vals vals vals vals vals vals";
+  }
+  .plot{ height:200px }
+}
+</style>
+</head>
+<body>
+  <div class="cfix-grid">
+    <div class="panel header" data-area="header">
+      <div style="width:420px"></div>
+      <h1>Financial Model Dashboard — Compare</h1>
+      <div class="meta"><span id="peerset"></span>&nbsp;|&nbsp;<span id="date"></span></div>
+    </div>
+
+    <div class="panel" data-area="kpiA"><div class="strip">Company A</div><div id="kpiA" class="body tight kv"></div></div>
+    <div class="panel" data-area="kpiB"><div class="strip">Company B</div><div id="kpiB" class="body tight kv"></div></div>
+    <div class="panel" data-area="kpiC"><div class="strip">Company C</div><div id="kpiC" class="body tight kv"></div></div>
+    <div class="panel" data-area="bench"><div class="strip">Benchmark</div><div id="kpiBench" class="body tight kv"></div></div>
+
+    <div class="panel" data-area="table"><div class="strip">Key Financials — Side by Side</div><div id="tbl" class="body tight"></div></div>
+    <div class="panel" data-area="foot"><div class="strip">Valuation Ranges — Football Field</div><div id="football" class="body tight plot"></div></div>
+
+    <div class="panel" data-area="rev"><div class="strip">Revenue — Multi-Company Trend</div><div id="rev" class="body tight plot"></div></div>
+    <div class="panel" data-area="ebitda"><div class="strip">EBITDA — Multi-Company Trend</div><div id="ebitda" class="body tight plot"></div></div>
+
+    <div class="panel" data-area="scatter"><div class="strip">Net Margin vs ROE — Peer Map</div><div id="scatter" class="body tight plot"></div></div>
+    <div class="panel" data-area="vals"><div class="strip">Valuation Summary — $/Share</div><div id="vals" class="body tight plot"></div></div>
+  </div>
+
+<script>
+/* ---------- formatters ---------- */
+const money=(n)=> (n==null||isNaN(n))?"—":((sign,a)=>`${sign}$${a[0]}${a[1]}`)(n<0?"-":"",((x)=>{x=Math.abs(x);const u=x>=1e9?"B":x>=1e6?"M":x>=1e3?"K":"";const v=x>=1e9?x/1e9:x>=1e6?x/1e6:x>=1e3?x/1e3:x;return [v.toFixed(v>=100?0:v>=10?1:2),u]})(n));
+const pct=(n)=> (n==null||isNaN(n))?"—":`${(+n).toFixed(1)}%`;
+const xfmt=(n)=> (n==null||isNaN(n))?"—":`${(+n).toFixed(2)}×`;
+
+/* ---------- helpers ---------- */
+function ensureArray(v){ return Array.isArray(v)?v:[]; }
+
+function renderKV(id, obj){
+  const el=document.getElementById(id); if (!el) return;
+  el.innerHTML="";
+  Object.entries(obj || {}).forEach(([k,v])=>{
+    const L=document.createElement("div"); L.textContent=k;
+    const R=document.createElement("div");
+    if (typeof v === "number") {
+      R.textContent = money(v);
+    } else {
+      R.textContent = v ?? "—";
+    }
+    el.append(L,R);
+  });
+}
+
+function autoStripLabels(tickers, companies){
+  const order=["kpiA","kpiB","kpiC"];
+  order.forEach((area, index)=>{
+    const strip = document.querySelector(`.panel[data-area="${area}"] .strip`);
+    if (!strip) return;
+    const ticker = tickers[index];
+    if (!ticker){
+      strip.textContent = "—";
+      renderKV(area, {});
+      return;
+    }
+    const company = companies?.[ticker];
+    strip.textContent = (company && company !== ticker) ? `${company} (${ticker})` : ticker;
+  });
+  const benchStrip = document.querySelector('.panel[data-area="bench"] .strip');
+  if (benchStrip) {
+    benchStrip.textContent = "Benchmark" + (companies?.benchmark ? ` (${companies.benchmark})` : "");
+  }
+}
+
+function renderTable(id, table){
+  const root=document.getElementById(id); if (!root) return;
+  root.innerHTML="";
+  const columns = ensureArray(table?.columns);
+  if (!columns.length){
+    root.textContent = "No table data";
+    return;
+  }
+  const t=document.createElement("table"); t.className="cfix-table";
+  const thead=document.createElement("thead"); const trh=document.createElement("tr");
+  columns.forEach(c=>{ const th=document.createElement("th"); th.textContent=c; trh.append(th); });
+  thead.append(trh); t.append(thead);
+  const tb=document.createElement("tbody");
+  const metricColumns = columns.slice(1);
+  for(const r of ensureArray(table?.rows)){
+    const tr=document.createElement("tr");
+    const td0=document.createElement("td"); td0.className="metric"; td0.textContent=r.label || ""; tr.append(td0);
+    metricColumns.forEach(col=>{
+      const td=document.createElement("td"); td.className="num";
+      const benchAlias = col === columns[columns.length-1] ? (r.SPX ?? r["S&P 500 Avg"]) : undefined;
+      const raw = r[col] ?? benchAlias;
+      td.textContent = r.type==="pct"?pct(raw) :
+        r.type==="x"?xfmt(raw) :
+        r.type==="moneyB"?`${money(raw)}B` : money(raw);
+      tr.append(td);
+    });
+    tb.append(tr);
+  }
+  t.append(tb); root.append(t);
+}
+
+const THEME={
+  paper_bgcolor:"#fff", plot_bgcolor:"#fff",
+  font:{family:"Inter, Open Sans, Roboto", color:"#003366", size:12},
+  xaxis:{gridcolor:"#E6E9EF", zeroline:false},
+  yaxis:{gridcolor:"#E6E9EF", zeroline:false},
+  legend:{orientation:"h", y:1.16, x:1.0, xanchor:"right", font:{size:10}},
+  margin:{l:48,r:36,t:24,b:36}
+};
+
+function plotMultiLine(div, years, series, yTitle){
+  const node=document.getElementById(div); if (!node) return;
+  const yr = ensureArray(years);
+  const entries = Object.entries(series || {}).filter(([,v])=>ensureArray(v).length);
+  if (!entries.length || !yr.length){
+    node.innerHTML = "<div class='cfi-error'>No data available</div>";
+    return;
+  }
+  const traces = entries.map(([name,arr])=>({type:"scatter", x:yr, y:arr, mode:"lines", name}));
+  Plotly.newPlot(node, traces, {...THEME, yaxis:{...THEME.yaxis,title:yTitle}}, {displayModeBar:false,responsive:true});
+}
+
+function plotFootball(div, football){
+  const node=document.getElementById(div); if (!node) return;
+  const rows = (football || []).filter(entry => Array.isArray(entry?.ranges) && entry.ranges.length);
+  if (!rows.length){
+    node.innerHTML = "<div class='cfi-error'>No valuation ranges</div>";
+    return;
+  }
+  const traces=[]; let y=0; const ticks=[];
+  rows.forEach(comp=>{
+    comp.ranges.forEach(r=>{
+      traces.push({type:"scatter", mode:"lines", x:[r.lo,r.hi], y:[y,y], line:{width:6,color:"#003366"}, name:`${comp.ticker} — ${r.name}`});
+      ticks.push(`${comp.ticker} • ${r.name}`); y+=1;
+    });
+    y+=0.5;
+  });
+  Plotly.newPlot(node, traces, {
+    ...THEME,
+    xaxis:{...THEME.xaxis,title:"$/Share"},
+    yaxis:{showgrid:false, tickmode:"array", tickvals:[...Array(traces.length + rows.length).keys()], ticktext:ticks}
+  }, {displayModeBar:false,responsive:true});
+}
+
+function plotPeerScatter(div, pts){
+  const node=document.getElementById(div); if (!node) return;
+  const data=(pts || []).filter(p=>typeof p?.x==="number" && typeof p?.y==="number");
+  if (!data.length){
+    node.innerHTML = "<div class='cfi-error'>No peer data</div>";
+    return;
+  }
+  const trace={type:"scatter", mode:"markers+text",
+    x:data.map(d=>d.x), y:data.map(d=>d.y), text:data.map(d=>d.ticker), textposition:"top center",
+    marker:{size:data.map(d=>Math.sqrt(Math.max(d.size || 1,1))*2.2), color:"#003366", opacity:0.85}};
+  Plotly.newPlot(node, [trace], {...THEME, xaxis:{...THEME.xaxis,title:"Net margin (%)"}, yaxis:{...THEME.yaxis,title:"ROE (%)"}}, {displayModeBar:false,responsive:true});
+}
+
+function plotValSummary(div, cases, byTicker, order){
+  const node=document.getElementById(div); if (!node) return;
+  const tickers = (order && order.length ? order : Object.keys(byTicker || {})).filter(t => Array.isArray(byTicker?.[t]));
+  if (!tickers.length || !ensureArray(cases).length){
+    node.innerHTML = "<div class='cfi-error'>No valuation summary</div>";
+    return;
+  }
+  const traces = tickers.map(t=>({type:"bar", x:cases, y:byTicker[t], name:t}));
+  Plotly.newPlot(node, traces, {...THEME, yaxis:{...THEME.yaxis,title:"$/Share"}}, {displayModeBar:false,responsive:true});
+}
+
+window.CFIX = {
+  render(payload){
+    document.getElementById("peerset").textContent = payload.meta?.peerset || "";
+    document.getElementById("date").textContent = payload.meta?.date || "";
+
+    const tickers = ensureArray(payload.meta?.tickers).slice(0,3);
+    autoStripLabels(tickers, {...payload.meta?.companies, benchmark: payload.meta?.benchmark});
+
+    renderKV("kpiA", payload.cards?.[tickers[0]] || payload.cards?.AAPL || {});
+    renderKV("kpiB", payload.cards?.[tickers[1]] || payload.cards?.MSFT || {});
+    renderKV("kpiC", payload.cards?.[tickers[2]] || payload.cards?.AMZN || {});
+    renderKV("kpiBench", payload.cards?.SP500 || payload.cards?.SPX || payload.cards?.BENCH || {});
+
+    renderTable("tbl", payload.table);
+    plotFootball("football", payload.football || []);
+    plotMultiLine("rev", payload.series?.years || [], payload.series?.revenue || {}, "Revenue ($B)");
+    plotMultiLine("ebitda", payload.series?.years || [], payload.series?.ebitda || {}, "EBITDA ($B)");
+    plotPeerScatter("scatter", payload.scatter || []);
+
+    const valSummary = {...(payload.valSummary || {})};
+    const cases = ensureArray(valSummary.case);
+    delete valSummary.case;
+    plotValSummary("vals", cases, valSummary, tickers);
+  }
+};
+
+const DEMO_PAYLOAD={
+  meta:{ date:"2025-10-19", peerset:"AAPL vs MSFT vs AMZN • S&P 500 Avg", tickers:["AAPL","MSFT","AMZN"], companies:{AAPL:"Apple Inc.",MSFT:"Microsoft Corp.",AMZN:"Amazon.com, Inc."}, benchmark:"S&P 500 Avg" },
+  cards:{
+    AAPL:{ Price:"$226.10", "Revenue (FY23 $B)":"383.3", "Net margin":"28.6%", ROE:"126.6%", "P/E (ttm)":"45.3×" },
+    MSFT:{ Price:"$420.50", "Revenue (FY23 $B)":"211.9", "Net margin":"35.3%", ROE:"47.2%", "P/E (ttm)":"43.7×" },
+    AMZN:{ Price:"$175.50", "Revenue (FY23 $B)":"574.8", "Net margin":"12.3%", ROE:"11.6%", "P/E (ttm)":"112.0×" },
+    SP500:{ "Revenue (Avg $B)":"18.3", "Net margin":"12.3%", ROE:"17.6%", "P/E (ttm)":"22.0×" }
+  },
+  table:{
+    columns:["Metric","AAPL","MSFT","AMZN","S&P 500 Avg"],
+    rows:[
+      {label:"Revenue (FY23 $B)", AAPL:383.3, MSFT:211.9, AMZN:574.8, "S&P 500 Avg":18.3, type:"moneyB"},
+      {label:"EBITDA margin", AAPL:31.6, MSFT:41.8, AMZN:17.6, "S&P 500 Avg":22.0, type:"pct"},
+      {label:"Net margin", AAPL:28.6, MSFT:41.6, AMZN:12.3, "S&P 500 Avg":12.3, type:"pct"},
+      {label:"ROE", AAPL:126.6, MSFT:42.7, AMZN:11.6, "S&P 500 Avg":17.6, type:"pct"},
+      {label:"P/E (ttm)", AAPL:45.3, MSFT:43.7, AMZN:112.0, "S&P 500 Avg":22.0, type:"x"},
+      {label:"EV/EBITDA (ttm)", AAPL:37.0, MSFT:43.0, AMZN:56.0, "S&P 500 Avg":11.5, type:"x"},
+      {label:"Debt/Equity", AAPL:5.0, MSFT:1.0, AMZN:3.0, "S&P 500 Avg":1.3, type:"x"}
+    ]
+  },
+  football:[
+    {ticker:"AAPL", ranges:[{name:"DCF",lo:180,hi:260},{name:"Comps",lo:205,hi:240},{name:"Market",lo:226,hi:226}]},
+    {ticker:"MSFT", ranges:[{name:"DCF",lo:420,hi:520},{name:"Comps",lo:450,hi:500},{name:"Market",lo:420,hi:420}]},
+    {ticker:"AMZN", ranges:[{name:"DCF",lo:160,hi:240},{name:"Comps",lo:170,hi:230},{name:"Market",lo:176,hi:176}]}
+  ],
+  series:{
+    years:[2019,2020,2021,2022,2023],
+    revenue:{ AAPL:[260,274,366,394,383], MSFT:[126,143,168,211,212], AMZN:[281,386,470,514,575] },
+    ebitda:{ AAPL:[31,35,43,47,46], MSFT:[57,73,95,112,118], AMZN:[37,48,56,61,72] }
+  },
+  scatter:[
+    {ticker:"AAPL",x:28.6,y:126.6,size:383.3},
+    {ticker:"MSFT",x:41.6,y:47.2,size:211.9},
+    {ticker:"AMZN",x:12.3,y:11.6,size:574.8},
+    {ticker:"S&P 500 Avg",x:12.3,y:17.6,size:18.3}
+  ],
+  valSummary:{
+    case:["DCF-Bull","DCF-Base","DCF-Bear","Comps","Market"],
+    AAPL:[260,220,190,230,226],
+    MSFT:[520,460,400,480,420],
+    AMZN:[240,200,160,210,176]
+  }
+};
+
+(async function bootstrap(){
+  try{
+    const response = await fetch("/api/dashboard/cfi-compare", { headers:{Accept:"application/json"} });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    window.CFIX.render(payload);
+  }catch(err){
+    console.warn("Falling back to demo payload:", err);
+    window.CFIX.render(DEMO_PAYLOAD);
+  }
+})();
+</script>
+</body>
+</html>

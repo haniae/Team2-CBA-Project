@@ -5926,6 +5926,79 @@ const DEMO_CFI_PAYLOAD = {
   },
 };
 
+const DEMO_CFIX_PAYLOAD = {
+  meta: {
+    date: "2025-10-19",
+    peerset: "Apple Inc. (AAPL) vs Microsoft Corp. (MSFT) vs Amazon.com, Inc. (AMZN) vs S&P 500 Avg",
+    tickers: ["AAPL", "MSFT", "AMZN"],
+    companies: { AAPL: "Apple Inc.", MSFT: "Microsoft Corp.", AMZN: "Amazon.com, Inc." },
+    benchmark: "S&P 500 Avg",
+  },
+  cards: {
+    AAPL: {
+      Price: "$226.10",
+      "Revenue (FY23 $B)": "383.3",
+      "Net margin": "28.6%",
+      ROE: "126.6%",
+      "P/E (ttm)": "45.3×",
+    },
+    MSFT: {
+      Price: "$420.50",
+      "Revenue (FY23 $B)": "211.9",
+      "Net margin": "35.3%",
+      ROE: "47.2%",
+      "P/E (ttm)": "43.7×",
+    },
+    AMZN: {
+      Price: "$175.50",
+      "Revenue (FY23 $B)": "574.8",
+      "Net margin": "5.3%",
+      ROE: "11.6%",
+      "P/E (ttm)": "112.0×",
+    },
+    SP500: {
+      "Revenue (Avg $B)": "18.3",
+      "Net margin": "12.3%",
+      ROE: "17.6%",
+      "P/E (ttm)": "22.0×",
+    },
+  },
+  table: {
+    columns: ["Metric", "AAPL", "MSFT", "AMZN", "S&P 500 Avg"],
+    rows: [
+      { label: "Revenue (FY23 $B)", AAPL: 383.3, MSFT: 211.9, AMZN: 574.8, SPX: 18.3, type: "moneyB" },
+      { label: "EBITDA margin", AAPL: 31.6, MSFT: 41.8, AMZN: 17.6, SPX: 22.0, type: "pct" },
+      { label: "Net margin", AAPL: 28.6, MSFT: 41.6, AMZN: 12.3, SPX: 12.3, type: "pct" },
+      { label: "ROE", AAPL: 126.6, MSFT: 42.7, AMZN: 4.8, SPX: 17.6, type: "pct" },
+      { label: "P/E (ttm)", AAPL: 45.3, MSFT: 43.7, AMZN: 112.0, SPX: 22.0, type: "x" },
+      { label: "EV/EBITDA (ttm)", AAPL: 37.0, MSFT: 43.0, AMZN: 56.0, SPX: 11.5, type: "x" },
+      { label: "Debt/Equity", AAPL: 5.0, MSFT: 1.0, AMZN: 3.0, SPX: 1.3, type: "x" },
+    ],
+  },
+  football: [
+    { ticker: "AAPL", ranges: [{ name: "DCF", lo: 135, hi: 210 }, { name: "Comps", lo: 160, hi: 220 }, { name: "Market", lo: 226, hi: 226 }] },
+    { ticker: "MSFT", ranges: [{ name: "DCF", lo: 350, hi: 480 }, { name: "Comps", lo: 380, hi: 460 }, { name: "Market", lo: 420, hi: 420 }] },
+    { ticker: "AMZN", ranges: [{ name: "DCF", lo: 160, hi: 240 }, { name: "Comps", lo: 170, hi: 230 }, { name: "Market", lo: 176, hi: 176 }] },
+  ],
+  series: {
+    years: [2019, 2020, 2021, 2022, 2023],
+    revenue: { AAPL: [260, 274, 366, 394, 383], MSFT: [126, 143, 168, 211, 212], AMZN: [281, 386, 470, 514, 575] },
+    ebitda: { AAPL: [31, 35, 43, 47, 46], MSFT: [57, 73, 95, 112, 118], AMZN: [37, 48, 56, 61, 72] },
+  },
+  scatter: [
+    { ticker: "AAPL", x: 28.6, y: 126.6, size: 383.3 },
+    { ticker: "MSFT", x: 41.6, y: 47.2, size: 211.9 },
+    { ticker: "AMZN", x: 12.3, y: 11.6, size: 574.8 },
+    { ticker: "S&P Avg", x: 12.3, y: 17.6, size: 18.3 },
+  ],
+  valSummary: {
+    case: ["DCF-Bull", "DCF-Base", "DCF-Bear", "Comps", "Market"],
+    AAPL: [250, 210, 180, 225, 226],
+    MSFT: [520, 460, 400, 480, 420],
+    AMZN: [240, 200, 160, 210, 176],
+  },
+};
+
 
 
 async function showCfiDashboard(options = {}) {
@@ -5977,33 +6050,92 @@ async function showCfiDashboard(options = {}) {
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const toolbar =
-    document.querySelector("[data-view-tabs]") ||
-    document.querySelector(".utility-nav") ||
-    document.querySelector(".top-bar-actions");
-  if (!toolbar) {
+async function fetchCfiComparePayload(options = {}) {
+  if (options.payload) {
+    return options.payload;
+  }
+  const params = new URLSearchParams();
+  if (options.tickers) {
+    const tickers = Array.isArray(options.tickers) ? options.tickers : [options.tickers];
+    if (tickers.length) {
+      params.set("tickers", tickers.join(","));
+    }
+  }
+  if (options.benchmark) {
+    params.set("benchmark", options.benchmark);
+  }
+  if (options.date) {
+    params.set("date", options.date);
+  }
+  const url = `/api/dashboard/cfi-compare${params.toString() ? `?${params.toString()}` : ""}`;
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    throw new Error(`CFI Compare fetch failed (${response.status})`);
+  }
+  return response.json();
+}
+
+async function loadCfiCompareMarkup(host) {
+  const response = await fetch("cfi_compare.html", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to load CFI Compare layout.");
+  }
+  host.innerHTML = await response.text();
+}
+
+async function showCfiCompareDashboard(options = {}) {
+  const host = resolveDashboardHost();
+  if (!host) {
+    throw new Error("Unable to resolve dashboard host container.");
+  }
+  host.innerHTML = '<div class="cfi-loading">Loading CFI Compare dashboard...</div>';
+  try {
+    await loadCfiCompareMarkup(host);
+    await ensureStylesheetOnce("cfi-compare-styles", "cfi_compare.css");
+    await ensurePlotlyLoaded();
+    await ensureScriptOnce("cfi-compare-script", "cfi_compare.js");
+  } catch (error) {
+    console.error(error);
+    host.innerHTML =
+      '<div class="cfi-error">Unable to load CFI Compare dashboard layout. Check console for details.</div>';
+    if (typeof showToast === "function") {
+      showToast("Unable to load CFI Compare dashboard.", "error");
+    }
     return;
   }
-  if (!toolbar.querySelector("[data-action='cfi-dashboard']")) {
-    const mainButton = document.createElement("button");
-    mainButton.type = "button";
-    mainButton.dataset.action = "cfi-dashboard";
-    mainButton.className = "utility-tab";
-    mainButton.textContent = "CFI Dashboard";
-    mainButton.addEventListener("click", () => showCfiDashboard().catch(() => {}));
-    toolbar.appendChild(mainButton);
+
+  let payload = null;
+  try {
+    payload = await fetchCfiComparePayload(options);
+  } catch (error) {
+    console.warn("CFI Compare dashboard fetch failed, falling back to demo payload.", error);
   }
-  if (!toolbar.querySelector("[data-action='cfi-dense']")) {
-    const denseButton = document.createElement("button");
-    denseButton.type = "button";
-    denseButton.dataset.action = "cfi-dense";
-    denseButton.className = "utility-tab";
-    denseButton.textContent = "CFI Dense";
-    denseButton.addEventListener("click", () => showCfiDenseDashboard().catch(() => {}));
-    toolbar.appendChild(denseButton);
+
+  if (!payload || typeof payload !== "object") {
+    payload = DEMO_CFIX_PAYLOAD;
   }
+
+  try {
+    if (window.CFIX && typeof window.CFIX.render === "function") {
+      window.CFIX.render(payload);
+      window.__cfiCompareLastPayload = payload;
+    } else {
+      throw new Error("CFI Compare renderer unavailable.");
+    }
+  } catch (error) {
+    console.error(error);
+    host.innerHTML =
+      '<div class="cfi-error">Unable to render CFI Compare dashboard. Check console for details.</div>';
+    if (typeof showToast === "function") {
+      showToast("Unable to render CFI Compare dashboard.", "error");
+    }
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  showCfiCompareDashboard().catch(() => {});
 });
 
 window.showCfiDenseDashboard = showCfiDenseDashboard;
 window.showCfiDashboard = showCfiDashboard;
+window.showCfiCompareDashboard = showCfiCompareDashboard;

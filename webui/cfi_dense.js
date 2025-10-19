@@ -25,7 +25,12 @@ window.CFI_DENSE = (function () {
     const formatted = scaled.toFixed(decimals).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
     return `${sign}$${formatted}${unit}`;
   };
-  const fmtPct = (n) => (n === null || n === undefined || Number.isNaN(Number(n)) ? "—" : `${Number(n).toFixed(1)}%`);
+  const fmtPct = (n) => {
+    if (n === null || n === undefined || Number.isNaN(Number(n))) return "—";
+    const percent = Number(n) * 100;
+    const decimals = Math.abs(percent) >= 10 ? 1 : 2;
+    return `${percent.toFixed(decimals)}%`;
+  };
   const fmtX = (n) => (n === null || n === undefined || Number.isNaN(Number(n)) ? "—" : `${Number(n).toFixed(1)}×`);
   const fmtNum = (n) => (n === null || n === undefined || Number.isNaN(Number(n)) ? "—" : Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 }));
   const fmtDate = (value) => {

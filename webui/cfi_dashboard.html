@@ -12,38 +12,42 @@
 <body>
   <div id="cfi-root" class="cfi-grid">
     <div class="cfi-panel cfi-header" data-area="header">
-      <div class="cfi-brand-block">
-        <div class="brand-name" id="cfi-brand"></div>
-        <div class="brand-company" id="cfi-company"></div>
-        <div class="brand-ticker" id="cfi-ticker"></div>
+      <div class="header-top">
+        <div class="brand-stack">
+          <div class="brand-row">
+            <span class="brand-badge" id="cfi-brand"></span>
+            <span class="brand-ticker" id="cfi-ticker"></span>
+          </div>
+          <div class="brand-company" id="cfi-company"></div>
+        </div>
+        <div class="header-title">
+          <h1>Financial Model Dashboard</h1>
+          <div class="header-meta">
+            <div class="meta-item">
+              <span class="meta-label">Recommendation</span>
+              <span class="meta-value pill" id="cfi-rec"></span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Target Price</span>
+              <span class="meta-value" id="cfi-target"></span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Live Scenario</span>
+              <span class="meta-value" id="cfi-scenario"></span>
+            </div>
+          </div>
+        </div>
+        <div class="header-side">
+          <div class="meta-item">
+            <span class="meta-label">Date</span>
+            <span class="meta-value" id="cfi-date"></span>
+          </div>
+          <div class="cfi-logo">CFI</div>
+        </div>
       </div>
-      <div class="cfi-header-center">
-        <h1>Financial Model Dashboard</h1>
-        <div class="cfi-summary">
-          <div class="summary-item">
-            <span class="summary-label">Recommendation</span>
-            <span class="summary-value pill" id="cfi-rec"></span>
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">Target Price</span>
-            <span class="summary-value" id="cfi-target"></span>
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">Live Scenario</span>
-            <span class="summary-value" id="cfi-scenario"></span>
-          </div>
-        </div>
-        <div class="cfi-subline">
-          <span id="cfi-website"></span>
-          <span id="cfi-report-tag"></span>
-        </div>
-      </div>
-      <div class="cfi-header-meta">
-        <div class="meta-item">
-          <span class="summary-label">Date</span>
-          <span class="summary-value" id="cfi-date"></span>
-        </div>
-        <div class="cfi-logo">CFI</div>
+      <div class="header-subline">
+        <span id="cfi-website"></span>
+        <span id="cfi-report-tag"></span>
       </div>
     </div>
 

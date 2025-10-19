@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import uuid
@@ -431,6 +432,199 @@ def _display_ticker_symbol(symbol: str) -> str:
     return symbol
 
 
+def _metric_year(record: Optional[database.MetricRecord]) -> Optional[int]:
+    """Extract a fiscal year from a metric snapshot."""
+    if record is None:
+        return None
+    if record.end_year:
+        return int(record.end_year)
+    if record.start_year:
+        return int(record.start_year)
+    if record.period:
+        matches = re.findall(r"\d{4}", record.period)
+        if matches:
+            try:
+                return int(matches[-1])
+            except ValueError:
+                return None
+    return None
+
+
+def _format_billions(value: Optional[float]) -> Optional[float]:
+    """Scale raw currency values to billions with compact precision."""
+    if value is None:
+        return None
+    scaled = value / 1_000_000_000
+    magnitude = abs(scaled)
+    if magnitude >= 100:
+        return round(scaled)
+    if magnitude >= 10:
+        return round(scaled, 1)
+    return round(scaled, 2)
+
+
+def _format_percent(value: Optional[float]) -> Optional[float]:
+    """Convert fractional metrics into percentage values."""
+    if value is None:
+        return None
+    return round(value * 100, 1)
+
+
+def _lookup_company_name(ticker: str) -> Optional[str]:
+    """Fetch a human-readable company name for the supplied ticker."""
+    settings = get_settings()
+    try:
+        with database.temporary_connection(settings.database_path) as connection:
+            row = connection.execute(
+                """
+                SELECT company_name
+                FROM ticker_aliases
+                WHERE ticker = ? AND company_name <> ''
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (ticker,),
+            ).fetchone()
+            if row and row[0]:
+                return str(row[0])
+            row = connection.execute(
+                """
+                SELECT company_name
+                FROM financial_facts
+                WHERE ticker = ? AND company_name <> ''
+                ORDER BY ingested_at DESC
+                LIMIT 1
+                """,
+                (ticker,),
+            ).fetchone()
+            if row and row[0]:
+                return str(row[0])
+    except Exception:  # pragma: no cover - best-effort lookup
+        return None
+    return None
+
+
+def _latest_metric_value(
+    latest: Dict[str, database.MetricRecord],
+    *names: str,
+) -> Optional[float]:
+    """Return the newest available metric value matching any of the supplied aliases."""
+    for name in names:
+        record = latest.get(name)
+        if record and record.value is not None:
+            try:
+                return float(record.value)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def _round_two(value: Optional[float]) -> Optional[float]:
+    """Round a float to two decimal places when present."""
+    if value is None:
+        return None
+    return round(value, 2)
+
+
+def _valuation_per_share(
+    latest: Dict[str, database.MetricRecord],
+) -> Optional[Dict[str, Optional[float]]]:
+    """Derive simple valuation scenarios (per share) from available metrics."""
+    shares = _latest_metric_value(latest, "shares_outstanding", "weighted_avg_diluted_shares")
+    if not shares or shares <= 0:
+        return None
+
+    net_income = _latest_metric_value(latest, "net_income")
+    pe_ratio = _latest_metric_value(latest, "pe_ratio")
+    ebitda = _latest_metric_value(latest, "ebitda")
+    free_cash_flow = _latest_metric_value(latest, "free_cash_flow")
+    ev_ebitda = _latest_metric_value(latest, "ev_ebitda")
+    cash = _latest_metric_value(latest, "cash_and_cash_equivalents", "cash")
+    total_debt = _latest_metric_value(latest, "total_debt", "long_term_debt")
+
+    eps = None
+    if net_income is not None:
+        eps = net_income / shares
+
+    market_price = None
+    if eps is not None and pe_ratio not in (None, 0):
+        market_price = eps * pe_ratio
+
+    fcf_per_share = None
+    if free_cash_flow is not None:
+        fcf_per_share = free_cash_flow / shares
+
+    comps_price = None
+    if ebitda is not None and ev_ebitda not in (None, 0):
+        enterprise_value = ebitda * ev_ebitda
+        net_debt = (total_debt or 0.0) - (cash or 0.0)
+        equity_value = enterprise_value - net_debt
+        comps_price = equity_value / shares if shares else None
+
+    if market_price is None:
+        market_price = comps_price
+
+    if fcf_per_share is None and market_price is not None:
+        # Back into a proxy FCF multiple when only market pricing exists
+        fcf_per_share = market_price / 18.0
+
+    if market_price is None and fcf_per_share is None:
+        return None
+
+    dcf_base = None
+    if fcf_per_share is not None:
+        dcf_base = fcf_per_share * 18.0
+
+    if dcf_base is None:
+        dcf_base = market_price
+
+    if dcf_base is None:
+        return None
+
+    dcf_bull = dcf_base * 1.15
+    dcf_bear = dcf_base * 0.85
+    comps_value = comps_price or market_price
+
+    return {
+        "dcf_base": _round_two(dcf_base),
+        "dcf_bull": _round_two(dcf_bull),
+        "dcf_bear": _round_two(dcf_bear),
+        "comps": _round_two(comps_value),
+        "market": _round_two(market_price),
+    }
+
+
+def _collect_series(
+    records: Iterable[database.MetricRecord],
+    metric: str,
+    *,
+    scale_billions: bool = False,
+) -> Dict[int, float]:
+    """Return a year -> value mapping for a metric."""
+    series: Dict[int, float] = {}
+    for record in records:
+        if record.metric != metric:
+            continue
+        year = _metric_year(record)
+        if year is None or record.value is None:
+            continue
+        value = float(record.value)
+        if scale_billions:
+            value = value / 1_000_000_000
+        series[year] = value
+    return series
+
+
+def _format_number(value: Optional[float], decimals: int = 1) -> Optional[str]:
+    """Format a float with trimmed trailing zeroes."""
+    if value is None:
+        return None
+    formatted = f"{value:.{decimals}f}"
+    if "." in formatted:
+        formatted = formatted.rstrip("0").rstrip(".")
+    return formatted
+
+
 # ----- Routes -----------------------------------------------------------------
 
 @app.get("/")
@@ -799,6 +993,338 @@ def compare(
         comparison[metric] = remapped
 
     return {"tickers": display_tickers, "comparison": comparison}
+
+
+@app.get("/api/dashboard/cfi-compare")
+def cfi_compare_dashboard(
+    tickers: Optional[str] = Query(
+        None,
+        description="Comma separated list of up to three tickers (defaults to AAPL, MSFT, AMZN).",
+    ),
+    benchmark: Optional[str] = Query(
+        None,
+        description="Override the benchmark label (defaults to S&P 500 Avg).",
+    ),
+) -> Dict[str, Any]:
+    """Return the structured payload required by the CFIX dashboard."""
+
+    requested = [
+        part.strip()
+        for part in (tickers.split(",") if tickers else [])
+        if part and part.strip()
+    ]
+    if not requested:
+        requested = ["AAPL", "MSFT", "AMZN"]
+    requested = requested[:3]
+    if not requested:
+        raise HTTPException(status_code=400, detail="At least one ticker is required.")
+
+    engine = get_engine()
+
+    canonical = [_normalise_ticker_symbol(ticker) for ticker in requested]
+    display_order = [_display_ticker_symbol(ticker) for ticker in canonical]
+
+    records_by_ticker: Dict[str, List[database.MetricRecord]] = {}
+    latest_by_ticker: Dict[str, Dict[str, database.MetricRecord]] = {}
+    valuations_by_ticker: Dict[str, Optional[Dict[str, Optional[float]]]] = {}
+    for ticker in canonical:
+        records = engine.get_metrics(ticker)
+        if not records:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No metric snapshots available for {_display_ticker_symbol(ticker)}.",
+            )
+        records_by_ticker[ticker] = records
+        latest = engine._select_latest_records(records, span_fn=engine._period_span)
+        latest_by_ticker[ticker] = latest
+        valuations_by_ticker[ticker] = _valuation_per_share(latest)
+
+    benchmark_label = benchmark or engine.benchmark_label()
+    metric_scope = {
+        "revenue",
+        "net_margin",
+        "return_on_equity",
+        "pe_ratio",
+        "ebitda_margin",
+        "ev_ebitda",
+        "debt_to_equity",
+        "ebitda",
+        "free_cash_flow",
+        "net_income",
+        "shares_outstanding",
+        "cash_and_cash_equivalents",
+        "total_debt",
+        "long_term_debt",
+    }
+    benchmark_metrics = engine.compute_benchmark_metrics(metric_scope)
+
+    company_names = {
+        name: (_lookup_company_name(symbol) or name)
+        for symbol, name in zip(canonical, display_order)
+    }
+
+    cards: Dict[str, Dict[str, str]] = {}
+    for symbol, display in zip(canonical, display_order):
+        latest = latest_by_ticker[symbol]
+        valuation = valuations_by_ticker[symbol] or {}
+        card: Dict[str, str] = {}
+
+        if valuation.get("market") is not None:
+            card["Price"] = f"${_format_number(valuation['market'], 2)}"
+
+        revenue_record = latest.get("revenue")
+        revenue_billions = _format_billions(
+            revenue_record.value if revenue_record and revenue_record.value is not None else None
+        )
+        if revenue_billions is not None:
+            year = _metric_year(revenue_record)
+            if year:
+                label = f"Revenue (FY{str(year)[-2:]} $B)"
+            else:
+                label = "Revenue ($B)"
+            card[label] = _format_number(revenue_billions, 1)
+
+        net_margin_pct = _format_percent(_latest_metric_value(latest, "net_margin"))
+        if net_margin_pct is not None:
+            card["Net margin"] = f"{_format_number(net_margin_pct, 1)}%"
+
+        roe_pct = _format_percent(_latest_metric_value(latest, "return_on_equity", "roe"))
+        if roe_pct is not None:
+            card["ROE"] = f"{_format_number(roe_pct, 1)}%"
+
+        pe_ratio = _latest_metric_value(latest, "pe_ratio")
+        if pe_ratio is not None:
+            card["P/E (ttm)"] = f"{_format_number(pe_ratio, 2)}×"
+
+        cards[display] = card
+
+    benchmark_card: Dict[str, str] = {}
+    bench_revenue = benchmark_metrics.get("revenue")
+    bench_revenue_b = _format_billions(bench_revenue.value if bench_revenue and bench_revenue.value is not None else None)
+    if bench_revenue_b is not None:
+        benchmark_card["Revenue (Avg $B)"] = _format_number(bench_revenue_b, 1)
+
+    bench_net_margin = _format_percent(_latest_metric_value(benchmark_metrics, "net_margin"))
+    if bench_net_margin is not None:
+        benchmark_card["Net margin"] = f"{_format_number(bench_net_margin, 1)}%"
+
+    bench_roe = _format_percent(_latest_metric_value(benchmark_metrics, "return_on_equity"))
+    if bench_roe is not None:
+        benchmark_card["ROE"] = f"{_format_number(bench_roe, 1)}%"
+
+    bench_pe = _latest_metric_value(benchmark_metrics, "pe_ratio")
+    if bench_pe is not None:
+        benchmark_card["P/E (ttm)"] = f"{_format_number(bench_pe, 2)}×"
+
+    cards["SP500"] = benchmark_card
+
+    peerset_parts: List[str] = []
+    for display in display_order:
+        name = company_names.get(display)
+        if name and name.strip() and name.upper() != display.upper():
+            peerset_parts.append(f"{name} ({display})")
+        else:
+            peerset_parts.append(display)
+    if benchmark_label:
+        peerset_parts.append(benchmark_label)
+
+    meta = {
+        "date": datetime.utcnow().date().isoformat(),
+        "peerset": " vs ".join(peerset_parts),
+        "tickers": display_order,
+        "companies": company_names,
+        "benchmark": benchmark_label,
+    }
+
+    table_columns = ["Metric", *display_order, benchmark_label]
+    table_rows: List[Dict[str, Any]] = []
+
+    table_config = [
+        {"metric": "revenue", "label": "Revenue", "type": "moneyB"},
+        {"metric": "ebitda_margin", "label": "EBITDA margin", "type": "pct"},
+        {"metric": "net_margin", "label": "Net margin", "type": "pct"},
+        {"metric": "return_on_equity", "label": "ROE", "type": "pct"},
+        {"metric": "pe_ratio", "label": "P/E (ttm)", "type": "x"},
+        {"metric": "ev_ebitda", "label": "EV/EBITDA (ttm)", "type": "x"},
+        {"metric": "debt_to_equity", "label": "Debt/Equity", "type": "x"},
+    ]
+
+    for config in table_config:
+        metric_name = config["metric"]
+        row: Dict[str, Any] = {"label": config["label"], "type": config["type"]}
+
+        if metric_name == "revenue":
+            revenue_years = [
+                _metric_year(latest_by_ticker[symbol].get("revenue"))
+                for symbol in canonical
+                if latest_by_ticker[symbol].get("revenue")
+            ]
+            revenue_years = [year for year in revenue_years if year]
+            if revenue_years:
+                row["label"] = f"Revenue (FY{str(max(revenue_years))[-2:]} $B)"
+
+        for symbol, display in zip(canonical, display_order):
+            latest = latest_by_ticker[symbol]
+            value: Optional[float]
+            if config["type"] == "pct":
+                value = _format_percent(_latest_metric_value(latest, metric_name))
+            elif config["type"] == "moneyB":
+                value = _format_billions(_latest_metric_value(latest, metric_name))
+            else:
+                value = _latest_metric_value(latest, metric_name)
+                if value is not None:
+                    value = round(float(value), 2)
+            row[display] = value
+
+        bench_metric = benchmark_metrics.get(metric_name)
+        bench_value: Optional[float]
+        if config["type"] == "pct":
+            bench_value = _format_percent(_latest_metric_value(benchmark_metrics, metric_name))
+        elif config["type"] == "moneyB":
+            bench_value = _format_billions(bench_metric.value if bench_metric else None)
+        else:
+            bench_value = _latest_metric_value(benchmark_metrics, metric_name)
+            if bench_value is not None:
+                bench_value = round(float(bench_value), 2)
+        row[benchmark_label] = bench_value
+        row["SPX"] = bench_value
+        table_rows.append(row)
+
+    table = {"columns": table_columns, "rows": table_rows}
+
+    all_years: set[int] = set()
+    revenue_series_map: Dict[str, Dict[int, float]] = {}
+    ebitda_series_map: Dict[str, Dict[int, float]] = {}
+    for symbol, display in zip(canonical, display_order):
+        revenue_series = _collect_series(
+            records_by_ticker[symbol],
+            "revenue",
+            scale_billions=True,
+        )
+        ebitda_series = _collect_series(
+            records_by_ticker[symbol],
+            "ebitda",
+            scale_billions=True,
+        )
+        if revenue_series:
+            all_years.update(revenue_series.keys())
+        if ebitda_series:
+            all_years.update(ebitda_series.keys())
+        revenue_series_map[display] = revenue_series
+        ebitda_series_map[display] = ebitda_series
+
+    years = sorted(all_years)
+    if len(years) > 8:
+        years = years[-8:]
+
+    revenue_series_payload: Dict[str, List[Optional[float]]] = {}
+    ebitda_series_payload: Dict[str, List[Optional[float]]] = {}
+    for display in display_order:
+        revenue_data = revenue_series_map.get(display, {})
+        ebitda_data = ebitda_series_map.get(display, {})
+        revenue_series_payload[display] = [
+            _round_two(revenue_data.get(year)) if revenue_data.get(year) is not None else None
+            for year in years
+        ]
+        ebitda_series_payload[display] = [
+            _round_two(ebitda_data.get(year)) if ebitda_data.get(year) is not None else None
+            for year in years
+        ]
+
+    series = {
+        "years": years,
+        "revenue": revenue_series_payload,
+        "ebitda": ebitda_series_payload,
+    }
+
+    scatter: List[Dict[str, Any]] = []
+    for symbol, display in zip(canonical, display_order):
+        latest = latest_by_ticker[symbol]
+        net_margin_pct = _format_percent(_latest_metric_value(latest, "net_margin"))
+        roe_pct = _format_percent(_latest_metric_value(latest, "return_on_equity", "roe"))
+        revenue_billions = _format_billions(_latest_metric_value(latest, "revenue"))
+        if net_margin_pct is None or roe_pct is None:
+            continue
+        scatter.append(
+            {
+                "ticker": display,
+                "x": net_margin_pct,
+                "y": roe_pct,
+                "size": _round_two(revenue_billions) or 0.0,
+            }
+        )
+
+    bench_scatter_margin = _format_percent(_latest_metric_value(benchmark_metrics, "net_margin"))
+    bench_scatter_roe = _format_percent(_latest_metric_value(benchmark_metrics, "return_on_equity"))
+    bench_scatter_revenue = _format_billions(
+        benchmark_metrics.get("revenue").value if benchmark_metrics.get("revenue") else None
+    )
+    if bench_scatter_margin is not None and bench_scatter_roe is not None:
+        scatter.append(
+            {
+                "ticker": benchmark_label,
+                "x": bench_scatter_margin,
+                "y": bench_scatter_roe,
+                "size": _round_two(bench_scatter_revenue) or 0.0,
+            }
+        )
+
+    football: List[Dict[str, Any]] = []
+    val_summary_cases = ["DCF-Bull", "DCF-Base", "DCF-Bear", "Comps", "Market"]
+    val_summary: Dict[str, Any] = {"case": val_summary_cases}
+
+    for symbol, display in zip(canonical, display_order):
+        valuation = valuations_by_ticker.get(symbol)
+        if not valuation:
+            continue
+        ranges: List[Dict[str, Optional[float]]] = []
+        if valuation.get("dcf_base") is not None:
+            ranges.append(
+                {
+                    "name": "DCF",
+                    "lo": valuation.get("dcf_bear"),
+                    "hi": valuation.get("dcf_bull"),
+                }
+            )
+        if valuation.get("comps") is not None:
+            comps = valuation.get("comps")
+            if comps is not None:
+                ranges.append(
+                    {
+                        "name": "Comps",
+                        "lo": _round_two(comps * 0.95),
+                        "hi": _round_two(comps * 1.05),
+                    }
+                )
+        if valuation.get("market") is not None:
+            market_price = valuation.get("market")
+            ranges.append(
+                {
+                    "name": "Market",
+                    "lo": market_price,
+                    "hi": market_price,
+                }
+            )
+        if ranges:
+            football.append({"ticker": display, "ranges": ranges})
+        val_summary[display] = [
+            valuation.get("dcf_bull"),
+            valuation.get("dcf_base"),
+            valuation.get("dcf_bear"),
+            valuation.get("comps"),
+            valuation.get("market"),
+        ]
+
+    payload = {
+        "meta": meta,
+        "cards": cards,
+        "table": table,
+        "football": football,
+        "series": series,
+        "scatter": scatter,
+        "valSummary": val_summary,
+    }
+    return payload
 
 
 @app.get("/facts", response_model=FactsResponse)
