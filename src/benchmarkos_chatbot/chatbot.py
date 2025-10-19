@@ -2427,7 +2427,7 @@ class BenchmarkOSChatbot:
             return ""
 
         total = len(summary_fragments)
-        summary_sentence = "Summary: " + "; ".join(summary_fragments) + "."
+        summary_sentence = "; ".join(summary_fragments) + "."
 
         action_sentence = ""
         if leadership_counter:

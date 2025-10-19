@@ -5764,3 +5764,246 @@ function renderProgressSummary(tracker) {
   summary.append(list);
   body.prepend(summary);
 }
+
+async function ensureStylesheetOnce(id, href) {
+  if (document.getElementById(id)) {
+    return;
+  }
+  return new Promise((resolve, reject) => {
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = href;
+    link.onload = () => resolve();
+    link.onerror = () => reject(new Error(`Failed to load stylesheet ${href}`));
+    document.head.appendChild(link);
+  });
+}
+
+async function ensureScriptOnce(id, src) {
+  if (document.getElementById(id)) {
+    return;
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.id = id;
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Failed to load script ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+async function ensurePlotlyLoaded() {
+  if (window.Plotly) {
+    return;
+  }
+  await ensureScriptOnce("plotly-core", "https://cdn.plot.ly/plotly-2.32.0.min.js");
+}
+
+function resolveDashboardHost() {
+  return (
+    document.getElementById("utility-content") ||
+    document.querySelector(".standalone-content") ||
+    document.querySelector(".chat-panel")
+  );
+}
+
+async function fetchCfiDensePayload(options = {}) {
+  if (options.payload) {
+    return options.payload;
+  }
+  const params = new URLSearchParams();
+  if (options.ticker) {
+    params.set("ticker", options.ticker);
+  }
+  const url = `/api/dashboard/cfi-dense${params.toString() ? `?${params.toString()}` : ""}`;
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    throw new Error(`Dashboard fetch failed (${response.status})`);
+  }
+  return response.json();
+}
+
+async function loadCfiDenseMarkup(host) {
+  const response = await fetch("cfi_dense.html", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to load CFI Dense layout.");
+  }
+  host.innerHTML = await response.text();
+}
+
+async function showCfiDenseDashboard(options = {}) {
+  const host = resolveDashboardHost();
+  if (!host) {
+    throw new Error("Unable to resolve dashboard host container.");
+  }
+  host.innerHTML = '<div class="cfi-loading">Loading CFI dashboard...</div>';
+  try {
+    await loadCfiDenseMarkup(host);
+    await ensureStylesheetOnce("cfi-dense-styles", "cfi_dense.css");
+    await ensurePlotlyLoaded();
+    await ensureScriptOnce("cfi-dense-script", "cfi_dense.js");
+    const payload = await fetchCfiDensePayload(options);
+    if (window.CFI_DENSE && typeof window.CFI_DENSE.render === "function") {
+      window.CFI_DENSE.render(payload);
+      window.__cfiDenseLastPayload = payload;
+    } else {
+      throw new Error("CFI Dense renderer unavailable.");
+    }
+  } catch (error) {
+    console.error(error);
+    host.innerHTML =
+      '<div class="cfi-error">Unable to load CFI Dense dashboard. Check console for details.</div>';
+    if (typeof showToast === "function") {
+      showToast("Unable to load CFI Dense dashboard.", "error");
+    }
+  }
+}
+
+async function fetchCfiDashboardPayload(options = {}) {
+  if (options.payload) {
+    return options.payload;
+  }
+  const params = new URLSearchParams();
+  if (options.ticker) {
+    params.set("ticker", options.ticker);
+  }
+  const url = `/api/dashboard/cfi${params.toString() ? `?${params.toString()}` : ""}`;
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    throw new Error(`Dashboard fetch failed (${response.status})`);
+  }
+  return response.json();
+}
+
+async function loadCfiDashboardMarkup(host) {
+  const response = await fetch("cfi_dashboard.html", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to load CFI dashboard layout.");
+  }
+  host.innerHTML = await response.text();
+}
+
+const DEMO_CFI_PAYLOAD = {
+  meta: { company: "Amazon.com, Inc.", ticker: "AMZN", recommendation: "Buy", target_price: 2600, date: "2024-10-01" },
+  overview: { Exchange: "NASDAQ", Sector: "Internet & Direct Marketing Retail", HQ: "Seattle, WA", "Upside %": 18.3 },
+  key_stats: { Employees: 850000, Founded: 1994, CEO: "Andy Jassy", "Primary Industry": "E-commerce" },
+  market_data: { "Shares O/S (M)": 5100, "Market Cap ($B)": 1750, "Net Debt ($B)": 17.4, "Enterprise Value ($B)": 808.7 },
+  valuation_table: [
+    { Label: "Share Price", Market: 1755, DCF: 2024, Comps: 2100 },
+    { Label: "Enterprise Value ($B)", Market: 808.7, DCF: 891.7, Comps: 834.2 },
+  ],
+  key_financials: {
+    columns: [2019, 2020, 2021, 2022, 2023],
+    rows: [
+      { label: "Revenue", values: [280522, 386064, 469822, 513983, 574800] },
+      { label: "EBITDA (ex SBC)", values: [36931, 48020, 56523, 60820, 71500] },
+      { label: "Net income", values: [11588, 21331, 33364, -270, 30500] },
+      { label: "Net profit margin", values: [4.1, 5.5, 7.1, -0.1, 5.3], type: "percent" },
+      { label: "Free cash flow", values: [25329, 29620, 36284, 42262, 65489] },
+      { label: "EV/Revenue (×)", values: [3.2, 2.8, 2.3, 2.1, 1.9], type: "multiple" },
+      { label: "EV/EBITDA (×)", values: [18.0, 15.2, 13.5, 12.3, 11.0], type: "multiple" },
+    ],
+  },
+  charts: {
+    revenue_ev: { Year: [2019, 2020, 2021, 2022, 2023], Revenue: [280522, 386064, 469822, 513983, 574800], EV_Rev: [3.2, 2.8, 2.3, 2.1, 1.9] },
+    ebitda_ev: { Year: [2019, 2020, 2021, 2022, 2023], EBITDA: [36931, 48020, 56523, 60820, 71500], EV_EBITDA: [18.0, 15.2, 13.5, 12.3, 11.0] },
+    forecast: { Year: [2013, 2015, 2017, 2019, 2021, 2023, 2025, 2027, 2029], Bull: [400, 600, 900, 1200, 1500, 2100, 2400, 2700, 3000], Base: [380, 520, 800, 1100, 1400, 1850, 2050, 2250, 2450], Bear: [360, 480, 700, 950, 1200, 1600, 1700, 1850, 2000] },
+    valuation_bar: { Case: ["DCF - Consensus", "DCF - Bull", "DCF - Bear", "Comps", "52-Week Hi/Lo"], Value: [2921, 4136, 918, 2216, 1755] },
+  },
+  valuation_data: {
+    current: 1755,
+    notes: [
+      "Football Field Chart",
+      "DCF - Consensus Case",
+      "DCF - Bull Case",
+      "DCF - Bear Case",
+      "Comps",
+      "52-Week Hi/Lo",
+    ],
+  },
+};
+
+
+
+async function showCfiDashboard(options = {}) {
+  const host = resolveDashboardHost();
+  if (!host) {
+    throw new Error("Unable to resolve dashboard host container.");
+  }
+  host.innerHTML = '<div class="cfi-loading">Loading CFI dashboard...</div>';
+  try {
+    await loadCfiDashboardMarkup(host);
+    await ensureStylesheetOnce("cfi-dashboard-styles", "cfi_dashboard.css");
+    await ensurePlotlyLoaded();
+    await ensureScriptOnce("cfi-dashboard-script", "cfi_dashboard.js");
+  } catch (error) {
+    console.error(error);
+    host.innerHTML =
+      '<div class="cfi-error">Unable to load CFI dashboard layout. Check console for details.</div>';
+    if (typeof showToast === "function") {
+      showToast("Unable to load CFI dashboard.", "error");
+    }
+    return;
+  }
+
+  let payload = null;
+  try {
+    payload = await fetchCfiDashboardPayload(options);
+  } catch (error) {
+    console.warn('CFI dashboard fetch failed, falling back to demo payload.', error);
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    payload = DEMO_CFI_PAYLOAD;
+  }
+
+  try {
+    if (window.CFI && typeof window.CFI.render === 'function') {
+      window.CFI.render(payload);
+      window.__cfiDashboardLastPayload = payload;
+    } else {
+      throw new Error('CFI renderer unavailable.');
+    }
+  } catch (error) {
+    console.error(error);
+    host.innerHTML =
+      '<div class="cfi-error">Unable to render CFI dashboard. Check console for details.</div>';
+    if (typeof showToast === 'function') {
+      showToast('Unable to render CFI dashboard.', 'error');
+    }
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const toolbar =
+    document.querySelector("[data-view-tabs]") ||
+    document.querySelector(".utility-nav") ||
+    document.querySelector(".top-bar-actions");
+  if (!toolbar) {
+    return;
+  }
+  if (!toolbar.querySelector("[data-action='cfi-dashboard']")) {
+    const mainButton = document.createElement("button");
+    mainButton.type = "button";
+    mainButton.dataset.action = "cfi-dashboard";
+    mainButton.className = "utility-tab";
+    mainButton.textContent = "CFI Dashboard";
+    mainButton.addEventListener("click", () => showCfiDashboard().catch(() => {}));
+    toolbar.appendChild(mainButton);
+  }
+  if (!toolbar.querySelector("[data-action='cfi-dense']")) {
+    const denseButton = document.createElement("button");
+    denseButton.type = "button";
+    denseButton.dataset.action = "cfi-dense";
+    denseButton.className = "utility-tab";
+    denseButton.textContent = "CFI Dense";
+    denseButton.addEventListener("click", () => showCfiDenseDashboard().catch(() => {}));
+    toolbar.appendChild(denseButton);
+  }
+});
+
+window.showCfiDenseDashboard = showCfiDenseDashboard;
+window.showCfiDashboard = showCfiDashboard;

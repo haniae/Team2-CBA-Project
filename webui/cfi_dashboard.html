@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>CFI Dashboard — BenchmarkOS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="cfi_dashboard.css"/>
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+</head>
+<body>
+  <div id="cfi-root" class="cfi-grid">
+    <div class="cfi-panel cfi-header" data-area="header">
+      <div class="cfi-brand-block">
+        <div class="brand-name" id="cfi-brand"></div>
+        <div class="brand-company" id="cfi-company"></div>
+        <div class="brand-ticker" id="cfi-ticker"></div>
+      </div>
+      <div class="cfi-header-center">
+        <h1>Financial Model Dashboard</h1>
+        <div class="cfi-summary">
+          <div class="summary-item">
+            <span class="summary-label">Recommendation</span>
+            <span class="summary-value pill" id="cfi-rec"></span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Target Price</span>
+            <span class="summary-value" id="cfi-target"></span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Live Scenario</span>
+            <span class="summary-value" id="cfi-scenario"></span>
+          </div>
+        </div>
+        <div class="cfi-subline">
+          <span id="cfi-website"></span>
+          <span id="cfi-report-tag"></span>
+        </div>
+      </div>
+      <div class="cfi-header-meta">
+        <div class="meta-item">
+          <span class="summary-label">Date</span>
+          <span class="summary-value" id="cfi-date"></span>
+        </div>
+        <div class="cfi-logo">CFI</div>
+      </div>
+    </div>
+
+    <div class="cfi-panel" data-area="overview">
+      <div class="cfi-strip">Company Overview</div>
+      <div class="cfi-body tight">
+        <div class="overview-grid">
+          <div class="overview-column">
+            <h3>Price</h3>
+            <table class="overview-table" id="cfi-price-table"></table>
+          </div>
+          <div class="overview-column">
+            <h3>Key Stats</h3>
+            <table class="overview-table" id="cfi-stat-table"></table>
+          </div>
+          <div class="overview-column">
+            <h3>Market Data</h3>
+            <table class="overview-table" id="cfi-market-table"></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cfi-panel" data-area="valuation">
+      <div class="cfi-strip">Valuation</div>
+      <div class="cfi-body tight">
+        <div class="valuation-grid">
+          <table class="valuation-table" id="cfi-valuation-table"></table>
+          <ul class="valuation-list" id="cfi-valuation-notes"></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="cfi-panel" data-area="keyfin">
+      <div class="cfi-strip">Key Financials</div>
+      <div id="cfi-keyfin" class="cfi-body tight"></div>
+    </div>
+    <div class="cfi-panel" data-area="pricechart">
+      <div class="cfi-strip">Share Price — Historical &amp; Forecast</div>
+      <div id="cfi-forecast" class="cfi-body tight plot"></div>
+    </div>
+
+    <div class="cfi-panel" data-area="rev">
+      <div class="cfi-strip">Revenue vs EV/Revenue</div>
+      <div id="cfi-rev" class="cfi-body tight plot"></div>
+    </div>
+    <div class="cfi-panel" data-area="ebitda">
+      <div class="cfi-strip">EBITDA vs EV/EBITDA</div>
+      <div id="cfi-ebitda" class="cfi-body tight plot"></div>
+    </div>
+    <div class="cfi-panel" data-area="valbar">
+      <div class="cfi-strip">Valuation Summary — Equity Value per Share ($)</div>
+      <div id="cfi-valbar" class="cfi-body tight plot"></div>
+    </div>
+  </div>
+
+  <script src="cfi_dashboard.js"></script>
+  <script>
+    (function demo(){
+      if (!window.CFI) return;
+      const payload = {
+        meta:{
+          brand:"amazon",
+          company:"Amazon.com, Inc.",
+          ticker:"AMZN",
+          exchange:"NASDAQ",
+          recommendation:"Buy",
+          target_price:2024,
+          scenario:"Consensus",
+          website:"Amazon.com | Internet & Direct Marketing Retail",
+          report_tag:"BenchmarkOS Equity Research",
+          date:"2018-11-09"
+        },
+        price:{"Ticker":"NASDAQ: AMZN","Current Price":1755,"Target Price":2024,"TP Upside %":15.9,"IRR %":7.7},
+        overview:{"Exchange":"NASDAQ","Sector":"Internet & Direct Marketing Retail","HQ":"Seattle, WA"},
+        key_stats:{"Employees":850000,"Founded":1994,"CEO":"Andy Jassy","Primary Industry":"E-commerce"},
+        market_data:{"Shares O/S (M)":5100,"Market Cap ($B)":1750,"Net Debt ($B)":17.4,"Enterprise Value ($B)":808.7},
+        valuation_table:[
+          {"Label":"Share Price","Market":1755,"DCF":2024,"Comps":2100},
+          {"Label":"Enterprise Value ($B)","Market":808.7,"DCF":891.7,"Comps":834.2}
+        ],
+        key_financials:{
+          columns:[2019,2020,2021,2022,2023],
+          rows:[
+            {"label":"Revenue","values":[280522,386064,469822,513983,574800]},
+            {"label":"EBITDA (ex SBC)","values":[36931,48020,56523,60820,71500]},
+            {"label":"Net income","values":[11588,21331,33364,-270,30500]},
+            {"label":"Net profit margin","values":[4.1,5.5,7.1,-0.1,5.3],"type":"percent"},
+            {"label":"Free cash flow","values":[25329,29620,36284,42262,65489]},
+            {"label":"EV/Revenue (×)","values":[3.2,2.8,2.3,2.1,1.9],"type":"multiple"},
+            {"label":"EV/EBITDA (×)","values":[18.0,15.2,13.5,12.3,11.0],"type":"multiple"}
+          ]
+        },
+        charts:{
+          revenue_ev:{Year:[2019,2020,2021,2022,2023], Revenue:[280522,386064,469822,513983,574800], EV_Rev:[3.2,2.8,2.3,2.1,1.9]},
+          ebitda_ev:{Year:[2019,2020,2021,2022,2023], EBITDA:[36931,48020,56523,60820,71500], EV_EBITDA:[18.0,15.2,13.5,12.3,11.0]},
+          forecast:{Year:[2013,2015,2017,2019,2021,2023,2025,2027,2029], Bull:[400,600,900,1200,1500,2100,2400,2700,3000], Base:[380,520,800,1100,1400,1850,2050,2250,2450], Bear:[360,480,700,950,1200,1600,1700,1850,2000]},
+          valuation_bar:{Case:["DCF - Consensus","DCF - Bull","DCF - Bear","Comps","52-Week Hi/Lo"], Value:[2921,4136,918,2216,1755]}
+        },
+        valuation_data:{current:1755,average:2031,notes:["Football Field Chart","DCF - Consensus Case","DCF - Bull Case","DCF - Bear Case","Comps","52-Week Hi/Lo"]}
+      };
+      window.CFI.render(payload);
+    })();
+  </script>
+</body>
+</html>
