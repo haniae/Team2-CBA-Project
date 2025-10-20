@@ -10,6 +10,13 @@ const statusDot = document.getElementById("api-status");
 const statusMessage = document.getElementById("status-message");
 const conversationList = document.getElementById("conversation-list");
 const navItems = document.querySelectorAll(".nav-item");
+const promptSuggestionsContainer = document.getElementById("prompt-suggestions");
+const conversationExportButtons = document.querySelectorAll(".chat-export-btn");
+const auditDrawer = document.getElementById("audit-drawer");
+const auditDrawerList = document.getElementById("audit-drawer-list");
+const auditDrawerStatus = document.getElementById("audit-drawer-status");
+const auditDrawerTitle = document.getElementById("audit-drawer-title");
+const auditDrawerDetail = document.getElementById("audit-drawer-detail");
 const chatSearchContainer = document.getElementById("chat-search");
 const chatSearchInput = document.getElementById("chat-search-input");
 const chatSearchClear = document.getElementById("chat-search-clear");
@@ -21,6 +28,54 @@ const chatPanel = document.querySelector(".chat-panel");
 const chatFormContainer = document.getElementById("chat-form");
 const savedSearchTrigger = document.querySelector("[data-action='search-saved']");
 const archivedToggleButton = document.querySelector("[data-action='toggle-archived']");
+
+const STREAM_STEP_MS = 18;
+const STREAM_MIN_SLICE = 2;
+const STREAM_MAX_SLICE = 24;
+const DEFAULT_PROMPT_SUGGESTIONS = [
+  "Summarise Q3 performance for AAPL, MSFT, and NVDA with key KPIs.",
+  "Show revenue CAGR, ROIC, and FCF margin trends for semiconductor peers.",
+  "Which tracked tickers triggered alerts in the past week and why?"
+];
+let activePromptSuggestions = [...DEFAULT_PROMPT_SUGGESTIONS];
+const FOLLOW_UP_SUGGESTION_LIBRARY = {
+  Growth: "Which peers are pacing the fastest quarter-over-quarter growth versus consensus?",
+  Revenue: "Break revenue down by segment with multi-year CAGR for each tracked ticker.",
+  Margin: "Compare gross and operating margins against peers over the trailing four quarters.",
+  Earnings: "Summarise EPS surprises and guidance changes across the peer set.",
+  "Cash Flow": "Analyse free-cash-flow conversion and working capital movements this year.",
+  Valuation: "Benchmark valuation multiples versus sector medians and the three-year average.",
+  Leverage: "Show leverage ratios and interest coverage versus covenant targets.",
+  Market: "Highlight market share shifts and relative price performance over the last month.",
+  Snapshot: "Generate a KPI snapshot that I can paste into an investment memo.",
+  KPI: "List the KPI definitions and calculation lineage referenced in this analysis."
+};
+const MAX_PROMPT_SUGGESTIONS = 5;
+const ALERT_PREFS_KEY = "benchmarkos.alertPreferences";
+const DEFAULT_ALERT_PREFERENCES = {
+  digest: "immediate",
+  quietHours: {
+    enabled: false,
+    start: "22:00",
+    end: "07:00",
+  },
+  types: {
+    filings: { enabled: true, mandatory: true },
+    metricDelta: { enabled: true, threshold: 10 },
+    dataQuality: { enabled: true },
+  },
+  channels: {
+    email: { enabled: true, address: "" },
+    slack: { enabled: false, webhook: "" },
+  },
+};
+const PREFERS_REDUCED_MOTION = (() => {
+  try {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  } catch (error) {
+    return false;
+  }
+})();
 
 const TICKER_STOPWORDS = new Set([
   "THE",
@@ -81,6 +136,10 @@ const PLACEHOLDERS = [
 let placeholderTimer = null;
 let placeholderIndex = 0;
 let hasNewSinceScroll = false;
+let lastFocusedBeforeAudit = null;
+let auditAbortController = null;
+let auditDrawerEvents = [];
+let auditActiveEventIndex = -1;
 
 function startPlaceholderRotation() {
   stopPlaceholderRotation();
@@ -295,6 +354,402 @@ function saveUserSettings(settings) {
     console.error("Unable to persist user settings", error);
     throw error;
   }
+}
+
+function cloneAlertDefaults() {
+  try {
+    // structuredClone is not available in older browsers, fall back to JSON copy.
+    return typeof structuredClone === "function"
+      ? structuredClone(DEFAULT_ALERT_PREFERENCES)
+      : JSON.parse(JSON.stringify(DEFAULT_ALERT_PREFERENCES));
+  } catch (error) {
+    return JSON.parse(JSON.stringify(DEFAULT_ALERT_PREFERENCES));
+  }
+}
+
+function loadAlertPreferences() {
+  try {
+    const raw = localStorage.getItem(ALERT_PREFS_KEY);
+    if (!raw) {
+      return cloneAlertDefaults();
+    }
+    const parsed = JSON.parse(raw);
+    const defaults = cloneAlertDefaults();
+    return {
+      ...defaults,
+      ...parsed,
+      digest: parsed?.digest || defaults.digest,
+      quietHours: {
+        ...defaults.quietHours,
+        ...(parsed?.quietHours || {}),
+      },
+      types: {
+        ...defaults.types,
+        ...(parsed?.types || {}),
+      },
+      channels: {
+        ...defaults.channels,
+        ...(parsed?.channels || {}),
+      },
+    };
+  } catch (error) {
+    console.warn("Unable to load alert preferences from storage", error);
+    return cloneAlertDefaults();
+  }
+}
+
+function saveAlertPreferences(preferences) {
+  try {
+    localStorage.setItem(ALERT_PREFS_KEY, JSON.stringify(preferences));
+  } catch (error) {
+    console.error("Unable to persist alert preferences", error);
+    throw error;
+  }
+}
+
+function renderAlertPreview(previewEl, preferences) {
+  if (!previewEl) {
+    return;
+  }
+  const prefs = preferences || cloneAlertDefaults();
+  previewEl.innerHTML = "";
+
+  const heading = document.createElement("strong");
+  heading.textContent = "What you'll receive";
+  previewEl.append(heading);
+
+  const items = document.createElement("ul");
+  const activeTypes = [];
+  if (prefs.types.filings?.enabled) {
+    activeTypes.push("New SEC filing events for tracked tickers.");
+  }
+  if (prefs.types.metricDelta?.enabled) {
+    const threshold = Number(prefs.types.metricDelta.threshold) || DEFAULT_ALERT_PREFERENCES.types.metricDelta.threshold;
+    activeTypes.push(`Metric change alerts above ${threshold}% delta.`);
+  }
+  if (prefs.types.dataQuality?.enabled) {
+    activeTypes.push("Data quality failures or ingestion retries.");
+  }
+  if (!activeTypes.length) {
+    activeTypes.push("No proactive alerts are currently enabled.");
+  }
+  activeTypes.forEach((line) => {
+    const li = document.createElement("li");
+    li.textContent = line;
+    items.append(li);
+  });
+  previewEl.append(items);
+
+  const channels = [];
+  if (prefs.channels.email?.enabled) {
+    const address = prefs.channels.email.address || "Add an email address";
+    channels.push(`Email → ${address}`);
+  }
+  if (prefs.channels.slack?.enabled) {
+    channels.push("Slack webhook");
+  }
+  if (!channels.length) {
+    channels.push("No delivery channels enabled.");
+  }
+  const channelLine = document.createElement("p");
+  channelLine.textContent = `Channels: ${channels.join(", ")}`;
+  previewEl.append(channelLine);
+
+  const digestLabel = {
+    immediate: "Deliver immediately",
+    daily: "Daily digest (8:00 AM)",
+    weekly: "Weekly digest (Monday 8:00 AM)",
+  }[prefs.digest] || "Deliver immediately";
+
+  const digestLine = document.createElement("p");
+  digestLine.textContent = `Cadence: ${digestLabel}`;
+  previewEl.append(digestLine);
+
+  const quietLine = document.createElement("p");
+  quietLine.textContent = prefs.quietHours?.enabled
+    ? `Quiet hours: ${prefs.quietHours.start || "22:00"} – ${prefs.quietHours.end || "07:00"}`
+    : "Quiet hours disabled.";
+  previewEl.append(quietLine);
+}
+
+function renderAlertSettingsSection({ container } = {}) {
+  if (!container) {
+    return;
+  }
+
+  const preferences = loadAlertPreferences();
+  container.innerHTML = `
+    <form class="alert-settings" data-role="alert-settings-form" novalidate>
+      <fieldset class="alert-settings__section">
+        <legend>Alert types</legend>
+        <p class="alert-settings__description">Choose which events raise notifications for your workspace.</p>
+        <div class="alert-settings__grid">
+          <label class="alert-settings__toggle" data-role="alert-type-filings">
+            <input type="checkbox" name="alerts.filings" disabled />
+            <span>New SEC filing ingested</span>
+            <small>Mandatory for audit coverage.</small>
+          </label>
+          <label class="alert-settings__toggle">
+            <input type="checkbox" name="alerts.metricDelta" />
+            <span>Metric change above threshold</span>
+            <small>Triggered when KPI delta exceeds your configured limit.</small>
+          </label>
+          <label class="alert-settings__toggle">
+            <input type="checkbox" name="alerts.dataQuality" />
+            <span>Data quality issue detected</span>
+            <small>Heads-up when ingestion or QA checks fail.</small>
+          </label>
+        </div>
+        <div class="alert-settings__field">
+          <span>Metric delta threshold (%)</span>
+          <input
+            type="number"
+            name="alerts.metricDeltaThreshold"
+            min="1"
+            max="100"
+            step="1"
+            inputmode="numeric"
+            aria-describedby="metric-threshold-help"
+          />
+          <small id="metric-threshold-help" class="alert-settings__description">Alerts fire when absolute change exceeds this value.</small>
+        </div>
+      </fieldset>
+      <fieldset class="alert-settings__section">
+        <legend>Delivery channels</legend>
+        <p class="alert-settings__description">Route alerts to your preferred communication channels.</p>
+        <div class="alert-settings__channels">
+          <div class="alert-settings__channel" data-channel="email">
+            <label class="alert-settings__toggle">
+              <input type="checkbox" name="channel.email.enabled" />
+              <span>Email (SES)</span>
+              <small>Distribute alerts to analysts or coverage aliases.</small>
+            </label>
+            <div class="alert-settings__field">
+              <span>Email address</span>
+              <input type="email" name="channel.email.address" placeholder="name@company.com" autocomplete="email" />
+            </div>
+          </div>
+          <div class="alert-settings__channel" data-channel="slack">
+            <label class="alert-settings__toggle">
+              <input type="checkbox" name="channel.slack.enabled" />
+              <span>Slack webhook</span>
+              <small>Post alerts into a shared #benchmarkos channel.</small>
+            </label>
+            <div class="alert-settings__field">
+              <span>Webhook URL</span>
+              <input type="url" name="channel.slack.webhook" placeholder="https://hooks.slack.com/..." inputmode="url" />
+            </div>
+          </div>
+        </div>
+      </fieldset>
+      <fieldset class="alert-settings__section">
+        <legend>Cadence & quiet hours</legend>
+        <div class="alert-settings__grid">
+          <div class="alert-settings__field">
+            <span>Digest cadence</span>
+            <select name="alerts.digest">
+              <option value="immediate">Send immediately</option>
+              <option value="daily">Daily summary</option>
+              <option value="weekly">Weekly digest</option>
+            </select>
+          </div>
+          <div class="alert-settings__field">
+            <label class="alert-settings__toggle">
+              <input type="checkbox" name="alerts.quiet.enabled" />
+              <span>Respect quiet hours</span>
+              <small>Pause notifications between the times below.</small>
+            </label>
+            <div class="alert-settings__grid">
+              <div class="alert-settings__field">
+                <span>Quiet hours start</span>
+                <input type="time" name="alerts.quiet.start" />
+              </div>
+              <div class="alert-settings__field">
+                <span>Quiet hours end</span>
+                <input type="time" name="alerts.quiet.end" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+      <div class="alert-settings__actions">
+        <button type="submit">Save preferences</button>
+        <button type="button" data-role="alert-reset">Reset to defaults</button>
+      </div>
+      <p class="alert-settings__status" data-role="alert-status" aria-live="polite"></p>
+      <div class="alert-settings__preview" data-role="alert-preview"></div>
+    </form>
+  `;
+
+  const form = container.querySelector("[data-role='alert-settings-form']");
+  if (!form) {
+    return;
+  }
+
+  const statusEl = form.querySelector("[data-role='alert-status']");
+  const resetButton = form.querySelector("[data-role='alert-reset']");
+  const previewEl = form.querySelector("[data-role='alert-preview']");
+  const channelContainers = {
+    email: form.querySelector("[data-channel='email']"),
+    slack: form.querySelector("[data-channel='slack']"),
+  };
+
+  const controls = {
+    filings: form.querySelector("[name='alerts.filings']"),
+    metricDelta: form.querySelector("[name='alerts.metricDelta']"),
+    metricDeltaThreshold: form.querySelector("[name='alerts.metricDeltaThreshold']"),
+    dataQuality: form.querySelector("[name='alerts.dataQuality']"),
+    digest: form.querySelector("[name='alerts.digest']"),
+    quietEnabled: form.querySelector("[name='alerts.quiet.enabled']"),
+    quietStart: form.querySelector("[name='alerts.quiet.start']"),
+    quietEnd: form.querySelector("[name='alerts.quiet.end']"),
+    emailEnabled: form.querySelector("[name='channel.email.enabled']"),
+    emailAddress: form.querySelector("[name='channel.email.address']"),
+    slackEnabled: form.querySelector("[name='channel.slack.enabled']"),
+    slackWebhook: form.querySelector("[name='channel.slack.webhook']"),
+  };
+
+  const applyPreferences = (prefs) => {
+    controls.filings.checked = true;
+    controls.metricDelta.checked = Boolean(prefs.types.metricDelta?.enabled);
+    controls.metricDeltaThreshold.value = Number(prefs.types.metricDelta?.threshold ?? DEFAULT_ALERT_PREFERENCES.types.metricDelta.threshold);
+    controls.dataQuality.checked = Boolean(prefs.types.dataQuality?.enabled);
+    controls.digest.value = prefs.digest || DEFAULT_ALERT_PREFERENCES.digest;
+    controls.quietEnabled.checked = Boolean(prefs.quietHours?.enabled);
+    controls.quietStart.value = prefs.quietHours?.start || DEFAULT_ALERT_PREFERENCES.quietHours.start;
+    controls.quietEnd.value = prefs.quietHours?.end || DEFAULT_ALERT_PREFERENCES.quietHours.end;
+    controls.emailEnabled.checked = Boolean(prefs.channels.email?.enabled);
+    controls.emailAddress.value = prefs.channels.email?.address || "";
+    controls.slackEnabled.checked = Boolean(prefs.channels.slack?.enabled);
+    controls.slackWebhook.value = prefs.channels.slack?.webhook || "";
+    syncQuietHours();
+    syncChannelState();
+    syncMetricThresholdState();
+    renderAlertPreview(previewEl, prefs);
+  };
+
+  const clampThreshold = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return DEFAULT_ALERT_PREFERENCES.types.metricDelta.threshold;
+    }
+    return Math.min(100, Math.max(1, Math.round(numeric)));
+  };
+
+  const collectPreferences = () => {
+    const next = cloneAlertDefaults();
+    next.types.metricDelta.enabled = Boolean(controls.metricDelta.checked);
+    next.types.metricDelta.threshold = clampThreshold(controls.metricDeltaThreshold.value);
+    next.types.dataQuality.enabled = Boolean(controls.dataQuality.checked);
+    next.digest = controls.digest.value || DEFAULT_ALERT_PREFERENCES.digest;
+    next.quietHours.enabled = Boolean(controls.quietEnabled.checked);
+    next.quietHours.start = controls.quietStart.value || DEFAULT_ALERT_PREFERENCES.quietHours.start;
+    next.quietHours.end = controls.quietEnd.value || DEFAULT_ALERT_PREFERENCES.quietHours.end;
+    next.channels.email.enabled = Boolean(controls.emailEnabled.checked);
+    next.channels.email.address = controls.emailAddress.value.trim();
+    next.channels.slack.enabled = Boolean(controls.slackEnabled.checked);
+    next.channels.slack.webhook = controls.slackWebhook.value.trim();
+    controls.metricDeltaThreshold.value = next.types.metricDelta.threshold;
+    return next;
+  };
+
+  const showStatus = (message, tone = "info") => {
+    if (!statusEl) {
+      return;
+    }
+    statusEl.textContent = message;
+    statusEl.dataset.tone = tone;
+  };
+
+  const syncChannelState = () => {
+    const emailEnabled = Boolean(controls.emailEnabled?.checked);
+    const slackEnabled = Boolean(controls.slackEnabled?.checked);
+    if (controls.emailAddress) {
+      controls.emailAddress.disabled = !emailEnabled;
+    }
+    if (controls.slackWebhook) {
+      controls.slackWebhook.disabled = !slackEnabled;
+    }
+    if (channelContainers.email) {
+      channelContainers.email.classList.toggle("alert-settings__channel-disabled", !emailEnabled);
+    }
+    if (channelContainers.slack) {
+      channelContainers.slack.classList.toggle("alert-settings__channel-disabled", !slackEnabled);
+    }
+  };
+
+  const syncQuietHours = () => {
+    const enabled = Boolean(controls.quietEnabled?.checked);
+    if (controls.quietStart) {
+      controls.quietStart.disabled = !enabled;
+    }
+    if (controls.quietEnd) {
+      controls.quietEnd.disabled = !enabled;
+    }
+  };
+
+  const syncMetricThresholdState = () => {
+    if (!controls.metricDeltaThreshold) {
+      return;
+    }
+    const enabled = Boolean(controls.metricDelta?.checked);
+    controls.metricDeltaThreshold.disabled = !enabled;
+  };
+
+  applyPreferences(preferences);
+
+  controls.emailEnabled?.addEventListener("change", () => {
+    syncChannelState();
+    renderAlertPreview(previewEl, collectPreferences());
+  });
+  controls.slackEnabled?.addEventListener("change", () => {
+    syncChannelState();
+    renderAlertPreview(previewEl, collectPreferences());
+  });
+  controls.quietEnabled?.addEventListener("change", () => {
+    syncQuietHours();
+    renderAlertPreview(previewEl, collectPreferences());
+  });
+  controls.metricDelta?.addEventListener("change", () => {
+    syncMetricThresholdState();
+    renderAlertPreview(previewEl, collectPreferences());
+  });
+
+  form.addEventListener("input", (event) => {
+    if (event.target === controls.metricDeltaThreshold) {
+      controls.metricDeltaThreshold.value = controls.metricDeltaThreshold.value.slice(0, 3);
+    }
+    if (statusEl) {
+      statusEl.textContent = "";
+      delete statusEl.dataset.tone;
+    }
+    renderAlertPreview(previewEl, collectPreferences());
+  });
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const next = collectPreferences();
+    try {
+      saveAlertPreferences(next);
+      showStatus("Alert preferences saved.", "success");
+      renderAlertPreview(previewEl, next);
+    } catch (error) {
+      showStatus("Unable to save alert preferences. Try again.", "error");
+    }
+  });
+
+  resetButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    const defaults = cloneAlertDefaults();
+    applyPreferences(defaults);
+    try {
+      saveAlertPreferences(defaults);
+      showStatus("Alert preferences reset to defaults.", "success");
+    } catch (error) {
+      showStatus("Unable to reset alert preferences.", "error");
+    }
+    renderAlertPreview(previewEl, defaults);
+  });
 }
 
 function generateRequestId() {
@@ -2074,6 +2529,11 @@ const UTILITY_SECTIONS = {
       <p class="panel-note">Liên kết phân tích với dashboard hoặc notebook để chia sẻ với đội ngũ nội bộ.</p>
     `,
   },
+  alerts: {
+    title: "Alert Settings",
+    html: `<div class="alert-settings__skeleton">Loading alert preferences…</div>`,
+    render: renderAlertSettingsSection,
+  },
   settings: {
     title: "Settings",
     html: `<div class="settings-panel" data-role="settings-root"></div>`,
@@ -2252,43 +2712,47 @@ function renderMessageArtifacts(wrapper, artifacts) {
   if (!body) {
     return;
   }
-  const inlineDashboard = renderDashboardArtifact(artifacts.dashboard);
-  const dashboardKind = artifacts.dashboard?.kind || "";
-  if (inlineDashboard) {
-    body.append(inlineDashboard);
-    if (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare") {
+    const inlineDashboard = renderDashboardArtifact(artifacts.dashboard);
+    const dashboardKind = artifacts.dashboard?.kind || "";
+    const isInlineClassic =
+      inlineDashboard && (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare");
+    if (inlineDashboard) {
+      body.append(inlineDashboard);
+      if (!isInlineClassic) {
+        return;
+      }
+    }
+    const dashboard = createDashboardLayout(artifacts);
+    if (dashboard && dashboardKind !== "cfi-classic") {
+      body.append(dashboard);
+      if (artifacts.comparisonTable) {
+        body.querySelectorAll(".message-table").forEach((tableNode) => tableNode.remove());
+      }
       return;
     }
-  }
-  const dashboard = createDashboardLayout(artifacts);
-  if (dashboard && dashboardKind !== "cfi-classic") {
-    body.append(dashboard);
-    if (artifacts.comparisonTable) {
-      body.querySelectorAll(".message-table").forEach((tableNode) => tableNode.remove());
+    const sections = [];
+    if (!isInlineClassic) {
+      const highlightsSection = createHighlightsSection(artifacts.highlights);
+      if (highlightsSection) {
+        sections.push(highlightsSection);
+      }
+      const tableSection = createComparisonTableSection(artifacts.comparisonTable);
+      if (tableSection) {
+        sections.push(tableSection);
+      }
+      const conclusionSection = createConclusionSection(artifacts.conclusion);
+      if (conclusionSection) {
+        sections.push(conclusionSection);
+      }
+      const trendsSection = createTrendSection(artifacts.trends);
+      if (trendsSection) {
+        sections.push(trendsSection);
+      }
     }
-    return;
-  }
-  const sections = [];
-  const highlightsSection = createHighlightsSection(artifacts.highlights);
-  if (highlightsSection) {
-    sections.push(highlightsSection);
-  }
-  const tableSection = createComparisonTableSection(artifacts.comparisonTable);
-  if (tableSection) {
-    sections.push(tableSection);
-  }
-  const conclusionSection = createConclusionSection(artifacts.conclusion);
-  if (conclusionSection) {
-    sections.push(conclusionSection);
-  }
-  const trendsSection = createTrendSection(artifacts.trends);
-  if (trendsSection) {
-    sections.push(trendsSection);
-  }
-  const citationsSection = createCitationSection(artifacts.citations);
-  if (citationsSection) {
-    sections.push(citationsSection);
-  }
+    const citationsSection = createCitationSection(artifacts.citations);
+    if (citationsSection) {
+      sections.push(citationsSection);
+    }
   const exportsSection = createExportSection(artifacts.exports);
   if (exportsSection) {
     sections.push(exportsSection);
@@ -2990,48 +3454,293 @@ function createCitationSection(citations) {
   if (!Array.isArray(citations) || !citations.length) {
     return null;
   }
-  const details = document.createElement("details");
-  details.className = "artifact-section artifact-citations";
-  const summary = document.createElement("summary");
-  summary.textContent = `Sources (${citations.length})`;
-  details.append(summary);
-  const list = document.createElement("ul");
-  list.className = "citation-list";
+  const wrapper = document.createElement("section");
+  wrapper.className = "artifact-section artifact-sources";
+
+  const title = document.createElement("h4");
+  title.className = "artifact-title";
+  title.textContent = `Sources (${citations.length})`;
+  wrapper.append(title);
+
+  const list = document.createElement("div");
+  list.className = "artifact-sources__list";
+
   citations.forEach((citation) => {
-    const item = document.createElement("li");
-    const parts = [
-      `${citation.ticker} • ${citation.label}`,
-      citation.period ? citation.period : null,
-      citation.formatted_value || (typeof citation.value === "number" ? citation.value : null),
+    const row = document.createElement("div");
+    row.className = "artifact-sources__row";
+
+    const descriptorParts = [
+      citation.ticker,
+      citation.label,
+      citation.period,
+      citation.formatted_value ||
+        (typeof citation.value === "number" ? citation.value.toLocaleString() : null),
     ].filter(Boolean);
-    const text = document.createElement("span");
-    text.textContent = parts.join(" · ");
-    item.append(text);
-    if (citation.form) {
-      const formTag = document.createElement("span");
-      formTag.className = "citation-form";
-      formTag.textContent = citation.form;
-      item.append(formTag);
-    }
-    if (citation.urls && citation.urls.detail) {
+
+    const descriptor = document.createElement("span");
+    descriptor.className = "artifact-sources__descriptor";
+    descriptor.textContent = descriptorParts.join(" • ");
+    row.append(descriptor);
+
+    const filingUrl = citation.urls?.detail || citation.urls?.interactive || null;
+    if (filingUrl) {
       const link = document.createElement("a");
-      link.href = citation.urls.detail;
+      link.href = filingUrl;
       link.target = "_blank";
       link.rel = "noopener";
+      link.className = "artifact-sources__link";
       link.textContent = "View filing";
-      item.append(link);
-    } else if (citation.urls && citation.urls.interactive) {
-      const link = document.createElement("a");
-      link.href = citation.urls.interactive;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.textContent = "View filing";
-      item.append(link);
+      row.append(link);
     }
-    list.append(item);
+
+    list.append(row);
   });
-  details.append(list);
-  return details;
+
+  wrapper.append(list);
+  return wrapper;
+}
+
+function closeAuditDrawer() {
+  if (!auditDrawer) {
+    return;
+  }
+  if (auditAbortController) {
+    auditAbortController.abort();
+    auditAbortController = null;
+  }
+  auditDrawer.classList.remove("visible");
+  auditDrawer.setAttribute("aria-hidden", "true");
+  auditDrawerStatus.textContent = "Select a metric to view lineage.";
+  auditDrawerList.innerHTML = "";
+  auditDrawerEvents = [];
+  auditActiveEventIndex = -1;
+  if (auditDrawerDetail) {
+    auditDrawerDetail.innerHTML =
+      '<p class="audit-drawer__placeholder">Select an audit event to inspect lineage details.</p>';
+  }
+  if (lastFocusedBeforeAudit && typeof lastFocusedBeforeAudit.focus === "function") {
+    lastFocusedBeforeAudit.focus();
+  }
+  lastFocusedBeforeAudit = null;
+}
+
+function openAuditDrawer({ ticker, metric, label, period } = {}) {
+  if (!auditDrawer || !auditDrawerList || !auditDrawerStatus) {
+    return;
+  }
+  const cleanTicker = ticker || "";
+  if (!cleanTicker) {
+    showToast("Unable to load audit trail without a ticker.", "error");
+    return;
+  }
+  if (auditAbortController) {
+    auditAbortController.abort();
+  }
+  auditAbortController = new AbortController();
+  lastFocusedBeforeAudit = document.activeElement;
+  auditDrawer.classList.add("visible");
+  auditDrawer.setAttribute("aria-hidden", "false");
+  auditDrawerStatus.textContent = "Loading audit trail…";
+  auditDrawerList.innerHTML = "";
+  if (auditDrawerTitle) {
+    const contextLabel = label ? `${cleanTicker} • ${label}` : cleanTicker;
+    auditDrawerTitle.textContent = `Audit Trail — ${contextLabel}`;
+  }
+  const closeButton = auditDrawer.querySelector(".audit-drawer__close");
+  if (closeButton) {
+    closeButton.focus();
+  }
+  const params = new URLSearchParams({ ticker: cleanTicker });
+  const fiscalYear = deriveFiscalYear(period);
+  if (fiscalYear) {
+    params.set("fiscal_year", String(fiscalYear));
+  }
+  fetch(`${API_BASE}/audit?${params.toString()}`, { signal: auditAbortController.signal })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Audit fetch failed (${response.status})`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      const events = Array.isArray(data?.events) ? data.events : [];
+      if (!events.length) {
+        auditDrawerStatus.textContent = "No lineage events were recorded for this metric.";
+        auditDrawerEvents = [];
+        if (auditDrawerDetail) {
+          auditDrawerDetail.innerHTML =
+            '<p class="audit-drawer__placeholder">No audit events were captured for this metric.</p>';
+        }
+        return;
+      }
+      const sorted = [...events].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      auditDrawerEvents = sorted;
+      auditDrawerStatus.textContent = `${sorted.length} event${sorted.length === 1 ? "" : "s"} recorded.`;
+      renderAuditTimeline(sorted);
+      setActiveAuditEvent(sorted.length - 1);
+    })
+    .catch((error) => {
+      if (error.name === "AbortError") {
+        return;
+      }
+      console.warn("Audit load failed:", error);
+      auditDrawerStatus.textContent = "Unable to load audit events. Try again later.";
+      auditDrawerEvents = [];
+      auditActiveEventIndex = -1;
+      if (auditDrawerDetail) {
+        auditDrawerDetail.innerHTML =
+          '<p class="audit-drawer__placeholder">Unable to load audit events. Try again later.</p>';
+      }
+    })
+    .finally(() => {
+      auditAbortController = null;
+    });
+}
+
+function deriveFiscalYear(period) {
+  if (!period || typeof period !== "string") {
+    return null;
+  }
+  const match = period.match(/\b(20\d{2}|19\d{2})\b/);
+  return match ? Number(match[0]) : null;
+}
+
+function capitalizeFirst(value) {
+  if (!value || typeof value !== "string") {
+    return "";
+  }
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function renderAuditTimeline(events) {
+  if (!auditDrawerList) {
+    return;
+  }
+  auditDrawerList.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  events.forEach((event, index) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "audit-drawer__node";
+    button.dataset.index = String(index);
+    button.setAttribute("aria-pressed", "false");
+
+    const title = document.createElement("span");
+    title.className = "audit-drawer__node-title";
+    title.textContent = `${index + 1}. ${capitalizeFirst(event.event_type || "Event")}`;
+    button.append(title);
+
+    const meta = document.createElement("span");
+    meta.className = "audit-drawer__node-meta";
+    meta.textContent = event.created_at ? formatDateHuman(event.created_at) : "Unknown timestamp";
+    button.append(meta);
+
+    if (event.details) {
+      const detail = document.createElement("span");
+      detail.className = "audit-drawer__node-detail";
+      detail.textContent = event.details;
+      button.append(detail);
+    }
+
+    button.addEventListener("click", () => {
+      setActiveAuditEvent(index);
+    });
+
+    item.append(button);
+    fragment.append(item);
+  });
+  auditDrawerList.append(fragment);
+}
+
+function setActiveAuditEvent(position) {
+  if (!Array.isArray(auditDrawerEvents) || !auditDrawerEvents.length) {
+    return;
+  }
+  const bounded = Math.max(0, Math.min(position, auditDrawerEvents.length - 1));
+  auditActiveEventIndex = bounded;
+  const nodes = auditDrawerList?.querySelectorAll(".audit-drawer__node") || [];
+  nodes.forEach((node) => {
+    const nodeIndex = Number(node.dataset.index);
+    const isActive = nodeIndex === bounded;
+    node.classList.toggle("is-active", isActive);
+    node.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+  renderAuditEventDetail(auditDrawerEvents[bounded]);
+}
+
+function renderAuditEventDetail(event) {
+  if (!auditDrawerDetail) {
+    return;
+  }
+  auditDrawerDetail.innerHTML = "";
+  if (!event) {
+    auditDrawerDetail.innerHTML =
+      '<p class="audit-drawer__placeholder">Select an audit event to inspect lineage details.</p>';
+    return;
+  }
+
+  const heading = document.createElement("h3");
+  heading.textContent = capitalizeFirst(event.event_type || "Audit event");
+  auditDrawerDetail.append(heading);
+
+  const descriptor = document.createElement("dl");
+  const appendRow = (label, value) => {
+    if (!value && value !== 0) {
+      return;
+    }
+    const dt = document.createElement("dt");
+    dt.textContent = label;
+    const dd = document.createElement("dd");
+    dd.textContent = `${value}`;
+    descriptor.append(dt, dd);
+  };
+
+  appendRow("Timestamp", event.created_at ? formatDateHuman(event.created_at) : "Unknown");
+  appendRow("Entity", event.entity_id || event.entity || "—");
+  appendRow("Metric", event.metric || "—");
+  if (event.label && event.label !== event.metric) {
+    appendRow("Label", event.label);
+  }
+  appendRow("Details", event.details || "—");
+  appendRow("Actor", event.created_by || "System");
+
+  auditDrawerDetail.append(descriptor);
+
+  const actions = document.createElement("div");
+  actions.className = "audit-drawer__detail-actions";
+
+  const copyButton = document.createElement("button");
+  copyButton.type = "button";
+  copyButton.className = "audit-drawer__detail-secondary";
+  copyButton.textContent = "Copy event JSON";
+  copyButton.addEventListener("click", () => copyAuditEvent(event));
+  actions.append(copyButton);
+
+  if (actions.children.length) {
+    auditDrawerDetail.append(actions);
+  }
+}
+
+function copyAuditEvent(event) {
+  if (!event) {
+    return;
+  }
+  const payload = JSON.stringify(event, null, 2);
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(payload).then(
+      () => showToast("Audit event copied to clipboard.", "success"),
+      () => {
+        window.prompt("Copy audit event details:", payload);
+        showToast("Copy the JSON shown to share manually.", "info");
+      }
+    );
+  } else {
+    window.prompt("Copy audit event details:", payload);
+    showToast("Copy the JSON shown to share manually.", "info");
+  }
 }
 
 function createExportSection(exports) {
@@ -3042,7 +3751,7 @@ function createExportSection(exports) {
   wrapper.className = "artifact-section artifact-exports";
   const title = document.createElement("h4");
   title.className = "artifact-title";
-  title.textContent = "Export";
+  title.textContent = "Exports";
   wrapper.append(title);
   const buttonRow = document.createElement("div");
   buttonRow.className = "artifact-export-buttons";
@@ -3352,11 +4061,123 @@ function showAssistantTyping() {
   return appendMessage("assistant", "", { isPlaceholder: true, animate: false });
 }
 
+function derivePromptSuggestionsFromPrompt(prompt) {
+  if (!prompt || typeof prompt !== "string") {
+    return [];
+  }
+  const matches = new Set();
+  METRIC_KEYWORD_MAP.forEach(({ regex, label }) => {
+    if (regex.test(prompt)) {
+      matches.add(label);
+    }
+  });
+  const suggestions = [];
+  matches.forEach((label) => {
+    const candidate = FOLLOW_UP_SUGGESTION_LIBRARY[label];
+    if (candidate) {
+      suggestions.push(candidate);
+    }
+  });
+  return suggestions;
+}
+
+function mergePromptSuggestionPool(dynamicSuggestions) {
+  const combined = [...(dynamicSuggestions || []), ...DEFAULT_PROMPT_SUGGESTIONS];
+  const unique = [];
+  const seen = new Set();
+  combined.forEach((suggestion) => {
+    const value = `${suggestion}`.trim();
+    if (!value) {
+      return;
+    }
+    const key = value.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    unique.push(value);
+  });
+  if (!unique.length) {
+    return [...DEFAULT_PROMPT_SUGGESTIONS];
+  }
+  return unique.slice(0, MAX_PROMPT_SUGGESTIONS);
+}
+
+function updatePromptSuggestionsFromPrompt(prompt) {
+  const dynamic = derivePromptSuggestionsFromPrompt(prompt);
+  activePromptSuggestions = mergePromptSuggestionPool(dynamic);
+  renderPromptChips();
+}
+
+function shouldStreamText(text) {
+  if (!text || typeof text !== "string") {
+    return false;
+  }
+  if (text.length < 80) {
+    return false;
+  }
+  if (/\n\s*\|/.test(text)) {
+    return false;
+  }
+  return true;
+}
+
+function streamMessageBody(wrapper, text, artifacts, { forceScroll = false } = {}) {
+  const body = wrapper?.querySelector(".message-body");
+  if (!body) {
+    return;
+  }
+  if (PREFERS_REDUCED_MOTION) {
+    setMessageBody(wrapper, text);
+    renderMessageArtifacts(wrapper, artifacts);
+    if (forceScroll || isNearBottom(120)) {
+      scrollChatToBottom({ smooth: true });
+      hasNewSinceScroll = false;
+    } else {
+      hasNewSinceScroll = true;
+    }
+    return;
+  }
+  body.innerHTML = "";
+  const streamBlock = document.createElement("div");
+  streamBlock.className = "message-stream";
+  streamBlock.setAttribute("aria-live", "polite");
+  streamBlock.setAttribute("aria-atomic", "false");
+  body.append(streamBlock);
+  const total = text.length;
+  const stepSize = Math.min(
+    STREAM_MAX_SLICE,
+    Math.max(STREAM_MIN_SLICE, Math.ceil(total / 120))
+  );
+  let index = 0;
+  const pump = () => {
+    if (index >= total) {
+      setMessageBody(wrapper, text);
+      renderMessageArtifacts(wrapper, artifacts);
+      if (forceScroll || isNearBottom(120)) {
+        scrollChatToBottom({ smooth: true });
+        hasNewSinceScroll = false;
+      } else {
+        hasNewSinceScroll = true;
+      }
+      return;
+    }
+    index = Math.min(total, index + stepSize);
+    streamBlock.textContent = text.slice(0, index);
+    if (forceScroll || isNearBottom(160)) {
+      scrollChatToBottom({ smooth: false });
+      hasNewSinceScroll = false;
+    }
+    window.setTimeout(pump, STREAM_STEP_MS);
+  };
+  pump();
+}
+
 function resolvePendingMessage(
   wrapper,
   role,
   text,
-  { forceScroll = false, artifacts = null } = {}
+  { forceScroll = false, artifacts = null, stream = false } = {}
 ) {
   if (!wrapper) {
     appendMessage(role, text, { forceScroll, smooth: true, artifacts });
@@ -3364,6 +4185,10 @@ function resolvePendingMessage(
   }
   updateMessageRole(wrapper, role);
   wrapper.classList.remove("typing");
+  if (role === "assistant" && stream && shouldStreamText(text)) {
+    streamMessageBody(wrapper, text, artifacts, { forceScroll });
+    return wrapper;
+  }
   setMessageBody(wrapper, text);
   renderMessageArtifacts(wrapper, artifacts);
   if (forceScroll || isNearBottom(120)) {
@@ -3716,6 +4541,10 @@ function handleGlobalKeyDown(event) {
   if (event.key === "Escape") {
     if (shareModalBackdrop && !shareModalBackdrop.classList.contains("hidden")) {
       closeShareModal();
+      return;
+    }
+    if (auditDrawer?.classList.contains("visible")) {
+      closeAuditDrawer();
       return;
     }
     closeReportMenu();
@@ -4633,6 +5462,118 @@ function renderConversationList() {
   });
 }
 
+function exportConversation(format) {
+  const conversation = activeConversation || conversations[0] || null;
+  if (!conversation || !Array.isArray(conversation.messages) || !conversation.messages.length) {
+    showToast("Start a conversation to export it.", "info");
+    return;
+  }
+  if (format === "csv") {
+    exportConversationCsv(conversation);
+    return;
+  }
+  if (format === "pdf") {
+    exportConversationPdf(conversation);
+    return;
+  }
+  showToast("Unsupported export format.", "error");
+}
+
+function exportConversationCsv(conversation) {
+  const headers = ["Timestamp", "Role", "Message"];
+  const lines = [headers.map(formatCsvValue).join(",")];
+  conversation.messages.forEach((message) => {
+    const row = [
+      formatExportTimestamp(message.timestamp),
+      message.role || "assistant",
+      (message.text || "").replace(/\s+/g, " ").trim(),
+    ];
+    lines.push(row.map(formatCsvValue).join(","));
+  });
+  const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${buildConversationSlug(conversation)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast("Conversation exported as CSV", "success");
+}
+
+function exportConversationPdf(conversation) {
+  const win = window.open("", "_blank", "noopener");
+  if (!win) {
+    showToast("Allow pop-ups to export the conversation.", "error");
+    return;
+  }
+  const title = conversation.title || "BenchmarkOS Conversation";
+  const entries = conversation.messages
+    .map((message) => {
+      const roleLabel =
+        message.role === "assistant" ? "BenchmarkOS" : message.role === "user" ? "You" : "System";
+      const timestamp = formatExportTimestamp(message.timestamp);
+      const safeText = (message.text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return `<article class="export-entry"><header><h3>${roleLabel}</h3><span>${timestamp}</span></header><p>${safeText.replace(
+        /\n/g,
+        "<br />"
+      )}</p></article>`;
+    })
+    .join("");
+  const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${title}</title>
+    <style>
+      body { font-family: "Segoe UI", Arial, sans-serif; margin: 32px; color: #0f172a; background: #fff; }
+      h1 { font-size: 22px; margin-bottom: 12px; }
+      .export-entry { border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; background: #f8fafc; }
+      .export-entry header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+      .export-entry p { margin: 0; font-size: 14px; line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+    <h1>${title}</h1>
+    ${entries}
+  </body>
+</html>`;
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  window.setTimeout(() => {
+    try {
+      win.print();
+    } catch (error) {
+      // ignore print errors
+    }
+  }, 300);
+  showToast("Conversation ready for printing", "success");
+}
+
+function buildConversationSlug(conversation) {
+  const base = conversation.title || "benchmarkos-conversation";
+  return (
+    base
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "benchmarkos-conversation"
+  );
+}
+
+function formatExportTimestamp(isoString) {
+  if (!isoString) {
+    return new Date().toLocaleString();
+  }
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return isoString;
+  }
+  return date.toLocaleString();
+}
+
 function loadConversation(conversationId) {
   const conversation = conversations.find((entry) => entry.id === conversationId);
   if (!conversation) {
@@ -4665,6 +5606,16 @@ function loadConversation(conversationId) {
     });
   });
 
+  const lastUserMessage = [...conversation.messages]
+    .reverse()
+    .find((message) => message.role === "user" && message.text);
+  if (lastUserMessage) {
+    updatePromptSuggestionsFromPrompt(lastUserMessage.text);
+  } else {
+    activePromptSuggestions = [...DEFAULT_PROMPT_SUGGESTIONS];
+    renderPromptChips();
+  }
+
   scrollChatToBottom({ smooth: false, force: true });
   renderConversationList();
   chatInput.focus();
@@ -4685,6 +5636,8 @@ function startNewConversation({ focusInput = true } = {}) {
   if (focusInput) {
     chatInput.focus();
   }
+  activePromptSuggestions = [...DEFAULT_PROMPT_SUGGESTIONS];
+  renderPromptChips();
   renderConversationList();
 }
 
@@ -5335,6 +6288,7 @@ chatForm.addEventListener("submit", async (event) => {
   const canonicalPrompt = canonicalisePrompt(prompt);
 
   recordMessage("user", prompt);
+  updatePromptSuggestionsFromPrompt(prompt);
   appendMessage("user", prompt, { forceScroll: true });
   chatInput.value = "";
 
@@ -5353,6 +6307,7 @@ chatForm.addEventListener("submit", async (event) => {
     const resolved = resolvePendingMessage(pendingMessage, "assistant", cachedEntry.reply, {
       forceScroll: true,
       artifacts: cachedEntry.artifacts,
+      stream: false,
     });
     if (resolved) {
       pendingMessage = resolved;
@@ -5371,9 +6326,11 @@ chatForm.addEventListener("submit", async (event) => {
     const artifacts = normaliseArtifacts(response);
     pushProgressEvents(requestId, response?.progress_events || []);
     recordMessage("assistant", messageText, artifacts);
+    const shouldStream = !pendingMessage?.dataset?.cached && shouldStreamText(messageText);
     const resolved = resolvePendingMessage(pendingMessage, "assistant", messageText, {
       forceScroll: true,
       artifacts,
+      stream: shouldStream,
     });
     if (resolved) {
       pendingMessage = resolved;
@@ -5469,15 +6426,41 @@ if (scrollBtn && chatLog && scrollBtn.parentElement !== chatLog) {
 
 // Initial visibility on load
 refreshScrollButton();
-function wirePromptChips() {
+function renderPromptChips() {
+  const suggestions =
+    Array.isArray(activePromptSuggestions) && activePromptSuggestions.length
+      ? activePromptSuggestions
+      : DEFAULT_PROMPT_SUGGESTIONS;
+  if (promptSuggestionsContainer) {
+    promptSuggestionsContainer.innerHTML = "";
+    promptSuggestionsContainer.setAttribute("role", "list");
+    suggestions.forEach((suggestion, index) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "prompt-chip";
+      chip.dataset.prompt = suggestion;
+      chip.setAttribute("role", "listitem");
+      chip.setAttribute("aria-label", `Suggested prompt ${index + 1}: ${suggestion}`);
+      chip.textContent = suggestion;
+      chip.addEventListener("click", () => {
+        if (!chatInput) {
+          return;
+        }
+        chatInput.value = suggestion;
+        chatInput.focus();
+      });
+      promptSuggestionsContainer.append(chip);
+    });
+    return;
+  }
   document.querySelectorAll(".prompt-chip").forEach((chip) => {
     chip.addEventListener("click", () => {
       const prompt = chip.getAttribute("data-prompt");
-      if (!prompt) {
+      if (!prompt || !chatInput) {
         return;
       }
       chatInput.value = prompt;
-      chatForm.requestSubmit();
+      chatInput.focus();
     });
   });
 }
@@ -5490,6 +6473,12 @@ if (navItems && navItems.length) {
 
 if (savedSearchTrigger) {
   savedSearchTrigger.addEventListener("click", () => handleNavAction("search-saved"));
+}
+
+if (conversationExportButtons && conversationExportButtons.length) {
+  conversationExportButtons.forEach((button) => {
+    button.addEventListener("click", () => exportConversation(button.dataset.export));
+  });
 }
 
 if (chatSearchInput) {
@@ -5524,8 +6513,19 @@ if (conversationList) {
   });
 }
 
-wirePromptChips();
+renderPromptChips();
 
+if (auditDrawer) {
+  auditDrawer.addEventListener("click", (event) => {
+    if (!(event.target instanceof HTMLElement)) {
+      return;
+    }
+    if (event.target.dataset.action === "close-audit") {
+      event.preventDefault();
+      closeAuditDrawer();
+    }
+  });
+}
 function ensureToastContainer() {
   if (toastContainer) {
     return;
@@ -5913,6 +6913,20 @@ async function ensurePlotlyLoaded() {
     return;
   }
   await ensureScriptOnce("plotly-core", "https://cdn.plot.ly/plotly-2.32.0.min.js");
+}
+
+async function ensureCfiCompareRenderer() {
+  if (window.CFIX && typeof window.CFIX.render === "function") {
+    return;
+  }
+  const maxAttempts = 10;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (window.CFIX && typeof window.CFIX.render === "function") {
+      return;
+    }
+  }
+  throw new Error("CFI Compare renderer unavailable.");
 }
 
 function resolveDashboardHost() {
@@ -6311,7 +7325,7 @@ async function showCfiCompareDashboard(options = {}) {
     await loadCfiCompareMarkup(host);
     await ensureStylesheetOnce("cfi-compare-styles", "cfi_compare.css");
     await ensurePlotlyLoaded();
-    await ensureScriptOnce("cfi-compare-script-v4", "cfi_compare.js?v=20241023");
+    await ensureScriptOnce("cfi-compare-script", "cfi_compare.js");
   } catch (error) {
     console.error(error);
     host.innerHTML =
@@ -6336,12 +7350,20 @@ async function showCfiCompareDashboard(options = {}) {
   }
 
   try {
-    if (window.CFIX && typeof window.CFIX.render === "function") {
-      window.CFIX.render(payload);
-      window.__cfiCompareLastPayload = payload;
-    } else {
-      throw new Error("CFI Compare renderer unavailable.");
+    await ensureCfiCompareRenderer();
+  } catch (error) {
+    console.warn(error?.message || "CFI Compare renderer unavailable. Check cfi_compare.js delivery.");
+    host.innerHTML =
+      '<div class="cfi-error">Unable to render CFI Compare dashboard. Renderer unavailable.</div>';
+    if (typeof showToast === "function") {
+      showToast("CFI Compare renderer unavailable.", "error");
     }
+    return;
+  }
+
+  try {
+    window.CFIX.render(payload);
+    window.__cfiCompareLastPayload = payload;
   } catch (error) {
     console.error(error);
     host.innerHTML =

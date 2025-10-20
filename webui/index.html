@@ -58,6 +58,10 @@
 <span aria-hidden="true" class="nav-icon">⚙️</span>
 <span class="nav-label">Settings</span>
 </button>
+<button class="nav-item" data-action="open-alerts">
+<span aria-hidden="true" class="nav-icon">🔔</span>
+<span class="nav-label">Alerts</span>
+</button>
 </nav>
 <section aria-labelledby="saved-reports-heading" class="sidebar-section saved-reports">
 <div class="section-header">
@@ -97,6 +101,10 @@
 <section class="chat-intro" id="chat-intro"></section>
 <div aria-live="polite" class="chat-log" id="chat-log"></div>
 
+<div class="chat-toolbar" aria-label="Conversation tools">
+  <div class="prompt-suggestions" id="prompt-suggestions" aria-label="Suggested prompts"></div>
+</div>
+
 <button id="scrollBtn" title="Jump to latest" class="scroll-btn" aria-hidden="true" aria-label="Scroll to latest messages">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
     <polyline points="6 9 12 15 18 9"></polyline>
@@ -116,6 +124,24 @@
 </form>
 </section></div>
 </main>
+</div>
+<div id="audit-drawer" class="audit-drawer" aria-hidden="true">
+  <div class="audit-drawer__overlay" data-action="close-audit"></div>
+  <aside class="audit-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="audit-drawer-title">
+    <header class="audit-drawer__header">
+      <h2 id="audit-drawer-title">Audit Trail</h2>
+      <button type="button" class="audit-drawer__close" data-action="close-audit" aria-label="Close audit drawer">×</button>
+    </header>
+    <section class="audit-drawer__body">
+      <div class="audit-drawer__summary">
+        <p class="audit-drawer__status" id="audit-drawer-status">Select a metric to view lineage.</p>
+        <ol class="audit-drawer__list" id="audit-drawer-list"></ol>
+      </div>
+      <div class="audit-drawer__detail" id="audit-drawer-detail" aria-live="polite">
+        <p class="audit-drawer__placeholder">Select an audit event to inspect lineage details.</p>
+      </div>
+    </section>
+  </aside>
 </div>
 <script defer="" src="/static/app.js?v=20241023"></script>
 </body>
