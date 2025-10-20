@@ -2706,58 +2706,66 @@ function renderMessageArtifacts(wrapper, artifacts) {
     existing.remove();
   }
   if (!artifacts) {
+    wrapper.classList.remove("message--has-dashboard");
     return;
   }
   const body = wrapper.querySelector(".message-body");
   if (!body) {
+    wrapper.classList.remove("message--has-dashboard");
     return;
   }
-    const inlineDashboard = renderDashboardArtifact(artifacts.dashboard);
-    const dashboardKind = artifacts.dashboard?.kind || "";
-    const isInlineClassic =
-      inlineDashboard && (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare");
-    if (inlineDashboard) {
-      body.append(inlineDashboard);
-      if (!isInlineClassic) {
-        return;
-      }
-    }
-    const dashboard = createDashboardLayout(artifacts);
-    if (dashboard && dashboardKind !== "cfi-classic") {
-      body.append(dashboard);
-      if (artifacts.comparisonTable) {
-        body.querySelectorAll(".message-table").forEach((tableNode) => tableNode.remove());
-      }
+  let hasDashboard = false;
+  const inlineDashboard = renderDashboardArtifact(artifacts.dashboard);
+  const dashboardKind = artifacts.dashboard?.kind || "";
+  const isInlineClassic =
+    inlineDashboard && (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare");
+  if (inlineDashboard) {
+    hasDashboard = true;
+    body.append(inlineDashboard);
+    if (!isInlineClassic) {
+      wrapper.classList.toggle("message--has-dashboard", hasDashboard);
       return;
     }
-    const sections = [];
-    if (!isInlineClassic) {
-      const highlightsSection = createHighlightsSection(artifacts.highlights);
-      if (highlightsSection) {
-        sections.push(highlightsSection);
-      }
-      const tableSection = createComparisonTableSection(artifacts.comparisonTable);
-      if (tableSection) {
-        sections.push(tableSection);
-      }
-      const conclusionSection = createConclusionSection(artifacts.conclusion);
-      if (conclusionSection) {
-        sections.push(conclusionSection);
-      }
-      const trendsSection = createTrendSection(artifacts.trends);
-      if (trendsSection) {
-        sections.push(trendsSection);
-      }
+  }
+  const dashboard = createDashboardLayout(artifacts);
+  if (dashboard && dashboardKind !== "cfi-classic") {
+    hasDashboard = true;
+    body.append(dashboard);
+    if (artifacts.comparisonTable) {
+      body.querySelectorAll(".message-table").forEach((tableNode) => tableNode.remove());
     }
-    const citationsSection = createCitationSection(artifacts.citations);
-    if (citationsSection) {
-      sections.push(citationsSection);
+    wrapper.classList.toggle("message--has-dashboard", hasDashboard);
+    return;
+  }
+  const sections = [];
+  if (!isInlineClassic) {
+    const highlightsSection = createHighlightsSection(artifacts.highlights);
+    if (highlightsSection) {
+      sections.push(highlightsSection);
     }
+    const tableSection = createComparisonTableSection(artifacts.comparisonTable);
+    if (tableSection) {
+      sections.push(tableSection);
+    }
+    const conclusionSection = createConclusionSection(artifacts.conclusion);
+    if (conclusionSection) {
+      sections.push(conclusionSection);
+    }
+    const trendsSection = createTrendSection(artifacts.trends);
+    if (trendsSection) {
+      sections.push(trendsSection);
+    }
+  }
+  const citationsSection = createCitationSection(artifacts.citations);
+  if (citationsSection) {
+    sections.push(citationsSection);
+  }
   const exportsSection = createExportSection(artifacts.exports);
   if (exportsSection) {
     sections.push(exportsSection);
   }
   if (!sections.length) {
+    wrapper.classList.toggle("message--has-dashboard", hasDashboard);
     return;
   }
   const container = document.createElement("div");
@@ -2767,6 +2775,7 @@ function renderMessageArtifacts(wrapper, artifacts) {
   if (artifacts.comparisonTable) {
     body.querySelectorAll(".message-table").forEach((tableNode) => tableNode.remove());
   }
+  wrapper.classList.toggle("message--has-dashboard", hasDashboard);
 }
 
 function createDashboardLayout(artifacts) {
