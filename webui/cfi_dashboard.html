@@ -99,6 +99,38 @@
       <div id="cfi-forecast" class="cfi-body tight plot"></div>
     </div>
 
+    <div class="cfi-panel" data-area="trend">
+      <div class="cfi-strip">Trend Explorer</div>
+      <div class="cfi-body trend-body">
+        <form id="cfi-trend-form" class="trend-form">
+          <label for="cfi-trend-metric">Metric</label>
+          <select id="cfi-trend-metric"></select>
+          <label for="cfi-trend-view">View</label>
+          <select id="cfi-trend-view">
+            <option value="absolute">Absolute</option>
+            <option value="growth">Growth %</option>
+          </select>
+          <button type="submit">Apply</button>
+        </form>
+        <div id="cfi-trend-chart" class="trend-chart plot"></div>
+      </div>
+    </div>
+
+    <div class="cfi-panel" data-area="peers">
+      <div class="cfi-strip">Peer Comparison</div>
+      <div class="cfi-body peers-body">
+        <form id="cfi-peer-form" class="peer-form">
+          <label for="cfi-peer-group">Peer Group</label>
+          <select id="cfi-peer-group"></select>
+          <label for="cfi-peer-custom">Custom Tickers (comma separated)</label>
+          <input id="cfi-peer-custom" type="text" placeholder="e.g. MSFT, GOOGL, NVDA"/>
+          <button type="submit">Update Peers</button>
+        </form>
+        <div id="cfi-peer-status" class="peer-status"></div>
+        <div id="cfi-peer-compare" class="peer-compare embed"></div>
+      </div>
+    </div>
+
     <div class="cfi-panel" data-area="rev">
       <div class="cfi-strip">Revenue vs EV/Revenue</div>
       <div id="cfi-rev" class="cfi-body tight plot"></div>
@@ -110,6 +142,14 @@
     <div class="cfi-panel" data-area="valbar">
       <div class="cfi-strip">Valuation Summary — Equity Value per Share ($)</div>
       <div id="cfi-valbar" class="cfi-body tight plot"></div>
+    </div>
+  </div>
+
+  <div id="cfi-drilldown" class="cfi-drilldown hidden">
+    <div class="cfi-drilldown__overlay" data-action="close-drilldown"></div>
+    <div class="cfi-drilldown__panel">
+      <button class="cfi-drilldown__close" data-action="close-drilldown" aria-label="Close drilldown">&times;</button>
+      <div class="cfi-drilldown__content" id="cfi-drilldown-content"></div>
     </div>
   </div>
 

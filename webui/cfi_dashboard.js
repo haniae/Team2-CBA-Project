@@ -284,8 +284,12 @@
     grid.className = "cfi-kpi-grid";
     items.forEach((item) => {
       if (!item) return;
+      const metricId = item.id || item.kpi_id || item.label || "";
       const card = document.createElement("div");
       card.className = "cfi-kpi-item";
+      card.dataset.metricId = metricId;
+      card.tabIndex = 0;
+      card.setAttribute("role", "button");
       const label = document.createElement("div");
       label.className = "cfi-kpi-label";
       label.textContent = item.label || item.id || "";
@@ -307,6 +311,13 @@
         meta.textContent = item.period;
         card.appendChild(meta);
       }
+      card.addEventListener("click", () => openKpiDrilldown(metricId));
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openKpiDrilldown(metricId);
+        }
+      });
       grid.appendChild(card);
     });
     container.appendChild(grid);
@@ -391,6 +402,343 @@
       const format = button.getAttribute("data-export-format");
       button.onclick = () => triggerExport(button, format, payload);
     });
+  }
+
+  function closeKpiDrilldown() {
+    const wrapper = scopedQuery("cfi-drilldown");
+    if (!wrapper) return;
+    wrapper.classList.remove("visible");
+    wrapper.classList.add("hidden");
+  }
+
+  function openKpiDrilldown(metricId) {
+    if (!metricId) return;
+    const payload = window.__cfiDashboardLastPayload;
+    if (!payload) return;
+    const wrapper = scopedQuery("cfi-drilldown");
+    const content = scopedQuery("cfi-drilldown-content");
+    if (!wrapper || !content) return;
+
+    const summary =
+      (payload.kpi_summary || []).find(
+        (item) =>
+          item?.id === metricId ||
+          item?.kpi_id === metricId ||
+          (item?.label && item.label.toLowerCase() === metricId.toLowerCase())
+      ) || null;
+    const drilldown =
+      (payload.interactions?.kpis?.drilldowns || []).find((entry) => entry?.id === metricId) || null;
+    const series = payload.kpi_series?.[metricId] || null;
+
+    content.innerHTML = "";
+
+    const title = document.createElement("h2");
+    title.textContent = drilldown?.label || summary?.label || metricId;
+    content.appendChild(title);
+
+    const meta = document.createElement("div");
+    meta.className = "drilldown-meta";
+    const period = summary?.period || "";
+    meta.textContent = period ? `Latest period: ${period}` : "Latest period unavailable";
+    content.appendChild(meta);
+
+    const cards = document.createElement("div");
+    cards.className = "drilldown-grid";
+
+    const latestCard = document.createElement("div");
+    latestCard.className = "drilldown-card";
+    const latestLabel = document.createElement("label");
+    latestLabel.textContent = "Latest Value";
+    const latestValue = document.createElement("strong");
+    latestValue.textContent = formatKpiValue(summary?.value, summary?.type);
+    latestCard.append(latestLabel, latestValue);
+    cards.appendChild(latestCard);
+
+    if (series && Array.isArray(series.values) && series.values.length >= 2) {
+      const last = series.values[series.values.length - 1];
+      const prev = series.values[series.values.length - 2];
+      if (isNumber(last) && isNumber(prev)) {
+        const diff = last - prev;
+        const diffCard = document.createElement("div");
+        diffCard.className = "drilldown-card";
+        const diffLabel = document.createElement("label");
+        diffLabel.textContent = "Change vs Prior Period";
+        const diffValue = document.createElement("strong");
+        diffValue.textContent = formatKpiValue(diff, series.type || summary?.type);
+        diffCard.append(diffLabel, diffValue);
+        cards.appendChild(diffCard);
+
+        if (prev !== 0) {
+          const growth = last / prev - 1;
+          const growthCard = document.createElement("div");
+          growthCard.className = "drilldown-card";
+          const growthLabel = document.createElement("label");
+          growthLabel.textContent = "Growth Rate";
+          const growthValue = document.createElement("strong");
+          growthValue.textContent = formatKpiValue(growth, "percent");
+          growthCard.append(growthLabel, growthValue);
+          cards.appendChild(growthCard);
+        }
+      }
+    }
+
+    content.appendChild(cards);
+
+    const chartNode = document.createElement("div");
+    chartNode.className = "drilldown-series";
+    content.appendChild(chartNode);
+
+    if (window.Plotly && series && Array.isArray(series.years) && series.years.length) {
+      const cleanPoints = series.years
+        .map((year, idx) => {
+          const value = series.values?.[idx];
+          return isNumber(value) ? { year, value } : null;
+        })
+        .filter(Boolean);
+      if (cleanPoints.length) {
+        Plotly.newPlot(
+          chartNode,
+          [
+            {
+              type: "scatter",
+              mode: "lines+markers",
+              x: cleanPoints.map((pt) => pt.year),
+              y: cleanPoints.map((pt) => pt.value),
+              name: drilldown?.label || summary?.label || metricId,
+              line: { color: "#1C7ED6", width: 3 },
+              marker: { color: "#1C7ED6", size: 6 },
+            },
+          ],
+          {
+            ...BASE_LAYOUT,
+            title: { text: "Historical Trend", x: 0.02, font: { size: 14 } },
+            yaxis:
+              series.type === "percent"
+                ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1%", rangemode: "tozero" }
+                : series.type === "multiple"
+                ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1" }
+                : { ...BASE_LAYOUT.yaxis, separatethousands: true },
+          },
+          { displayModeBar: false, responsive: true }
+        );
+      } else {
+        chartNode.innerHTML = '<div class="cfi-error">Insufficient data for trend.</div>';
+      }
+    } else {
+      chartNode.innerHTML = '<div class="cfi-error">Trend chart unavailable.</div>';
+    }
+
+    if (series && Array.isArray(series.years)) {
+      const table = document.createElement("table");
+      table.className = "drilldown-table";
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      const thYear = document.createElement("th");
+      thYear.textContent = "Period";
+      headerRow.appendChild(thYear);
+      const thValue = document.createElement("th");
+      thValue.textContent = "Value";
+      headerRow.appendChild(thValue);
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      series.years.forEach((year, idx) => {
+        const tr = document.createElement("tr");
+        const tdYear = document.createElement("td");
+        tdYear.textContent = year;
+        const tdValue = document.createElement("td");
+        tdValue.textContent = formatKpiValue(series.values?.[idx], series.type || summary?.type);
+        tr.append(tdYear, tdValue);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      content.appendChild(table);
+    }
+
+    wrapper.classList.remove("hidden");
+    wrapper.classList.add("visible");
+  }
+
+  function setupDrilldownListeners() {
+    const wrapper = scopedQuery("cfi-drilldown");
+    if (!wrapper || wrapper.dataset.bound === "true") return;
+    wrapper.dataset.bound = "true";
+    wrapper.addEventListener("click", (event) => {
+      if (event.target instanceof HTMLElement && event.target.dataset.action === "close-drilldown") {
+        closeKpiDrilldown();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeKpiDrilldown();
+      }
+    });
+  }
+
+  function renderTrendChart(metricId, mode = "absolute") {
+    const chartNode = scopedQuery("cfi-trend-chart");
+    if (!chartNode) return;
+    const payload = window.__cfiDashboardLastPayload;
+    if (!payload) return;
+    const series = payload.kpi_series?.[metricId];
+    if (!series || !Array.isArray(series.years) || !series.years.length) {
+      chartNode.innerHTML = '<div class="cfi-error">Trend unavailable.</div>';
+      return;
+    }
+    if (!window.Plotly) {
+      chartNode.innerHTML = '<div class="cfi-error">Chart library unavailable.</div>';
+      return;
+    }
+    const baseType = series.type || "number";
+    let years = series.years.slice();
+    let values = series.values.slice();
+    let type = baseType;
+    if (mode === "growth") {
+      const growth = [];
+      for (let i = 1; i < values.length; i += 1) {
+        const prev = values[i - 1];
+        const curr = values[i];
+        if (!isNumber(prev) || !isNumber(curr) || prev === 0) {
+          growth.push(null);
+        } else {
+          growth.push(curr / prev - 1);
+        }
+      }
+      years = years.slice(1);
+      values = growth;
+      type = "percent";
+    }
+    const cleanPoints = years
+      .map((year, idx) => {
+        const value = values[idx];
+        return isNumber(value) ? { year, value } : null;
+      })
+      .filter(Boolean);
+    if (!cleanPoints.length) {
+      chartNode.innerHTML = '<div class="cfi-error">Trend unavailable.</div>';
+      return;
+    }
+    Plotly.newPlot(
+      chartNode,
+      [
+        {
+          type: "scatter",
+          mode: "lines+markers",
+          x: cleanPoints.map((pt) => pt.year),
+          y: cleanPoints.map((pt) => pt.value),
+          line: { color: "#FF7F0E", width: 3 },
+          marker: { color: "#FF7F0E", size: 6 },
+        },
+      ],
+      {
+        ...BASE_LAYOUT,
+        title: { text: mode === "growth" ? "Growth Trend" : "Absolute Trend", x: 0.02, font: { size: 14 } },
+        yaxis:
+          type === "percent"
+            ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1%", rangemode: "tozero" }
+            : type === "multiple"
+            ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1" }
+            : { ...BASE_LAYOUT.yaxis, separatethousands: true },
+      },
+      { displayModeBar: false, responsive: true }
+    );
+  }
+
+  function setupTrendExplorer(payload) {
+    const form = scopedQuery("cfi-trend-form");
+    const metricSelect = scopedQuery("cfi-trend-metric");
+    const viewSelect = scopedQuery("cfi-trend-view");
+    const chartNode = scopedQuery("cfi-trend-chart");
+    if (!form || !metricSelect || !viewSelect || !chartNode) return;
+    const metrics = (payload.kpi_summary || []).filter((item) => item?.id && payload.kpi_series?.[item.id]);
+    metricSelect.innerHTML = "";
+    if (!metrics.length) {
+      metricSelect.innerHTML = '<option value="">No metrics available</option>';
+      chartNode.innerHTML = '<div class="cfi-error">Trend data unavailable.</div>';
+      form.querySelector("button")?.setAttribute("disabled", "disabled");
+      return;
+    }
+    metrics.forEach((item, index) => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = item.label || item.id;
+      if (index === 0) option.selected = true;
+      metricSelect.appendChild(option);
+    });
+    form.querySelector("button")?.removeAttribute("disabled");
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      if (!metricSelect.value) return;
+      renderTrendChart(metricSelect.value, viewSelect.value || "absolute");
+    };
+    renderTrendChart(metricSelect.value, viewSelect.value || "absolute");
+  }
+
+  function setupPeerControls(payload) {
+    const panel = scopedSelect('[data-area="peers"]');
+    const form = scopedQuery("cfi-peer-form");
+    const select = scopedQuery("cfi-peer-group");
+    const customInput = scopedQuery("cfi-peer-custom");
+    const status = scopedQuery("cfi-peer-status");
+    const host = scopedQuery("cfi-peer-compare");
+    if (!panel || !form || !select || !customInput || !status || !host) return;
+
+    const peerConfig = payload.peer_config;
+    if (!peerConfig) {
+      panel.style.display = "none";
+      return;
+    }
+    panel.style.display = "";
+
+    const groups = Array.isArray(peerConfig.available_peer_groups) ? peerConfig.available_peer_groups : [];
+    select.innerHTML = "";
+    groups.forEach((group) => {
+      const option = document.createElement("option");
+      option.value = group.id || group.label || "";
+      option.textContent = group.label || group.id || "Group";
+      select.appendChild(option);
+    });
+    if (!select.value && groups.length) {
+      select.value = peerConfig.default_peer_group || groups[0].id || groups[0].label || "";
+    } else if (peerConfig.default_peer_group) {
+      select.value = peerConfig.default_peer_group;
+    }
+
+    status.textContent = "Select a peer group or enter tickers to compare.";
+    host.innerHTML = "";
+
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      const selectedGroup = select.value;
+      const groupDefinition = groups.find((group) => group.id === selectedGroup || group.label === selectedGroup);
+      const focus = peerConfig.focus_ticker ? [peerConfig.focus_ticker] : [];
+      const groupTickers = Array.isArray(groupDefinition?.tickers) ? groupDefinition.tickers.slice() : [];
+      const customTickers = customInput.value
+        .split(",")
+        .map((ticker) => ticker.trim().toUpperCase())
+        .filter((ticker) => ticker && /^[A-Z0-9\.-]+$/.test(ticker));
+      const tickers = Array.from(new Set([...focus, ...groupTickers, ...customTickers]));
+      if (tickers.length < 2) {
+        status.textContent = "Add at least one peer ticker to compare.";
+        return;
+      }
+      status.textContent = "Loading peer comparison…";
+      host.innerHTML = '<div class="cfi-loading">Loading peer comparison…</div>';
+      window
+        .showCfiCompareDashboard({
+          container: host,
+          tickers,
+          benchmark: peerConfig.default_peer_group === selectedGroup ? peerConfig.benchmark_label : selectedGroup,
+        })
+        .then(() => {
+          status.textContent = `Comparing ${tickers.join(", ")}`;
+        })
+        .catch((error) => {
+          console.error("Peer comparison failed:", error);
+          status.textContent = "Unable to load peer comparison.";
+          host.innerHTML = '<div class="cfi-error">Unable to load peer comparison.</div>';
+        });
+    };
   }
 
   function plotRevenueChart(data) {
@@ -630,6 +978,10 @@
       renderKeyFinancials("cfi-keyfin", payload.key_financials || {});
       const kpiItems = payload.kpi_summary || payload.kpis || [];
       renderKpiSummary("cfi-kpi", kpiItems);
+      window.__cfiDashboardLastPayload = payload;
+      setupDrilldownListeners();
+      setupTrendExplorer(payload);
+      setupPeerControls(payload);
       window.__cfiDashboardInteractions = payload.interactions || null;
       window.__cfiDashboardPeerConfig = payload.peer_config || null;
       window.__cfiDashboardSeries = window.__cfiDashboardSeries || {};

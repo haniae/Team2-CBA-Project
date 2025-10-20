@@ -27,12 +27,13 @@ body {
   display: grid;
   grid-gap: 12px;
   grid-template-columns: repeat(12, 1fr);
-  grid-template-rows: auto 166px 320px 220px 260px;
+  grid-template-rows: auto 166px 320px 220px 220px 260px;
   grid-template-areas:
     "header header header header header header header header header header header header"
     "overview overview overview overview overview overview valuation valuation valuation valuation valuation valuation"
     "keyfin keyfin keyfin keyfin keyfin keyfin keyfin keyfin pricechart pricechart pricechart pricechart"
     "kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi"
+    "trend trend trend trend trend trend peers peers peers peers peers peers"
     "rev rev rev rev ebitda ebitda ebitda ebitda valbar valbar valbar valbar";
   background: #ffffff;
   border-radius: 8px;
@@ -71,6 +72,14 @@ body {
 
 .cfi-panel[data-area="pricechart"] {
   grid-area: pricechart;
+}
+
+.cfi-panel[data-area="trend"] {
+  grid-area: trend;
+}
+
+.cfi-panel[data-area="peers"] {
+  grid-area: peers;
 }
 
 .cfi-panel[data-area="rev"] {
@@ -467,6 +476,190 @@ body {
   color: var(--orange);
 }
 
+.trend-body,
+.peers-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trend-form,
+.peer-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.trend-form label,
+.peer-form label {
+  font: 600 11px/1.4 "Inter", "Open Sans", Roboto;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.trend-form select,
+.peer-form select,
+.peer-form input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  font: 12px "Inter", "Open Sans", Roboto;
+}
+
+.trend-form button,
+.peer-form button {
+  justify-self: start;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font: 600 12px "Inter", "Open Sans", Roboto;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.trend-form button:hover,
+.peer-form button:hover {
+  background: #155da6;
+  transform: translateY(-1px);
+}
+
+.trend-chart {
+  min-height: 240px;
+}
+
+.peer-status {
+  font: 12px "Inter", "Open Sans", Roboto;
+  color: var(--muted);
+}
+
+.peer-compare {
+  min-height: 320px;
+  background: #f9fbff;
+  border: 1px dashed var(--grid);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.peer-compare .cfi-error {
+  padding: 24px;
+}
+
+.cfi-drilldown {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.cfi-drilldown.visible {
+  display: flex;
+}
+
+.cfi-drilldown.hidden {
+  display: none;
+}
+
+.cfi-drilldown__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 46, 89, 0.55);
+}
+
+.cfi-drilldown__panel {
+  position: relative;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 18px 46px rgba(11, 46, 89, 0.22);
+  width: min(840px, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px 28px 32px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.cfi-drilldown__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.cfi-drilldown__content h2 {
+  margin: 0;
+  font: 600 20px "Inter", "Open Sans", Roboto;
+  color: var(--navy);
+}
+
+.drilldown-meta {
+  font: 12px "Inter", "Open Sans", Roboto;
+  color: var(--muted);
+}
+
+.drilldown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.drilldown-card {
+  border: 1px solid var(--grid);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f9fbff;
+}
+
+.drilldown-card label {
+  font: 600 10px/1 "Inter", "Open Sans", Roboto;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.drilldown-card strong {
+  font: 600 16px "Inter", "Open Sans", Roboto;
+  color: var(--navy);
+}
+
+.drilldown-series {
+  min-height: 260px;
+}
+
+.drilldown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 12px "Inter", "Open Sans", Roboto;
+}
+
+.drilldown-table th,
+.drilldown-table td {
+  border: 1px solid var(--grid);
+  padding: 6px 8px;
+  text-align: right;
+}
+
+.drilldown-table th:first-child,
+.drilldown-table td:first-child {
+  text-align: left;
+}
+
 .cfi-kpi-meta {
   font: 500 10px/1.2 "Inter", "Open Sans", Roboto;
   color: #7080a3;
@@ -487,10 +680,16 @@ body {
       "overview overview overview overview overview overview valuation valuation valuation valuation valuation valuation"
       "keyfin keyfin keyfin keyfin keyfin keyfin keyfin keyfin keyfin keyfin keyfin keyfin"
       "kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi"
+      "trend trend trend trend trend trend peers peers peers peers peers peers"
       "pricechart pricechart pricechart pricechart pricechart pricechart pricechart pricechart pricechart pricechart pricechart pricechart"
       "rev rev rev rev rev rev rev rev rev rev rev rev"
       "ebitda ebitda ebitda ebitda ebitda ebitda ebitda ebitda ebitda ebitda ebitda ebitda"
       "valbar valbar valbar valbar valbar valbar valbar valbar valbar valbar valbar valbar";
+  }
+
+  .trend-form,
+  .peer-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .cfi-kpi-grid {
@@ -513,6 +712,8 @@ body {
       "valuation"
       "keyfin"
       "kpi"
+      "trend"
+      "peers"
       "pricechart"
       "rev"
       "ebitda"
@@ -564,6 +765,16 @@ body {
   .cfi-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .trend-form,
+  .peer-form {
+    grid-template-columns: 1fr;
+  }
+
+  .cfi-drilldown__panel {
+    width: 94vw;
+    padding: 20px;
+  }
 }
 
 @media (max-width: 520px) {
@@ -573,5 +784,10 @@ body {
 
   .export-button {
     flex: 1 1 100%;
+  }
+
+  .trend-form button,
+  .peer-form button {
+    width: 100%;
   }
 }

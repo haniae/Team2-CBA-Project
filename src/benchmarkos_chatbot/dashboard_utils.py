@@ -276,6 +276,7 @@ def _build_peer_config(
         "default_peer_group": "benchmark",
         "max_peers": 5,
         "supports_custom": True,
+        "benchmark_label": benchmark_label,
         "available_peer_groups": [
             {
                 "id": "benchmark",
@@ -692,6 +693,19 @@ def build_cfi_compare_payload(
         "cash_and_cash_equivalents",
         "total_debt",
         "long_term_debt",
+        "revenue_cagr",
+        "eps_cagr",
+        "ebitda_growth",
+        "operating_margin",
+        "return_on_assets",
+        "return_on_invested_capital",
+        "pb_ratio",
+        "peg_ratio",
+        "cash_conversion",
+        "working_capital",
+        "tsr",
+        "dividend_yield",
+        "share_buyback_intensity",
     }
     benchmark_metrics = engine.compute_benchmark_metrics(metric_scope)
 
@@ -751,11 +765,25 @@ def build_cfi_compare_payload(
     table_rows: List[Dict[str, Any]] = []
     table_config = [
         {"metric": "revenue", "label": "Revenue", "type": "moneyB"},
+        {"metric": "revenue_cagr", "label": "Revenue CAGR", "type": "pct"},
+        {"metric": "eps_cagr", "label": "EPS CAGR", "type": "pct"},
+        {"metric": "ebitda_growth", "label": "EBITDA Growth", "type": "pct"},
         {"metric": "ebitda_margin", "label": "EBITDA margin", "type": "pct"},
+        {"metric": "operating_margin", "label": "Operating margin", "type": "pct"},
         {"metric": "net_margin", "label": "Net margin", "type": "pct"},
+        {"metric": "return_on_assets", "label": "ROA", "type": "pct"},
         {"metric": "return_on_equity", "label": "ROE", "type": "pct"},
+        {"metric": "return_on_invested_capital", "label": "ROIC", "type": "pct"},
         {"metric": "pe_ratio", "label": "P/E (ttm)", "type": "x"},
         {"metric": "ev_ebitda", "label": "EV/EBITDA (ttm)", "type": "x"},
+        {"metric": "pb_ratio", "label": "P/B", "type": "x"},
+        {"metric": "peg_ratio", "label": "PEG", "type": "x"},
+        {"metric": "free_cash_flow", "label": "Free Cash Flow", "type": "moneyB"},
+        {"metric": "cash_conversion", "label": "Cash Conversion", "type": "pct"},
+        {"metric": "working_capital", "label": "Working Capital", "type": "moneyB"},
+        {"metric": "tsr", "label": "TSR", "type": "pct"},
+        {"metric": "dividend_yield", "label": "Dividend Yield", "type": "pct"},
+        {"metric": "share_buyback_intensity", "label": "Share Buyback Intensity", "type": "pct"},
         {"metric": "debt_to_equity", "label": "Debt/Equity", "type": "x"},
     ]
 
@@ -771,6 +799,8 @@ def build_cfi_compare_payload(
             revenue_years = [year for year in revenue_years if year]
             if revenue_years:
                 row["label"] = f"Revenue (FY{str(max(revenue_years))[-2:]} $B)"
+        elif metric_name in {"free_cash_flow", "working_capital"}:
+            row["label"] = f"{config['label']} ($B)"
 
         for symbol, display in zip(canonical, display_order):
             latest = latest_by_ticker[symbol]
