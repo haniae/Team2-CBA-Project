@@ -8,10 +8,20 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-import pandas as pd
+try:  # Optional dependency for dividend and price history helpers
+    import pandas as pd  # type: ignore[import]
+except ImportError:  # pragma: no cover - lightweight environments
+    pd = None  # type: ignore[assignment]
 
+from . import imf_proxy
 from .backfill_policy import POLICY, Rule, register_rules
-from .database import Database, FinancialFactRecord, KpiValueRecord, MetricRecord
+from .database import (
+    Database,
+    FinancialFactRecord,
+    KpiValueRecord,
+    MetricRecord,
+    replace_metric_snapshots,
+)
 from .external_data import stooq_last_close, yahoo_snapshot
 
 LOGGER = logging.getLogger(__name__)
@@ -79,9 +89,14 @@ def _calc_cagr(start: Optional[float], end: Optional[float], periods: int) -> Op
     if start <= 0:
         return None
     try:
-        return (end / start) ** (1 / periods) - 1
+        result = (end / start) ** (1 / periods) - 1
     except (ZeroDivisionError, ValueError):
         return None
+    if isinstance(result, complex):
+        return None
+    if not math.isfinite(result):
+        return None
+    return float(result)
 
 
 def _infer_year_from_period(period: Optional[str]) -> Optional[int]:
@@ -157,6 +172,7 @@ class Context:
         self._fact_cache: Dict[str, List[FinancialFactRecord]] = {}
         self._external_snapshot: Optional[Dict[str, Any]] = None
         self._quote_cache: Optional[Dict[str, Any]] = None
+        self._imf_sector: Optional[str] = None
 
     # ------------------------------------------------------------------
     # Retrieval helpers
@@ -281,26 +297,94 @@ class Context:
         aliases: Optional[Sequence[str]] = None,
         allow_quarterly: bool = False,
         warn_metric: Optional[str] = None,
-    ) -> Tuple[Optional[float], str]:
+        return_year: bool = False,
+        fallback_to_prior: bool = True,
+        max_lookback: int = 5,
+    ) -> Tuple[Optional[float], str] | Tuple[Optional[float], str, Optional[int]]:
         """Return value with fallback lookups and provenance tag."""
         names = [metric]
         if aliases:
             names.extend(aliases)
         target_year = year if year is not None else self.fiscal_year
-        for name in names:
-            value = self.metric(name, target_year, include_kpi=False)
-            if value is not None:
-                return value, f"{name}.metric"
-            value = self.fact(name, target_year, fiscal_period="FY")
-            if value is not None:
-                return value, f"{name}.fact"
-        if allow_quarterly:
-            aggregated = self.sum_quarterly(metric, target_year)
-            if aggregated is not None:
-                metric_id = warn_metric or metric
-                self.add_warning(metric_id, f"Summed quarterly {metric} for FY{target_year}")
-                return aggregated, f"{metric}.quarterly"
+        candidate_years: List[Optional[int]] = [target_year]
+        if fallback_to_prior and target_year is not None:
+            for offset in range(1, max_lookback + 1):
+                candidate = target_year - offset
+                if candidate < 1900:
+                    break
+                candidate_years.append(candidate)
+
+        def _result(
+            value: Optional[float],
+            ref: str,
+            year_used: Optional[int],
+            fell_back: bool,
+        ) -> Tuple[Optional[float], str] | Tuple[Optional[float], str, Optional[int]]:
+            if value is None:
+                if return_year:
+                    return None, "", None
+                return None, ""
+            if fell_back and warn_metric and year_used is not None and target_year is not None:
+                self.add_warning(
+                    warn_metric,
+                    f"Using FY{year_used} data for requested FY{target_year}",
+                )
+            if return_year:
+                return value, ref, year_used
+            return value, ref
+
+        for candidate_year in candidate_years:
+            fell_back = candidate_year is not None and target_year is not None and candidate_year != target_year
+            for name in names:
+                value = self.metric(name, candidate_year, include_kpi=False)
+                if value is not None:
+                    return _result(value, f"{name}.metric", candidate_year, fell_back)
+            for name in names:
+                value = self.fact(name, candidate_year, fiscal_period="FY")
+                if value is not None:
+                    return _result(value, f"{name}.fact", candidate_year, fell_back)
+            if allow_quarterly and candidate_year is not None:
+                aggregated = self.sum_quarterly(metric, candidate_year)
+                if aggregated is not None:
+                    metric_id = warn_metric or metric
+                    self.add_warning(metric_id, f"Summed quarterly {metric} for FY{candidate_year}")
+                    return _result(aggregated, f"{metric}.quarterly", candidate_year, fell_back)
+        if return_year:
+            return None, "", None
         return None, ""
+
+    def imf_sector(self) -> str:
+        """Return the sector associated with the current ticker (falls back to GLOBAL)."""
+        if self._imf_sector is None:
+            self._imf_sector = imf_proxy.sector_for_ticker(self.ticker) or "GLOBAL"
+        return self._imf_sector
+
+    def _imf_fallback(self, metric_id: str) -> Optional[Tuple[float, str]]:
+        """Return an IMF-derived proxy for the requested metric, if available."""
+        value = imf_proxy.metric_for(self.ticker, metric_id)
+        if value is None:
+            return None
+        sector = self.imf_sector()
+        self.add_warning(metric_id, f"Used IMF sector proxy ({sector})")
+        try:
+            return float(value), sector
+        except (TypeError, ValueError):
+            LOGGER.debug("IMF proxy for %s/%s is not numeric (%s)", self.ticker, metric_id, value)
+            return None
+
+    def _imf_result(self, metric_id: str) -> Optional[ComputationResult]:
+        fallback = self._imf_fallback(metric_id)
+        if fallback is None:
+            return None
+        value, sector = fallback
+        warning = self._pop_warning(metric_id)
+        return (
+            value,
+            "proxy",
+            "IMF",
+            f"imf_sector::{sector}",
+            warning,
+        )
 
     # ------------------------------------------------------------------
     # Warning management & computed results
@@ -541,71 +625,128 @@ class Context:
             return abs(total_dividends) / shares, f"dividends_paid[{div_ref}]/shares[{shares_ref}]"
         snapshot = self.get_ext_snapshot()
         dividends = snapshot.get("dividends")
-        if isinstance(dividends, pd.Series) and not dividends.empty:
+        if pd is not None and isinstance(dividends, pd.Series) and not dividends.empty:
             trailing = dividends.tail(4).sum()
             if float(trailing) != 0.0:
                 self.add_warning("dividend_yield", "Used Yahoo dividend history for trailing DPS")
                 return float(trailing), "dividends.yahoo"
         return None, ""
 
-    def eps_value(self, year: Optional[int], *, warn_metric: str) -> Tuple[Optional[float], str]:
-        eps, ref = self.value_with_fallback(
+    def eps_value(
+        self,
+        year: Optional[int],
+        *,
+        warn_metric: str,
+        return_year: bool = False,
+    ) -> Tuple[Optional[float], str] | Tuple[Optional[float], str, Optional[int]]:
+        eps_value = self.value_with_fallback(
             "eps_diluted",
             year,
             aliases=["eps_basic"],
             allow_quarterly=False,
             warn_metric=warn_metric,
+            return_year=True,
         )
+        eps, ref, eps_year = eps_value
         if eps is not None:
+            if return_year:
+                return eps, ref, eps_year
             return eps, ref
-        net_income, ni_ref = self.value_with_fallback(
+        net_income_value = self.value_with_fallback(
             "net_income",
             year,
             allow_quarterly=False,
             warn_metric=warn_metric,
+            return_year=True,
         )
+        net_income, ni_ref, ni_year = net_income_value
         shares, shares_ref = self.shares_outstanding(year)
         if net_income is not None and shares not in (None, 0):
-            self.add_warning(warn_metric, f"Derived EPS from net income and shares for FY{year}")
-            return net_income / shares, f"net_income[{ni_ref}]/shares[{shares_ref}]"
+            actual_year = ni_year if ni_year is not None else year
+            self.add_warning(
+                warn_metric,
+                f"Derived EPS from net income and shares for FY{actual_year}",
+            )
+            value = net_income / shares
+            if return_year:
+                return value, f"net_income[{ni_ref}]/shares[{shares_ref}]", actual_year
+            return value, f"net_income[{ni_ref}]/shares[{shares_ref}]"
         snapshot = self.get_ext_snapshot()
         raw_info = snapshot.get("raw") or {}
         trailing_eps = raw_info.get("trailingEps")
         if isinstance(trailing_eps, (int, float)) and year == self.fiscal_year:
             self.add_warning(warn_metric, "Used Yahoo trailing EPS as fallback")
+            if return_year:
+                return float(trailing_eps), "eps.yahoo.trailing", year
             return float(trailing_eps), "eps.yahoo.trailing"
+        if return_year:
+            return None, "", None
         return None, ""
 
-    def ebitda_value(self, year: Optional[int], warn_metric: str) -> Tuple[Optional[float], str]:
-        ebitda, ref = self.value_with_fallback(
+    def ebitda_value(
+        self,
+        year: Optional[int],
+        warn_metric: str,
+        *,
+        return_year: bool = False,
+        fallback_to_prior: bool = True,
+    ) -> Tuple[Optional[float], str] | Tuple[Optional[float], str, Optional[int]]:
+        ebitda_result = self.value_with_fallback(
             "ebitda",
             year,
             aliases=["adjusted_ebitda"],
             allow_quarterly=False,
             warn_metric=warn_metric,
+            return_year=True,
+            fallback_to_prior=fallback_to_prior,
         )
+        ebitda, ref, e_year = ebitda_result
         if ebitda is not None:
+            if return_year:
+                return ebitda, ref, e_year
             return ebitda, ref
-        operating_income, op_ref = self.value_with_fallback(
+        operating_income_result = self.value_with_fallback(
             "operating_income",
             year,
             allow_quarterly=False,
             warn_metric=warn_metric,
+            return_year=True,
+            fallback_to_prior=fallback_to_prior,
         )
-        depreciation, dep_ref = self.value_with_fallback(
+        operating_income, op_ref, op_year = operating_income_result
+        depreciation_result = self.value_with_fallback(
             "depreciation_and_amortization",
             year,
             allow_quarterly=False,
             warn_metric=warn_metric,
+            return_year=True,
+            fallback_to_prior=fallback_to_prior,
         )
+        depreciation, dep_ref, dep_year = depreciation_result
         if operating_income is not None:
             depreciation = depreciation or 0.0
+            actual_year = op_year if op_year is not None else year
             self.add_warning(warn_metric, "Approximated EBITDA via operating income + D&A")
-            return operating_income + depreciation, f"operating_income[{op_ref}]+depr[{dep_ref}]"
-        profit_loss, pl_ref = self.value_with_fallback("profit_loss", year)
+            value = operating_income + depreciation
+            if return_year:
+                return value, f"operating_income[{op_ref}]+depr[{dep_ref}]", actual_year
+            return value, f"operating_income[{op_ref}]+depr[{dep_ref}]"
+        profit_loss_result = self.value_with_fallback(
+            "profit_loss",
+            year,
+            return_year=True,
+            fallback_to_prior=fallback_to_prior,
+        )
+        profit_loss, pl_ref, pl_year = profit_loss_result
         if profit_loss is not None and depreciation is not None:
+            actual_year = pl_year if pl_year is not None else year
             self.add_warning(warn_metric, "Used profit loss + D&A for EBITDA approximation")
-            return profit_loss + depreciation, f"profit_loss[{pl_ref}]+depr[{dep_ref}]"
+            value = profit_loss + depreciation
+            if return_year:
+                return value, f"profit_loss[{pl_ref}]+depr[{dep_ref}]", actual_year
+            return value, f"profit_loss[{pl_ref}]+depr[{dep_ref}]"
+        if return_year:
+            return None, "", None
         return None, ""
 
     def free_cash_flow(self, year: Optional[int], warn_metric: str) -> Tuple[Optional[float], str]:
@@ -680,66 +821,100 @@ class Context:
     # Metric computations
     # ------------------------------------------------------------------
     def compute_revenue_cagr(self) -> ComputationResult:
-        end_year = self.fiscal_year
-        end_value, end_ref = self.value_with_fallback(
+        end_year_request = self.fiscal_year
+        end_result = self.value_with_fallback(
             "revenue",
-            end_year,
+            end_year_request,
             allow_quarterly=True,
             warn_metric="revenue_cagr",
+            return_year=True,
         )
+        end_value, end_ref, end_year_actual = end_result
         if end_value is None:
             warning = self._pop_warning("revenue_cagr") or "Missing revenue for latest fiscal year"
             return (None, "n/a", "", "", warning)
 
+        anchor_year = end_year_actual if end_year_actual is not None else end_year_request
+
         start_value: Optional[float] = None
         start_ref = ""
         start_year: Optional[int] = None
-        for lookback in range(1, 6):
-            candidate_year = end_year - lookback
-            if candidate_year < 1900:
-                break
-            value, ref = self.value_with_fallback(
-                "revenue",
-                candidate_year,
-                allow_quarterly=True,
-                warn_metric="revenue_cagr",
-            )
-            if value is not None:
-                start_year = candidate_year
-                start_value = value
-                start_ref = ref
-                break
-        if start_year is None or start_value is None:
+        if anchor_year is not None:
+            for lookback in range(1, 6):
+                candidate_year = anchor_year - lookback
+                if candidate_year < 1900:
+                    break
+                value, ref, value_year = self.value_with_fallback(
+                    "revenue",
+                    candidate_year,
+                    allow_quarterly=True,
+                    warn_metric="revenue_cagr",
+                    return_year=True,
+                    fallback_to_prior=False,
+                )
+                if value is not None:
+                    start_year = value_year if value_year is not None else candidate_year
+                    start_value = value
+                    start_ref = ref
+                    break
+
+        if (start_year is None or start_value is None) and anchor_year is not None:
+            series = self.metric_series("revenue", upto=anchor_year, limit=2)
+            if len(series) >= 2:
+                earlier_year, earlier_value = series[-2]
+                start_year = earlier_year
+                start_value = earlier_value
+                start_ref = "revenue.series"
+                self.add_warning("revenue_cagr", "Used historical revenue series fallback")
+
+        if start_year is None or start_value is None or anchor_year is None:
+            imf_result = self._imf_result("revenue_cagr")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("revenue_cagr") or "Insufficient revenue history for CAGR"
             return (None, "n/a", "", "", warning)
 
-        periods = end_year - start_year
-        value = _calc_cagr(start_value, end_value, periods)
-        if value is None:
+        periods = anchor_year - start_year
+        if periods <= 0:
             warning = self._pop_warning("revenue_cagr") or "Unable to compute revenue CAGR"
             return (None, "n/a", "", "", warning)
 
-        source_ref = f"revenue[{start_year}:{start_ref}->{end_year}:{end_ref}]"
+        value = _calc_cagr(start_value, end_value, periods)
+        if value is None:
+            imf_result = self._imf_result("revenue_cagr")
+            if imf_result is not None:
+                return imf_result
+            warning = self._pop_warning("revenue_cagr") or "Unable to compute revenue CAGR"
+            return (None, "n/a", "", "", warning)
+
+        source_ref = f"revenue[{start_year}:{start_ref}->{anchor_year}:{end_ref}]"
         warning = self._pop_warning("revenue_cagr")
         return (value, "derived", "SEC", source_ref, warning)
 
     def compute_eps_cagr(self) -> ComputationResult:
-        end_year = self.fiscal_year
-        end_value, end_ref = self.eps_value(end_year, warn_metric="eps_cagr")
+        end_year_request = self.fiscal_year
+        end_tuple = self.eps_value(end_year_request, warn_metric="eps_cagr", return_year=True)
+        end_value, end_ref, end_year_actual = end_tuple
 
         start_value: Optional[float] = None
         start_ref = ""
         start_year: Optional[int] = None
-        for lookback in range(1, 6):
-            candidate_year = end_year - lookback
-            if candidate_year < 1900:
-                break
-            value, ref = self.eps_value(candidate_year, warn_metric="eps_cagr")
-            if value is not None:
-                start_year = candidate_year
-                start_value = value
-                start_ref = ref
-                break
+        anchor_year = end_year_actual if end_year_actual is not None else end_year_request
+        if anchor_year is not None:
+            for lookback in range(1, 6):
+                candidate_year = anchor_year - lookback
+                if candidate_year < 1900:
+                    break
+                value, ref, value_year = self.eps_value(
+                    candidate_year,
+                    warn_metric="eps_cagr",
+                    return_year=True,
+                )
+                if value is not None:
+                    start_year = value_year if value_year is not None else candidate_year
+                    start_value = value
+                    start_ref = ref
+                    break
 
         periods: Optional[int] = None
         if start_year is None or start_value is None or end_value is None:
@@ -748,7 +923,11 @@ class Context:
             trailing = raw_info.get("trailingEps")
             forward = raw_info.get("forwardEps")
             if isinstance(trailing, (int, float)) and isinstance(forward, (int, float)):
-                start_year = end_year - 1
+                base_year = anchor_year if anchor_year is not None else end_year_request
+                if base_year is None:
+                    warning = self._pop_warning("eps_cagr") or "Insufficient EPS history for CAGR"
+                    return (None, "n/a", "", "", warning)
+                start_year = base_year - 1
                 start_value = float(trailing)
                 end_value = float(forward)
                 start_ref = "eps.yahoo.trailing"
@@ -760,30 +939,86 @@ class Context:
                 return (None, "n/a", "", "", warning)
 
         if periods is None:
-            periods = end_year - start_year
+            if anchor_year is None or start_year is None:
+                imf_result = self._imf_result("eps_cagr")
+                if imf_result is not None:
+                    return imf_result
+                warning = self._pop_warning("eps_cagr") or "Unable to compute EPS CAGR"
+                return (None, "n/a", "", "", warning)
+            periods = anchor_year - start_year
 
-        value = _calc_cagr(start_value, end_value, periods)
-        if value is None:
+        if periods <= 0 or start_value is None or end_value is None:
+            imf_result = self._imf_result("eps_cagr")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("eps_cagr") or "Unable to compute EPS CAGR"
             return (None, "n/a", "", "", warning)
 
-        source_ref = f"eps[{start_year}:{start_ref}->{end_year}:{end_ref}]"
+        value = _calc_cagr(start_value, end_value, periods)
+        if value is None:
+            imf_result = self._imf_result("eps_cagr")
+            if imf_result is not None:
+                return imf_result
+            warning = self._pop_warning("eps_cagr") or "Unable to compute EPS CAGR"
+            return (None, "n/a", "", "", warning)
+
+        end_year_for_ref = anchor_year if anchor_year is not None else end_year_request
+        source_ref = f"eps[{start_year}:{start_ref}->{end_year_for_ref}:{end_ref}]"
         warning = self._pop_warning("eps_cagr")
         return (value, "derived", "SEC", source_ref, warning)
 
     def compute_ebitda_growth(self) -> ComputationResult:
-        current_year = self.fiscal_year
-        previous_year = current_year - 1
-        current, current_ref = self.ebitda_value(current_year, warn_metric="ebitda_growth")
-        previous, prev_ref = self.ebitda_value(previous_year, warn_metric="ebitda_growth")
-        if current is None or previous in (None, 0):
+        current_year_request = self.fiscal_year
+        current_tuple = self.ebitda_value(
+            current_year_request,
+            warn_metric="ebitda_growth",
+            return_year=True,
+        )
+        current_value, current_ref, current_year_actual = current_tuple
+        if current_value is None:
+            imf_result = self._imf_result("ebitda_growth")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("ebitda_growth") or "Missing EBITDA history"
             return (None, "n/a", "", "", warning)
-        growth = _safe_div(current - previous, abs(previous))
+
+        anchor_year = current_year_actual if current_year_actual is not None else current_year_request
+        previous_value: Optional[float] = None
+        previous_ref = ""
+        previous_year_actual: Optional[int] = None
+        if anchor_year is not None:
+            for lookback in range(1, 6):
+                candidate_year = anchor_year - lookback
+                if candidate_year < 1900:
+                    break
+                prev_tuple = self.ebitda_value(
+                    candidate_year,
+                    warn_metric="ebitda_growth",
+                    return_year=True,
+                    fallback_to_prior=False,
+                )
+                prev_value, prev_ref, prev_year = prev_tuple
+                if prev_value is not None:
+                    previous_value = prev_value
+                    previous_ref = prev_ref
+                    previous_year_actual = prev_year if prev_year is not None else candidate_year
+                    break
+
+        if previous_value in (None, 0) or previous_year_actual is None or anchor_year is None:
+            imf_result = self._imf_result("ebitda_growth")
+            if imf_result is not None:
+                return imf_result
+            warning = self._pop_warning("ebitda_growth") or "Missing EBITDA history"
+            return (None, "n/a", "", "", warning)
+
+        growth = _safe_div(current_value - previous_value, abs(previous_value))
         if growth is None:
+            imf_result = self._imf_result("ebitda_growth")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("ebitda_growth") or "Unable to compute EBITDA growth"
             return (None, "n/a", "", "", warning)
-        source_ref = f"ebitda[{previous_year}:{prev_ref}->{current_year}:{current_ref}]"
+        source_ref = f"ebitda[{previous_year_actual}:{previous_ref}->{anchor_year}:{current_ref}]"
         warning = self._pop_warning("ebitda_growth")
         return (growth, "derived", "SEC", source_ref, warning)
 
@@ -830,6 +1065,9 @@ class Context:
             numerator_aliases=["adjusted_ebitda"],
         )
         if value is None:
+            imf_result = self._imf_result("ebitda_margin")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("ebitda_margin") or "Unable to compute EBITDA margin"
             return (None, "n/a", "", "", warning)
         source_ref = f"ebitda[{num_ref}]/revenue[{den_ref}]"
@@ -843,6 +1081,9 @@ class Context:
             warn_metric="operating_margin",
         )
         if value is None:
+            imf_result = self._imf_result("operating_margin")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("operating_margin") or "Unable to compute operating margin"
             return (None, "n/a", "", "", warning)
         source_ref = f"operating_income[{num_ref}]/revenue[{den_ref}]"
@@ -856,6 +1097,9 @@ class Context:
             warn_metric="net_margin",
         )
         if value is None:
+            imf_result = self._imf_result("net_margin")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("net_margin") or "Unable to compute net margin"
             return (None, "n/a", "", "", warning)
         source_ref = f"net_income[{num_ref}]/revenue[{den_ref}]"
@@ -878,10 +1122,16 @@ class Context:
         )
         average_assets, asset_ref = self.average_balance("total_assets", self.fiscal_year, "return_on_assets")
         if net_income is None or average_assets in (None, 0):
+            imf_result = self._imf_result("return_on_assets")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("return_on_assets") or "Unable to compute ROA"
             return (None, "n/a", "", "", warning)
         value = _safe_div(net_income, average_assets)
         if value is None:
+            imf_result = self._imf_result("return_on_assets")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("return_on_assets") or "Unable to compute ROA"
             return (None, "n/a", "", "", warning)
         source_ref = f"net_income[{ni_ref}]/avg_assets[{asset_ref}]"
@@ -901,10 +1151,16 @@ class Context:
             "return_on_equity",
         )
         if net_income is None or average_equity in (None, 0):
+            imf_result = self._imf_result("return_on_equity")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("return_on_equity") or "Unable to compute ROE"
             return (None, "n/a", "", "", warning)
         value = _safe_div(net_income, average_equity)
         if value is None:
+            imf_result = self._imf_result("return_on_equity")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("return_on_equity") or "Unable to compute ROE"
             return (None, "n/a", "", "", warning)
         source_ref = f"net_income[{ni_ref}]/avg_equity[{eq_ref}]"
@@ -939,15 +1195,24 @@ class Context:
         nopat = operating_income * (1 - tax_rate)
 
         if total_debt is None or equity is None:
+            imf_result = self._imf_result("return_on_invested_capital")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("return_on_invested_capital") or "Unable to compute invested capital"
             return (None, "n/a", "", "", warning)
         invested_capital = total_debt + equity - (cash or 0.0)
         if invested_capital in (None, 0):
+            imf_result = self._imf_result("return_on_invested_capital")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("return_on_invested_capital") or "Invested capital unavailable"
             return (None, "n/a", "", "", warning)
 
         value = _safe_div(nopat, invested_capital)
         if value is None:
+            imf_result = self._imf_result("return_on_invested_capital")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("return_on_invested_capital") or "Unable to compute ROIC"
             return (None, "n/a", "", "", warning)
 
@@ -964,6 +1229,9 @@ class Context:
             warn_metric="free_cash_flow_margin",
         )
         if fcf is None or revenue in (None, 0):
+            imf_result = self._imf_result("free_cash_flow_margin")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("free_cash_flow_margin") or "Unable to compute FCF margin"
             return (None, "n/a", "", "", warning)
         value = _safe_div(fcf, revenue)
@@ -985,6 +1253,9 @@ class Context:
             warn_metric="cash_conversion",
         )
         if cfo is None or net_income in (None, 0):
+            imf_result = self._imf_result("cash_conversion")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("cash_conversion") or "Unable to compute cash conversion"
             return (None, "n/a", "", "", warning)
         value = _safe_div(cfo, net_income)
@@ -1002,6 +1273,9 @@ class Context:
             warn_metric="debt_to_equity",
         )
         if total_debt is None or equity in (None, 0):
+            imf_result = self._imf_result("debt_to_equity")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("debt_to_equity") or "Unable to compute debt to equity"
             return (None, "n/a", "", "", warning)
         value = _safe_div(total_debt, equity)
@@ -1013,6 +1287,9 @@ class Context:
         price = self.latest_price()
         dps, dps_ref = self.dividends_per_share(self.fiscal_year)
         if price in (None, 0) or dps is None:
+            imf_result = self._imf_result("dividend_yield")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("dividend_yield")
             return (None, "n/a", "", "", warning or "Dividend yield requires price and DPS")
         value = _safe_div(dps, price)
@@ -1024,12 +1301,17 @@ class Context:
     def compute_tsr(self) -> ComputationResult:
         price = self.latest_price()
         if price is None:
-            warning = "Latest price unavailable"
-            return (None, "n/a", "", "", warning)
+            imf_result = self._imf_result("tsr")
+            if imf_result is not None:
+                return imf_result
+            return (None, "n/a", "", "", "Latest price unavailable")
         one_year_ago = self._now - timedelta(days=365)
         previous_quote = self.db.fetch_quote_on_or_before(self.ticker, before=one_year_ago)
         prev_price = previous_quote.get("price") if previous_quote else None
         if prev_price in (None, 0):
+            imf_result = self._imf_result("tsr")
+            if imf_result is not None:
+                return imf_result
             return (None, "n/a", "", "", "Historical price unavailable for TSR")
         dps, dps_ref = self.dividends_per_share(self.fiscal_year)
         dividends = dps or 0.0
@@ -1047,6 +1329,9 @@ class Context:
         )
         market_cap, mc_ref = self.market_cap(self.fiscal_year)
         if repurchases is None or market_cap in (None, 0):
+            imf_result = self._imf_result("share_buyback_intensity")
+            if imf_result is not None:
+                return imf_result
             warning = self._pop_warning("share_buyback_intensity") or "Missing data for buyback intensity"
             return (None, "n/a", "", "", warning)
         intensity = abs(repurchases) / market_cap
@@ -1102,16 +1387,31 @@ class Context:
     def compute_peg_ratio(self) -> ComputationResult:
         pe_value = self.get_kpi("pe_ratio") or self.metric("pe_ratio", self.fiscal_year)
         if pe_value is None:
-            pe_value = self.compute_pe_ratio()[0]
+            computed = self.compute_pe_ratio()
+            pe_value = computed[0]
+            if computed[4]:
+                self.add_warning("peg_ratio", computed[4])
+        if pe_value in (None, 0):
+            imf_result = self._imf_result("peg_ratio")
+            if imf_result is not None:
+                return imf_result
+            warning = self._pop_warning("peg_ratio") or "P/E ratio unavailable for PEG"
+            return (None, "n/a", "", "", warning)
         eps_growth = self.get_kpi("eps_cagr") or self.metric("eps_cagr", self.fiscal_year)
         if eps_growth in (None, 0):
-            warning = "EPS growth unavailable for PEG"
-            self.add_warning("peg_ratio", warning)
+            self.add_warning("peg_ratio", "EPS growth unavailable for PEG")
+            imf_result = self._imf_result("peg_ratio")
+            if imf_result is not None:
+                return imf_result
+            warning = self._pop_warning("peg_ratio") or "EPS growth unavailable for PEG"
             return (None, "n/a", "", "", warning)
         if abs(eps_growth) < 1e-6:
-            warning = "EPS growth near zero; PEG undefined"
-            self.add_warning("peg_ratio", warning)
-            return (None, "n/a", "", "", warning)
+            self.add_warning("peg_ratio", "EPS growth near zero; PEG undefined")
+            imf_result = self._imf_result("peg_ratio")
+            if imf_result is not None:
+                return imf_result
+            warning = self._pop_warning("peg_ratio")
+            return (None, "n/a", "", "", warning or "EPS growth near zero; PEG undefined")
         value = pe_value / (eps_growth * 100)
         warning = self._pop_warning("peg_ratio")
         return (value, "derived", "SEC", "pe_ratio/eps_cagr", warning)
@@ -1219,7 +1519,7 @@ def compute_price_based(metric_id: str, ctx: Context, snapshot: Dict[str, Any]) 
 
     if metric_id == "tsr":
         history = snapshot.get("history")
-        if not isinstance(history, pd.DataFrame) or history.empty or "Close" not in history:
+        if pd is None or not isinstance(history, pd.DataFrame) or history.empty or "Close" not in history:
             return (None, "n/a", "", "", "Price history unavailable for TSR")
         history = history.dropna(subset=["Close"]).sort_index()
         if history.empty:
@@ -1297,6 +1597,10 @@ def fill_missing_kpis(
                     source = ext_source
                     source_ref = ext_source_ref
                     warning = ext_warning
+            if value is None:
+                imf_result = ctx._imf_result(metric_id)
+                if imf_result is not None:
+                    value, method, source, source_ref, warning = imf_result
         if value is None:
             continue
         if metric_id in PERCENT_METRICS:
@@ -1325,5 +1629,17 @@ def fill_missing_kpis(
             source_ref=source_ref or "",
             warning=warning,
         )
+        period = f"FY{fy}" if fq is None else f"FY{fy}Q{fq}"
+        record = MetricRecord(
+            ticker=ticker.upper(),
+            metric=metric_id,
+            period=period,
+            value=float(value),
+            source=source or method or "proxy",
+            updated_at=ctx._now,
+            start_year=fy,
+            end_year=fy,
+        )
+        replace_metric_snapshots(db.path, [record])
         filled += 1
     return filled

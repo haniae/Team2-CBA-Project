@@ -2085,6 +2085,7 @@ function normaliseArtifacts(response) {
   if (!response || typeof response !== "object") {
     return null;
   }
+  const dashboard = response.dashboard || response.Dashboard || null;
   const artifacts = {
     highlights: Array.isArray(response.highlights) ? response.highlights : [],
     trends: Array.isArray(response.trends) ? response.trends : [],
@@ -2092,13 +2093,15 @@ function normaliseArtifacts(response) {
     citations: Array.isArray(response.citations) ? response.citations : [],
     exports: Array.isArray(response.exports) ? response.exports : [],
     conclusion: typeof response.conclusion === "string" ? response.conclusion.trim() : "",
+    dashboard: dashboard,
   };
   if (
     !artifacts.highlights.length &&
     !artifacts.trends.length &&
     !artifacts.comparisonTable &&
     !artifacts.citations.length &&
-    !artifacts.exports.length
+    !artifacts.exports.length &&
+    !artifacts.dashboard
   ) {
     return null;
   }
@@ -2237,6 +2240,7 @@ function setMessageBody(wrapper, text) {
 }
 
 function renderMessageArtifacts(wrapper, artifacts) {
+  wrapper.querySelectorAll(".message-dashboard").forEach((node) => node.remove());
   const existing = wrapper.querySelector(".message-artifacts");
   if (existing) {
     existing.remove();
@@ -2248,8 +2252,16 @@ function renderMessageArtifacts(wrapper, artifacts) {
   if (!body) {
     return;
   }
+  const inlineDashboard = renderDashboardArtifact(artifacts.dashboard);
+  const dashboardKind = artifacts.dashboard?.kind || "";
+  if (inlineDashboard) {
+    body.append(inlineDashboard);
+    if (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare") {
+      return;
+    }
+  }
   const dashboard = createDashboardLayout(artifacts);
-  if (dashboard) {
+  if (dashboard && dashboardKind !== "cfi-classic") {
     body.append(dashboard);
     if (artifacts.comparisonTable) {
       body.querySelectorAll(".message-table").forEach((tableNode) => tableNode.remove());
@@ -2359,6 +2371,72 @@ function createDashboardLayout(artifacts) {
     }
   }
   return wrapper;
+}
+
+
+function renderDashboardArtifact(descriptor) {
+  if (!descriptor) {
+    return null;
+  }
+  const kind = descriptor.kind || "cfi-classic";
+  const container = document.createElement("div");
+  container.className = "message-dashboard";
+  if (kind === "cfi-classic" || kind === "cfi-compare") {
+    container.classList.add("message-dashboard--cfi");
+  }
+  const host = document.createElement("div");
+  host.className = "message-dashboard__surface";
+  container.append(host);
+  const options = { container: host };
+  if (descriptor.payload) {
+    options.payload = descriptor.payload;
+  }
+  if (descriptor.ticker) {
+    options.ticker = descriptor.ticker;
+  }
+  if (descriptor.tickers) {
+    options.tickers = descriptor.tickers;
+  }
+  if (descriptor.benchmark) {
+    options.benchmark = descriptor.benchmark;
+  }
+  const previousContainer = window.__cfiActiveContainer;
+  window.__cfiActiveContainer = host;
+  const finalizeContainer = () => {
+    if (window.__cfiActiveContainer === host) {
+      window.__cfiActiveContainer = previousContainer;
+    }
+  };
+  let renderPromise;
+  try {
+    if (kind === "cfi-compare") {
+      renderPromise = showCfiCompareDashboard(options);
+    } else if (kind === "cfi-dense") {
+      renderPromise = showCfiDenseDashboard(options);
+    } else {
+      renderPromise = showCfiDashboard(options);
+    }
+  } catch (error) {
+    console.error(error);
+    host.innerHTML = '<div class="cfi-error">Unable to render dashboard. Check console for details.</div>';
+    finalizeContainer();
+    return container;
+  }
+  if (renderPromise && typeof renderPromise.catch === "function") {
+    renderPromise.catch((error) => {
+      console.error(error);
+      host.innerHTML = '<div class="cfi-error">Unable to render dashboard. Check console for details.</div>';
+      finalizeContainer();
+    });
+    if (typeof renderPromise.finally === "function") {
+      renderPromise.finally(finalizeContainer);
+    } else {
+      finalizeContainer();
+    }
+  } else {
+    finalizeContainer();
+  }
+  return container;
 }
 
 function createDashboardHeader(table) {
@@ -5765,6 +5843,41 @@ function renderProgressSummary(tracker) {
   body.prepend(summary);
 }
 
+function resolveStaticAsset(path) {
+  if (!path) {
+    return path;
+  }
+  if (path.startsWith("data:") || path.startsWith("blob:")) {
+    return path;
+  }
+  if (/^(?:https?:)?\/\//i.test(path)) {
+    return path;
+  }
+  if (path.startsWith("/")) {
+    return path;
+  }
+  return `/static/${path}`;
+}
+
+function extractBodyMarkup(html) {
+  if (!html) return "";
+  const match = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  return match ? match[1] : html;
+}
+
+function stripInlineAssetTags(html, stem) {
+  if (!stem) return html;
+  const escapedStem = stem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const cssPattern = new RegExp(`<link[^>]+${escapedStem}[^>]*>`, "gi");
+  const jsPattern = new RegExp(`<script[^>]+${escapedStem}[^<]*<\/script>`, "gi");
+  return html.replace(cssPattern, "").replace(jsPattern, "");
+}
+
+function prepareEmbeddedLayout(html, stem) {
+  const bodyMarkup = extractBodyMarkup(html);
+  return stripInlineAssetTags(bodyMarkup, stem);
+}
+
 async function ensureStylesheetOnce(id, href) {
   if (document.getElementById(id)) {
     return;
@@ -5773,7 +5886,7 @@ async function ensureStylesheetOnce(id, href) {
     const link = document.createElement("link");
     link.id = id;
     link.rel = "stylesheet";
-    link.href = href;
+    link.href = resolveStaticAsset(href);
     link.onload = () => resolve();
     link.onerror = () => reject(new Error(`Failed to load stylesheet ${href}`));
     document.head.appendChild(link);
@@ -5787,7 +5900,7 @@ async function ensureScriptOnce(id, src) {
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.id = id;
-    script.src = src;
+    script.src = resolveStaticAsset(src);
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error(`Failed to load script ${src}`));
@@ -5827,15 +5940,25 @@ async function fetchCfiDensePayload(options = {}) {
 }
 
 async function loadCfiDenseMarkup(host) {
-  const response = await fetch("cfi_dense.html", { cache: "no-store" });
+  const response = await fetch(resolveStaticAsset("cfi_dense.html"), { cache: "no-store" });
   if (!response.ok) {
     throw new Error("Unable to load CFI Dense layout.");
   }
-  host.innerHTML = await response.text();
+  const html = await response.text();
+  host.innerHTML = prepareEmbeddedLayout(html, "cfi_dense");
 }
 
 async function showCfiDenseDashboard(options = {}) {
-  const host = resolveDashboardHost();
+  const { container, payload: suppliedPayload, ...fetchOptions } = options || {};
+  let host = null;
+  if (container instanceof HTMLElement) {
+    host = container;
+  } else if (typeof container === "string") {
+    host = document.getElementById(container);
+  }
+  if (!host) {
+    host = resolveDashboardHost();
+  }
   if (!host) {
     throw new Error("Unable to resolve dashboard host container.");
   }
@@ -5845,7 +5968,7 @@ async function showCfiDenseDashboard(options = {}) {
     await ensureStylesheetOnce("cfi-dense-styles", "cfi_dense.css");
     await ensurePlotlyLoaded();
     await ensureScriptOnce("cfi-dense-script", "cfi_dense.js");
-    const payload = await fetchCfiDensePayload(options);
+    const payload = suppliedPayload || (await fetchCfiDensePayload(fetchOptions));
     if (window.CFI_DENSE && typeof window.CFI_DENSE.render === "function") {
       window.CFI_DENSE.render(payload);
       window.__cfiDenseLastPayload = payload;
@@ -5879,11 +6002,12 @@ async function fetchCfiDashboardPayload(options = {}) {
 }
 
 async function loadCfiDashboardMarkup(host) {
-  const response = await fetch("cfi_dashboard.html", { cache: "no-store" });
+  const response = await fetch(resolveStaticAsset("cfi_dashboard.html"), { cache: "no-store" });
   if (!response.ok) {
     throw new Error("Unable to load CFI dashboard layout.");
   }
-  host.innerHTML = await response.text();
+  const html = await response.text();
+  host.innerHTML = prepareEmbeddedLayout(html, "cfi_dashboard");
 }
 
 const DEMO_CFI_PAYLOAD = {
@@ -5907,6 +6031,79 @@ const DEMO_CFI_PAYLOAD = {
       { label: "EV/EBITDA (×)", values: [18.0, 15.2, 13.5, 12.3, 11.0], type: "multiple" },
     ],
   },
+  kpi_summary: [
+    { label: "Revenue CAGR", value: 0.17, type: "percent", period: "3Y CAGR", source: "SEC filings" },
+    { label: "EPS CAGR", value: 0.21, type: "percent", period: "3Y CAGR", source: "SEC filings" },
+    { label: "EBITDA Growth", value: 0.12, type: "percent", period: "YoY", source: "BenchmarkOS model" },
+    { label: "EBITDA margin", value: 0.178, type: "percent", period: "TTM", source: "BenchmarkOS model" },
+    { label: "Operating margin", value: 0.073, type: "percent", period: "TTM", source: "BenchmarkOS model" },
+    { label: "Net margin", value: 0.053, type: "percent", period: "FY2023", source: "SEC filings" },
+    { label: "Profit margin", value: 0.058, type: "percent", period: "FY2023", source: "SEC filings" },
+    { label: "Return on assets", value: 0.087, type: "percent", period: "FY2023", source: "BenchmarkOS model" },
+    { label: "Return on equity", value: 0.116, type: "percent", period: "FY2023", source: "BenchmarkOS model" },
+    { label: "Return on invested capital", value: 0.142, type: "percent", period: "FY2023", source: "BenchmarkOS model" },
+    { label: "Free cash flow margin", value: 0.114, type: "percent", period: "TTM", source: "Company filings" },
+    { label: "Cash conversion", value: 1.18, type: "percent", period: "FY2023", source: "BenchmarkOS model" },
+    { label: "Debt to equity", value: 1.3, type: "multiple", period: "FY2023", source: "SEC filings" },
+    { label: "P/E (ttm)", value: 112.0, type: "multiple", period: "TTM", source: "Market data" },
+    { label: "EV/EBITDA (ttm)", value: 31.0, type: "multiple", period: "TTM", source: "Market data" },
+    { label: "P/B ratio", value: 8.5, type: "multiple", period: "FY2023", source: "Market data" },
+    { label: "PEG ratio", value: 1.6, type: "multiple", period: "FY2023", source: "Market data" },
+    { label: "Dividend yield", value: 0.004, type: "percent", period: "TTM", source: "Market data" },
+    { label: "Total shareholder return", value: 0.245, type: "percent", period: "1Y", source: "Market data" },
+    { label: "Share buyback intensity", value: 0.018, type: "percent", period: "FY2023", source: "Company filings" },
+  ],
+  kpi_series: {
+    revenue_cagr: { type: "percent", years: [2021, 2022, 2023], values: [0.15, 0.16, 0.17] },
+    eps_cagr: { type: "percent", years: [2021, 2022, 2023], values: [0.19, 0.2, 0.21] },
+    ebitda_growth: { type: "percent", years: [2021, 2022, 2023], values: [0.09, 0.11, 0.12] },
+    ebitda_margin: { type: "percent", years: [2021, 2022, 2023], values: [0.172, 0.175, 0.178] },
+    operating_margin: { type: "percent", years: [2021, 2022, 2023], values: [0.069, 0.071, 0.073] },
+    net_margin: { type: "percent", years: [2021, 2022, 2023], values: [0.044, 0.048, 0.053] },
+    profit_margin: { type: "percent", years: [2021, 2022, 2023], values: [0.048, 0.054, 0.058] },
+    return_on_assets: { type: "percent", years: [2021, 2022, 2023], values: [0.072, 0.079, 0.087] },
+    return_on_equity: { type: "percent", years: [2021, 2022, 2023], values: [0.102, 0.109, 0.116] },
+    return_on_invested_capital: { type: "percent", years: [2021, 2022, 2023], values: [0.128, 0.135, 0.142] },
+    free_cash_flow_margin: { type: "percent", years: [2021, 2022, 2023], values: [0.098, 0.106, 0.114] },
+    cash_conversion: { type: "percent", years: [2021, 2022, 2023], values: [1.05, 1.12, 1.18] },
+    debt_to_equity: { type: "multiple", years: [2021, 2022, 2023], values: [1.5, 1.4, 1.3] },
+    pe_ratio: { type: "multiple", years: [2021, 2022, 2023], values: [78.0, 92.0, 112.0] },
+    ev_ebitda: { type: "multiple", years: [2021, 2022, 2023], values: [36.0, 34.0, 31.0] },
+    pb_ratio: { type: "multiple", years: [2021, 2022, 2023], values: [9.8, 9.1, 8.5] },
+    peg_ratio: { type: "multiple", years: [2021, 2022, 2023], values: [1.9, 1.8, 1.6] },
+    dividend_yield: { type: "percent", years: [2021, 2022, 2023], values: [0.003, 0.0035, 0.004] },
+    tsr: { type: "percent", years: [2021, 2022, 2023], values: [0.18, 0.21, 0.245] },
+    share_buyback_intensity: { type: "percent", years: [2021, 2022, 2023], values: [0.012, 0.015, 0.018] },
+  },
+  interactions: {
+    kpis: {
+      default_mode: "trend",
+      drilldowns: [
+        { id: "revenue_cagr", label: "Revenue CAGR", default_view: "trend", data_refs: { series: "kpi_series.revenue_cagr", summary_id: "revenue_cagr" } },
+        { id: "eps_cagr", label: "EPS CAGR", default_view: "trend", data_refs: { series: "kpi_series.eps_cagr", summary_id: "eps_cagr" } },
+        { id: "ebitda_growth", label: "EBITDA Growth", default_view: "trend", data_refs: { series: "kpi_series.ebitda_growth", summary_id: "ebitda_growth" } },
+      ],
+    },
+    charts: { controls: { modes: ["absolute", "growth"], default: "absolute" } },
+    sources: { enabled: true, types: ["filing", "market_data", "derived"] },
+  },
+  peer_config: {
+    focus_ticker: "AMZN",
+    default_peer_group: "benchmark",
+    max_peers: 5,
+    supports_custom: true,
+    available_peer_groups: [
+      { id: "benchmark", label: "S&P 500 Avg", tickers: [] },
+      { id: "custom", label: "Custom selection", tickers: [] },
+    ],
+  },
+  sources: [
+    { label: "Revenue", period: "FY2023", source: "SEC 10-K 2023", value: 574800 },
+    { label: "Net income", period: "FY2023", source: "SEC 10-K 2023", value: 30500 },
+    { label: "Free cash flow", period: "FY2023", source: "Company filings", value: 65489 },
+    { label: "Shares O/S (M)", period: "FY2023", source: "Market data snapshot", value: 5100 },
+    { label: "Net margin", period: "FY2023", source: "BenchmarkOS derived", value: 0.053 },
+  ],
   charts: {
     revenue_ev: { Year: [2019, 2020, 2021, 2022, 2023], Revenue: [280522, 386064, 469822, 513983, 574800], EV_Rev: [3.2, 2.8, 2.3, 2.1, 1.9] },
     ebitda_ev: { Year: [2019, 2020, 2021, 2022, 2023], EBITDA: [36931, 48020, 56523, 60820, 71500], EV_EBITDA: [18.0, 15.2, 13.5, 12.3, 11.0] },
@@ -6002,7 +6199,16 @@ const DEMO_CFIX_PAYLOAD = {
 
 
 async function showCfiDashboard(options = {}) {
-  const host = resolveDashboardHost();
+  const { container, payload: suppliedPayload, ...fetchOptions } = options || {};
+  let host = null;
+  if (container instanceof HTMLElement) {
+    host = container;
+  } else if (typeof container === "string") {
+    host = document.getElementById(container);
+  }
+  if (!host) {
+    host = resolveDashboardHost();
+  }
   if (!host) {
     throw new Error("Unable to resolve dashboard host container.");
   }
@@ -6022,11 +6228,13 @@ async function showCfiDashboard(options = {}) {
     return;
   }
 
-  let payload = null;
-  try {
-    payload = await fetchCfiDashboardPayload(options);
-  } catch (error) {
-    console.warn('CFI dashboard fetch failed, falling back to demo payload.', error);
+  let payload = suppliedPayload || null;
+  if (!payload) {
+    try {
+      payload = await fetchCfiDashboardPayload(fetchOptions);
+    } catch (error) {
+      console.warn('CFI dashboard fetch failed, falling back to demo payload.', error);
+    }
   }
 
   if (!payload || typeof payload !== 'object') {
@@ -6076,15 +6284,25 @@ async function fetchCfiComparePayload(options = {}) {
 }
 
 async function loadCfiCompareMarkup(host) {
-  const response = await fetch("cfi_compare.html", { cache: "no-store" });
+  const response = await fetch(resolveStaticAsset("cfi_compare.html"), { cache: "no-store" });
   if (!response.ok) {
     throw new Error("Unable to load CFI Compare layout.");
   }
-  host.innerHTML = await response.text();
+  const html = await response.text();
+  host.innerHTML = prepareEmbeddedLayout(html, "cfi_compare");
 }
 
 async function showCfiCompareDashboard(options = {}) {
-  const host = resolveDashboardHost();
+  const { container, payload: suppliedPayload, ...fetchOptions } = options || {};
+  let host = null;
+  if (container instanceof HTMLElement) {
+    host = container;
+  } else if (typeof container === "string") {
+    host = document.getElementById(container);
+  }
+  if (!host) {
+    host = resolveDashboardHost();
+  }
   if (!host) {
     throw new Error("Unable to resolve dashboard host container.");
   }
@@ -6093,7 +6311,7 @@ async function showCfiCompareDashboard(options = {}) {
     await loadCfiCompareMarkup(host);
     await ensureStylesheetOnce("cfi-compare-styles", "cfi_compare.css");
     await ensurePlotlyLoaded();
-    await ensureScriptOnce("cfi-compare-script", "cfi_compare.js");
+    await ensureScriptOnce("cfi-compare-script-v4", "cfi_compare.js?v=20241023");
   } catch (error) {
     console.error(error);
     host.innerHTML =
@@ -6104,11 +6322,13 @@ async function showCfiCompareDashboard(options = {}) {
     return;
   }
 
-  let payload = null;
-  try {
-    payload = await fetchCfiComparePayload(options);
-  } catch (error) {
-    console.warn("CFI Compare dashboard fetch failed, falling back to demo payload.", error);
+  let payload = suppliedPayload || null;
+  if (!payload) {
+    try {
+      payload = await fetchCfiComparePayload(fetchOptions);
+    } catch (error) {
+      console.warn("CFI Compare dashboard fetch failed, falling back to demo payload.", error);
+    }
   }
 
   if (!payload || typeof payload !== "object") {

@@ -612,6 +612,32 @@ def bulk_upsert_financial_facts(
     if not facts:
         return 0
 
+    def _fact_priority(fact: "FinancialFact") -> Tuple[int, datetime]:
+        """Rank facts so FY/TTM rows win over interim duplicates."""
+        period = (fact.period or fact.fiscal_period or "").upper()
+        score = 0
+        if "FY" in period:
+            score += 3
+        elif "TTM" in period or "LTM" in period:
+            score += 2
+        elif "HY" in period:
+            score += 1
+        if "Q" in period and "FY" not in period:
+            score -= 1
+        timestamp = fact.ingested_at or datetime.min.replace(tzinfo=timezone.utc)
+        return (score, timestamp)
+
+    dedup: Dict[Tuple[str, str, Optional[int]], "FinancialFact"] = {}
+    for fact in facts:
+        key = (
+            _normalize_ticker(fact.ticker),
+            fact.metric.lower(),
+            fact.fiscal_year,
+        )
+        existing = dedup.get(key)
+        if existing is None or _fact_priority(fact) >= _fact_priority(existing):
+            dedup[key] = fact
+
     payload = [
         (
             fact.cik,
@@ -632,7 +658,7 @@ def bulk_upsert_financial_facts(
             fact.source,
             _iso_utc(fact.ingested_at) if fact.ingested_at else None,
         )
-        for fact in facts
+        for fact in dedup.values()
     ]
 
     own_connection = False
@@ -647,7 +673,7 @@ def bulk_upsert_financial_facts(
                 unit, source_filing, raw, period_start, period_end, adjusted,
                 adjustment_note, source, ingested_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(ticker, metric, period, source, source_filing) DO UPDATE SET
+            ON CONFLICT DO UPDATE SET
                 cik = excluded.cik,
                 company_name = excluded.company_name,
                 fiscal_year = excluded.fiscal_year,
@@ -676,20 +702,24 @@ def bulk_upsert_financial_facts(
 
 def fetch_financial_facts(
     database_path: Path,
-    ticker: str,
+    ticker: Optional[str] = None,
     *,
     fiscal_year: Optional[int] = None,
     metric: Optional[str] = None,
     limit: Optional[int] = None,
 ) -> List[FinancialFactRecord]:
-    """Stream financial facts filtered by ticker/year/metric."""
+    """Stream financial facts filtered by optional ticker/year/metric."""
     sql = [
-        "SELECT cik, metric, fiscal_year, fiscal_period, period, value, unit, source,",
+        "SELECT ticker, cik, metric, fiscal_year, fiscal_period, period, value, unit, source,",
         "       source_filing, period_start, period_end, adjusted, adjustment_note, ingested_at, raw",
         "FROM financial_facts",
-        "WHERE ticker = ?",
+        "WHERE 1=1",
     ]
-    params: List[Any] = [_normalize_ticker(ticker)]
+    params: List[Any] = []
+
+    if ticker is not None:
+        sql.append("AND ticker = ?")
+        params.append(_normalize_ticker(ticker))
 
     if fiscal_year is not None:
         sql.append("AND fiscal_year = ?")
@@ -714,7 +744,7 @@ def fetch_financial_facts(
         raw_data = json.loads(raw_payload) if raw_payload else None
         records.append(
             FinancialFactRecord(
-                ticker=_normalize_ticker(ticker),
+                ticker=_normalize_ticker(row["ticker"]),
                 metric=row["metric"],
                 fiscal_year=row["fiscal_year"],
                 fiscal_period=row["fiscal_period"],
@@ -888,6 +918,24 @@ def bulk_insert_audit_events(
             connection.close()
 
 
+def record_audit_event(
+    database_path: Path,
+    event: "AuditEvent",
+    *,
+    connection: Optional[sqlite3.Connection] = None,
+) -> int:
+    """Persist a single audit trail event.
+
+    This is a thin wrapper around ``bulk_insert_audit_events`` that callers can
+    use when only one event needs to be recorded (common in error-handling
+    paths).  It gracefully ignores ``None`` payloads so defensive callers do not
+    need to duplicate guards.
+    """
+    if event is None:
+        return 0
+    return bulk_insert_audit_events(database_path, [event], connection=connection)
+
+
 def fetch_audit_events(
     database_path: Path,
     ticker: str,
@@ -925,6 +973,46 @@ def fetch_audit_events(
                 event_type=row["event_type"],
                 entity_id=row["entity_id"],
                 details=json.loads(row["details"]) if row["details"] else {},
+                created_at=_parse_dt(row["created_at"]) or datetime(1970, 1, 1, tzinfo=timezone.utc),
+                created_by=row["created_by"],
+            )
+        )
+    return events
+
+
+def fetch_recent_audit_events(
+    database_path: Path,
+    limit: int = 20,
+) -> List[AuditEventRecord]:
+    """Return the most recent audit events across all tickers."""
+    sql = [
+        "SELECT ticker, event_type, entity_id, details, created_at, created_by",
+        "FROM audit_events",
+        "ORDER BY created_at DESC",
+    ]
+    params: List[Any] = []
+    if limit:
+        sql.append("LIMIT ?")
+        params.append(limit)
+
+    query = "\n".join(sql)
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(query, params).fetchall()
+
+    events: List[AuditEventRecord] = []
+    for row in rows:
+        details_raw = row["details"] or "{}"
+        try:
+            details = json.loads(details_raw)
+        except Exception:
+            details = {}
+        events.append(
+            AuditEventRecord(
+                ticker=row["ticker"],
+                event_type=row["event_type"],
+                entity_id=row["entity_id"],
+                details=details,
                 created_at=_parse_dt(row["created_at"]) or datetime(1970, 1, 1, tzinfo=timezone.utc),
                 created_by=row["created_by"],
             )
@@ -1283,7 +1371,12 @@ def fetch_kpi_values(
     query = "\n".join(sql)
     with _connect(database_path) as connection:
         connection.row_factory = sqlite3.Row
-        rows = connection.execute(query, params).fetchall()
+        try:
+            rows = connection.execute(query, params).fetchall()
+        except sqlite3.OperationalError as exc:
+            if "no such table" in str(exc).lower():
+                return []
+            raise
 
     results: List[KpiValueRecord] = []
     for row in rows:
@@ -1327,7 +1420,7 @@ class Database:
 
     def fetch_financial_facts(
         self,
-        ticker: str,
+        ticker: Optional[str] = None,
         *,
         fiscal_year: Optional[int] = None,
         metric: Optional[str] = None,

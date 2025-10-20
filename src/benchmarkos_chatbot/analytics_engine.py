@@ -114,11 +114,14 @@ DERIVED_METRICS = {
     "ebitda",
     "ebitda_margin",
     "free_cash_flow",
+    "adjusted_ebitda_margin",
 }
 
 AGGREGATE_METRICS = {
     "revenue_cagr",
     "eps_cagr",
+    "revenue_cagr_3y",
+    "eps_cagr_3y",
     "ebitda_growth",
     "working_capital_change",
     "pe_ratio",
@@ -143,9 +146,12 @@ METRIC_DEFINITIONS: List[MetricDefinition] = [
     MetricDefinition("total_liabilities", "Total liabilities"),
     MetricDefinition("shareholders_equity", "Shareholders' equity"),
     MetricDefinition("revenue_cagr", "Revenue CAGR"),
+    MetricDefinition("revenue_cagr_3y", "Revenue CAGR (3Y)"),
     MetricDefinition("eps_cagr", "EPS CAGR"),
+    MetricDefinition("eps_cagr_3y", "EPS CAGR (3Y)"),
     MetricDefinition("ebitda_growth", "EBITDA growth"),
     MetricDefinition("ebitda_margin", "EBITDA margin"),
+    MetricDefinition("adjusted_ebitda_margin", "Adjusted EBITDA margin"),
     MetricDefinition("profit_margin", "Profit margin"),
     MetricDefinition("operating_margin", "Operating margin"),
     MetricDefinition("net_margin", "Net margin"),
@@ -184,9 +190,12 @@ CURRENCY_METRICS = {
 
 PERCENTAGE_METRICS = {
     "revenue_cagr",
+    "revenue_cagr_3y",
     "eps_cagr",
+    "eps_cagr_3y",
     "ebitda_growth",
     "ebitda_margin",
+    "adjusted_ebitda_margin",
     "profit_margin",
     "operating_margin",
     "net_margin",
@@ -227,9 +236,12 @@ SUMMARY_SECTIONS: List[Tuple[str, Sequence[str]]] = [
         "Phase 2 KPIs",
         (
             "revenue_cagr",
+            "revenue_cagr_3y",
             "eps_cagr",
+            "eps_cagr_3y",
             "ebitda_growth",
             "ebitda_margin",
+            "adjusted_ebitda_margin",
             "profit_margin",
             "operating_margin",
             "net_margin",
@@ -249,6 +261,25 @@ SUMMARY_SECTIONS: List[Tuple[str, Sequence[str]]] = [
         ),
     ),
 ]
+
+PHASE_METRIC_INDEX: Dict[str, Sequence[str]] = {
+    "phase1": tuple(
+        list(SUMMARY_SECTIONS[0][1])
+        + [
+            "adjusted_ebitda_margin",
+            "return_on_equity",
+            "revenue_cagr_3y",
+        ]
+    ),
+    "phase2": tuple(
+        list(SUMMARY_SECTIONS[1][1])
+        + [
+            "revenue_cagr_3y",
+            "eps_cagr_3y",
+            "adjusted_ebitda_margin",
+        ]
+    ),
+}
 
 
 def _now() -> datetime:
@@ -535,11 +566,38 @@ class AnalyticsEngine:
                     periods,
                 )
                 _add_metric("revenue_cagr", revenue_cagr, start=years[0], end=last_year)
+                trailing_years = years[-min(4, len(years)) :]
+                if len(trailing_years) >= 2:
+                    revenue_cagr_3y = _calc_cagr(
+                        _first_non_none(values_by_year[trailing_years[0]], "revenue"),
+                        _first_non_none(values_by_year[trailing_years[-1]], "revenue"),
+                        len(trailing_years) - 1,
+                    )
+                    _add_metric(
+                        "revenue_cagr_3y",
+                        revenue_cagr_3y,
+                        start=trailing_years[0],
+                        end=trailing_years[-1],
+                    )
 
                 eps_start = _eps_from(values_by_year[years[0]])
                 eps_end = _eps_from(last_values)
                 eps_cagr = _calc_cagr(eps_start, eps_end, periods)
                 _add_metric("eps_cagr", eps_cagr, start=years[0], end=last_year)
+                if len(trailing_years) >= 2:
+                    eps_start_trailing = _eps_from(values_by_year[trailing_years[0]])
+                    eps_end_trailing = _eps_from(values_by_year[trailing_years[-1]])
+                    eps_cagr_3y = _calc_cagr(
+                        eps_start_trailing,
+                        eps_end_trailing,
+                        len(trailing_years) - 1,
+                    )
+                    _add_metric(
+                        "eps_cagr_3y",
+                        eps_cagr_3y,
+                        start=trailing_years[0],
+                        end=trailing_years[-1],
+                    )
 
                 prev_year = years[-2]
                 ebitda_growth = _calc_growth(
@@ -750,14 +808,33 @@ class AnalyticsEngine:
         self,
         ticker: str,
         *,
+        phase: Optional[str] = None,
         period_filters: Optional[Sequence[Tuple[int, int]]] = None,
     ) -> List[database.MetricRecord]:
-        """Return cached metric snapshots for ``ticker`` with optional period filters."""
-        return database.fetch_metric_snapshots(
+        """Return cached metric snapshots for ``ticker`` with optional filters."""
+        records = database.fetch_metric_snapshots(
             self.settings.database_path,
             ticker.upper(),
             period_filters=period_filters,
         )
+        latest_map = self._select_latest_records(records, span_fn=self._period_span)
+        if not phase:
+            return records
+
+        phase_key = phase.replace(" ", "").lower()
+        allowed_metrics = PHASE_METRIC_INDEX.get(phase_key)
+        if allowed_metrics:
+            allowed_set = set(allowed_metrics)
+            ordered = [latest_map[name] for name in allowed_metrics if name in latest_map]
+            extras = [
+                rec for name, rec in sorted(latest_map.items()) if name not in allowed_set
+            ]
+            if not ordered:
+                return extras or list(latest_map.values())
+            ordered.extend(extras)
+            return ordered
+
+        return list(sorted(latest_map.values(), key=lambda rec: rec.metric))
 
     def generate_summary(self, ticker: str) -> str:
         """Return a narrative summary of key metrics for ``ticker``."""
@@ -825,7 +902,7 @@ class AnalyticsEngine:
         body = "\n\n".join(section_blocks)
         return "\n".join(header_lines) + body
 
-    def lookup_ticker(self, query: str, *, allow_partial: bool = False) -> Optional[str]:
+    def lookup_ticker(self, query: str, *, allow_partial: bool = True) -> Optional[str]:
         """Map a natural-language company reference to a ticker if possible."""
         return database.lookup_ticker(
             self.settings.database_path,
@@ -1194,7 +1271,9 @@ def _compute_derived_metrics(
     derived: Dict[str, Optional[float]] = {}
 
     revenue = _first_non_none(value_map, "revenue")
-    net_income = _first_non_none(value_map, "net_income")
+    net_income_raw = _first_non_none(value_map, "net_income")
+    net_income_adjusted = _first_non_none(value_map, "adjusted_net_income")
+    net_income = net_income_adjusted if net_income_adjusted is not None else net_income_raw
     operating_income = _first_non_none(value_map, "operating_income", "clean_operating_income")
     total_assets = _first_non_none(value_map, "total_assets")
     shareholders_equity = _first_non_none(value_map, "shareholders_equity", "total_equity")
@@ -1207,6 +1286,7 @@ def _compute_derived_metrics(
     ebit = _first_non_none(value_map, "ebit", "operating_income", "clean_operating_income")
     depreciation = _first_non_none(value_map, "depreciation_and_amortization")
 
+    adjusted_ebitda = _first_non_none(value_map, "adjusted_ebitda")
     ebitda = _first_non_none(value_map, "ebitda", "adjusted_ebitda")
     if ebitda is None and operating_income is not None:
         ebitda = operating_income + (depreciation or 0.0)
@@ -1228,10 +1308,13 @@ def _compute_derived_metrics(
     derived["roe"] = derived["return_on_equity"]
     derived["debt_to_equity"] = _safe_div(total_liabilities, shareholders_equity)
     derived["free_cash_flow_margin"] = _safe_div(free_cash_flow, revenue)
-    derived["cash_conversion"] = _safe_div(cash_from_operations, net_income)
+    cash_conversion_denominator = net_income if net_income is not None else net_income_raw
+    derived["cash_conversion"] = _safe_div(cash_from_operations, cash_conversion_denominator)
     derived["working_capital"] = working_capital
     derived["ebitda"] = ebitda
     derived["ebitda_margin"] = _safe_div(ebitda, revenue)
+    if adjusted_ebitda is not None:
+        derived["adjusted_ebitda_margin"] = _safe_div(adjusted_ebitda, revenue)
 
     invested_capital = None
     if total_assets is not None:

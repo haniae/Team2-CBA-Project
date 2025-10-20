@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import string
+from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .analytics_engine import (
@@ -453,29 +454,44 @@ def _infer_year_from_period(period: str) -> Optional[int]:
     return None
 
 
-def _select_latest(records: Iterable, metric: str) -> Optional[Tuple[str, Optional[float]]]:
-    """Return the most recent metric entries per ticker."""
-    latest_period = None
-    latest_value = None
+def _extract_year_from_period(period: str) -> int:
+    period = period.upper()
+    if period.startswith("FY") and len(period) >= 6 and period[2:6].isdigit():
+        return int(period[2:6])
+    digits = "".join(ch for ch in period if ch.isdigit())
+    if len(digits) >= 4:
+        return int(digits[:4])
+    return -1
+
+
+def _select_latest(records: Iterable, metric: str):
+    """Return the most recent metric entry for ``metric`` from the record iterable."""
+    latest_record = None
+    latest_key: Tuple[int, str, datetime] = (-1, "", datetime.min)
     for record in records:
         if record.metric != metric:
             continue
-        if latest_period is None or record.period > latest_period:
-            latest_period = record.period
-            latest_value = record.value
-    if latest_period is None:
-        return None
-    return latest_period, latest_value
+        year = record.end_year or record.start_year or _extract_year_from_period(record.period)
+        updated_raw = record.updated_at or datetime.min
+        updated = updated_raw.replace(tzinfo=None) if getattr(updated_raw, "tzinfo", None) else updated_raw
+        key = (year, record.period, updated)
+        if latest_record is None or key > latest_key:
+            latest_record = record
+            latest_key = key
+    return latest_record
 
 
-def _format_value_display(latest: Optional[Tuple[str, Optional[float]]]) -> str:
-    """Format a metric value for display alongside units/notes."""
-    if latest is None:
+def _format_value_display(record) -> str:
+    """Format a metric value for display alongside period and source."""
+    if record is None:
         return "-"
-    period, value = latest
+    period = record.period
+    source = (record.source or "").upper()
+    suffix = period if not source else f"{period}, {source}"
+    value = record.value
     if value is None:
-        return f"- ({period})"
-    return f"{_format_value(value)} ({period})"
+        return f"- ({suffix})"
+    return f"{_format_value(value)} ({suffix})"
 
 
 def _format_value(value: Optional[float]) -> str:

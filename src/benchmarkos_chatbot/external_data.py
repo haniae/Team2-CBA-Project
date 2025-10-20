@@ -6,8 +6,14 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-import pandas as pd
-import yfinance as yf
+try:  # Optional dependency required when fetching Yahoo/Stooq history
+    import pandas as pd  # type: ignore[import]
+except ImportError:  # pragma: no cover - lightweight environments
+    pd = None  # type: ignore[assignment]
+try:  # Optional dependency used for richer external data fallbacks
+    import yfinance as yf  # type: ignore[import]
+except ImportError:  # pragma: no cover - optional in limited environments
+    yf = None  # type: ignore[assignment]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,6 +39,10 @@ def stooq_last_close(ticker: str, asof: datetime) -> Optional[float]:
     asof:
         Anchor date for the lookup.
     """
+    if pd is None:
+        LOGGER.debug("pandas unavailable; skipping Stooq lookup for %s", ticker)
+        return None
+
     symbol = _stooq_symbol(ticker)
     if not symbol:
         return None
@@ -67,6 +77,10 @@ def yahoo_snapshot(ticker: str) -> Dict[str, Any]:
     The function relies on :mod:`yfinance` (no API key required) and attempts to
     provide sensible fallbacks when certain fields are unavailable.
     """
+    if yf is None:
+        LOGGER.debug("yfinance unavailable; returning empty snapshot for %s", ticker)
+        return {}
+
     ticker_obj = yf.Ticker(ticker)
     info: Dict[str, Any] = {}
     fast_info = getattr(ticker_obj, "fast_info", None)
@@ -82,11 +96,13 @@ def yahoo_snapshot(ticker: str) -> Dict[str, Any]:
         info.setdefault("shares", static_info.get("sharesOutstanding"))
         info.setdefault("enterprise_value", static_info.get("enterpriseValue"))
 
-    try:
-        history = ticker_obj.history(period="1y", actions=True, auto_adjust=True)
-    except Exception as exc:  # pragma: no cover - network dependent
-        LOGGER.debug("Yahoo history fetch failed for %s (%s)", ticker, exc)
-        history = pd.DataFrame()
+    history = None
+    if pd is not None:
+        try:
+            history = ticker_obj.history(period="1y", actions=True, auto_adjust=True)
+        except Exception as exc:  # pragma: no cover - network dependent
+            LOGGER.debug("Yahoo history fetch failed for %s (%s)", ticker, exc)
+            history = pd.DataFrame()
 
     price_candidates = [
         info.get("lastPrice"),
@@ -94,7 +110,7 @@ def yahoo_snapshot(ticker: str) -> Dict[str, Any]:
         info.get("regular_market_price"),
         info.get("regularMarketPrice"),
     ]
-    if not history.empty and "Close" in history:
+    if pd is not None and history is not None and not history.empty and "Close" in history:
         price_candidates.append(history["Close"].dropna().iloc[-1])
 
     price = next((float(p) for p in price_candidates if isinstance(p, (int, float))), None)
@@ -111,7 +127,7 @@ def yahoo_snapshot(ticker: str) -> Dict[str, Any]:
         enterprise_value = None
 
     dividends = None
-    if not history.empty and "Dividends" in history:
+    if pd is not None and history is not None and not history.empty and "Dividends" in history:
         dividends = history["Dividends"].copy()
 
     return {

@@ -163,6 +163,11 @@ Navigate to `http://localhost:8000`. The SPA exposes:
 - Export shortcuts (CSV, PDF) and in-line benchmarks.
 - Settings panel to toggle data sources, timeline detail, and export defaults.
 
+#### CFI dashboards (Compare, Classic, Dense)
+- The web UI now launches straight into the **CFI Compare** experience powered by `/api/dashboard/cfi-compare`, showing multi-company KPIs, trend charts, valuation football fields, and a peer scatter map.
+- Need to flip layouts during QA? Run `showCfiDashboard()`, `showCfiCompareDashboard()`, or `showCfiDenseDashboard()` in the browser console to jump between the classic single-company view, the new compare grid, and the dense summary.
+- For stand-alone demos or embedding, open `webui/cfi_compare_standalone.html` directly. It fetches live data when the server is running and gracefully falls back to the baked-in demo payload when offline.
+
 ### REST endpoints
 | Method | Route | Purpose |
 |--------|-------|---------|

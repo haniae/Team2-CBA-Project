@@ -1,0 +1,16 @@
+{
+  "GLOBAL": {
+    "revenue_cagr": 0.02,
+    "eps_cagr": 0.018,
+    "ebitda_growth": 0.019,
+    "ebitda_margin": 0.16,
+    "net_margin": 0.095,
+    "free_cash_flow_margin": 0.08,
+    "cash_conversion": 0.95,
+    "debt_to_equity": 1.10,
+    "peg_ratio": 1.50,
+    "dividend_yield": 0.018,
+    "tsr": 0.07,
+    "share_buyback_intensity": 0.01
+  }
+}

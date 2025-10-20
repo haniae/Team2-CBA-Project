@@ -22,6 +22,7 @@ from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Seque
 import requests
 
 from . import database, tasks
+from .data_sources import AuditEvent
 from .analytics_engine import AnalyticsEngine
 from .config import Settings
 from .data_ingestion import IngestionReport, ingest_financial_data
@@ -29,6 +30,12 @@ from .help_content import HELP_TEXT
 from .llm_client import LLMClient, build_llm_client
 from .parsing.parse import parse_to_structured
 from .table_renderer import METRIC_DEFINITIONS, render_table_command
+from .dashboard_utils import (
+    build_cfi_dashboard_payload,
+    build_cfi_compare_payload,
+    _display_ticker_symbol,
+    _normalise_ticker_symbol,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -442,6 +449,7 @@ class BenchmarkOSChatbot:
             "exports": [],
             "conclusion": "",
             "parser": {},
+            "dashboard": None,
         }
 
     def _progress(self, stage: str, detail: str) -> None:
@@ -684,10 +692,11 @@ class BenchmarkOSChatbot:
         except Exception as exc:  # pragma: no cover - defensive guard
             database.record_audit_event(
                 settings.database_path,
-                database.AuditEvent(
+                AuditEvent(
+                    ticker="__system__",
                     event_type="ingestion_error",
                     entity_id="startup",
-                    details=f"Bootstrap ingestion failed: {exc}",
+                    details={"error": str(exc)},
                     created_at=datetime.utcnow(),
                     created_by="chatbot",
                 ),
@@ -1447,7 +1456,18 @@ class BenchmarkOSChatbot:
         if not tickers:
             return "Provide at least one ticker for metrics."
         if len(tickers) == 1 and not period_filters:
-            return self.analytics_engine.generate_summary(tickers[0])
+            ticker = tickers[0]
+            dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, ticker)
+            if dashboard_payload:
+                display = _display_ticker_symbol(_normalise_ticker_symbol(ticker))
+                self.last_structured_response["dashboard"] = {
+                    "kind": "cfi-classic",
+                    "ticker": display,
+                    "payload": dashboard_payload,
+                }
+            else:
+                self.last_structured_response["dashboard"] = None
+            return self.analytics_engine.generate_summary(ticker)
         return self._format_metrics_table(
             tickers,
             period_filters=period_filters,
@@ -2334,6 +2354,7 @@ class BenchmarkOSChatbot:
             "cell_metadata": cell_metadata,
             "metric_keys": metric_keys,
         }
+
         trends_payload = self._build_trend_series(histories, ordered_tickers)
         citations_payload = self._build_metric_citations(
             metrics_per_ticker, ordered_tickers
@@ -2345,6 +2366,26 @@ class BenchmarkOSChatbot:
             descriptor,
             benchmark_label=benchmark_label,
         )
+
+        dashboard_descriptor = None
+        if len(ordered_tickers) >= 2:
+            try:
+                dashboard_payload = build_cfi_compare_payload(
+                    self.analytics_engine,
+                    ordered_tickers,
+                    benchmark_label=benchmark_label,
+                    strict=False,
+                )
+            except Exception:
+                dashboard_payload = None
+            if dashboard_payload:
+                dashboard_descriptor = {
+                    "kind": "cfi-compare",
+                    "tickers": dashboard_payload.get("meta", {}).get("tickers"),
+                    "benchmark": dashboard_payload.get("meta", {}).get("benchmark"),
+                    "payload": dashboard_payload,
+                }
+
         self.last_structured_response = {
             "highlights": highlights,
             "trends": trends_payload,
@@ -2352,6 +2393,7 @@ class BenchmarkOSChatbot:
             "citations": citations_payload,
             "exports": exports_payload,
             "conclusion": conclusion,
+            "dashboard": dashboard_descriptor,
         }
 
         output_lines: List[str] = []

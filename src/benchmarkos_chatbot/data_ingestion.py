@@ -128,8 +128,304 @@ class IngestionError(Exception):
 def ingest_financial_data(settings: Settings) -> Optional[IngestionReport]:
     """Bootstrap ingestion hook used by the CLI."""
 
-    LOGGER.info("Bootstrap ingestion skipped (no packaged sample data).")
-    return None
+    data_path = Path(__file__).resolve().parents[2] / "data" / "sample_financials.csv"
+    if not data_path.exists():
+        raise IngestionError(f"Sample financial dataset not found at {data_path}")
+
+    frame = pd.read_csv(data_path)
+    if frame.empty:
+        raise IngestionError("Sample financial dataset is empty.")
+
+    database.initialise(settings.database_path)
+    if hasattr(settings, "disable_quote_refresh"):
+        object.__setattr__(settings, "disable_quote_refresh", True)
+
+    # Normalise tickers early so lookups stay consistent across the ingestion flow.
+    frame["ticker"] = frame["ticker"].astype(str).str.upper()
+
+    metric_map: Dict[str, Tuple[str, Optional[str]]] = {
+        "revenue": ("revenue", "USD"),
+        "ebitda": ("ebitda", "USD"),
+        "net_income": ("net_income", "USD"),
+        "operating_income": ("operating_income", "USD"),
+        "total_equity": ("shareholders_equity", "USD"),
+        "total_assets": ("total_assets", "USD"),
+        "shares_outstanding": ("shares_outstanding", "shares"),
+        "dividends_paid": ("dividends_paid", "USD"),
+        "free_cash_flow": ("free_cash_flow", "USD"),
+        "operating_cash_flow": ("cash_from_operations", "USD"),
+        "capital_expenditure": ("capital_expenditures", "USD"),
+        "cash": ("cash_and_cash_equivalents", "USD"),
+        "total_debt": ("total_debt", "USD"),
+        "enterprise_value": ("enterprise_value", "USD"),
+        "market_cap": ("market_cap", "USD"),
+        "price": ("price", "USD"),
+        "working_capital": ("working_capital", "USD"),
+        "share_buybacks": ("share_repurchases", "USD"),
+        "non_recurring_expense": ("non_recurring_expense", "USD"),
+        "stock_compensation": ("stock_compensation", "USD"),
+    }
+
+    tickers = sorted(frame["ticker"].unique())
+    cik_map: Dict[str, str] = {
+        ticker: f"{index + 1:010d}" for index, ticker in enumerate(tickers)
+    }
+
+    facts: List[FinancialFact] = []
+    aliases: List[database.TickerAliasRecord] = []
+    audit_events: List[AuditEvent] = []
+
+    def _is_missing(value: Any) -> bool:
+        return pd.isna(value)
+
+    for ticker in tickers:
+        company_rows = frame[frame["ticker"] == ticker].sort_values("fiscal_year")
+        if company_rows.empty:
+            continue
+
+        first = company_rows.iloc[0]
+        company_name = str(first.get("company_name", "") or "")
+        sector = str(first.get("sector", "") or "")
+        cik = cik_map[ticker]
+        aliases.append(
+            database.TickerAliasRecord(
+                ticker=ticker,
+                cik=cik,
+                company_name=company_name,
+                updated_at=_now(),
+            )
+        )
+
+        sector_code = SECTOR_CODES.get(sector)
+        if sector_code is not None:
+            facts.append(
+                FinancialFact(
+                    cik=cik,
+                    ticker=ticker,
+                    company_name=company_name,
+                    metric="sector_code",
+                    fiscal_year=None,
+                    fiscal_period=None,
+                    period="FYSECTOR",
+                    value=float(sector_code),
+                    unit=None,
+                    source="sample",
+                    source_filing="sample-sector",
+                    period_start=None,
+                    period_end=None,
+                    adjusted=False,
+                    adjustment_note=None,
+                    ingested_at=_now(),
+                    raw={
+                        "source": "sample_financials",
+                        "sector": sector,
+                    },
+                )
+            )
+
+        for row in company_rows.to_dict("records"):
+            fiscal_year_value = row.get("fiscal_year")
+            if _is_missing(fiscal_year_value):
+                continue
+            fiscal_year = int(fiscal_year_value)
+            period_label = f"FY{fiscal_year}"
+            ingested_at = _now()
+            source_filing = f"sample-{fiscal_year}"
+
+            for column, (metric_name, unit) in metric_map.items():
+                value = row.get(column)
+                if _is_missing(value):
+                    continue
+                facts.append(
+                    FinancialFact(
+                        cik=cik,
+                        ticker=ticker,
+                        company_name=company_name,
+                        metric=metric_name,
+                        fiscal_year=fiscal_year,
+                        fiscal_period="FY",
+                        period=period_label,
+                        value=float(value),
+                        unit=unit,
+                        source="sample",
+                        source_filing=source_filing,
+                        period_start=None,
+                        period_end=None,
+                        adjusted=False,
+                        adjustment_note=None,
+                        ingested_at=ingested_at,
+                        raw={
+                            "source": "sample_financials",
+                            "original_metric": column,
+                            "fiscal_year": fiscal_year,
+                        },
+                    )
+                )
+
+            total_assets = row.get("total_assets")
+            total_equity = row.get("total_equity")
+            if not _is_missing(total_assets) and not _is_missing(total_equity):
+                total_liabilities = float(total_assets) - float(total_equity)
+                facts.append(
+                    FinancialFact(
+                        cik=cik,
+                        ticker=ticker,
+                        company_name=company_name,
+                        metric="total_liabilities",
+                        fiscal_year=fiscal_year,
+                        fiscal_period="FY",
+                        period=period_label,
+                        value=total_liabilities,
+                        unit="USD",
+                        source="sample",
+                        source_filing=source_filing,
+                        period_start=None,
+                        period_end=None,
+                        adjusted=False,
+                        adjustment_note=None,
+                        ingested_at=ingested_at,
+                        raw={
+                            "source": "sample_financials",
+                            "calculation": "total_assets - total_equity",
+                            "fiscal_year": fiscal_year,
+                        },
+                    )
+                )
+
+            revenue = row.get("revenue")
+            ebitda = row.get("ebitda")
+            non_recurring = row.get("non_recurring_expense", 0.0)
+            stock_comp = row.get("stock_compensation", 0.0)
+            net_income = row.get("net_income")
+
+            adjusted_note = (
+                "Adjusted for non-recurring expense and 50% of stock compensation."
+            )
+
+            if not _is_missing(ebitda) and not _is_missing(non_recurring):
+                adjusted_ebitda_value = float(ebitda) + float(non_recurring)
+                facts.append(
+                    FinancialFact(
+                        cik=cik,
+                        ticker=ticker,
+                        company_name=company_name,
+                        metric="adjusted_ebitda",
+                        fiscal_year=fiscal_year,
+                        fiscal_period="FY",
+                        period=period_label,
+                        value=adjusted_ebitda_value,
+                        unit="USD",
+                        source="sample",
+                        source_filing=source_filing,
+                        period_start=None,
+                        period_end=None,
+                        adjusted=True,
+                        adjustment_note="Adds back non-recurring expense to EBITDA.",
+                        ingested_at=ingested_at,
+                        raw={
+                            "source": "sample_financials",
+                            "fiscal_year": fiscal_year,
+                            "formula": "ebitda + non_recurring_expense",
+                        },
+                    )
+                )
+                if not _is_missing(revenue) and float(revenue):
+                    adjusted_margin = adjusted_ebitda_value / float(revenue)
+                    facts.append(
+                        FinancialFact(
+                            cik=cik,
+                            ticker=ticker,
+                            company_name=company_name,
+                            metric="adjusted_ebitda_margin",
+                            fiscal_year=fiscal_year,
+                            fiscal_period="FY",
+                            period=period_label,
+                            value=adjusted_margin,
+                            unit=None,
+                            source="sample",
+                            source_filing=source_filing,
+                            period_start=None,
+                            period_end=None,
+                            adjusted=True,
+                            adjustment_note="Adjusted EBITDA margin uses adjusted EBITDA divided by revenue.",
+                            ingested_at=ingested_at,
+                            raw={
+                                "source": "sample_financials",
+                                "fiscal_year": fiscal_year,
+                                "formula": "(ebitda + non_recurring_expense) / revenue",
+                            },
+                        )
+                    )
+
+            if not _is_missing(net_income):
+                adjustments = 0.0
+                if not _is_missing(non_recurring):
+                    adjustments += float(non_recurring)
+                if not _is_missing(stock_comp):
+                    adjustments += 0.5 * float(stock_comp)
+                adjusted_net_income = float(net_income) + adjustments
+                facts.append(
+                    FinancialFact(
+                        cik=cik,
+                        ticker=ticker,
+                        company_name=company_name,
+                        metric="adjusted_net_income",
+                        fiscal_year=fiscal_year,
+                        fiscal_period="FY",
+                        period=period_label,
+                        value=adjusted_net_income,
+                        unit="USD",
+                        source="sample",
+                        source_filing=source_filing,
+                        period_start=None,
+                        period_end=None,
+                        adjusted=True,
+                        adjustment_note=adjusted_note,
+                        ingested_at=ingested_at,
+                        raw={
+                            "source": "sample_financials",
+                            "fiscal_year": fiscal_year,
+                            "formula": "net_income + non_recurring_expense + 0.5 * stock_compensation",
+                        },
+                    )
+                )
+
+        audit_events.append(
+            AuditEvent(
+                ticker=ticker,
+                event_type="ingestion",
+                entity_id=f"{ticker}-sample",
+                details={
+                    "source": "sample_financials",
+                    "company_name": company_name,
+                    "rows": len(company_rows),
+                    "years": sorted(set(company_rows["fiscal_year"].tolist())),
+                },
+                created_at=_now(),
+                created_by="sample_ingestion",
+            )
+        )
+
+    with database.temporary_connection(settings.database_path) as connection:
+        facts_loaded = database.bulk_upsert_financial_facts(
+            settings.database_path, facts, connection=connection
+        )
+        database.bulk_insert_audit_events(
+            settings.database_path, audit_events, connection=connection
+        )
+        database.upsert_ticker_aliases(
+            settings.database_path, aliases, connection=connection
+        )
+
+    return IngestionReport(
+        companies=tickers,
+        records_loaded=facts_loaded,
+        filings_loaded=0,
+        facts_loaded=facts_loaded,
+        quotes_loaded=0,
+        bloomberg_quotes_loaded=0,
+        errors=[],
+    )
 
 
 def _now() -> datetime:

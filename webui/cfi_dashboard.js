@@ -1,4 +1,24 @@
 (function(){
+  function resolveScope() {
+    const container = window.__cfiActiveContainer;
+    return container instanceof HTMLElement ? container : document;
+  }
+  function scopedQuery(id) {
+    const scope = resolveScope();
+    if (scope === document) return document.getElementById(id);
+    return scope.querySelector(`#${id}`);
+  }
+  function scopedSelect(selector) {
+    const scope = resolveScope();
+    if (scope === document) return document.querySelector(selector);
+    return scope.querySelector(selector);
+  }
+  function scopedSelectAll(selector) {
+    const scope = resolveScope();
+    if (scope === document) return document.querySelectorAll(selector);
+    return scope.querySelectorAll(selector);
+  }
+
   const COLORS = {
     navy: "#0B2E59",
     accent: "#1C7ED6",
@@ -50,6 +70,16 @@
   };
   const formatMultiple = (value) => (isNumber(value) ? `${Number(value).toFixed(1)}×` : "—");
   const formatInteger = (value) => (isNumber(value) ? Number(value).toLocaleString() : "—");
+
+  function formatKpiValue(value, type) {
+    if (!isNumber(value)) return "—";
+    const kind = type || "number";
+    if (kind === "percent") return formatPercent(value);
+    if (kind === "multiple") return formatMultiple(value);
+    if (kind === "currency") return formatMoney(value);
+    if (kind === "integer") return formatInteger(value);
+    return formatMoney(value);
+  }
 
   function normalizePairs(source) {
     if (!source) return [];
@@ -104,7 +134,7 @@
   }
 
   function renderPairsTable(target, source) {
-    const table = typeof target === "string" ? document.getElementById(target) : target;
+    const table = typeof target === "string" ? scopedQuery(target) : target;
     if (!table) return;
     const tbody = ensureTBody(table);
     if (!tbody) return;
@@ -134,7 +164,7 @@
   }
 
   function renderValuationTable(target, rows) {
-    const table = typeof target === "string" ? document.getElementById(target) : target;
+    const table = typeof target === "string" ? scopedQuery(target) : target;
     if (!table) return;
     table.innerHTML = "";
     if (!rows || !rows.length) {
@@ -174,7 +204,7 @@
   }
 
   function renderValuationNotes(target, notes) {
-    const list = typeof target === "string" ? document.getElementById(target) : target;
+    const list = typeof target === "string" ? scopedQuery(target) : target;
     if (!list) return;
     list.innerHTML = "";
     if (!Array.isArray(notes) || !notes.length) return;
@@ -187,7 +217,7 @@
   }
 
   function renderKeyFinancials(targetId, table) {
-    const container = document.getElementById(targetId);
+    const container = scopedQuery(targetId);
     if (!container) return;
     container.innerHTML = "";
     if (!table || !Array.isArray(table.columns) || !table.columns.length) {
@@ -239,8 +269,132 @@
     container.appendChild(tbl);
   }
 
+  function renderKpiSummary(targetId, items) {
+    const container = scopedQuery(targetId);
+    if (!container) return;
+    container.innerHTML = "";
+    if (!Array.isArray(items) || !items.length) {
+      const empty = document.createElement("div");
+      empty.className = "cfi-kpi-empty";
+      empty.textContent = "No KPI metrics available.";
+      container.appendChild(empty);
+      return;
+    }
+    const grid = document.createElement("div");
+    grid.className = "cfi-kpi-grid";
+    items.forEach((item) => {
+      if (!item) return;
+      const card = document.createElement("div");
+      card.className = "cfi-kpi-item";
+      const label = document.createElement("div");
+      label.className = "cfi-kpi-label";
+      label.textContent = item.label || item.id || "";
+      const value = document.createElement("div");
+      value.className = "cfi-kpi-value";
+      value.textContent = formatKpiValue(item.value, item.type);
+      if (isNumber(item.value)) {
+        if (item.type === "percent") {
+          value.classList.add(item.value >= 0 ? "positive" : "negative");
+        } else if (item.type === "multiple" && item.value < 0) {
+          value.classList.add("negative");
+        }
+      }
+      card.appendChild(label);
+      card.appendChild(value);
+      if (item.period) {
+        const meta = document.createElement("div");
+        meta.className = "cfi-kpi-meta";
+        meta.textContent = item.period;
+        card.appendChild(meta);
+      }
+      grid.appendChild(card);
+    });
+    container.appendChild(grid);
+  }
+
+  function parseFilenameFromDisposition(disposition) {
+    if (!disposition) return "";
+    const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utfMatch && utfMatch[1]) {
+      try {
+        return decodeURIComponent(utfMatch[1]);
+      } catch (error) {
+        console.warn("Unable to decode filename from disposition:", error);
+      }
+    }
+    const simpleMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
+    if (simpleMatch && simpleMatch[1]) {
+      return simpleMatch[1];
+    }
+    return "";
+  }
+
+  async function triggerExport(button, format, payload) {
+    const exporter = button;
+    const exportFormat = (format || "").toLowerCase();
+    const ticker =
+      payload?.meta?.ticker_label ||
+      payload?.meta?.ticker ||
+      payload?.meta?.ticker_display ||
+      payload?.meta?.company ||
+      "";
+    if (!exportFormat) {
+      return;
+    }
+    if (!ticker) {
+      if (typeof window.showToast === "function") {
+        window.showToast("Unable to determine ticker for export.", "error");
+      }
+      return;
+    }
+    try {
+      exporter.disabled = true;
+      exporter.classList.add("loading");
+      const params = new URLSearchParams();
+      params.set("format", exportFormat);
+      params.set("ticker", ticker);
+      const response = await fetch(`/api/export/cfi?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Export failed (${response.status})`);
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition");
+      const filename =
+        parseFilenameFromDisposition(disposition) ||
+        `benchmarkos-export-${Date.now()}.${exportFormat === "ppt" ? "pptx" : exportFormat}`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      if (typeof window.showToast === "function") {
+        window.showToast(`Export ready (${filename})`, "success");
+      }
+    } catch (error) {
+      console.error("Export failed:", error);
+      if (typeof window.showToast === "function") {
+        window.showToast("Unable to generate export.", "error");
+      }
+    } finally {
+      exporter.disabled = false;
+      exporter.classList.remove("loading");
+    }
+  }
+
+  function attachExportHandlers(payload) {
+    const buttons = scopedSelectAll("[data-export-format]");
+    if (!buttons || !buttons.length) return;
+    buttons.forEach((button) => {
+      const format = button.getAttribute("data-export-format");
+      button.onclick = () => triggerExport(button, format, payload);
+    });
+  }
+
   function plotRevenueChart(data) {
-    const node = document.getElementById("cfi-rev");
+    const node = scopedQuery("cfi-rev");
     if (!node) return;
     if (!data || !Array.isArray(data.Year) || !Array.isArray(data.Revenue)) {
       node.textContent = "No revenue data.";
@@ -281,7 +435,7 @@
   }
 
   function plotEbitdaChart(data) {
-    const node = document.getElementById("cfi-ebitda");
+    const node = scopedQuery("cfi-ebitda");
     if (!node) return;
     if (!data || !Array.isArray(data.Year) || !Array.isArray(data.EBITDA)) {
       node.textContent = "No EBITDA data.";
@@ -322,7 +476,7 @@
   }
 
   function plotForecastChart(data) {
-    const node = document.getElementById("cfi-forecast");
+    const node = scopedQuery("cfi-forecast");
     if (!node) return;
     if (!data || !Array.isArray(data.Year)) {
       node.textContent = "No forecast data.";
@@ -359,7 +513,7 @@
   }
 
   function plotValuationBar(data, meta = {}) {
-    const node = document.getElementById("cfi-valbar");
+    const node = scopedQuery("cfi-valbar");
     if (!node) return;
     if (!data || !Array.isArray(data.Case) || !Array.isArray(data.Value)) {
       node.textContent = "No valuation data.";
@@ -409,13 +563,13 @@
     const ticker = meta.ticker ? String(meta.ticker).toUpperCase() : "";
     const brand = meta.brand || company.split(" ")[0] || ticker || "";
 
-    const brandNode = document.getElementById("cfi-brand");
+    const brandNode = scopedQuery("cfi-brand");
     if (brandNode) brandNode.textContent = brand ? brand.toLowerCase() : "";
 
-    const companyNode = document.getElementById("cfi-company");
+    const companyNode = scopedQuery("cfi-company");
     if (companyNode) companyNode.textContent = company;
 
-    const tickerNode = document.getElementById("cfi-ticker");
+    const tickerNode = scopedQuery("cfi-ticker");
     if (tickerNode) {
       const explicit = meta.ticker_label || meta.ticker_display;
       if (explicit) tickerNode.textContent = explicit;
@@ -426,26 +580,26 @@
       }
     }
 
-    const recNode = document.getElementById("cfi-rec");
+    const recNode = scopedQuery("cfi-rec");
     if (recNode) recNode.textContent = meta.recommendation || "—";
 
-    const targetNode = document.getElementById("cfi-target");
+    const targetNode = scopedQuery("cfi-target");
     if (targetNode) targetNode.textContent = isNumber(meta.target_price) ? formatCurrency(meta.target_price) : meta.target_price || "—";
 
-    const scenarioNode = document.getElementById("cfi-scenario");
+    const scenarioNode = scopedQuery("cfi-scenario");
     if (scenarioNode) scenarioNode.textContent = meta.scenario || meta.live_scenario || meta.case || "Consensus";
 
-    const dateNode = document.getElementById("cfi-date");
+    const dateNode = scopedQuery("cfi-date");
     if (dateNode) dateNode.textContent = meta.date || "";
 
-    const websiteNode = document.getElementById("cfi-website");
+    const websiteNode = scopedQuery("cfi-website");
     if (websiteNode) {
       const value = meta.website || meta.url || "";
       websiteNode.textContent = value;
       websiteNode.style.display = value ? "" : "none";
     }
 
-    const tagNode = document.getElementById("cfi-report-tag");
+    const tagNode = scopedQuery("cfi-report-tag");
     if (tagNode) {
       const value = meta.report_tag || meta.report || "";
       tagNode.textContent = value;
@@ -474,6 +628,13 @@
       renderValuationTable("cfi-valuation-table", payload.valuation_table || []);
       renderValuationNotes("cfi-valuation-notes", payload.valuation_data?.notes || payload.valuation_notes || []);
       renderKeyFinancials("cfi-keyfin", payload.key_financials || {});
+      const kpiItems = payload.kpi_summary || payload.kpis || [];
+      renderKpiSummary("cfi-kpi", kpiItems);
+      window.__cfiDashboardInteractions = payload.interactions || null;
+      window.__cfiDashboardPeerConfig = payload.peer_config || null;
+      window.__cfiDashboardSeries = window.__cfiDashboardSeries || {};
+      window.__cfiDashboardSeries.kpi = payload.kpi_series || {};
+      attachExportHandlers(payload);
       const charts = payload.charts || {};
       plotRevenueChart(charts.revenue_ev || null);
       plotEbitdaChart(charts.ebitda_ev || null);
