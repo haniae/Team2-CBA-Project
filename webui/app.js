@@ -3846,6 +3846,30 @@ function openPdfPreview(payload) {
           .join("")}</tr>`
     )
     .join("");
+  const sourcesList = Array.isArray(payload.sources)
+    ? payload.sources
+        .map((source) => {
+          const text =
+            typeof source?.text === "string" && source.text.trim().length
+              ? source.text.trim()
+              : "";
+          const link =
+            source?.url && typeof source.url === "string"
+              ? `<a href="${source.url}" target="_blank" rel="noopener">View filing</a>`
+              : "";
+          if (!text && !link) {
+            return "";
+          }
+          return `<li>${text}${link ? ` — ${link}` : ""}</li>`;
+        })
+        .filter(Boolean)
+    : [];
+  const sourcesMarkup = sourcesList.length
+    ? `<section class="sources">
+        <h2>Sources</h2>
+        <ul>${sourcesList.join("")}</ul>
+      </section>`
+    : "";
   const html = `<!DOCTYPE html>
 <html>
   <head>
@@ -3860,6 +3884,12 @@ function openPdfPreview(payload) {
       th { background: #eff6ff; }
       ul { margin: 12px 0; padding-left: 18px; }
       .meta { font-size: 12px; color: #475569; margin-top: 4px; }
+      .sources { margin-top: 28px; border-top: 1px solid #cbd5f5; padding-top: 16px; }
+      .sources h2 { font-size: 16px; margin: 0 0 10px; }
+      .sources ul { list-style: none; padding-left: 0; margin: 0; }
+      .sources li { font-size: 13px; line-height: 1.6; margin-bottom: 6px; }
+      .sources a { color: #1d4ed8; text-decoration: none; font-weight: 600; }
+      .sources a:hover { text-decoration: underline; }
     </style>
   </head>
   <body>
@@ -3874,6 +3904,7 @@ function openPdfPreview(payload) {
         ${tableRows}
       </tbody>
     </table>
+    ${sourcesMarkup}
     <p class="meta">Generated ${new Date().toLocaleString()}</p>
   </body>
 </html>`;
