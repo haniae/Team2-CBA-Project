@@ -2552,7 +2552,7 @@ function normaliseArtifacts(response) {
     comparisonTable: response.comparison_table || response.comparisonTable || null,
     citations: Array.isArray(response.citations) ? response.citations : [],
     exports: Array.isArray(response.exports) ? response.exports : [],
-    conclusion: typeof response.conclusion === "string" ? response.conclusion.trim() : "",
+    conclusion: "",
     dashboard: dashboard,
   };
   if (
