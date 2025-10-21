@@ -1371,6 +1371,37 @@ class BenchmarkOSChatbot:
     # ----------------------------------------------------------------------------------
     def _handle_financial_intent(self, text: str) -> Optional[str]:
         """Handle natural-language requests that map to metrics workflows."""
+        
+        # Priority 2: Check for legacy commands FIRST
+        lowered = text.strip().lower()
+        if lowered == "help":
+            return HELP_TEXT
+        
+        # More specific legacy command detection
+        if lowered.startswith("compare ") and self._is_legacy_compare_command(text):
+            tokens = text.split()[1:]
+            return self._handle_metrics_comparison(tokens)
+        if lowered.startswith("table "):
+            table_output = render_table_command(text, self.analytics_engine)
+            if table_output is None:
+                return "Unable to generate a table for that request."
+            return table_output
+        if lowered.startswith("fact "):
+            return self._handle_fact_command(text)
+        if lowered.startswith("fact-range "):
+            return self._handle_fact_range_command(text)
+        if lowered.startswith("audit "):
+            return self._handle_audit_command(text)
+        if lowered.startswith("ingest "):
+            return self._handle_ingest_command(text)
+        if lowered.startswith("scenario "):
+            return self._handle_scenario_command(text)
+
+        # Check for complex natural language queries that should bypass structured parsing
+        if self._is_complex_natural_language_query(text):
+            return None  # Will trigger LLM fallback
+        
+        # Priority 1: Try structured metrics parsing
         structured = parse_to_structured(text)
         self.last_structured_response["parser"] = structured
 
@@ -1378,6 +1409,11 @@ class BenchmarkOSChatbot:
         if structured_reply:
             return structured_reply
 
+        # Check for natural language fallback conditions
+        if self._should_fallback_to_llm(structured):
+            return None  # Will trigger LLM fallback
+
+        # Legacy metrics request parsing (fallback)
         metrics_request = self._parse_metrics_request(text)
         if metrics_request is not None:
             tickers_summary = ", ".join(metrics_request.tickers) if metrics_request.tickers else ""
@@ -1396,35 +1432,99 @@ class BenchmarkOSChatbot:
                 resolution.available, metrics_request.period_filters
             )
 
-        lowered = text.strip().lower()
-        if lowered == "help":
-            return HELP_TEXT
-        if lowered.startswith("compare "):
-            tokens = text.split()[1:]
-            return self._handle_metrics_comparison(tokens)
-
-        if lowered.startswith("table "):
-            table_output = render_table_command(text, self.analytics_engine)
-            if table_output is None:
-                return "Unable to generate a table for that request."
-            return table_output
-
-        if lowered.startswith("fact "):
-            return self._handle_fact_command(text)
-
-        if lowered.startswith("fact-range "):
-            return self._handle_fact_range_command(text)
-
-        if lowered.startswith("audit "):
-            return self._handle_audit_command(text)
-
-        if lowered.startswith("ingest "):
-            return self._handle_ingest_command(text)
-
-        if lowered.startswith("scenario "):
-            return self._handle_scenario_command(text)
-
         return None
+
+    def _is_legacy_compare_command(self, text: str) -> bool:
+        """Determine if this is a legacy compare command vs natural language comparison."""
+        # Legacy compare commands are typically: "compare AAPL MSFT" or "compare AAPL MSFT GOOGL"
+        # Natural language comparisons are: "Compare Apple vs Microsoft revenue"
+        
+        tokens = text.split()
+        if len(tokens) < 3:  # "compare AAPL" is too short
+            return False
+        
+        # Check if tokens after "compare" look like ticker symbols (uppercase, 1-5 chars)
+        ticker_like_tokens = []
+        for token in tokens[1:]:  # Skip "compare"
+            if token.isupper() and len(token) <= 5 and token.isalpha():
+                ticker_like_tokens.append(token)
+        
+        # If most tokens look like ticker symbols, it's likely a legacy command
+        if len(ticker_like_tokens) >= 2:
+            return True
+        
+        # If there are natural language words like "vs", "versus", "revenue", etc., it's natural language
+        natural_language_words = ["vs", "versus", "revenue", "earnings", "profit", "apple", "microsoft", "google", "amazon"]
+        for token in tokens:
+            if token.lower() in natural_language_words:
+                return False
+        
+        # Default to legacy command if unclear
+        return True
+
+    def _is_complex_natural_language_query(self, text: str) -> bool:
+        """Detect complex natural language queries that should go directly to LLM."""
+        lowered = text.lower()
+        
+        # Complex query patterns that should bypass structured parsing
+        complex_patterns = [
+            "tell me about", "how is", "what are the key", "explain the risks",
+            "sector analysis", "market outlook", "investment advice", "what's the",
+            "how do you", "can you explain", "what does it mean", "how does",
+            "what are the", "what is the", "how are the", "can you tell me"
+        ]
+        
+        for pattern in complex_patterns:
+            if pattern in lowered:
+                return True
+        
+        # Queries with multiple question words
+        question_words = ["what", "how", "why", "when", "where", "which"]
+        question_count = sum(1 for word in question_words if word in lowered)
+        if question_count >= 2:
+            return True
+        
+        # Sector/industry related queries
+        sector_keywords = ["sector", "industry", "market", "economy", "outlook", "trends"]
+        for keyword in sector_keywords:
+            if keyword in lowered:
+                return True
+        
+        return False
+
+    def _should_fallback_to_llm(self, structured: Dict[str, Any]) -> bool:
+        """Determine if the query should fall back to LLM instead of structured parsing."""
+        intent = structured.get("intent")
+        tickers = structured.get("tickers", [])
+        metrics = structured.get("vmetrics", [])
+        norm_text = structured.get("norm_text", "")
+        
+        # Fall back to LLM if:
+        # 1. Intent is unclear or parsing seems forced
+        if not intent or (intent == "lookup" and not tickers and not metrics):
+            return True
+        
+        # 2. Too many ambiguous tickers parsed (likely over-parsing)
+        if len(tickers) > 3:
+            return True
+            
+        # 3. Complex natural language patterns that don't fit structured intents
+        complex_patterns = [
+            "tell me about", "how is", "what are the key", "explain the risks",
+            "sector analysis", "market outlook", "investment advice"
+        ]
+        
+        for pattern in complex_patterns:
+            if pattern in norm_text.lower():
+                return True
+                
+        # 4. Ambiguous ticker parsing for ranking/explain queries
+        if intent in ["rank", "explain_metric"]:
+            # If tickers were parsed but shouldn't have been
+            if tickers and not any(ticker in norm_text.upper() for ticker in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]):
+                return True
+        
+        return False
 
     def _handle_metrics_comparison(self, tokens: Sequence[str]) -> str:
         """Render a comparison table for the resolved tickers/metrics."""

@@ -115,10 +115,18 @@ def classify_intent(
     
     # Check for rank intent first (highest priority for ranking questions)
     if INTENT_RANK_PATTERN.search(norm_text):
+        # For ranking queries, only parse tickers if explicitly mentioned
+        if tickers and not any(ticker in norm_text.upper() for ticker in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"]):
+            # Likely over-parsing, return rank without ticker dependency
+            pass
         return "rank"
 
     # Check for explain intent (second priority)
     if INTENT_EXPLAIN_PATTERN.search(norm_text):
+        # For explain queries, only parse tickers if explicitly mentioned
+        if tickers and not any(ticker in norm_text.upper() for ticker in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"]):
+            # Likely over-parsing, return explain without ticker dependency
+            pass
         return "explain_metric"
 
     # Check for trend intent (third priority)
