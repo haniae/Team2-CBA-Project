@@ -557,3 +557,16 @@ CI isn’t configured by default, but `pytest -ra` (preconfigured in `pyproject.
 - Consider versioning your `.env` templates and deployment runbooks alongside these docs as the project evolves.
 
 Happy building! 👋
+## Dataset size (updated 2025-10-21)
+
+- **metric_snapshots:** 617,484 rows (~0.617 M)
+- **financial_facts:** 93,210 rows (~0.093 M)
+- **company_filings:** 52,280 rows (~0.052 M)
+- **market_quotes:** 955 rows (~0.001 M)
+- **audit_events:** 2,146 rows (~0.002 M)
+
+**Total (core):** ~765k rows (~0.77 M)  
+**DB size:** ~160 MB  
+**Coverage:** Fiscal years 2012–2027; filing timestamps 2012-02-18 → 2025-10-10; quote data from 2012-01-03 onward.
+
+> To extend history or use a custom universe, rerun ingestion with your desired date range and ticker set.
