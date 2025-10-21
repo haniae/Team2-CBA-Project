@@ -58,7 +58,7 @@ Input: "Compare Microsoft and Amazon in FY2023"  → Output: "compare microsoft 
 Input: "What was Tesla's 2022 revenue?"          → Output: "what was tesla's 2022 revenue?"          ✅
 ```
 
-### 🔍 Phân tích từng bước
+### 🔍 Step-by-step Analysis
 
 #### Bước 1: Handle None/Empty
 ```python
@@ -72,7 +72,7 @@ normalized = text or ""
 normalized = unicodedata.normalize("NFKC", normalized)
 ```
 - **NFKC**: Normalization Form Compatibility Composition
-- Compose các ký tự có thể compose được
+- Compose characters that can be composed
 - ⚠️ `™` → `TM` (có thể ảnh hưởng matching)
 
 #### Bước 3: Lowercase Conversion
@@ -105,19 +105,19 @@ normalized = normalized.strip()
 4. **Simple and efficient**: Code ngắn gọn, hiệu quả
 
 #### **Điểm cần cải thiện:**
-1. **Unicode composition**: Cần test kỹ hơn với financial symbols
+1. **Unicode composition**: Need more testing with financial symbols
 2. **Edge cases**: Có thể cần xử lý thêm một số special characters
 
 #### **Recommendation:**
-Function `normalize()` hoạt động tốt cho mục đích của nó. Unicode composition behavior là đúng theo chuẩn NFKC và không ảnh hưởng nghiêm trọng đến functionality.
+The `normalize()` function works well for its purpose. Unicode composition behavior is correct according to NFKC standard and does not seriously affect functionality.
 
 ### 📈 Performance
-- **Processing time**: < 1ms cho typical queries
+- **Processing time**: < 1ms for typical queries
 - **Memory usage**: Minimal overhead
 - **Accuracy**: 92.3% test pass rate
 
 ### 🔗 Integration
-Function này được sử dụng trong:
+This function is used in:
 - `parse_to_structured()` - Main parsing function
 - Tất cả các bước phân tích text tiếp theo
-- Caching và comparison logic
+- Caching and comparison logic

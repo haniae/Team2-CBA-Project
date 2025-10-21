@@ -62,7 +62,7 @@ def _deduplicate_results(self, matches: List[TickerMatch]) -> List[TickerMatch]:
 
 **Benefits:**
 - No more duplicate results
-- Preserves order và priority
+- Preserves order and priority
 - Cleaner output
 
 #### **3. Johnson & Johnson Handling** ✅
@@ -72,7 +72,7 @@ def _deduplicate_results(self, matches: List[TickerMatch]) -> List[TickerMatch]:
 ```
 
 **Technical Implementation:**
-- Added to manual overrides với priority 1
+- Added to manual overrides with priority 1
 - Context-aware healthcare mapping
 - Better confidence scoring
 
@@ -200,7 +200,7 @@ def resolve_tickers_final(self, text: str, context: Optional[str] = None) -> Tup
 ### 🚀 **Final Implementation Status**
 
 #### **✅ Completed (High Priority)**
-1. **Fix pattern matching** cho 3M, BRK.A/BRK.B cases ✅
+1. **Fix pattern matching** for 3M, BRK.A/BRK.B cases ✅
 2. **Add deduplication logic** ✅
 3. **Improve Johnson & Johnson handling** ✅
 
@@ -231,7 +231,7 @@ def resolve_tickers_final(self, text: str, context: Optional[str] = None) -> Tup
 ### 🎯 **Final Recommendations**
 
 #### **1. Immediate Deployment**
-- ✅ **Ready for production** với current improvements
+- ✅ **Ready for production** with current improvements
 - ✅ **All critical issues fixed**
 - ✅ **Performance optimized**
 
@@ -241,13 +241,13 @@ def resolve_tickers_final(self, text: str, context: Optional[str] = None) -> Tup
 - **Edge case handling**: More comprehensive coverage
 
 #### **3. Monitoring & Maintenance**
-- **Track confidence scores** để identify issues
-- **Monitor performance** để ensure optimization
-- **Collect user feedback** để improve accuracy
+- **Track confidence scores** to identify issues
+- **Monitor performance** to ensure optimization
+- **Collect user feedback** to improve accuracy
 
 ### 🎯 **Conclusion**
 
-**Ticker Resolution improvements đã thành công vượt mong đợi** với:
+**Ticker Resolution improvements have achieved exceptional success** with:
 
 - **Success rate improvement**: 81.2% → 87.5% (+6.2%)
 - **Performance improvement**: 97.2% faster
@@ -257,7 +257,7 @@ def resolve_tickers_final(self, text: str, context: Optional[str] = None) -> Tup
 - **Confidence scoring**: Clear differentiation
 - **Deduplication**: Clean results
 
-**System is ready for production deployment** với significant improvements trong accuracy, performance, và reliability.
+**System is ready for production deployment** with significant improvements in accuracy, performance, and reliability.
 
 ---
 
@@ -266,4 +266,4 @@ def resolve_tickers_final(self, text: str, context: Optional[str] = None) -> Tup
 - `comprehensive_ticker_comparison.py` - Comprehensive testing and comparison
 - `final_ticker_improvements_report.md` - Final report
 
-**Next Steps**: Deploy to production và monitor performance metrics.
+**Next Steps**: Deploy to production and monitor performance metrics.

@@ -183,8 +183,8 @@ def resolve_tickers_with_context(text: str, context: str = None):
 
 ### 💡 **Key Insights**
 
-1. **System is already very good** với 92.5% overall success rate
-2. **Main issues are edge cases** và special ticker formats
+1. **System is already very good** with 92.5% overall success rate
+2. **Main issues are edge cases** and special ticker formats
 3. **Fuzzy matching works well** nhưng có thể tuned
 4. **Manual overrides are effective** nhưng cần priority system
 5. **Performance is excellent** - no bottlenecks
@@ -208,13 +208,13 @@ def resolve_tickers_with_context(text: str, context: str = None):
 
 ### 🎯 **Conclusion**
 
-**Ticker Resolution system đã hoạt động rất tốt** với 92.5% success rate. Các vấn đề chính là:
+**The Ticker Resolution system is working very well** with 92.5% success rate. The main issues are:
 
-1. **Pattern matching** cần enhanced cho special cases
-2. **Fuzzy matching** cần tuning cho better coverage
+1. **Pattern matching** needs to be enhanced for special cases
+2. **Fuzzy matching** needs tuning for better coverage
 3. **Manual overrides** cần priority system
 4. **Edge cases** cần better handling
 
-Với các improvements được đề xuất, hệ thống có thể đạt được **97%+ accuracy** và **better edge case coverage**.
+With the proposed improvements, the system can achieve **97%+ accuracy** and **better edge case coverage**.
 
-**Recommendation**: Implement Native 2 trong 3 months để đạt được target performance.
+**Recommendation**: Implement Native 2 within 3 months to achieve target performance.

@@ -20,9 +20,9 @@ After testing all proposed improvements, we have achieved significant improvemen
 
 #### **2. Fuzzy Matching Improvements Test**
 - **Success Rate**: 100% (10/10 test cases passed) 🎉
-- **Major Improvement**: "aple" → AAPL (đã fix được vấn đề trước đây)
+- **Major Improvement**: "aple" → AAPL (fixed the previous issue)
 - **All fuzzy cases working**: microsft, nividia, amazn, netflx, facebok
-- **Adaptive cutoff working**: Better coverage với cutoff 0.85 cho longer tokens
+- **Adaptive cutoff working**: Better coverage with cutoff 0.85 for longer tokens
 
 #### **3. Edge Cases Handling Test**
 - **Success Rate**: 70% (expected behavior)
@@ -39,7 +39,7 @@ After testing all proposed improvements, we have achieved significant improvemen
 #### **5. Comprehensive Improvements Test**
 - **Success Rate**: 76.9% (10/13 test cases passed)
 - **Strong performers**: Fuzzy matching, Priority system, Complex queries
-- **Areas for improvement**: Enhanced pattern matching cho special cases
+- **Areas for improvement**: Enhanced pattern matching for special cases
 
 ### 📈 **Performance Comparison**
 
@@ -220,18 +220,18 @@ def resolve_with_context(text, context=None):
 
 ### 🎯 **Conclusion**
 
-**Ticker Resolution improvements đã thành công** với:
+**Ticker Resolution improvements have been successful** with:
 - **Fuzzy Matching**: 100% success rate (major improvement)
 - **Priority System**: 100% success rate (perfect implementation)
 - **Overall Performance**: 95.4% (vs 92.5% original)
 
 **Main remaining issues**:
-- Pattern matching cho special cases (3M, BRK.A/BRK.B)
+- Pattern matching for special cases (3M, BRK.A/BRK.B)
 - Deduplication logic
 - Edge case handling
 
-**Recommendation**: Implement Phase 1 fixes để đạt được 97%+ overall accuracy.
+**Recommendation**: Implement Phase 1 fixes to achieve 97%+ overall accuracy.
 
 ---
 
-**Next Steps**: Focus on pattern matching improvements và deduplication để hoàn thiện hệ thống.
+**Next Steps**: Focus on pattern matching improvements and deduplication to complete the system.

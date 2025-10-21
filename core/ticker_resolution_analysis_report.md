@@ -62,7 +62,7 @@ Top performers:
 
 #### **5. Performance Optimization**
 - **Sub-millisecond processing** for typical queries
-- Efficient caching với pre-built alias maps
+- Efficient caching with pre-built alias maps
 - Minimal memory overhead
 
 ### ⚠️ **Issues and Limitations**
@@ -136,7 +136,7 @@ def improve_alias_quality(alias_map: Dict[str, Set[str]]) -> Dict[str, Set[str]]
 #### **3. Enhanced Fuzzy Matching**
 
 **Current Issues:**
-- Cutoff 0.9 too strict cho some cases
+- Cutoff 0.9 too strict for some cases
 - No context-aware matching
 - Single token limitation
 
@@ -237,12 +237,12 @@ def resolve_tickers_with_context(
 #### **Phase 1: Quick Wins (1-2 weeks)**
 1. **Fix pattern matching** for 3M, AT&T cases
 2. **Improve manual overrides** with priority system
-3. **Filter short aliases** để reduce false positives
+3. **Filter short aliases** to reduce false positives
 
 #### **Phase 2: Enhanced Features (3-4 weeks)**
 1. **Implement enhanced fuzzy matching**
 2. **Add context-aware resolution**
-3. **Improve alias quality** với filtering
+3. **Improve alias quality** with filtering
 
 #### **Phase 3: Advanced Features (5-6 weeks)**
 1. **Multi-token fuzzy matching**
@@ -261,7 +261,7 @@ def resolve_tickers_with_context(
 
 ### 💡 **Key Benefits**
 
-1. **Higher Accuracy**: Better pattern matching và fuzzy matching
+1. **Higher Accuracy**: Better pattern matching and fuzzy matching
 2. **Reduced False Positives**: Improved alias quality filtering
 3. **Better Edge Case Handling**: Enhanced pattern recognition
 4. **Context Awareness**: Industry-specific resolution
@@ -270,18 +270,18 @@ def resolve_tickers_with_context(
 ### ⚠️ **Considerations**
 
 - **Backward Compatibility**: Ensure existing functionality works
-- **Testing**: Comprehensive testing với edge cases
+- **Testing**: Comprehensive testing with edge cases
 - **Performance**: Monitor for any performance degradation
 - **Data Quality**: Validate alias map improvements
 - **User Experience**: Maintain consistent behavior
 
 ### 🎯 **Conclusion**
 
-Ticker Resolution system hiện tại đã hoạt động tốt với **95.2% fuzzy matching success rate** và **sub-millisecond performance**. Tuy nhiên, có nhiều cơ hội cải tiến:
+The current Ticker Resolution system is working well with **95.2% fuzzy matching success rate** and **sub-millisecond performance**. However, there are many improvement opportunities:
 
-1. **Pattern matching** cần được enhanced cho special cases
-2. **Alias quality** cần được optimized
-3. **Context awareness** có thể được thêm vào
-4. **Edge case handling** cần được cải thiện
+1. **Pattern matching** needs to be enhanced for special cases
+2. **Alias quality** needs to be optimized
+3. **Context awareness** can be added
+4. **Edge case handling** needs to be improved
 
-Với các improvements được đề xuất, hệ thống có thể đạt được **98%+ accuracy** và **better edge case coverage**.
+With the proposed improvements, the system can achieve **98%+ accuracy** and **better edge case coverage**.
