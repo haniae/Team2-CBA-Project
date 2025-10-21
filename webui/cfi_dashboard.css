@@ -17,7 +17,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--navy);
-  font: 12px "Inter", "Open Sans", Roboto, system-ui, -apple-system, "Segoe UI";
+  font: 13px/1.55 "Inter", "Open Sans", Roboto, system-ui, -apple-system, "Segoe UI";
+  font-feature-settings: "tnum", "lnum";
 }
 
 #cfi-root {
@@ -387,7 +388,7 @@ body {
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
-  font: 500 12px/22px "Inter", "Open Sans", Roboto;
+  font: 500 13px/24px "Inter", "Open Sans", Roboto;
 }
 
 .cfi-table colgroup col:first-child {
@@ -402,8 +403,10 @@ body {
   color: var(--navy);
   border-bottom: 1px solid var(--grid);
   font: 700 11px/26px "Inter", "Open Sans", Roboto;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   text-align: right;
-  padding: 0 8px;
+  padding: 0 10px;
 }
 
 .cfi-table thead th:first-child {
@@ -415,8 +418,8 @@ body {
 
 .cfi-table tbody td {
   border-bottom: 1px solid #eef2fb;
-  padding: 0 8px;
-  height: 22px;
+  padding: 0 10px;
+  height: 24px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -431,12 +434,14 @@ body {
   left: 0;
   background: inherit;
   font-weight: 600;
-  color: #243554;
+  color: #1b2f4e;
 }
 
 .cfi-table .num {
   text-align: right;
   font-variant-numeric: tabular-nums lining-nums;
+  font-weight: 600;
+  color: #10274b;
 }
 
 .cfi-kpi-grid {

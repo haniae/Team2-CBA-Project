@@ -196,6 +196,17 @@ The `/chat` response includes structured extras (`highlights`, `trends`, `compar
 
 All scripts honour the configuration from `load_settings()` and write audit events so the chatbot can justify sourcing decisions.
 
+## Data sources & lineage
+| Source | What we pull | How it’s used | Notes |
+|--------|--------------|---------------|-------|
+| **SEC EDGAR** (`https://data.sec.gov`) | Structured fundamentals (CompanyFacts JSON, frames endpoints) plus raw 10-K/10-Q filings | Primary source for revenue, EBITDA, balance-sheet data, and disclosure-driven KPIs. We persist the facts in `financial_facts`, filings metadata in `company_filings`, and lineage detail in `audit_events` so every response cites the filing/period. | Respect SEC rate limits; always set `SEC_API_USER_AGENT`. Each load stores the accession number, retrieval timestamp, and hash so provenance auditors get a verifiable trail. |
+| **Yahoo Finance** (`/v7/finance/quote`) | End-of-day quotes, share counts, dividend flags | Powers market multiples (P/E, EV/EBITDA), TSR, and scenario deltas. Quotes land in `market_quotes`, after which `AnalyticsEngine.refresh_metrics` recalculates ratios. | Requests are batched (default 50 tickers) with retry logic. On stale data the chatbot triggers a fresh quote pull before serving responses. |
+| **Stooq** (`scripts/ingestion/load_prices_stooq.py`) | Historical price backfills | Optional fallback when Yahoo throttles or omits history, keeping long-window ratios consistent. | Disabled by default—run manually when you need deeper history. Uses the same quote tables for consistency. |
+| **Bloomberg B-PIPE** (optional) | Intraday quotes, FX, benchmarks | Enterprise deployments can flip `ENABLE_BLOOMBERG=true`. The adapter writes to `market_quotes`, preserving downstream behaviour while respecting client network controls. | Requires B-PIPE connectivity credentials; left off for student/practicum environments. |
+| **Static universe files** (`data/tickers/universe_sp500.txt`, `webui/data/*.json`) | Ticker watch lists, demo dashboard payloads | Seed ingestion (so scripts know what to pull) and let the SPA render without hitting live APIs in demo mode. | Regenerate with `docs/ticker_names.md` helpers when the universe shifts; demo JSON lives under `webui/data`. |
+
+Every ingestion path writes an `audit_events` row that captures source system, identifiers, and timestamps. The chat responses surface those breadcrumbs via the audit drawer, keeping data lineage 100% inspectable.
+
 ### Price-refresh workflow
 Use this to keep price-driven ratios current without re-ingesting everything:
 ```powershell

@@ -4178,6 +4178,9 @@ body::-webkit-scrollbar {
 
   .financial-dashboard__grid thead th.is-metric {
     text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .financial-dashboard__grid tbody th,
@@ -4185,6 +4188,7 @@ body::-webkit-scrollbar {
     padding: 12px 18px;
     border-bottom: 1px solid rgba(13, 45, 98, 0.12);
     background: rgba(249, 251, 255, 0.96);
+    vertical-align: middle;
   }
 
   .financial-dashboard__grid tbody tr:nth-child(even) th,
@@ -4196,11 +4200,16 @@ body::-webkit-scrollbar {
     font-weight: 600;
     color: #0d2d62;
     text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .financial-dashboard__grid tbody td.is-value {
     text-align: right;
     color: rgba(13, 45, 98, 0.85);
+    white-space: nowrap;
+    font-feature-settings: "tnum", "lnum";
   }
 
   .financial-dashboard__charts {

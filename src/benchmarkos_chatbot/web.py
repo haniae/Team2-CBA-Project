@@ -153,6 +153,7 @@ class ExportPayload(BaseModel):
     descriptor: Optional[str] = None
     highlights: Optional[List[str]] = None
     title: Optional[str] = None
+    sources: Optional[List[Dict[str, str]]] = None
 
 
 class ChatResponse(BaseModel):

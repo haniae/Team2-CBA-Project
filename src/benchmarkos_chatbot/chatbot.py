@@ -2151,6 +2151,7 @@ class BenchmarkOSChatbot:
         self,
         table_data: Optional[Dict[str, Any]],
         highlights: Sequence[str],
+        citations: Optional[Sequence[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
         """Prepare lightweight export descriptors consumed by the web UI."""
         if not table_data:
@@ -2184,6 +2185,32 @@ class BenchmarkOSChatbot:
             "highlights": list(highlights),
             "title": table_data.get("title"),
         }
+        sources: List[Dict[str, str]] = []
+        for citation in citations or []:
+            if not isinstance(citation, dict):
+                continue
+            parts = [
+                str(citation.get("ticker") or "").strip() or None,
+                str(citation.get("label") or "").strip() or None,
+                str(citation.get("period") or "").strip() or None,
+                str(citation.get("formatted_value") or "").strip()
+                or (
+                    str(citation.get("value"))
+                    if citation.get("value") is not None
+                    else None
+                ),
+                str(citation.get("form") or "").strip() or None,
+            ]
+            descriptor = " • ".join(part for part in parts if part)
+            urls = citation.get("urls") if isinstance(citation.get("urls"), dict) else {}
+            url = urls.get("detail") or urls.get("interactive")
+            if descriptor or url:
+                entry: Dict[str, str] = {"text": descriptor}
+                if url:
+                    entry["url"] = url
+                sources.append(entry)
+        if sources:
+            pdf_payload["sources"] = sources
         return [csv_payload, pdf_payload]
 
     def _format_metrics_table(
@@ -2359,13 +2386,10 @@ class BenchmarkOSChatbot:
         citations_payload = self._build_metric_citations(
             metrics_per_ticker, ordered_tickers
         )
-        exports_payload = self._build_export_payloads(table_payload, highlights)
-        conclusion = self._build_benchmark_conclusion(
-            highlights,
-            ordered_tickers,
-            descriptor,
-            benchmark_label=benchmark_label,
+        exports_payload = self._build_export_payloads(
+            table_payload, highlights, citations_payload
         )
+        conclusion = ""
 
         dashboard_descriptor = None
         if len(ordered_tickers) >= 2:
@@ -2460,16 +2484,21 @@ class BenchmarkOSChatbot:
             best_ticker = tokens[0]
             leadership_counter[best_ticker] += 1
             value_tokens = " ".join(tokens[1:]).strip().rstrip(",")
-            headline = f"{metric_label.strip()} leadership from {_format_ticker(best_ticker)}"
+            metric_phrase = metric_label.strip().lower()
+            sentence = f"{_format_ticker(best_ticker)} leads {metric_phrase}"
             if value_tokens:
-                headline = f"{headline} {value_tokens}"
-            summary_fragments.append(headline)
+                sentence = f"{sentence} at {value_tokens}"
+            comparatives = remainder.split(" vs ")[1:]
+            if comparatives:
+                formatted_comparatives = "; ".join(comparatives)
+                sentence = f"{sentence}, ahead of {formatted_comparatives}"
+            summary_fragments.append(sentence + ".")
 
         if not summary_fragments:
             return ""
 
         total = len(summary_fragments)
-        summary_sentence = "; ".join(summary_fragments) + "."
+        summary_sentence = " ".join(summary_fragments)
 
         action_sentence = ""
         if leadership_counter:

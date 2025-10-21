@@ -3045,15 +3045,16 @@ function createDashboardSummary(table) {
     card.className = "financial-dashboard__stat-card";
     const heading = document.createElement("h4");
     heading.className = "financial-dashboard__stat-title";
-    heading.textContent = ticker;
+    heading.textContent = normalizeDashboardText(ticker) || "—";
     card.append(heading);
     const list = document.createElement("dl");
     list.className = "financial-dashboard__stat-list";
     summaryRows.forEach((row) => {
       const dt = document.createElement("dt");
-      dt.textContent = row[0];
+      dt.textContent = normalizeDashboardText(row[0]) || "—";
       const dd = document.createElement("dd");
-      dd.textContent = row[index + 1] ?? "—";
+      const text = normalizeDashboardText(row[index + 1]);
+      dd.textContent = text || "—";
       list.append(dt, dd);
     });
     card.append(list);
@@ -3083,6 +3084,48 @@ function createDashboardHighlights(highlights) {
   return section;
 }
 
+function normalizeDashboardText(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const absolute = Math.abs(value);
+    const formatter =
+      Number.isInteger(value) && absolute >= 100
+        ? { maximumFractionDigits: 0 }
+        : { minimumFractionDigits: absolute < 10 ? 2 : 1, maximumFractionDigits: 2 };
+    return value.toLocaleString("en-US", formatter);
+  }
+  let text = String(value);
+  try {
+    text = decodeURIComponent(escape(text));
+  } catch (error) {
+    // ignore decoding failures
+  }
+  text = text
+    .normalize("NFKC")
+    .replace(/\u00a0/g, " ")
+    .replace(/Ã—|Ã|Ã\x97/g, "×")
+    .replace(/Â/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) {
+    return "";
+  }
+  if (/^(?:n\/?a|na|not\s+available|--|-|—)$/i.test(text)) {
+    return "—";
+  }
+  text = text.replace(/(\d)\s*%/g, "$1%");
+  text = text.replace(/(\d)\s*(b|m|k)\b/gi, "$1\u00a0$2");
+  text = text.replace(/(\d)\s*[xX]$/g, "$1×");
+  text = text.replace(/(\d)\s*×$/g, "$1×");
+  text = text
+    .normalize("NFKC")
+    .replace(/[^\w\s.,%$€£¥±×–—°()/\-&]/g, "")
+    .trim();
+  return text;
+}
+
 function createDashboardTable(table) {
   if (!table || !Array.isArray(table.headers) || !table.headers.length) {
     return null;
@@ -3098,7 +3141,7 @@ function createDashboardTable(table) {
   if (table.descriptor) {
     const descriptor = document.createElement("span");
     descriptor.className = "financial-dashboard__table-descriptor";
-    descriptor.textContent = table.descriptor;
+    descriptor.textContent = normalizeDashboardText(table.descriptor) || "";
     head.append(descriptor);
   }
   section.append(head);
@@ -3110,7 +3153,7 @@ function createDashboardTable(table) {
   const headerRow = document.createElement("tr");
   table.headers.forEach((label, index) => {
     const cell = document.createElement("th");
-    cell.textContent = label;
+    cell.textContent = normalizeDashboardText(label) || "—";
     if (index === 0) {
       cell.classList.add("is-metric");
     }
@@ -3132,7 +3175,8 @@ function createDashboardTable(table) {
       } else {
         cell.classList.add("is-value");
       }
-      cell.textContent = value;
+      const text = normalizeDashboardText(value);
+      cell.textContent = text || "—";
       tr.append(cell);
     });
     tbody.append(tr);

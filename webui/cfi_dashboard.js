@@ -92,9 +92,73 @@
     return Object.entries(source).map(([label, value]) => ({ label, value }));
   }
 
+  function sanitizeText(value) {
+    if (value === null || value === undefined) return "";
+    let text = String(value);
+    try {
+      text = decodeURIComponent(escape(text));
+    } catch (error) {
+      // ignore; fallback to original text
+    }
+    return text
+      .normalize("NFKC")
+      .replace(/\u00a0/g, " ")
+      .replace(/Â/g, "")
+      .replace(/Ã[\u0097\u0098×]/g, "×")
+      .replace(/\u00A6/g, "×")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function coerceFromText(label, raw) {
+    const cleaned = sanitizeText(raw);
+    if (!cleaned) return { text: "", numeric: null };
+    if (/^(?:n\/?a|na|not available|--|-|—)$/i.test(cleaned)) {
+      return { text: "—", numeric: null };
+    }
+    const lowerLabel = String(label || "").toLowerCase();
+    const moneyMatch = cleaned.match(/^(-?\d+(?:\.\d+)?)(?:\s*)([bmk])$/i);
+    if (moneyMatch) {
+      const rawNumber = Number(moneyMatch[1]);
+      const unit = moneyMatch[2].toUpperCase();
+      const multiplier = unit === "B" ? 1e9 : unit === "M" ? 1e6 : 1e3;
+      return { text: cleaned, numeric: rawNumber * multiplier, meta: { unit } };
+    }
+    const multipleMatch = cleaned.match(/^(-?\d+(?:\.\d+)?)[x×]$/i);
+    if (multipleMatch) {
+      return { text: cleaned, numeric: Number(multipleMatch[1]), meta: { kind: "multiple" } };
+    }
+    const percentMatch = cleaned.match(/^(-?\d+(?:\.\d+)?)%$/);
+    if (percentMatch) {
+      return { text: cleaned, numeric: Number(percentMatch[1]) / 100, meta: { kind: "percent" } };
+    }
+    const plainNumber = cleaned.replace(/[,]/g, "");
+    if (/^-?\d+(?:\.\d+)?$/.test(plainNumber)) {
+      return { text: cleaned, numeric: Number(plainNumber), meta: {} };
+    }
+    return { text: cleaned, numeric: null };
+  }
+
   function formatValue(label, value) {
     if (value === null || value === undefined || value === "") return "—";
-    if (typeof value === "string") return value;
+    if (typeof value === "string") {
+      const coerced = coerceFromText(label, value);
+      if (coerced.numeric !== null) {
+        const numeric = coerced.numeric;
+        const lower = String(label || "").toLowerCase();
+        if (coerced.meta?.kind === "percent" || lower.includes("percent") || lower.includes("%")) {
+          return formatPercent(numeric);
+        }
+        if (coerced.meta?.kind === "multiple" || lower.includes("multiple") || lower.includes("ev/")) {
+          return formatMultiple(numeric);
+        }
+        if (coerced.meta?.unit) {
+          return formatMoney(numeric);
+        }
+        return formatMoney(numeric);
+      }
+      return coerced.text || "—";
+    }
     const lower = String(label || "").toLowerCase();
     if (lower.includes("margin") || lower.includes("growth") || lower.includes("pct") || lower.includes("%")) return formatPercent(value);
     if (
@@ -120,8 +184,8 @@
     ) {
       return formatMoney(value);
     }
-    return formatMoney(value);
-  }
+  return formatMoney(value);
+}
 
   function ensureTBody(table) {
     if (!table) return null;
@@ -154,7 +218,7 @@
       const tr = document.createElement("tr");
       const left = document.createElement("td");
       left.className = "kv-label";
-      left.textContent = String(label).replace(/_/g, " ");
+      left.textContent = sanitizeText(String(label).replace(/_/g, " "));
       const right = document.createElement("td");
       right.className = "kv-value";
       right.textContent = formatValue(label, value);
@@ -179,7 +243,7 @@
     const headings = ["Metric", ...columns];
     headings.forEach((heading, index) => {
       const th = document.createElement("th");
-      th.textContent = heading;
+      th.textContent = sanitizeText(heading);
       if (index === 0) th.className = "col-label";
       headRow.appendChild(th);
     });
@@ -190,7 +254,7 @@
       const tr = document.createElement("tr");
       const labelCell = document.createElement("td");
       labelCell.className = "kv-label";
-      labelCell.textContent = row.Label || row.label || "";
+      labelCell.textContent = sanitizeText(row.Label || row.label || "");
       tr.appendChild(labelCell);
       columns.forEach((field) => {
         const td = document.createElement("td");
@@ -240,7 +304,7 @@
     headerRow.appendChild(metricHeader);
     columns.forEach((year) => {
       const th = document.createElement("th");
-      th.textContent = year;
+      th.textContent = sanitizeText(year);
       headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
@@ -251,15 +315,34 @@
       const tr = document.createElement("tr");
       const metricCell = document.createElement("td");
       metricCell.className = "metric";
-      metricCell.textContent = row.label || "";
+      metricCell.textContent = sanitizeText(row.label || "");
       tr.appendChild(metricCell);
       columns.forEach((_, index) => {
         const td = document.createElement("td");
         td.className = "num";
-        const value = row.values ? row.values[index] : null;
-        let formatted = formatMoney(value);
-        if (row.type === "percent") formatted = formatPercent(value);
-        else if (row.type === "multiple") formatted = formatMultiple(value);
+        const rawValue = row.values ? row.values[index] : null;
+        let numericValue = null;
+        let fallback = "";
+        if (isNumber(rawValue)) {
+          numericValue = Number(rawValue);
+        } else if (typeof rawValue === "string") {
+          const coerced = coerceFromText(row.label, rawValue);
+          if (coerced.numeric !== null) {
+            numericValue = Number(coerced.numeric);
+          } else {
+            fallback = coerced.text || "—";
+          }
+        }
+        let formatted = "—";
+        if (fallback) {
+          formatted = fallback;
+        } else if (numericValue !== null) {
+          if (row.type === "percent") formatted = formatPercent(numericValue);
+          else if (row.type === "multiple") formatted = formatMultiple(numericValue);
+          else if (row.type === "currency") formatted = formatCurrency(numericValue);
+          else if (row.type === "integer") formatted = formatInteger(numericValue);
+          else formatted = formatMoney(numericValue);
+        }
         td.textContent = formatted;
         tr.appendChild(td);
       });
@@ -321,6 +404,23 @@
       grid.appendChild(card);
     });
     container.appendChild(grid);
+  }
+
+  function deepSanitize(value) {
+    if (typeof value === "string") {
+      return sanitizeText(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => deepSanitize(item));
+    }
+    if (value && typeof value === "object") {
+      const result = Array.isArray(value) ? [] : {};
+      Object.entries(value).forEach(([key, entry]) => {
+        result[key] = deepSanitize(entry);
+      });
+      return result;
+    }
+    return value;
   }
 
   function parseFilenameFromDisposition(disposition) {
@@ -958,6 +1058,7 @@
   window.CFI = {
     render(payload) {
       if (!payload) return;
+      payload = deepSanitize(payload);
       const meta = { ...(payload.meta || {}) };
       const priceTicker = payload.price?.Ticker || payload.price?.ticker || payload.price?.symbol;
       if (!meta.ticker_label && priceTicker) meta.ticker_label = String(priceTicker);
