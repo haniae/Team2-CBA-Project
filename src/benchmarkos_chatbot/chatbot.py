@@ -1100,6 +1100,9 @@ class BenchmarkOSChatbot:
                 ordered_subjects.append(resolved)
 
             if ordered_subjects:
+                # Initialize fact_metric before first usage
+                fact_metric = self._detect_fact_metric(t)
+                
                 span_match = re.search(
                     r"(?:fy\s*)?\d{4}(?:\s*[-/]\s*(?:fy\s*)?\d{4})?",
                     t,
@@ -1123,8 +1126,6 @@ class BenchmarkOSChatbot:
                     quarter_year, quarter_label = quarter_info
                     period_token = period_token or str(quarter_year)
                     quarter_token = f"{quarter_year}{quarter_label}"
-
-                fact_metric = self._detect_fact_metric(t)
                 if (
                     fact_metric
                     and period_token
