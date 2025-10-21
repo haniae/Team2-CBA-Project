@@ -382,7 +382,7 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                 if score > best_score:
                     best_alias = alias
                     best_score = score
-            if best_alias and best_score >= 0.78:
+            if best_alias and best_score >= 0.95:
                 if _try_add_alias(best_alias, candidate_phrase, mark_warning=True):
                     continue
 

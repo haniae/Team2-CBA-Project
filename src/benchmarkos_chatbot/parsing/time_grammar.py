@@ -20,6 +20,9 @@ RANGE_PATTERN = re.compile(
     rf"(?i)\b(?:(FY|CY|fiscal|financial)(?:\s+year\s*)?)?{_YEAR_TOKEN}\s*{RANGE_JOINER}\s*"
     rf"(?:(FY|CY|fiscal|financial)(?:\s+year\s*)?)?{_YEAR_TOKEN}\b"
 )
+QUARTER_RANGE_PATTERN = re.compile(
+    rf"(?i)\bQ([1-4])\s*{RANGE_JOINER}\s*Q([1-4])(?:\s*({_YEAR_TOKEN}))?\b"
+)
 RELATIVE_PATTERN = re.compile(r"(?i)\blast\s+(\d{1,2})\s+(quarters?|years?)\b")
 _NORMALIZATION_RULES: Sequence[Tuple[re.Pattern, str]] = [
     (re.compile(r"(?i)\bfisical\b"), "fiscal"),
@@ -149,6 +152,23 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
     calendar_override = False
     fiscal_token_present = bool(FY_PATTERN.search(lower_text) or FISCAL_PATTERN.search(lower_text))
 
+    # Handle quarter ranges first (e.g., Q1-Q4 2023) - before single quarters
+    for match in QUARTER_RANGE_PATTERN.finditer(original):
+        start_span = match.span()
+        if _span_overlaps(start_span, consumed_spans):
+            continue
+        quarter1, quarter2, year_token = match.groups()
+        year = _extract_year(year_token) if year_token else None
+        if year is None:
+            continue
+        q1, q2 = int(quarter1), int(quarter2)
+        if q2 < q1:
+            q1, q2 = q2, q1
+        # Add quarter range as multiple quarters
+        for q in range(q1, q2 + 1):
+            _add_spec(specs, seen_specs, year, year, f"Q{q}")
+        consumed_spans.append(start_span)
+
     for pattern, order in QUARTER_COMBOS:
         for match in pattern.finditer(original):
             start, end = match.span()
@@ -176,7 +196,22 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
         start_span = match.span()
         if _span_overlaps(start_span, consumed_spans):
             continue
-        prefix1, year1, prefix2, year2 = match.groups()
+        groups = match.groups()
+        if len(groups) >= 4:
+            prefix1, year1, prefix2, year2 = groups[:4]
+        elif len(groups) == 3:
+            # Handle case where one prefix is missing
+            prefix1, year1, prefix2 = groups[:3]
+            year2 = groups[2] if groups[2] else groups[1]
+        elif len(groups) == 2:
+            # Handle case where both prefixes are missing
+            year1, year2 = groups[:2]
+            prefix1, prefix2 = None, None
+        else:
+            # Skip this match if we don't have enough groups
+            continue
+        if year1 is None or year2 is None:
+            continue
         y1 = _extract_year(year1)
         y2 = _extract_year(year2)
         if y2 < y1:
@@ -187,6 +222,7 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
             fiscal_token_present = True
         _add_spec(specs, seen_specs, y1, y2, None)
         consumed_spans.append(start_span)
+
 
     for match in FY_PATTERN.finditer(original):
         span = match.span()

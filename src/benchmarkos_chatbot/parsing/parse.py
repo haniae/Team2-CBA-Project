@@ -17,9 +17,17 @@ INTENT_TREND_PATTERN = re.compile(
     r"(over time|over the last|history|trend|past \d+\s+(?:years?|quarters?))"
 )
 INTENT_LAST_PATTERN = re.compile(r"\blast\s+\d+\s+(quarters?|years?)\b")
-INTENT_RANK_PATTERN = re.compile(r"\b(which|highest|lowest|top)\b")
+INTENT_RANK_PATTERN = re.compile(
+    r"\b(which|highest|lowest|top|best|worst|most|least|fastest|slowest|"
+    r"rank|ranking|ranked|best performing|worst performing|"
+    r"which.*has.*best|which.*has.*worst|which.*has.*highest|which.*has.*lowest|"
+    r"which.*company.*has|which.*stock.*has|which.*firm.*has)\b"
+)
 INTENT_EXPLAIN_PATTERN = re.compile(
-    r"\b(what is|define|how (?:do|does|is|to).*(?:compute|calculated))\b"
+    r"\b(define|explain|tell me about|describe|break down|"
+    r"how (?:do|does|is|to).*(?:compute|calculate|calculated|work|mean)|"
+    r"what does.*mean|what.*mean|explain.*mean|"
+    r"definition of|meaning of|explanation of)\b"
 )
 
 
@@ -52,11 +60,12 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
     structured = {
         "intent": intent,
         "tickers": [{"input": entry["input"], "ticker": entry["ticker"]} for entry in ticker_matches],
-        "metrics": [{"input": entry["input"], "metric_id": entry["metric_id"]} for entry in metric_matches],
+        "vmetrics": [{"input": entry["input"], "key": entry["metric_id"]} for entry in metric_matches],
         "periods": periods,
         "computed": infer_computed(metric_matches),
         "filters": {"currency": "USD", "unit_preference": "auto"},
         "free_text": text,
+        "norm_text": norm,  # Fix: Add norm_text field
         "warnings": warnings,
     }
     return structured
@@ -102,22 +111,32 @@ def classify_intent(
     unique_tickers = {entry["ticker"] for entry in tickers}
     period_type = periods.get("type")
 
-    if len(unique_tickers) >= 2 or INTENT_COMPARE_PATTERN.search(norm_text):
-        return "compare"
-
+    # Priority order: rank > explain > trend > compare > lookup
+    
+    # Check for rank intent first (highest priority for ranking questions)
     if INTENT_RANK_PATTERN.search(norm_text):
         return "rank"
 
+    # Check for explain intent (second priority)
     if INTENT_EXPLAIN_PATTERN.search(norm_text):
         return "explain_metric"
 
+    # Check for trend intent (third priority)
     if (
         INTENT_TREND_PATTERN.search(norm_text)
         or INTENT_LAST_PATTERN.search(norm_text)
         or period_type in {"range", "multi", "relative"}
+        or re.search(r"Q\d+-Q\d+", norm_text)  # Quarter range pattern
     ):
         return "trend"
 
+    # Check for compare intent (fourth priority)
+    # Only classify as compare if explicitly compare keywords OR multiple tickers with clear compare context
+    if (INTENT_COMPARE_PATTERN.search(norm_text) or 
+        (len(unique_tickers) >= 2 and ("compare" in norm_text or "vs" in norm_text or "versus" in norm_text))):
+        return "compare"
+
+    # Default to lookup intent
     return "lookup"
 
 
