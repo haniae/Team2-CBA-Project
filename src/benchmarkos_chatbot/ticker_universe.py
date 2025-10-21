@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import List
 
 # S&P 500 constituents as of 2025-03 (approximate list; 505 tickers including share classes).
@@ -75,4 +76,22 @@ def load_ticker_universe(name: str = "sp500") -> List[str]:
         tickers = _UNIVERSES[name.lower()]
     except KeyError as exc:
         raise ValueError(f"Unknown ticker universe: {name}") from exc
+    return sorted(set(tickers))
+
+
+def load_ticker_file(path) -> List[str]:
+    """Load tickers from a newline-delimited text file."""
+
+    if not path:
+        raise ValueError("Ticker file path is required")
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Ticker list not found: {path}")
+    tickers = []
+    for line in path.read_text().splitlines():
+        ticker = line.strip().upper()
+        if ticker and not ticker.startswith("#"):
+            tickers.append(ticker)
+    if not tickers:
+        raise ValueError(f"No tickers found in {path}")
     return sorted(set(tickers))

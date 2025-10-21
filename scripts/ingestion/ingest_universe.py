@@ -12,7 +12,11 @@ from typing import Iterable, List
 
 from benchmarkos_chatbot import AnalyticsEngine, load_settings
 from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
-from benchmarkos_chatbot.ticker_universe import load_ticker_universe, available_universes
+from benchmarkos_chatbot.ticker_universe import (
+    load_ticker_universe,
+    available_universes,
+    load_ticker_file,
+)
 
 DEFAULT_PROGRESS_FILE = Path.cwd() / ".ingestion_progress.json"
 
@@ -52,6 +56,7 @@ def save_progress(progress_file: Path, completed: set[str]) -> None:
 def ingest_universe(
     *,
     universe: str,
+    tickers: List[str] | None,
     years: int,
     chunk_size: int,
     sleep_seconds: float,
@@ -61,7 +66,8 @@ def ingest_universe(
     """Iterate through the ticker universe, running ingestion with progress tracking.
     """
     settings = load_settings()
-    tickers = load_ticker_universe(universe)
+    if tickers is None:
+        tickers = load_ticker_universe(universe)
     completed = load_progress(progress_file) if resume else set()
 
     todo = [ticker for ticker in tickers if ticker not in completed]
@@ -124,8 +130,12 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument(
         "--universe",
         default="sp500",
-        choices=available_universes(),
         help="Ticker universe to ingest.",
+    )
+    parser.add_argument(
+        "--universe-file",
+        type=Path,
+        help="Path to a newline-delimited ticker list. Overrides --universe.",
     )
     parser.add_argument(
         "--years",
@@ -163,8 +173,15 @@ def main(argv: List[str] | None = None) -> None:
     """Run the universe ingest loop with checkpointing and batching.
     """
     args = parse_args(argv or sys.argv[1:])
+    if args.universe_file:
+        tickers = load_ticker_file(args.universe_file)
+        universe_name = args.universe_file.stem
+    else:
+        tickers = None
+        universe_name = args.universe
     ingest_universe(
-        universe=args.universe,
+        universe=universe_name,
+        tickers=tickers,
         years=args.years,
         chunk_size=args.chunk_size,
         sleep_seconds=args.sleep,
