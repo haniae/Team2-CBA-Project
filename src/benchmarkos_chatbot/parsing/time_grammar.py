@@ -6,29 +6,46 @@ import re
 import unicodedata
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-_YEAR_TOKEN = r"([12]\d{3}|\d{2})"
-FY_PATTERN = re.compile(rf"(?i)\bFY\s*{_YEAR_TOKEN}\b")
-CY_PATTERN = re.compile(rf"(?i)\bCY\s*{_YEAR_TOKEN}\b|\bcalendar\s+([12]\d{{3}})\b")
+_YEAR_TOKEN = r"(?:[12]\d{3}|\d{2})"
+FY_PATTERN = re.compile(rf"(?i)\bfy['’\-\s]*({_YEAR_TOKEN})(?=[^\d]|$)")
+FISCAL_PATTERN = re.compile(
+    rf"(?i)\b(?:fiscal|financial)\s+(?:year\s*)?({_YEAR_TOKEN})(?=[^\d]|$)"
+)
+CY_PATTERN = re.compile(
+    rf"(?i)\bcy['’\-\s]*({_YEAR_TOKEN})(?=[^\d]|$)|\bcalendar\s+([12]\d{{3}})\b"
+)
 YEAR_PATTERN = re.compile(r"(?<!\d)([12]\d{3})(?!\d)")
 RANGE_JOINER = r"(?:-|–|—|to|\.\.)"
 RANGE_PATTERN = re.compile(
-    rf"(?i)\b(?:(FY|CY)\s*)?{_YEAR_TOKEN}\s*{RANGE_JOINER}\s*(?:(FY|CY)\s*)?{_YEAR_TOKEN}\b"
+    rf"(?i)\b(?:(FY|CY|fiscal|financial)(?:\s+year\s*)?)?{_YEAR_TOKEN}\s*{RANGE_JOINER}\s*"
+    rf"(?:(FY|CY|fiscal|financial)(?:\s+year\s*)?)?{_YEAR_TOKEN}\b"
 )
 RELATIVE_PATTERN = re.compile(r"(?i)\blast\s+(\d{1,2})\s+(quarters?|years?)\b")
+_NORMALIZATION_RULES: Sequence[Tuple[re.Pattern, str]] = [
+    (re.compile(r"(?i)\bfisical\b"), "fiscal"),
+    (re.compile(r"(?i)\bfiscaly\b"), "fiscal"),
+    (re.compile(r"(?i)\bfinacial\b"), "financial"),
+    (re.compile(r"(?i)\bcalender\b"), "calendar"),
+    (re.compile(r"(?i)\bf\s*[\-']?\s*y\b"), "FY"),
+    (re.compile(r"(?i)\bc\s*[\-']?\s*y\b"), "CY"),
+]
 QUARTER_COMBOS: Sequence[Tuple[re.Pattern, Tuple[int, int]]] = [
-    (re.compile(rf"(?i)\bQ([1-4])\s*FY\s*{_YEAR_TOKEN}\b"), (1, 2)),
-    (re.compile(rf"(?i)\bFY\s*{_YEAR_TOKEN}\s*Q([1-4])\b"), (2, 1)),
-    (re.compile(rf"(?i)\bQ([1-4])\s*(?:CY|calendar)\s*{_YEAR_TOKEN}\b"), (1, 2)),
-    (re.compile(rf"(?i)\b(?:CY|calendar)\s*{_YEAR_TOKEN}\s*Q([1-4])\b"), (2, 1)),
-    (re.compile(rf"(?i)\bQ([1-4])\s*{_YEAR_TOKEN}\b"), (1, 2)),
-    (re.compile(rf"(?i)\b{_YEAR_TOKEN}\s*Q([1-4])\b"), (2, 1)),
+    (re.compile(rf"(?i)\bQ([1-4])\s*FY['’\-\s]*({_YEAR_TOKEN})\b"), (1, 2)),
+    (re.compile(rf"(?i)\bFY['’\-\s]*({_YEAR_TOKEN})\s*Q([1-4])\b"), (2, 1)),
+    (re.compile(rf"(?i)\bQ([1-4])\s*(?:CY|calendar)\s*({_YEAR_TOKEN})\b"), (1, 2)),
+    (re.compile(rf"(?i)\b(?:CY|calendar)\s*({_YEAR_TOKEN})\s*Q([1-4])\b"), (2, 1)),
+    (re.compile(rf"(?i)\bQ([1-4])\s*({_YEAR_TOKEN})\b"), (1, 2)),
+    (re.compile(rf"(?i)\b({_YEAR_TOKEN})\s*Q([1-4])\b"), (2, 1)),
     (re.compile(r"(?i)\bQ([1-4])\s*'([0-9]{2})\b"), (1, 2)),
     (re.compile(r"(?i)\b'([0-9]{2})\s*Q([1-4])\b"), (2, 1)),
 ]
 
 
 def _normalize(text: str) -> str:
-    return unicodedata.normalize("NFKC", text or "")
+    normalized = unicodedata.normalize("NFKC", text or "")
+    for pattern, replacement in _NORMALIZATION_RULES:
+        normalized = pattern.sub(replacement, normalized)
+    return normalized
 
 
 def _convert_two_digit_year(value: str) -> int:
@@ -36,6 +53,49 @@ def _convert_two_digit_year(value: str) -> int:
     if number <= 30:
         return 2000 + number
     return 1900 + number
+
+
+def _extract_year(value: str) -> int:
+    cleaned = (value or "").upper()
+    cleaned = re.sub(r"(?<=\d)[O](?=\d)", "0", cleaned)
+    cleaned = re.sub(r"(?<=\d)[IL](?=\d)", "1", cleaned)
+    cleaned = re.sub(r"[O](?=\d{2,})", "0", cleaned)
+    digits = re.findall(r"\d+", cleaned)
+    if not digits:
+        raise ValueError(f"No year digits found in '{value}'")
+    token = digits[-1]
+    if len(token) == 2:
+        return _convert_two_digit_year(token)
+    if len(token) == 3:
+        # Treat 3-digit tokens as the last two digits of a fiscal year (rare edge case)
+        return _convert_two_digit_year(token[-2:])
+    if len(token) > 4:
+        token = token[-4:]
+    return int(token)
+
+
+def _clean_quarter(value: str) -> Optional[int]:
+    digits = re.findall(r"\d", (value or "").upper())
+    if not digits:
+        return None
+    quarter = int(digits[-1])
+    if 1 <= quarter <= 4:
+        return quarter
+    return None
+
+
+def _is_calendar_prefix(prefix: Optional[str]) -> bool:
+    if not prefix:
+        return False
+    pref = prefix.lower()
+    return pref.startswith("cy") or pref.startswith("cal")
+
+
+def _is_fiscal_prefix(prefix: Optional[str]) -> bool:
+    if not prefix:
+        return False
+    pref = prefix.lower()
+    return pref.startswith("fy") or pref.startswith("fis") or pref.startswith("fin")
 
 
 def _span_overlaps(span: Tuple[int, int], intervals: List[Tuple[int, int]]) -> bool:
@@ -87,7 +147,7 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
     seen_specs: set = set()
     consumed_spans: List[Tuple[int, int]] = []
     calendar_override = False
-    fiscal_token_present = bool(FY_PATTERN.search(lower_text))
+    fiscal_token_present = bool(FY_PATTERN.search(lower_text) or FISCAL_PATTERN.search(lower_text))
 
     for pattern, order in QUARTER_COMBOS:
         for match in pattern.finditer(original):
@@ -100,15 +160,14 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
             if year_token is None:
                 year_token = quarter_token
                 quarter_token = match.group(2 if first_idx == 1 else 1)
-            quarter_num = int(quarter_token)
-            if len(year_token) == 2:
-                year = _convert_two_digit_year(year_token)
-            else:
-                year = int(year_token)
+            quarter_num = _clean_quarter(quarter_token)
+            if quarter_num is None:
+                continue
+            year = _extract_year(year_token)
             calendar_hint = "calendar" in match.group(0).lower() or "cy" in match.group(0).lower()
             if calendar_hint:
                 calendar_override = True
-            if re.search(r"(?i)\bFY\b", match.group(0)):
+            if re.search(r"(?i)\bFY\b|\bfiscal\b|\bfinancial\b", match.group(0)):
                 fiscal_token_present = True
             _add_spec(specs, seen_specs, year, year, f"Q{quarter_num}")
             consumed_spans.append((start, end))
@@ -118,13 +177,13 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
         if _span_overlaps(start_span, consumed_spans):
             continue
         prefix1, year1, prefix2, year2 = match.groups()
-        y1 = _convert_two_digit_year(year1) if len(year1) == 2 else int(year1)
-        y2 = _convert_two_digit_year(year2) if len(year2) == 2 else int(year2)
+        y1 = _extract_year(year1)
+        y2 = _extract_year(year2)
         if y2 < y1:
             y1, y2 = y2, y1
-        if (prefix1 and prefix1.upper() == "CY") or (prefix2 and prefix2.upper() == "CY"):
+        if _is_calendar_prefix(prefix1) or _is_calendar_prefix(prefix2):
             calendar_override = True
-        if (prefix1 and prefix1.upper() == "FY") or (prefix2 and prefix2.upper() == "FY"):
+        if _is_fiscal_prefix(prefix1) or _is_fiscal_prefix(prefix2):
             fiscal_token_present = True
         _add_spec(specs, seen_specs, y1, y2, None)
         consumed_spans.append(start_span)
@@ -134,7 +193,17 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
         if _span_overlaps(span, consumed_spans):
             continue
         raw_year = match.group(1)
-        year = _convert_two_digit_year(raw_year) if len(raw_year) == 2 else int(raw_year)
+        year = _extract_year(raw_year)
+        fiscal_token_present = True
+        _add_spec(specs, seen_specs, year, year, None)
+        consumed_spans.append(span)
+
+    for match in FISCAL_PATTERN.finditer(original):
+        span = match.span()
+        if _span_overlaps(span, consumed_spans):
+            continue
+        raw_year = match.group(1)
+        year = _extract_year(raw_year)
         fiscal_token_present = True
         _add_spec(specs, seen_specs, year, year, None)
         consumed_spans.append(span)
@@ -147,7 +216,7 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
         if not year_groups:
             continue
         raw_year = year_groups[0]
-        year = _convert_two_digit_year(raw_year) if len(raw_year) == 2 else int(raw_year)
+        year = _extract_year(raw_year)
         calendar_override = True
         _add_spec(specs, seen_specs, year, year, None)
         consumed_spans.append(span)

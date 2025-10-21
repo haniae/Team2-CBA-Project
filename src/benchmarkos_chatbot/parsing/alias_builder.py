@@ -347,21 +347,44 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
     matches.sort(key=lambda item: item[0])
     resolved = [{"input": match[1], "ticker": match[2]} for match in matches]
 
-    if not resolved:
-        tokens = [token for token in _base_tokens(lowered_text) if token]
-        alias_candidates = list(lookup.keys())
-        for token in tokens:
-            candidates = difflib.get_close_matches(token, alias_candidates, n=1, cutoff=0.9)
-            if not candidates:
+    alias_candidates = list(lookup.keys())
+
+    def _try_add_alias(alias_key: str, source_value: str, mark_warning: bool = False) -> bool:
+        if not alias_key:
+            return False
+        for ticker in lookup.get(alias_key, []):
+            if ticker in seen:
                 continue
-            alias = candidates[0]
-            for ticker in lookup.get(alias, []):
-                resolved.append({"input": token, "ticker": ticker})
+            resolved.append({"input": source_value, "ticker": ticker})
+            seen.add(ticker)
+            if mark_warning:
                 warnings.append("fuzzy_match")
-                seen.add(ticker)
-                break
-            if resolved:
-                break
+            return True
+        return False
+
+    tokens = [token for token in _base_tokens(lowered_text) if token]
+    max_window = min(4, len(tokens))
+    for window in range(max_window, 0, -1):
+        for start_idx in range(len(tokens) - window + 1):
+            phrase_tokens = tokens[start_idx : start_idx + window]
+            candidate_phrase = " ".join(phrase_tokens)
+            if not candidate_phrase:
+                continue
+            normalised_phrase = normalize_alias(candidate_phrase)
+            if normalised_phrase and _try_add_alias(normalised_phrase, candidate_phrase):
+                continue
+            if len(normalised_phrase) <= 2:
+                continue
+            best_alias = None
+            best_score = 0.0
+            for alias in alias_candidates:
+                score = difflib.SequenceMatcher(None, normalised_phrase, alias).ratio()
+                if score > best_score:
+                    best_alias = alias
+                    best_score = score
+            if best_alias and best_score >= 0.78:
+                if _try_add_alias(best_alias, candidate_phrase, mark_warning=True):
+                    continue
 
     return resolved, warnings
 
