@@ -181,7 +181,31 @@ The `/chat` response includes structured extras (`highlights`, `trends`, `compar
 
 ---
 
-## Data ingestion playbooks
+## Data ingestion
+### 📊 Updated Dataset Snapshot (as of 2025-10-21)
+
+| Table | Row count | ≈ Millions of rows | What it stores |
+|-------|-----------|--------------------|----------------|
+| metric_snapshots | 617,484 | 0.617 M | Pre-computed KPI outputs (YoY deltas, TTM ratios, scenario anchors) that the dashboard reads directly. |
+| inancial_facts | 93,210 | 0.093 M | Normalised fundamentals keyed by ticker, metric, filing accession, and fiscal period. |
+| company_filings | 52,280 | 0.052 M | Filing metadata (CIK, accession, form type, timestamps) for provenance references. |
+| market_quotes | 955 | 0.001 M | Latest market prices, share counts, and quote metadata per ticker. |
+| udit_events | 2,146 | 0.002 M | Lineage and quality logs for ingestion runs, quote refreshes, and validation warnings. |
+| 	icker_aliases | 54 | <0.0001 M | Canonical ticker/name mappings used by chat autocomplete and dashboard headers. |
+
+**Total footprint:** ~765 k rows (~0.77 M) across six core tables, occupying ≈160 MB on disk.  
+Raw API replies that feed those tables are cached under \cache/\ for reproducibility.
+
+#### Coverage facts
+- **Universe:** 521 unique tickers (current S&P 500 + mega-cap watch list).  
+- **Financial span:** Fiscal years 2012–2027 (\--years 15\), including quarterly detail where available.  
+- **Filing range:** 2012-02-18 → 2025-10-10 (\iled_at\ timestamps).  
+- **Quote range:** 2012-01-03 → 2025-10-10 (ensuring valuation multiples reflect latest prices).  
+- **Static assets:** \data/tickers/universe_sp500.txt\ drives ingestion selection; \webui/data/*.json\ ships demo payloads for offline dashboard renderings.
+
+As you ingest additional tickers or refresh prices, row counts scale linearly while the schema remains unchanged—ready for Postgres or lakehouse migration.  
+Need to revisit ingestion playbooks or CLI commands? Restore the original README from version control.
+ playbooks
 ### On-demand
 `AnalyticsEngine.get_metrics` calls `ingest_live_tickers` when it detects missing coverage. You can route this through `tasks.TaskManager` to queue and monitor ingestion jobs—see inline docstrings for patterns.
 
