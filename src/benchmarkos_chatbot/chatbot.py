@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 import unicodedata
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from enum import Enum
 
 import requests
 
@@ -38,6 +39,77 @@ from .dashboard_utils import (
 )
 
 LOGGER = logging.getLogger(__name__)
+
+# Enhanced Error Handling
+class ErrorCategory(Enum):
+    """Error categories for enhanced error handling."""
+    TICKER_NOT_FOUND = "ticker_not_found"
+    METRIC_NOT_AVAILABLE = "metric_not_available"
+    INVALID_PERIOD = "invalid_period"
+    NETWORK_ERROR = "network_error"
+    DATABASE_ERROR = "database_error"
+    PARSING_ERROR = "parsing_error"
+    UNKNOWN_ERROR = "unknown_error"
+
+# Enhanced Error Messages with specific guidance
+ERROR_MESSAGES = {
+    ErrorCategory.TICKER_NOT_FOUND: {
+        "message": "I couldn't find the ticker symbol '{ticker}'. Please check the spelling or try a different ticker.",
+        "suggestions": [
+            "Try searching for the company name instead",
+            "Check if the ticker symbol is correct",
+            "Use the 'help' command to see available tickers"
+        ]
+    },
+    ErrorCategory.METRIC_NOT_AVAILABLE: {
+        "message": "The metric '{metric}' is not available for {ticker}. Available metrics include: {available_metrics}",
+        "suggestions": [
+            "Try a different metric",
+            "Check available metrics with 'help'",
+            "Use a different time period"
+        ]
+    },
+    ErrorCategory.INVALID_PERIOD: {
+        "message": "The time period '{period}' is not valid. Please use a valid format like '2023', 'Q1 2023', or 'last 3 years'.",
+        "suggestions": [
+            "Use calendar years (e.g., '2023')",
+            "Use quarters (e.g., 'Q1 2023')",
+            "Use relative periods (e.g., 'last 3 years')"
+        ]
+    },
+    ErrorCategory.NETWORK_ERROR: {
+        "message": "I'm having trouble connecting to the data source. Please try again in a moment.",
+        "suggestions": [
+            "Check your internet connection",
+            "Try again in a few minutes",
+            "Contact support if the issue persists"
+        ]
+    },
+    ErrorCategory.DATABASE_ERROR: {
+        "message": "There's an issue accessing the financial database. Please try again later.",
+        "suggestions": [
+            "Try again in a few minutes",
+            "Use a different query",
+            "Contact support if the issue persists"
+        ]
+    },
+    ErrorCategory.PARSING_ERROR: {
+        "message": "I had trouble understanding your request. Please try rephrasing it.",
+        "suggestions": [
+            "Be more specific about what you want",
+            "Use simpler language",
+            "Try the 'help' command for examples"
+        ]
+    },
+    ErrorCategory.UNKNOWN_ERROR: {
+        "message": "I'm not sure how to help with that yet.",
+        "suggestions": [
+            "Try rephrasing your question",
+            "Use the 'help' command for examples",
+            "Be more specific about what you need"
+        ]
+    }
+}
 
 POPULAR_TICKERS: Sequence[str] = (
     "AAPL",
@@ -310,6 +382,64 @@ CONTEXT_SUMMARY_METRICS: Sequence[str] = (
     "free_cash_flow_margin",
     "pe_ratio",
 )
+
+# Enhanced Context Metrics for comprehensive financial analysis
+ENHANCED_CONTEXT_SUMMARY_METRICS: Sequence[str] = (
+    # Core Financials
+    "revenue",
+    "net_income", 
+    "gross_margin",
+    "operating_margin",
+    "net_margin",
+    "ebitda",
+    "ebitda_margin",
+    
+    # Profitability
+    "return_on_equity",
+    "return_on_assets",
+    "return_on_invested_capital",
+    
+    # Liquidity
+    "current_ratio",
+    "quick_ratio",
+    "free_cash_flow",
+    "free_cash_flow_margin",
+    
+    # Leverage
+    "debt_to_equity",
+    "debt_to_assets",
+    "interest_coverage_ratio",
+    
+    # Efficiency
+    "asset_turnover",
+    "inventory_turnover",
+    
+    # Growth
+    "revenue_growth",
+    "earnings_growth",
+    
+    # Valuation
+    "pe_ratio",
+    "price_to_book",
+    "price_to_sales",
+    "market_cap",
+    
+    # Market
+    "beta",
+    "volatility"
+)
+
+# Enhanced Context Categories for organized financial analysis
+CONTEXT_CATEGORIES = {
+    "Core Financials": ["revenue", "net_income", "gross_margin", "operating_margin", "net_margin", "ebitda", "ebitda_margin"],
+    "Profitability": ["return_on_equity", "return_on_assets", "return_on_invested_capital"],
+    "Liquidity": ["current_ratio", "quick_ratio", "free_cash_flow", "free_cash_flow_margin"],
+    "Leverage": ["debt_to_equity", "debt_to_assets", "interest_coverage_ratio"],
+    "Efficiency": ["asset_turnover", "inventory_turnover"],
+    "Growth": ["revenue_growth", "earnings_growth"],
+    "Valuation": ["pe_ratio", "price_to_book", "price_to_sales", "market_cap"],
+    "Market": ["beta", "volatility"]
+}
 
 BENCHMARK_KEY_METRICS: Dict[str, str] = {
     "adjusted_ebitda_margin": "Adjusted EBITDA margin",
@@ -1137,13 +1267,26 @@ class BenchmarkOSChatbot:
                         return " ".join(["fact", ordered_subjects[0], quarter_token, fact_metric])
                     return " ".join(["fact", ordered_subjects[0], year_token, fact_metric])
 
+                # Enhanced compare triggers detection
                 compare_triggers = bool(
                     re.search(r"\b(compare|versus|vs\.?|against|between|relative)\b", lower)
                     or "better than" in lower
                     or "outperform" in lower
                     or "beats" in lower
+                    or "and" in lower  # Add "and" as compare trigger
                 )
+                
+                # Check if we have enough subjects for comparison
                 if compare_triggers and len(ordered_subjects) >= 2:
+                    parts = ["compare", *ordered_subjects]
+                    if period_token:
+                        parts.append(period_token)
+                    return " ".join(parts)
+                
+                # Special handling for "compare X and Y" patterns
+                if (re.search(r"\bcompare\b", lower) and 
+                    re.search(r"\band\b", lower) and 
+                    len(ordered_subjects) >= 2):
                     parts = ["compare", *ordered_subjects]
                     if period_token:
                         parts.append(period_token)
@@ -1295,14 +1438,16 @@ class BenchmarkOSChatbot:
                     emit("help_complete", "Help guide ready")
                 else:
                     attempted_intent = False
-                    if normalized_command and normalized_command.strip().lower() != lowered_input:
-                        emit("intent_normalised", "Detected structured financial intent")
+                    # Try structured parsing first (Priority 1)
+                    emit("intent_routed_structured", "Trying structured parsing first")
+                    reply = self._handle_financial_intent(user_input)
+                    attempted_intent = True
+                    
+                    # Fallback to normalized command if structured parsing fails
+                    if reply is None and normalized_command and normalized_command.strip().lower() != lowered_input:
+                        emit("intent_normalised", "Falling back to normalized command")
                         emit("intent_routed_structured", f"Executing structured command: {normalized_command}")
                         reply = self._handle_financial_intent(normalized_command)
-                        attempted_intent = True
-                    if reply is None:
-                        emit("intent_routed_natural", "Falling back to natural-language resolver")
-                        reply = self._handle_financial_intent(user_input)
                         attempted_intent = True
                     if attempted_intent:
                         if reply is not None:
@@ -1321,8 +1466,8 @@ class BenchmarkOSChatbot:
                         emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
 
             if reply is None:
-                emit("context_build_start", "Gathering financial context")
-                context = self._build_rag_context(user_input)
+                emit("context_build_start", "Gathering enhanced financial context")
+                context = self._build_enhanced_rag_context(user_input)
                 emit(
                     "context_build_ready",
                     "Context compiled" if context else "Context not required",
@@ -1333,8 +1478,8 @@ class BenchmarkOSChatbot:
                 emit("llm_query_complete", "Explanation drafted")
 
             if reply is None:
-                emit("fallback", "Using fallback reply")
-                reply = "I'm not sure how to help with that yet."
+                emit("fallback", "Using enhanced fallback reply")
+                reply = self._handle_enhanced_error(ErrorCategory.UNKNOWN_ERROR)
 
             emit("finalize", "Finalising response")
             database.log_message(
@@ -1401,9 +1546,18 @@ class BenchmarkOSChatbot:
         if self._is_complex_natural_language_query(text):
             return None  # Will trigger LLM fallback
         
-        # Priority 1: Try structured metrics parsing
+        # Priority 1: Try structured metrics parsing FIRST
         structured = parse_to_structured(text)
         self.last_structured_response["parser"] = structured
+
+        # If structured parsing detected compare intent with multiple tickers, handle it directly
+        if (structured and 
+            structured.get('intent') == 'compare' and 
+            len(structured.get('tickers', [])) >= 2):
+            
+            structured_reply = self._handle_structured_metrics(structured)
+            if structured_reply:
+                return structured_reply
 
         structured_reply = self._handle_structured_metrics(structured)
         if structured_reply:
@@ -1443,6 +1597,13 @@ class BenchmarkOSChatbot:
         if len(tokens) < 3:  # "compare AAPL" is too short
             return False
         
+        # Check if there are natural language words like "vs", "versus", "revenue", etc., it's natural language
+        natural_language_words = ["vs", "versus", "revenue", "earnings", "profit", "income", "sales", "growth", "performance", "results", "financial", "metrics", "data", "analysis"]
+        has_natural_language = any(word.lower() in text.lower() for word in natural_language_words)
+        
+        if has_natural_language:
+            return False  # It's natural language, not legacy command
+        
         # Check if tokens after "compare" look like ticker symbols (uppercase, 1-5 chars)
         ticker_like_tokens = []
         for token in tokens[1:]:  # Skip "compare"
@@ -1453,14 +1614,8 @@ class BenchmarkOSChatbot:
         if len(ticker_like_tokens) >= 2:
             return True
         
-        # If there are natural language words like "vs", "versus", "revenue", etc., it's natural language
-        natural_language_words = ["vs", "versus", "revenue", "earnings", "profit", "apple", "microsoft", "google", "amazon"]
-        for token in tokens:
-            if token.lower() in natural_language_words:
-                return False
-        
-        # Default to legacy command if unclear
-        return True
+        # Default to not legacy command if unclear
+        return False
 
     def _is_complex_natural_language_query(self, text: str) -> bool:
         """Detect complex natural language queries that should go directly to LLM."""
@@ -1595,6 +1750,13 @@ class BenchmarkOSChatbot:
 
         intent = structured.get("intent")
         if intent == "compare" and len(resolved_tickers) >= 2:
+            # Check if specific metrics are requested
+            requested_metrics = structured.get("vmetrics", [])
+            if requested_metrics:
+                # Filter to only requested metrics
+                metric_keys = [metric.get("key") for metric in requested_metrics if metric.get("key")]
+                if metric_keys:
+                    return self._format_metrics_table(resolved_tickers, period_filters=period_filters, metric_filter=metric_keys)
             return self._format_metrics_table(resolved_tickers, period_filters=period_filters)
 
         if intent in {"lookup", "trend", "rank"}:
@@ -2319,6 +2481,7 @@ class BenchmarkOSChatbot:
         tickers: Sequence[str],
         *,
         period_filters: Optional[Sequence[tuple[int, int]]] = None,
+        metric_filter: Optional[List[str]] = None,
     ) -> str:
         """Render metrics output as a table suitable for chat."""
         metrics_per_ticker: Dict[str, Dict[str, database.MetricRecord]] = {}
@@ -2432,7 +2595,12 @@ class BenchmarkOSChatbot:
         rows: List[List[str]] = []
         cell_metadata: Dict[str, Dict[str, Dict[str, Any]]] = {}
         metric_keys: List[str] = []
-        for definition in METRIC_DEFINITIONS:
+        # Filter metrics if specific metrics are requested
+        definitions_to_use = METRIC_DEFINITIONS
+        if metric_filter:
+            definitions_to_use = [defn for defn in METRIC_DEFINITIONS if defn.name in metric_filter]
+        
+        for definition in definitions_to_use:
             label = definition.description
             metric_keys.append(definition.name)
             row = [label]
@@ -2493,7 +2661,8 @@ class BenchmarkOSChatbot:
         conclusion = ""
 
         dashboard_descriptor = None
-        if len(ordered_tickers) >= 2:
+        # Only build dashboard if no metric filter is applied (user wants full comparison)
+        if len(ordered_tickers) >= 2 and not metric_filter:
             try:
                 dashboard_payload = build_cfi_compare_payload(
                     self.analytics_engine,
@@ -2737,6 +2906,461 @@ class BenchmarkOSChatbot:
             self._store_cached_context(cache_key, final_context)
         return final_context
 
+    def _build_enhanced_rag_context(self, user_input: str) -> Optional[str]:
+        """Enhanced RAG context building with comprehensive financial data."""
+        tickers = self._detect_tickers(user_input)
+        if not tickers:
+            return None
+        
+        # Normalize tickers
+        normalized_tickers: List[str] = []
+        seen_tickers: set[str] = set()
+        for ticker in tickers:
+            if not ticker:
+                continue
+            upper = ticker.upper()
+            if upper in seen_tickers:
+                continue
+            seen_tickers.add(upper)
+            normalized_tickers.append(upper)
+        
+        if normalized_tickers:
+            self._progress("context_sources_scan", f"Scanning enhanced context for {', '.join(normalized_tickers)}")
+        
+        tickers = normalized_tickers or tickers
+        cache_key = "|".join(sorted(normalized_tickers)) if normalized_tickers else None
+        
+        if cache_key:
+            cached = self._get_cached_context(cache_key)
+            if cached:
+                self._progress("context_cache_hit", "Reusing cached enhanced context bundle")
+                return cached
+        
+        context_sections: List[str] = []
+        
+        for ticker in tickers:
+            try:
+                records = self._fetch_metrics_cached(ticker)
+            except Exception:
+                continue
+            if not records:
+                continue
+            
+            latest = self._select_latest_records(
+                records, span_fn=self.analytics_engine._period_span
+            )
+            if not latest:
+                continue
+            
+            # Build enhanced context with categories
+            ticker_context = self._build_ticker_enhanced_context(ticker, latest)
+            if ticker_context:
+                context_sections.append(ticker_context)
+        
+        if not context_sections:
+            self._progress("context_sources_empty", "No enhanced context located")
+            return None
+        
+        combined = "\n".join(context_sections)
+        final_context = "Enhanced Financial Context:\n" + combined
+        
+        self._progress("context_sources_ready", f"Added {len(context_sections)} enhanced context sections")
+        if cache_key:
+            self._store_cached_context(cache_key, final_context)
+        
+        return final_context
+
+    def _build_ticker_enhanced_context(self, ticker: str, latest: Dict[str, database.MetricRecord]) -> str:
+        """Build enhanced context for a single ticker with categorized metrics."""
+        
+        spans = [
+            self.analytics_engine._period_span(record.period)
+            for record in latest.values()
+            if record.period
+        ]
+        descriptor = (
+            self._describe_period_filters(spans) if spans else "latest available"
+        )
+        
+        lines = [f"{ticker} ({descriptor})"]
+        
+        # Build context by category
+        for category, metrics in CONTEXT_CATEGORIES.items():
+            category_lines = []
+            for metric_name in metrics:
+                formatted = self._format_metric_value(metric_name, latest)
+                if formatted == "n/a":
+                    continue
+                label = _METRIC_LABEL_MAP.get(
+                    metric_name, metric_name.replace("_", " ").title()
+                )
+                category_lines.append(f"  • {label}: {formatted}")
+            
+            if category_lines:
+                lines.append(f"  {category}:")
+                lines.extend(category_lines)
+        
+        return "\n".join(lines) if len(lines) > 1 else ""
+
+    def _handle_enhanced_error(self, error_category: ErrorCategory, **kwargs) -> str:
+        """Handle errors with specific messages and suggestions."""
+        error_info = ERROR_MESSAGES.get(error_category, ERROR_MESSAGES[ErrorCategory.UNKNOWN_ERROR])
+        
+        message = error_info["message"].format(**kwargs)
+        suggestions = error_info["suggestions"]
+        
+        response = f"{message}\n\n"
+        if suggestions:
+            response += "Here are some suggestions:\n"
+            for i, suggestion in enumerate(suggestions, 1):
+                response += f"{i}. {suggestion}\n"
+        
+        return response
+
+    def _detect_ticker_error(self, ticker: str) -> Optional[ErrorCategory]:
+        """Detect if ticker is not found."""
+        try:
+            # Try to fetch metrics for the ticker
+            records = self._fetch_metrics_cached(ticker)
+            if not records:
+                return ErrorCategory.TICKER_NOT_FOUND
+        except Exception:
+            return ErrorCategory.TICKER_NOT_FOUND
+        return None
+
+    def _detect_metric_error(self, metric: str, ticker: str) -> Optional[ErrorCategory]:
+        """Detect if metric is not available."""
+        try:
+            records = self._fetch_metrics_cached(ticker)
+            if not records:
+                return ErrorCategory.METRIC_NOT_AVAILABLE
+            
+            # Check if metric exists in records
+            latest = self._select_latest_records(
+                records, span_fn=self.analytics_engine._period_span
+            )
+            if metric not in latest:
+                return ErrorCategory.METRIC_NOT_AVAILABLE
+        except Exception:
+            return ErrorCategory.METRIC_NOT_AVAILABLE
+        return None
+
+    def _detect_period_error(self, period: str) -> Optional[ErrorCategory]:
+        """Detect if period is invalid."""
+        # Basic period validation
+        if not period or period.strip() == "":
+            return ErrorCategory.INVALID_PERIOD
+        
+        # Check for valid year format
+        if re.match(r'^\d{4}$', period.strip()):
+            year = int(period.strip())
+            if year < 1900 or year > 2030:
+                return ErrorCategory.INVALID_PERIOD
+            return None
+        
+        # Check for valid quarter format
+        if re.match(r'^Q[1-4]\s+\d{4}$', period.strip(), re.IGNORECASE):
+            return None
+        
+        # Check for relative periods
+        if any(keyword in period.lower() for keyword in ['last', 'previous', 'recent']):
+            return None
+        
+        # If none of the above patterns match, it's likely invalid
+        return ErrorCategory.INVALID_PERIOD
+
+    # Enhanced Visual Formatting Methods
+    def _generate_line_chart(self, data: Dict[str, List[float]], title: str, 
+                            x_labels: List[str] = None) -> str:
+        """Generate line chart for time series data."""
+        if not data or not any(data.values()):
+            return ""
+        
+        # Create ASCII line chart
+        chart_lines = [f"📈 {title}", "=" * 50]
+        
+        # Find max value for scaling
+        max_value = max(max(values) for values in data.values() if values)
+        min_value = min(min(values) for values in data.values() if values)
+        range_value = max_value - min_value if max_value != min_value else 1
+        
+        # Create chart for each series
+        for series_name, values in data.items():
+            if not values:
+                continue
+                
+            chart_lines.append(f"\n{series_name}:")
+            chart_lines.append("┌" + "─" * 48 + "┐")
+            
+            # Create ASCII line chart
+            for i, value in enumerate(values):
+                if value is None:
+                    continue
+                    
+                # Scale value to 0-40 range
+                scaled_value = int((value - min_value) / range_value * 40) if range_value > 0 else 20
+                bar = "█" * scaled_value + " " * (40 - scaled_value)
+                
+                label = x_labels[i] if x_labels and i < len(x_labels) else f"Point {i+1}"
+                chart_lines.append(f"│ {bar} │ {label}: {value:,.1f}")
+            
+            chart_lines.append("└" + "─" * 48 + "┘")
+        
+        return "\n".join(chart_lines)
+
+    def _generate_bar_chart(self, data: Dict[str, float], title: str) -> str:
+        """Generate bar chart for comparison data."""
+        if not data:
+            return ""
+        
+        chart_lines = [f"📊 {title}", "=" * 50]
+        
+        # Find max value for scaling
+        max_value = max(data.values()) if data.values() else 1
+        min_value = min(data.values()) if data.values() else 0
+        range_value = max_value - min_value if max_value != min_value else 1
+        
+        # Create bar chart
+        for label, value in data.items():
+            if value is None:
+                continue
+                
+            # Scale value to 0-40 range
+            scaled_value = int((value - min_value) / range_value * 40) if range_value > 0 else 20
+            bar = "█" * scaled_value + " " * (40 - scaled_value)
+            
+            chart_lines.append(f"{label:20} │{bar}│ {value:,.1f}")
+        
+        return "\n".join(chart_lines)
+
+    def _generate_pie_chart(self, data: Dict[str, float], title: str) -> str:
+        """Generate pie chart for distribution data."""
+        if not data:
+            return ""
+        
+        chart_lines = [f"🥧 {title}", "=" * 50]
+        
+        # Calculate percentages
+        total = sum(data.values()) if data.values() else 1
+        percentages = {k: (v / total * 100) if total > 0 else 0 for k, v in data.items()}
+        
+        # Create pie chart representation
+        for label, value in data.items():
+            percentage = percentages[label]
+            bar_length = int(percentage / 2)  # Scale to 0-50 range
+            bar = "█" * bar_length + " " * (50 - bar_length)
+            
+            chart_lines.append(f"{label:20} │{bar}│ {percentage:.1f}% ({value:,.1f})")
+        
+        return "\n".join(chart_lines)
+
+    def _format_enhanced_table(self, headers: List[str], rows: List[List[str]], 
+                              title: str = None, chart_type: str = None) -> str:
+        """Format table with enhanced visual styling."""
+        if not headers or not rows:
+            return ""
+        
+        # Add title if provided
+        result_lines = []
+        if title:
+            result_lines.append(f"📋 {title}")
+            result_lines.append("=" * len(title) + "=" * 4)
+        
+        # Calculate column widths
+        col_widths = [len(str(header)) for header in headers]
+        for row in rows:
+            for i, cell in enumerate(row):
+                if i < len(col_widths):
+                    col_widths[i] = max(col_widths[i], len(str(cell)))
+        
+        # Create table header
+        header_line = "┌" + "┬".join("─" * (width + 2) for width in col_widths) + "┐"
+        result_lines.append(header_line)
+        
+        # Add header row
+        header_cells = [f" {str(header):<{col_widths[i]}} " for i, header in enumerate(headers)]
+        result_lines.append("│" + "│".join(header_cells) + "│")
+        
+        # Add separator
+        separator = "├" + "┼".join("─" * (width + 2) for width in col_widths) + "┤"
+        result_lines.append(separator)
+        
+        # Add data rows
+        for row in rows:
+            row_cells = []
+            for i, cell in enumerate(row):
+                if i < len(col_widths):
+                    row_cells.append(f" {str(cell):<{col_widths[i]}} ")
+                else:
+                    row_cells.append(" " * (col_widths[i] + 2))
+            
+            result_lines.append("│" + "│".join(row_cells) + "│")
+        
+        # Add footer
+        footer_line = "└" + "┴".join("─" * (width + 2) for width in col_widths) + "┘"
+        result_lines.append(footer_line)
+        
+        # Add chart if requested
+        if chart_type and len(rows) > 0:
+            result_lines.append("\n")
+            if chart_type == "line" and len(rows) > 1:
+                # Generate line chart for time series data
+                chart_data = {}
+                for i, row in enumerate(rows):
+                    if len(row) > 1:
+                        series_name = row[0]
+                        values = []
+                        for j in range(1, len(row)):
+                            try:
+                                value = float(row[j].replace(',', '').replace('%', ''))
+                                values.append(value)
+                            except (ValueError, IndexError):
+                                continue
+                        if values:
+                            chart_data[series_name] = values
+                if chart_data:
+                    result_lines.append(self._generate_line_chart(chart_data, f"{title} - Trend Analysis"))
+            
+            elif chart_type == "bar":
+                # Generate bar chart for comparison data
+                chart_data = {}
+                for row in rows:
+                    if len(row) >= 2:
+                        try:
+                            value = float(row[1].replace(',', '').replace('%', ''))
+                            chart_data[row[0]] = value
+                        except (ValueError, IndexError):
+                            continue
+                if chart_data:
+                    result_lines.append(self._generate_bar_chart(chart_data, f"{title} - Comparison"))
+        
+        return "\n".join(result_lines)
+
+    def _export_to_csv(self, data: Dict[str, Any], filename: str) -> str:
+        """Export data to CSV format."""
+        import csv
+        import io
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers
+        if 'headers' in data:
+            writer.writerow(data['headers'])
+        
+        # Write rows
+        if 'rows' in data:
+            for row in data['rows']:
+                writer.writerow(row)
+        
+        csv_content = output.getvalue()
+        output.close()
+        
+        # Save to file
+        with open(filename, 'w', newline='', encoding='utf-8') as f:
+            f.write(csv_content)
+        
+        return f"📁 Data exported to {filename}"
+
+    def _export_to_pdf(self, data: Dict[str, Any], filename: str) -> str:
+        """Export data to PDF format."""
+        try:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib import colors
+            
+            doc = SimpleDocTemplate(filename, pagesize=letter)
+            styles = getSampleStyleSheet()
+            story = []
+            
+            # Add title
+            if 'title' in data:
+                title = Paragraph(data['title'], styles['Title'])
+                story.append(title)
+                story.append(Spacer(1, 12))
+            
+            # Add table
+            if 'headers' in data and 'rows' in data:
+                table_data = [data['headers']] + data['rows']
+                table = Table(table_data)
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 14),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                story.append(table)
+            
+            doc.build(story)
+            return f"📄 PDF exported to {filename}"
+            
+        except ImportError:
+            return "❌ PDF export requires reportlab package. Install with: pip install reportlab"
+        except Exception as e:
+            return f"❌ PDF export failed: {str(e)}"
+
+    def _add_visual_indicators(self, text: str) -> str:
+        """Add visual indicators to text responses."""
+        # Add emojis and visual indicators
+        enhanced_text = text
+        
+        # Add indicators for different types of content
+        if "revenue" in text.lower():
+            enhanced_text = enhanced_text.replace("revenue", "💰 Revenue")
+        if "profit" in text.lower():
+            enhanced_text = enhanced_text.replace("profit", "📈 Profit")
+        if "growth" in text.lower():
+            enhanced_text = enhanced_text.replace("growth", "📊 Growth")
+        if "ratio" in text.lower():
+            enhanced_text = enhanced_text.replace("ratio", "📏 Ratio")
+        
+        return enhanced_text
+
+    def _format_financial_metrics(self, metrics: Dict[str, float]) -> str:
+        """Format financial metrics with visual enhancements."""
+        if not metrics:
+            return ""
+        
+        result_lines = ["📊 Financial Metrics Summary", "=" * 40]
+        
+        for metric, value in metrics.items():
+            if value is None:
+                continue
+                
+            # Add visual indicators based on metric type
+            if "revenue" in metric.lower():
+                indicator = "💰"
+            elif "profit" in metric.lower() or "income" in metric.lower():
+                indicator = "📈"
+            elif "ratio" in metric.lower():
+                indicator = "📏"
+            elif "growth" in metric.lower():
+                indicator = "📊"
+            else:
+                indicator = "📋"
+            
+            # Format value with appropriate precision
+            if isinstance(value, float):
+                if abs(value) >= 1e9:
+                    formatted_value = f"{value/1e9:.2f}B"
+                elif abs(value) >= 1e6:
+                    formatted_value = f"{value/1e6:.2f}M"
+                elif abs(value) >= 1e3:
+                    formatted_value = f"{value/1e3:.2f}K"
+                else:
+                    formatted_value = f"{value:.2f}"
+            else:
+                formatted_value = str(value)
+            
+            result_lines.append(f"{indicator} {metric.replace('_', ' ').title()}: {formatted_value}")
+        
+        return "\n".join(result_lines)
+
     def _detect_tickers(self, text: str) -> List[str]:
         """Best-effort ticker extraction from user text (tickers + company names)."""
         candidates: List[str] = []
@@ -2895,3 +3519,72 @@ class BenchmarkOSChatbot:
         separator = "-+-".join("-" * width for width in widths)
         body = "\n".join(format_row(row) for row in rows)
         return "\n".join([header_line, separator, body])
+
+    # Enhanced Error Handling Methods
+    def _detect_error_category(self, error_message: str) -> ErrorCategory:
+        """Detect error category based on error message content."""
+        error_lower = error_message.lower()
+        
+        if any(keyword in error_lower for keyword in ["not found", "missing", "unavailable"]):
+            return ErrorCategory.DATA_NOT_FOUND
+        elif any(keyword in error_lower for keyword in ["invalid", "incorrect", "wrong"]):
+            return ErrorCategory.INVALID_INPUT
+        elif any(keyword in error_lower for keyword in ["timeout", "connection", "network"]):
+            return ErrorCategory.NETWORK_ERROR
+        elif any(keyword in error_lower for keyword in ["permission", "access", "unauthorized"]):
+            return ErrorCategory.PERMISSION_ERROR
+        elif any(keyword in error_lower for keyword in ["limit", "quota", "exceeded"]):
+            return ErrorCategory.QUOTA_EXCEEDED
+        elif any(keyword in error_lower for keyword in ["server", "internal", "system"]):
+            return ErrorCategory.SERVER_ERROR
+        else:
+            return ErrorCategory.UNKNOWN_ERROR
+
+    def _format_error_message(self, error: Exception, context: str = "") -> str:
+        """Format error message with specific guidance based on error category."""
+        error_message = str(error)
+        category = self._detect_error_category(error_message)
+        
+        base_message = ERROR_MESSAGES.get(category, ERROR_MESSAGES[ErrorCategory.UNKNOWN_ERROR])
+        
+        # Add context-specific suggestions
+        suggestions = []
+        if context:
+            suggestions.append(f"Context: {context}")
+        
+        if category == ErrorCategory.DATA_NOT_FOUND:
+            suggestions.extend([
+                "• Try using a different company name or ticker symbol",
+                "• Check if the company is publicly traded",
+                "• Verify the time period is available"
+            ])
+        elif category == ErrorCategory.INVALID_INPUT:
+            suggestions.extend([
+                "• Check your query format",
+                "• Ensure ticker symbols are valid",
+                "• Verify time period format (e.g., 2023, Q1 2023)"
+            ])
+        elif category == ErrorCategory.NETWORK_ERROR:
+            suggestions.extend([
+                "• Check your internet connection",
+                "• Try again in a few moments",
+                "• Contact support if the issue persists"
+            ])
+        
+        if suggestions:
+            base_message += "\n\nSuggestions:\n" + "\n".join(suggestions)
+        
+        return base_message
+
+    # Enhanced Chart Generation Methods
+    def _generate_chart(self, data: Dict[str, List[float]], title: str, chart_type: str = "line") -> str:
+        """Generate various types of charts based on data."""
+        if chart_type == "line":
+            return self._generate_line_chart(data, title)
+        elif chart_type == "bar":
+            return self._generate_bar_chart(data, title)
+        elif chart_type == "pie":
+            return self._generate_pie_chart(data, title)
+        else:
+            return f"❌ Unsupported chart type: {chart_type}"
+
