@@ -15,6 +15,7 @@ DASHBOARD_KPI_ORDER: Tuple[str, ...] = (
     "eps_cagr",
     "ebitda_growth",
     "ebitda_margin",
+    "gross_margin",
     "operating_margin",
     "net_margin",
     "profit_margin",
@@ -23,8 +24,13 @@ DASHBOARD_KPI_ORDER: Tuple[str, ...] = (
     "return_on_invested_capital",
     "free_cash_flow_margin",
     "cash_conversion",
+    "current_ratio",
+    "quick_ratio",
     "debt_to_equity",
+    "interest_coverage",
+    "asset_turnover",
     "pe_ratio",
+    "ps_ratio",
     "ev_ebitda",
     "pb_ratio",
     "peg_ratio",
@@ -609,14 +615,30 @@ def build_cfi_dashboard_payload(
         if ratio_ebitda is not None:
             ev_ebitda_series[year] = ratio_ebitda
 
+    # Get additional series for extended metrics
+    operating_income_series = _collect_series(records, "operating_income")
+    gross_profit_series = _collect_series(records, "gross_profit")
+    eps_series = _collect_series(records, "eps")
+    total_assets_series = _collect_series(records, "total_assets")
+    total_debt_series = _collect_series(records, "total_debt")
+    shares_series = _collect_series(records, "shares_outstanding")
+    gross_margin_series = _collect_series(records, "gross_margin")
+    
     key_financials = {
         "columns": years,
         "rows": [
             {"label": "Revenue", "values": _series_values(revenue_series)},
+            {"label": "Gross Profit", "values": _series_values(gross_profit_series)},
             {"label": "EBITDA", "values": _series_values(ebitda_series)},
-            {"label": "Net income", "values": _series_values(net_income_series)},
-            {"label": "Net profit margin", "values": _series_values(net_margin_series), "type": "percent"},
-            {"label": "Free cash flow", "values": _series_values(fcf_series)},
+            {"label": "Operating Income", "values": _series_values(operating_income_series)},
+            {"label": "Net Income", "values": _series_values(net_income_series)},
+            {"label": "EPS ($)", "values": _series_values(eps_series)},
+            {"label": "Free Cash Flow", "values": _series_values(fcf_series)},
+            {"label": "Total Assets", "values": _series_values(total_assets_series)},
+            {"label": "Total Debt", "values": _series_values(total_debt_series)},
+            {"label": "Shares Outstanding (M)", "values": _series_values(shares_series)},
+            {"label": "Gross Margin", "values": _series_values(gross_margin_series), "type": "percent"},
+            {"label": "Net Profit Margin", "values": _series_values(net_margin_series), "type": "percent"},
             {"label": "EV/Revenue (×)", "values": _series_values(ev_revenue_series), "type": "multiple"},
             {"label": "EV/EBITDA (×)", "values": _series_values(ev_ebitda_series), "type": "multiple"},
         ],
