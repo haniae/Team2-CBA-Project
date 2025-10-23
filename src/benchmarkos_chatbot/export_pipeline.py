@@ -12,9 +12,12 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 from pptx import Presentation
 from pptx.chart.data import ChartData
-from pptx.enum.chart import XL_CHART_TYPE
+from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.util import Inches, Pt
 from .dashboard_utils import build_cfi_dashboard_payload
+from .cfi_ppt_builder import build_cfi_ppt
 
 
 @dataclass(frozen=True)
@@ -191,98 +194,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
 
 
 def _build_ppt(payload: Dict[str, Any]) -> bytes:
-    meta = payload.get("meta", {})
-    kpis = payload.get("kpi_summary", [])
-    sources = payload.get("sources", [])
-
-    presentation = Presentation()
-
-    title_slide = presentation.slides.add_slide(presentation.slide_layouts[0])
-    title_slide.shapes.title.text = f"{meta.get('company', 'Dashboard')}"
-    subtitle = title_slide.shapes.placeholders[1]
-    subtitle.text = f"{meta.get('ticker', '')} • Recommendation: {meta.get('recommendation', '—')} • Target { _format_currency(meta.get('target_price')) }"
-
-    kpi_slide = presentation.slides.add_slide(presentation.slide_layouts[5])
-    kpi_slide.shapes.title.text = "KPI Scorecard"
-    rows = len(_collect_kpi_rows(kpis)) + 1
-    cols = 3
-    table = kpi_slide.shapes.add_table(rows, cols, Inches(0.5), Inches(1.5), Inches(9.0), Inches(4.5)).table
-    table.columns[0].width = Inches(3.6)
-    table.columns[1].width = Inches(2.0)
-    table.columns[2].width = Inches(3.0)
-    headers = ("Metric", "Value", "Period / Source")
-    for col, text in enumerate(headers):
-        table.cell(0, col).text = text
-        table.cell(0, col).text_frame.paragraphs[0].font.bold = True
-    for row_index, (label, value_text, period, source) in enumerate(_collect_kpi_rows(kpis), start=1):
-        table.cell(row_index, 0).text = label
-        table.cell(row_index, 1).text = value_text
-        meta_text = period or ""
-        if source:
-            meta_text = f"{meta_text} • {source}" if meta_text else source
-        table.cell(row_index, 2).text = meta_text
-
-    trend_slide = presentation.slides.add_slide(presentation.slide_layouts[5])
-    trend_slide.shapes.title.text = "Trend Analysis"
-    series_map = payload.get("kpi_series") or {}
-    selected_series = None
-    selected_label = ""
-    for kpi in kpis:
-        series = series_map.get(kpi.get("id"))
-        if series and series.get("years") and series.get("values"):
-            selected_series = series
-            selected_label = kpi.get("label") or kpi.get("id")
-            break
-    if selected_series:
-        chart_data = ChartData()
-        chart_data.categories = selected_series["years"]
-        chart_data.add_series(selected_label, tuple(selected_series["values"]))
-        chart = trend_slide.shapes.add_chart(
-            XL_CHART_TYPE.LINE_MARKERS, Inches(0.7), Inches(1.7), Inches(8.6), Inches(4.3), chart_data
-        ).chart
-        chart.has_legend = False
-    else:
-        text_box = trend_slide.shapes.add_textbox(Inches(0.7), Inches(1.8), Inches(8.5), Inches(1.5))
-        text_box.text_frame.text = "Trend data unavailable."
-
-    valuation = payload.get("valuation_table") or []
-    if valuation:
-        valuation_slide = presentation.slides.add_slide(presentation.slide_layouts[5])
-        valuation_slide.shapes.title.text = "Valuation Summary"
-        val_table = valuation_slide.shapes.add_table(len(valuation) + 1, 4, Inches(0.5), Inches(1.6), Inches(9.0), Inches(4.2)).table
-        headers = ("Metric", "Market", "DCF", "Comps")
-        for idx, header in enumerate(headers):
-            cell = val_table.cell(0, idx)
-            cell.text = header
-            cell.text_frame.paragraphs[0].font.bold = True
-        for row_index, row in enumerate(valuation, start=1):
-            val_table.cell(row_index, 0).text = row.get("Label") or ""
-            val_table.cell(row_index, 1).text = _format_currency(row.get("Market"))
-            val_table.cell(row_index, 2).text = _format_currency(row.get("DCF"))
-            val_table.cell(row_index, 3).text = _format_currency(row.get("Comps"))
-
-    sources_slide = presentation.slides.add_slide(presentation.slide_layouts[1])
-    sources_slide.shapes.title.text = "Source Footnotes"
-    bullet_frame = sources_slide.shapes.placeholders[1].text_frame
-    bullet_frame.clear()
-    source_rows = _collect_source_rows(sources)
-    if not source_rows:
-        bullet_frame.text = "Source details unavailable."
-    else:
-        for index, (label, period, source) in enumerate(source_rows):
-            paragraph = bullet_frame.add_paragraph() if index else bullet_frame.paragraphs[0]
-            text = label
-            if period:
-                text += f" ({period})"
-            if source:
-                text += f" — {source}"
-            paragraph.text = text
-            paragraph.level = 0
-            paragraph.font.size = Pt(14)
-
-    buffer = BytesIO()
-    presentation.save(buffer)
-    return buffer.getvalue()
+    """Generate CFI-style professional PowerPoint deck."""
+    return build_cfi_ppt(payload)
 
 
 def _build_excel(payload: Dict[str, Any]) -> bytes:
@@ -398,11 +311,11 @@ def generate_dashboard_export(engine: "AnalyticsEngine", ticker: str, fmt: str) 
 
     if format_normalized in {"pdf"}:
         content = _build_pdf(payload)
-        filename = f"{slug}-benchmarkos-{today}.pdf"
+        filename = f"BenchmarkOS_{ticker_label}_{today}.pdf"
         return ExportResult(content=content, media_type="application/pdf", filename=filename)
     if format_normalized in {"ppt", "pptx"}:
         content = _build_ppt(payload)
-        filename = f"{slug}-benchmarkos-{today}.pptx"
+        filename = f"BenchmarkOS_{ticker_label}_{today}.pptx"
         return ExportResult(
             content=content,
             media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -410,7 +323,7 @@ def generate_dashboard_export(engine: "AnalyticsEngine", ticker: str, fmt: str) 
         )
     if format_normalized in {"xlsx", "excel"}:
         content = _build_excel(payload)
-        filename = f"{slug}-benchmarkos-{today}.xlsx"
+        filename = f"BenchmarkOS_{ticker_label}_{today}.xlsx"
         return ExportResult(
             content=content,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
