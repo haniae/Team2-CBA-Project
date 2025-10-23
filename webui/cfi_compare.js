@@ -294,8 +294,8 @@
     }
     if (!traces.length) {
       node.innerHTML = "<div class=\"cfi-error\">No valuation ranges</div>";
-      return;
-    }
+            return;
+        }
     const layout={
       ...L,
       xaxis:{...L.xaxis,title:"$/Share"},
