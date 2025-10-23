@@ -43,7 +43,7 @@ Picture a Monday 8 a.m. stand-up in GW's practicum lab. Hania, acting as the ana
 - [Retrieval & ML internals](#retrieval--ml-internals)
 - [Quick start](#quick-start)
 - [Running the chatbot](#running-the-chatbot)
-- [Data ingestion playbooks](#data-ingestion-playbooks)
+- [Data Ingestion Guide](#data-ingestion-guide)
 - [Ingest and quote loading (English quick guide)](#ingest-and-quote-loading-english-quick-guide)
 - [Configuration reference](#configuration-reference)
 - [Database schema](#database-schema)
@@ -65,7 +65,7 @@ BenchmarkOS ships as a batteries-included template for building finance copilots
 
 ## Current Data Coverage
 
-The database currently contains **390,016 total rows** of financial data across 475 S&P 500 companies:
+The database currently contains **390,966 total rows** of financial data across 475 S&P 500 companies:
 
 | Table | Rows | Description |
 |-------|------|-------------|
@@ -73,13 +73,40 @@ The database currently contains **390,016 total rows** of financial data across 
 | financial_facts | 33,684 | Raw SEC filing data (revenue, expenses, etc.) |
 | company_filings | 23,743 | SEC filing metadata (10-K, 10-Q forms) |
 | kpi_values | 9,980 | KPI backfill and override values |
-| audit_events | 2,065 | Data ingestion and processing logs |
-| ticker_aliases | 475 | Company ticker mappings |
+| audit_events | 3,015 | Data ingestion and processing logs |
+| ticker_aliases | 475 | Company ticker mappings (S&P 500) |
 | conversations | 132 | Chat history and user interactions |
 | market_quotes | 46 | Latest market prices and quotes |
 | scenario_results | 0 | Saved scenario analysis results |
 
-**Data spans multiple years** with comprehensive coverage for years 2019-2024, and includes over 16,000 financial fact records ingested from SEC EDGAR APIs with full audit trails and lineage tracking.
+### Data Characteristics
+
+- **Year Range:** 2019-2027 (9 years of coverage)
+- **Companies:** 475 unique S&P 500 tickers
+- **Data Sources:** SEC EDGAR (10-K, 10-Q filings), Yahoo Finance (market quotes)
+- **Update Frequency:** On-demand ingestion with smart gap detection
+- **Audit Trail:** Full lineage tracking for every data point
+- **Database Size:** ~150-200 MB (SQLite file)
+
+### Quick Start: First-Time Data Ingestion
+
+If you're setting up BenchmarkOS for the first time, start with a focused ingestion to get familiar with the process:
+
+```bash
+# Step 1: Activate your virtual environment
+.\.venv\Scripts\Activate.ps1  # Windows
+# source .venv/bin/activate    # macOS/Linux
+
+# Step 2: Run a quick 3-year ingestion (recommended for first-time users)
+python scripts/ingestion/fill_data_gaps.py --target-years "2022,2023,2024" --years-back 3 --batch-size 10
+
+# Expected: ~5-7 minutes, loads ~5,000-8,000 records for 475 companies
+```
+
+After this completes, you can:
+1. Start the chatbot: `python run_chatbot.py`
+2. Try queries like: "Show me Apple's metrics" or "Compare Microsoft and Google"
+3. Launch the web UI: `python serve_chatbot.py --port 8000`
 
 ## Core capabilities
 
@@ -298,21 +325,126 @@ Navigate to http://localhost:8000. The SPA exposes:
 
 The /chat response includes structured extras (highlights, trends, comparison_table, citations, exports, conclusion) so downstream integrations can reuse the analytics without re-parsing text.
 
-## Data ingestion playbooks
+## Data Ingestion Guide
 
-### On-demand
+BenchmarkOS provides multiple ingestion strategies to fit different use cases. This section explains how to populate your database with financial data.
 
-AnalyticsEngine.get_metrics calls ingest_live_tickers when it detects missing coverage. You can route this through tasks.TaskManager to queue and monitor ingestion jobs—see inline docstrings for patterns.
+### 🚀 Recommended: Smart Gap Filling Script
 
-### Batch scripts
+The `fill_data_gaps.py` script is the **easiest and most powerful** way to ingest data. It automatically:
+- Detects which companies are missing data for specified years
+- Fetches data from SEC EDGAR with intelligent rate limiting
+- Handles retries and failures gracefully
+- Provides real-time progress tracking
+- Generates comprehensive completion reports
+
+#### Basic Usage Examples
+
+```bash
+# 1. Quick Start: Get last 3 years of data (recommended for first-time users)
+python scripts/ingestion/fill_data_gaps.py --target-years "2022,2023,2024" --years-back 3 --batch-size 10
+# Time: ~5-7 minutes | Records: ~5,000-8,000 | Companies: 475
+
+# 2. Recent History: Last 5 years for analysis
+python scripts/ingestion/fill_data_gaps.py --target-years "2020,2021,2022,2023,2024" --years-back 5 --batch-size 10
+# Time: ~8-12 minutes | Records: ~12,000-15,000 | Companies: 475
+
+# 3. Full Historical Data: 20 years for long-term trends
+python scripts/ingestion/fill_data_gaps.py \
+  --target-years "2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025" \
+  --years-back 20 \
+  --batch-size 10
+# Time: ~25-35 minutes | Records: ~50,000-80,000 | Companies: 475
+
+# 4. Fill Specific Gap Years Only
+python scripts/ingestion/fill_data_gaps.py --target-years "2019,2020" --years-back 7 --batch-size 10
+# Time: ~3-5 minutes | Fills only missing 2019 and 2020 data
+```
+
+#### Command-Line Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--target-years` | "2019,2020,2025" | Comma-separated years to check and fill |
+| `--years-back` | 7 | How many years of data to fetch from SEC API |
+| `--batch-size` | 10 | Number of companies to process per batch |
+| `--max-tickers` | None | Limit ingestion to first N companies (for testing) |
+| `--dry-run` | False | Show what would be ingested without actually doing it |
+
+#### Windows PowerShell Shortcut
+
+```powershell
+# One-command 20-year ingestion
+.\run_data_ingestion.ps1
+
+# This runs the full historical ingestion automatically
+```
+
+#### Understanding the Output
+
+While running, you'll see:
+```
+================================================================================
+FILLING DATA GAPS - MAKING ALL YEARS SOLID
+================================================================================
+Target years: 2022, 2023, 2024
+Years to fetch from SEC: 3
+Batch size: 10
+Started at: 2025-10-23 15:30:00 UTC
+
+📊 Loading existing tickers from database...
+   Found 475 tickers in database
+🔍 Checking coverage for years: 2022, 2023, 2024...
+   156 companies missing data for these years
+🚀 Starting ingestion of 475 tickers...
+   This will take approximately 1.2 minutes
+
+[1/48 - 2.1%] Processing: AAPL, ABBV, ABNB, ABT, ACGL, ACN, ADBE, ADI, ADM, ADP
+   ✅ Loaded 335 records (Total: 335)
+[2/48 - 4.2%] Processing: ADSK, AEP, AES, AFL, AIG, AIZ, AJG, AKAM, ALB, ALGN
+   ✅ Loaded 318 records (Total: 653)
+...
+📊 Progress Report:
+   Batches processed: 10/48
+   Total records loaded: 3,249
+   Successes: 100
+   Failures: 0
+...
+🔄 Refreshing derived metrics...
+   ✅ Metrics refreshed
+📄 Summary saved to: fill_gaps_summary.json
+================================================================================
+INGESTION COMPLETE
+================================================================================
+✅ Successfully ingested: 475 companies
+📊 Total records loaded: 15,889
+🎉 All companies ingested successfully!
+```
+
+#### After Ingestion Completes
+
+Check your data:
+```bash
+# View row counts per table
+python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/benchmarkos_chatbot.sqlite3'); cursor = conn.cursor(); tables = ['financial_facts', 'company_filings', 'metric_snapshots', 'kpi_values']; [print(f'{t}: {cursor.execute(f\"SELECT COUNT(*) FROM {t}\").fetchone()[0]:,}') for t in tables]; conn.close()"
+
+# Check year coverage
+python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/benchmarkos_chatbot.sqlite3'); cursor = conn.cursor(); cursor.execute('SELECT MIN(fiscal_year), MAX(fiscal_year), COUNT(DISTINCT ticker) FROM financial_facts'); print('Years: %s-%s | Companies: %s' % cursor.fetchone()); conn.close()"
+```
+
+### Alternative: Legacy Batch Scripts
+
+These scripts are available for specific use cases but `fill_data_gaps.py` is generally easier:
 
 | Script | When to use it | Example |
 |--------|---------------|---------|
-| scripts/ingestion/ingest_universe.py | Refresh a watch list with resume support and polite rate limiting. | python scripts/ingestion/ingest_universe.py --universe sp500 --years 10 --chunk-size 25 --sleep 2 --resume |
-| scripts/ingestion/batch_ingest.py | Pull the built-in mega-cap list through ingest_live_tickers with retry/backoff. | python scripts/ingestion/batch_ingest.py |
-| scripts/ingestion/ingest_companyfacts.py | Mirror SEC companyfacts into Postgres (configure SEC_TICKERS and PG* env vars). | SEC_TICKERS=MSFT,AAPL PGHOST=localhost python scripts/ingestion/ingest_companyfacts.py |
-| scripts/ingestion/ingest_frames.py | Download SEC data frames for benchmarking in Postgres. | SEC_TICKERS=MSFT,AAPL python scripts/ingestion/ingest_frames.py |
-| scripts/ingestion/load_prices_stooq.py | Backfill prices from Stooq when Yahoo throttles. | SEC_TICKERS=MSFT,AAPL python scripts/ingestion/load_prices_stooq.py |
+| `scripts/ingestion/ingest_universe.py` | Refresh a watch list with resume support and polite rate limiting. | `python scripts/ingestion/ingest_universe.py --universe sp500 --years 10 --chunk-size 25 --sleep 2 --resume` |
+| `scripts/ingestion/batch_ingest.py` | Pull the built-in mega-cap list through ingest_live_tickers with retry/backoff. | `python scripts/ingestion/batch_ingest.py` |
+| `scripts/ingestion/load_prices_yfinance.py` | Refresh market quotes from Yahoo Finance. | `python scripts/ingestion/load_prices_yfinance.py` |
+
+### On-Demand Ingestion
+
+AnalyticsEngine.get_metrics calls ingest_live_tickers when it detects missing coverage. You can route this through tasks.TaskManager to queue and monitor ingestion jobs—see inline docstrings for patterns.
 
 All scripts honour the configuration from load_settings() and write audit events so the chatbot can justify sourcing decisions.
 
@@ -555,6 +687,7 @@ Project/
 ├── scripts/
 │   ├── generate_aliases.py
 │   ├── ingestion/
+│   │   ├── fill_data_gaps.py          # ⭐ Recommended: Smart gap-filling script
 │   │   ├── batch_ingest.py
 │   │   ├── ingest_companyfacts.py
 │   │   ├── ingest_companyfacts_batch.py
@@ -665,11 +798,108 @@ CI isn't configured by default, but pytest -ra (preconfigured in pyproject.toml)
 
 ## Troubleshooting
 
-- "OpenAI API key not found" – set OPENAI_API_KEY, store it via keyring, or create ~/.config/benchmarkos-chatbot/openai_api_key.
-- WinError 10048 when starting the server – another process is on the port. Run Get-NetTCPConnection -LocalPort 8000 and terminate it, or start with --port 8001.
-- Yahoo Finance 429 errors – lower YAHOO_QUOTE_BATCH_SIZE, add delays between runs, or temporarily use scripts/ingestion/load_prices_stooq.py.
-- PostgreSQL auth failures – confirm SSL/network settings, then double-check POSTGRES_* vars; the DSN is logged at debug level when DATABASE_TYPE=postgresql is active.
-- Pytest cannot locate modules – run from the repo root so the pythonpath = ["src", "."] entry in pyproject.toml kicks in.
+### General Issues
+
+- **"OpenAI API key not found"** – set OPENAI_API_KEY, store it via keyring, or create ~/.config/benchmarkos-chatbot/openai_api_key.
+- **WinError 10048 when starting the server** – another process is on the port. Run `Get-NetTCPConnection -LocalPort 8000` and terminate it, or start with `--port 8001`.
+- **PostgreSQL auth failures** – confirm SSL/network settings, then double-check POSTGRES_* vars; the DSN is logged at debug level when DATABASE_TYPE=postgresql is active.
+- **Pytest cannot locate modules** – run from the repo root so the pythonpath = ["src", "."] entry in pyproject.toml kicks in.
+
+### Data Ingestion Issues
+
+#### "No data showing up in chatbot after ingestion"
+**Cause:** Metrics need to be refreshed after data ingestion.
+**Solution:**
+```bash
+python -c "from benchmarkos_chatbot.config import load_settings; from benchmarkos_chatbot.analytics_engine import AnalyticsEngine; AnalyticsEngine(load_settings()).refresh_metrics(force=True)"
+```
+The `fill_data_gaps.py` script does this automatically, but manual ingestion scripts may not.
+
+#### "Yahoo Finance 429 errors during ingestion"
+**Cause:** Yahoo Finance rate limits (too many requests too quickly).
+**Solution:**
+- The script automatically retries with exponential backoff (1s → 2s → 4s → 8s)
+- These are warnings, not errors - the process continues
+- If persistent, lower `YAHOO_QUOTE_BATCH_SIZE` in your `.env` file:
+  ```bash
+  YAHOO_QUOTE_BATCH_SIZE=25  # Default is 50
+  ```
+- Alternative: Use `scripts/ingestion/load_prices_stooq.py` for market data
+
+#### "SEC API returns 403 Forbidden"
+**Cause:** Missing or invalid User-Agent header (SEC requires identification).
+**Solution:** Set a descriptive User-Agent in your `.env`:
+```bash
+SEC_API_USER_AGENT="YourCompany/1.0 (your.email@example.com)"
+```
+
+#### "Some companies show 'Failed to ingest' messages"
+**Cause:** Some tickers may not have SEC filings (delisted, private, or ticker changed).
+**Examples from logs:** ALP, BRV, CTL, FIN (these are known issues)
+**Solution:** This is expected behavior - the script handles failures gracefully and continues. Check the summary report in `fill_gaps_summary.json` for details.
+
+#### "Ingestion seems slow or stuck"
+**Cause:** SEC API rate limiting (10 requests/second limit enforced by script).
+**What's normal:**
+- 3-year ingestion: 5-7 minutes
+- 5-year ingestion: 8-12 minutes
+- 20-year ingestion: 25-35 minutes
+
+**Progress indicators to watch:**
+```
+[10/48 - 20.8%] Processing: CMCSA, CME, CMG, CMI, CMS, CNC, CNP, COF, COO, COP
+   ✅ Loaded 331 records (Total: 3,254)
+```
+If you see new batches completing, the script is working correctly.
+
+#### "Database file not found"
+**Cause:** Default database path may differ from your configuration.
+**Solution:** Check your `.env` file for `DATABASE_PATH`:
+```bash
+DATABASE_PATH=./data/sqlite/benchmarkos_chatbot.sqlite3
+```
+Or use the full path:
+```bash
+DATABASE_PATH=C:/Users/YOUR_USERNAME/Documents/GitHub/Project/benchmarkos_chatbot.sqlite3
+```
+
+#### "ModuleNotFoundError: benchmarkos_chatbot"
+**Cause:** Package not installed in editable mode.
+**Solution:**
+```bash
+pip install -e .
+# Or set PYTHONPATH manually:
+$env:PYTHONPATH = (Resolve-Path .\src).Path  # PowerShell
+export PYTHONPATH=./src  # Bash
+```
+
+### Verifying Ingestion Success
+
+After ingestion completes, verify your data:
+
+```bash
+# 1. Check total row counts
+python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/benchmarkos_chatbot.sqlite3'); cursor = conn.cursor(); print(f'financial_facts: {cursor.execute(\"SELECT COUNT(*) FROM financial_facts\").fetchone()[0]:,}'); print(f'metric_snapshots: {cursor.execute(\"SELECT COUNT(*) FROM metric_snapshots\").fetchone()[0]:,}'); conn.close()"
+
+# 2. Check year coverage
+python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/benchmarkos_chatbot.sqlite3'); cursor = conn.cursor(); cursor.execute('SELECT MIN(fiscal_year), MAX(fiscal_year), COUNT(DISTINCT ticker) FROM financial_facts'); print('Years: %s-%s | Companies: %s' % cursor.fetchone()); conn.close()"
+
+# 3. Test a specific company
+python run_chatbot.py
+# Then type: metrics AAPL
+```
+
+**Expected results after successful 3-year ingestion:**
+- financial_facts: ~30,000-35,000 rows
+- metric_snapshots: ~250,000-350,000 rows
+- Companies: 475 tickers
+- Years: 2022-2024
+
+**Expected results after successful 20-year ingestion:**
+- financial_facts: ~80,000-120,000 rows
+- metric_snapshots: ~500,000-700,000 rows
+- Companies: 475 tickers
+- Years: 2005-2025 (varies by company IPO date)
 
 ## Further reading
 
