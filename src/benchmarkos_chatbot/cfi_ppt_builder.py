@@ -115,95 +115,178 @@ def _create_plotly_layout(title: str = "", height: int = 500) -> dict:
 
 
 def _export_revenue_chart(payload: Dict[str, Any], output_path: str) -> bool:
-    """Generate and export revenue chart matching dashboard style."""
+    """Generate and export Revenue vs EV/Revenue dual-axis chart matching dashboard."""
     if not PLOTLY_AVAILABLE:
         return False
     
     try:
         series_map = payload.get("kpi_series", {})
         rev_series = None
-        for kpi_id, series in series_map.items():
-            if "revenue" in kpi_id.lower() and series.get("years") and series.get("values"):
-                rev_series = series
-                break
+        ev_rev_series = None
         
+        for kpi_id, series in series_map.items():
+            if "revenue" in kpi_id.lower() and "ev" not in kpi_id.lower():
+                if series.get("years") and series.get("values"):
+                    rev_series = series
+            elif "ev" in kpi_id.lower() and "revenue" in kpi_id.lower():
+                if series.get("years") and series.get("values"):
+                    ev_rev_series = series
+        
+        # Use fallback data if not available
+        current_year = datetime.now().year
         if not rev_series:
-            # Use fallback data
-            current_year = datetime.now().year
             rev_series = {
-                "years": [current_year - i for i in range(9, -1, -1)],
-                "values": [155.2, 168.4, 182.9, 198.5, 215.8, 234.2, 258.6, 287.4, 312.8, 338.5]
+                "years": [current_year - i for i in range(6, -1, -1)],
+                "values": [50, 60, 270, 360, 380, 370, 280]
+            }
+        if not ev_rev_series:
+            ev_rev_series = {
+                "years": [current_year - i for i in range(6, -1, -1)],
+                "values": [2.5, 2.8, 3.2, 3.5, 3.3, 3.1, 2.9]
             }
         
+        # Create figure with secondary y-axis
         fig = go.Figure()
+        
+        # Revenue bars (primary y-axis)
         fig.add_trace(go.Bar(
-            x=[str(year) for year in rev_series["years"][-10:]],
-            y=rev_series["values"][-10:],
-            name="Revenue",
-            marker=dict(color="#4682B4", line=dict(color="#2E5A7D", width=1))
+            x=[str(year) for year in rev_series["years"][-7:]],
+            y=rev_series["values"][-7:],
+            name="Revenue ($M)",
+            marker=dict(color="#4682B4", line=dict(color="#2E5A7D", width=1)),
+            yaxis="y"
         ))
         
-        fig.update_layout(**_create_plotly_layout("Revenue Growth", 500))
-        fig.update_layout(yaxis_title="Revenue ($B)")
+        # EV/Revenue line (secondary y-axis)
+        fig.add_trace(go.Scatter(
+            x=[str(year) for year in ev_rev_series["years"][-7:]],
+            y=ev_rev_series["values"][-7:],
+            name="EV/Revenue (x)",
+            mode="lines+markers",
+            line=dict(color="#1E88E5", width=3),
+            marker=dict(size=8, color="#1E88E5"),
+            yaxis="y2"
+        ))
+        
+        fig.update_layout(
+            title=dict(text="Revenue vs EV/Revenue", font=dict(size=16, color="#333")),
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            font=dict(family="Inter, sans-serif", size=12, color="#333"),
+            margin=dict(l=60, r=60, t=60, b=60),
+            height=500,
+            xaxis=dict(showgrid=True, gridcolor="#E5E7EB", gridwidth=1),
+            yaxis=dict(
+                title="Revenue ($M)",
+                showgrid=True,
+                gridcolor="#E5E7EB",
+                gridwidth=1,
+                side="left"
+            ),
+            yaxis2=dict(
+                title="EV/Revenue (x)",
+                overlaying="y",
+                side="right",
+                showgrid=False
+            ),
+            legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.8)"),
+            hovermode="x unified"
+        )
         
         fig.write_image(output_path, width=1200, height=500, scale=2)
         return True
     except Exception as e:
         print(f"Error exporting revenue chart: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
 def _export_valuation_chart(payload: Dict[str, Any], output_path: str) -> bool:
-    """Generate and export valuation multiples chart matching dashboard style."""
+    """Generate and export EBITDA vs EV/EBITDA dual-axis chart matching dashboard."""
     if not PLOTLY_AVAILABLE:
         return False
     
     try:
         series_map = payload.get("kpi_series", {})
+        ebitda_series = None
         ev_ebitda_series = None
         
         for kpi_id, series in series_map.items():
-            if "ev" in kpi_id.lower() and "ebitda" in kpi_id.lower():
+            if "ebitda" in kpi_id.lower() and "ev" not in kpi_id.lower():
+                if series.get("years") and series.get("values"):
+                    ebitda_series = series
+            elif "ev" in kpi_id.lower() and "ebitda" in kpi_id.lower():
                 if series.get("years") and series.get("values"):
                     ev_ebitda_series = series
-                    break
         
+        # Use fallback data if not available
+        current_year = datetime.now().year
+        if not ebitda_series:
+            ebitda_series = {
+                "years": [current_year - i for i in range(6, -1, -1)],
+                "values": [65, 75, 78, 110, 120, 115, 90]
+            }
         if not ev_ebitda_series:
-            current_year = datetime.now().year
             ev_ebitda_series = {
-                "years": [current_year - i for i in range(7, -1, -1)],
-                "values": [28.5, 30.2, 32.1, 35.8, 33.4, 31.7, 32.2, 32.5]
+                "years": [current_year - i for i in range(6, -1, -1)],
+                "values": [28.5, 30.2, 32.1, 35.8, 33.4, 31.7, 29.5]
             }
         
+        # Create figure with secondary y-axis
         fig = go.Figure()
         
-        # EV/EBITDA line
+        # EBITDA bars (primary y-axis)
+        fig.add_trace(go.Bar(
+            x=[str(year) for year in ebitda_series["years"][-7:]],
+            y=ebitda_series["values"][-7:],
+            name="EBITDA ($M)",
+            marker=dict(color="#4682B4", line=dict(color="#2E5A7D", width=1)),
+            yaxis="y"
+        ))
+        
+        # EV/EBITDA line (secondary y-axis)
         fig.add_trace(go.Scatter(
-            x=[str(year) for year in ev_ebitda_series["years"][-8:]],
-            y=ev_ebitda_series["values"][-8:],
-            name="EV/EBITDA",
+            x=[str(year) for year in ev_ebitda_series["years"][-7:]],
+            y=ev_ebitda_series["values"][-7:],
+            name="EV/EBITDA (x)",
             mode="lines+markers",
-            line=dict(color="#4682B4", width=3),
-            marker=dict(size=8, color="#4682B4")
+            line=dict(color="#1E88E5", width=3),
+            marker=dict(size=8, color="#1E88E5"),
+            yaxis="y2"
         ))
         
-        # Average line
-        avg_val = sum(ev_ebitda_series["values"][-8:]) / len(ev_ebitda_series["values"][-8:])
-        fig.add_trace(go.Scatter(
-            x=[str(year) for year in ev_ebitda_series["years"][-8:]],
-            y=[avg_val] * len(ev_ebitda_series["years"][-8:]),
-            name="Average",
-            mode="lines",
-            line=dict(color="#999", width=2, dash="dash")
-        ))
-        
-        fig.update_layout(**_create_plotly_layout("Valuation Multiples", 500))
-        fig.update_layout(yaxis_title="EV/EBITDA Multiple")
+        fig.update_layout(
+            title=dict(text="EBITDA vs EV/EBITDA", font=dict(size=16, color="#333")),
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            font=dict(family="Inter, sans-serif", size=12, color="#333"),
+            margin=dict(l=60, r=60, t=60, b=60),
+            height=500,
+            xaxis=dict(showgrid=True, gridcolor="#E5E7EB", gridwidth=1),
+            yaxis=dict(
+                title="EBITDA ($M)",
+                showgrid=True,
+                gridcolor="#E5E7EB",
+                gridwidth=1,
+                side="left"
+            ),
+            yaxis2=dict(
+                title="EV/EBITDA (x)",
+                overlaying="y",
+                side="right",
+                showgrid=False
+            ),
+            legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.8)"),
+            hovermode="x unified"
+        )
         
         fig.write_image(output_path, width=1200, height=500, scale=2)
         return True
     except Exception as e:
         print(f"Error exporting valuation chart: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
