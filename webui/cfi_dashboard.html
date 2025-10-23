@@ -6,11 +6,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="cfi_dashboard.css"/>
+  <link rel="stylesheet" href="cfi_dashboard.css?v=20241024b"/>
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 </head>
 <body>
   <div id="cfi-root" class="cfi-grid">
+    <!-- Improvement #9: Dashboard Navigation Toolbar -->
+    <div class="dashboard-toolbar">
+      <div class="toolbar-left">
+        <select id="dashboard-switcher" class="dashboard-switcher" aria-label="Switch dashboard view">
+          <option value="cfi-classic">Single Company View</option>
+          <option value="cfi-compare">Multi-Company Compare</option>
+          <option value="cfi-dense">Compact View</option>
+        </select>
+        <!-- Improvement #2: Search/Filter -->
+        <div class="search-container">
+          <input type="search" id="dashboard-search" class="dashboard-search" placeholder="Search metrics..." aria-label="Search metrics">
+          <span class="search-icon">🔍</span>
+        </div>
+      </div>
+      <div class="toolbar-right">
+        <!-- Improvement #1: Real-time indicators -->
+        <div class="data-freshness" id="data-freshness">
+          <span class="freshness-dot fresh"></span>
+          <span class="freshness-text">Updated just now</span>
+        </div>
+        <button type="button" class="toolbar-button" id="refresh-dashboard" aria-label="Refresh data" title="Refresh data (R)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+        </button>
+        <button type="button" class="toolbar-button" id="show-shortcuts" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
     <div class="cfi-panel cfi-header" data-area="header">
       <div class="header-top">
         <div class="brand-stack">
@@ -90,9 +125,25 @@
       <div class="cfi-strip">Key Financials</div>
       <div id="cfi-keyfin" class="cfi-body tight"></div>
     </div>
+    <!-- Improvement #8: Grouped KPI Scorecard -->
     <div class="cfi-panel" data-area="kpi">
-      <div class="cfi-strip">KPI Scorecard</div>
-      <div id="cfi-kpi" class="cfi-body tight"></div>
+      <div class="cfi-strip">
+        KPI Scorecard
+        <button class="strip-action" id="toggle-all-kpis" title="Expand/Collapse All">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+      </div>
+      <div id="cfi-kpi" class="cfi-body tight">
+        <!-- Improvement #4: Loading state -->
+        <div class="skeleton-kpi-grid">
+          <div class="skeleton-kpi-item"></div>
+          <div class="skeleton-kpi-item"></div>
+          <div class="skeleton-kpi-item"></div>
+          <div class="skeleton-kpi-item"></div>
+        </div>
+      </div>
     </div>
     <div class="cfi-panel" data-area="pricechart">
       <div class="cfi-strip">Share Price — Historical &amp; Forecast</div>
@@ -153,7 +204,96 @@
     </div>
   </div>
 
-  <script src="cfi_dashboard.js"></script>
+  <!-- Improvement #10: Export Preview Modal -->
+  <div id="export-preview-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="export-modal-title">Export Preview</h3>
+        <button class="modal-close" aria-label="Close" onclick="document.getElementById('export-preview-modal').style.display='none'">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="export-preview-content" id="export-preview-content">
+          <div class="preview-info">
+            <div class="preview-item">
+              <span class="preview-label">Format:</span>
+              <span id="preview-format">PDF</span>
+            </div>
+            <div class="preview-item">
+              <span class="preview-label">Company:</span>
+              <span id="preview-company">-</span>
+            </div>
+            <div class="preview-item">
+              <span class="preview-label">Estimated Size:</span>
+              <span id="preview-size">~2.5 MB</span>
+            </div>
+            <div class="preview-item">
+              <span class="preview-label">Includes:</span>
+              <ul id="preview-includes">
+                <li>Executive summary</li>
+                <li>Financial metrics</li>
+                <li>Charts and visualizations</li>
+                <li>Data sources</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-button secondary" onclick="document.getElementById('export-preview-modal').style.display='none'">Cancel</button>
+        <button class="modal-button primary" id="confirm-export-btn">Download</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Improvement #7: Error/Retry UI Template -->
+  <template id="error-template">
+    <div class="error-state">
+      <div class="error-icon">⚠️</div>
+      <h4 class="error-title">Unable to Load Data</h4>
+      <p class="error-message"></p>
+      <button class="retry-button">Retry</button>
+    </div>
+  </template>
+
+  <!-- Keyboard Shortcuts Help -->
+  <div id="keyboard-shortcuts-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog shortcuts-dialog">
+      <div class="modal-header">
+        <h3>⌨️ Keyboard Shortcuts</h3>
+        <button class="modal-close" aria-label="Close" onclick="document.getElementById('keyboard-shortcuts-modal').style.display='none'">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="shortcuts-grid">
+          <div class="shortcut-item">
+            <kbd>/</kbd>
+            <span>Focus search</span>
+          </div>
+          <div class="shortcut-item">
+            <kbd>R</kbd>
+            <span>Refresh data</span>
+          </div>
+          <div class="shortcut-item">
+            <kbd>E</kbd>
+            <span>Export dashboard</span>
+          </div>
+          <div class="shortcut-item">
+            <kbd>Esc</kbd>
+            <span>Close modal</span>
+          </div>
+          <div class="shortcut-item">
+            <kbd>1-6</kbd>
+            <span>Toggle KPI categories</span>
+          </div>
+          <div class="shortcut-item">
+            <kbd>?</kbd>
+            <span>Show this help</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="cfi_dashboard.js?v=20241024b"></script>
   <script>
     (function demo(){
       if (!window.CFI) return;

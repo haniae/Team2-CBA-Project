@@ -101,6 +101,7 @@ DERIVED_METRICS = {
     "profit_margin",
     "net_margin",
     "operating_margin",
+    "gross_margin",
     "return_on_assets",
     "roa",
     "return_on_equity",
@@ -108,6 +109,10 @@ DERIVED_METRICS = {
     "return_on_invested_capital",
     "roic",
     "debt_to_equity",
+    "current_ratio",
+    "quick_ratio",
+    "interest_coverage",
+    "asset_turnover",
     "free_cash_flow_margin",
     "cash_conversion",
     "working_capital",
@@ -115,6 +120,7 @@ DERIVED_METRICS = {
     "ebitda_margin",
     "free_cash_flow",
     "adjusted_ebitda_margin",
+    "ps_ratio",
 }
 
 AGGREGATE_METRICS = {
@@ -160,8 +166,14 @@ METRIC_DEFINITIONS: List[MetricDefinition] = [
     MetricDefinition("return_on_invested_capital", "Return on invested capital"),
     MetricDefinition("free_cash_flow_margin", "Free cash flow margin"),
     MetricDefinition("cash_conversion", "Cash conversion"),
+    MetricDefinition("current_ratio", "Current ratio"),
+    MetricDefinition("quick_ratio", "Quick ratio"),
     MetricDefinition("debt_to_equity", "Debt to equity"),
+    MetricDefinition("interest_coverage", "Interest coverage"),
+    MetricDefinition("asset_turnover", "Asset turnover"),
+    MetricDefinition("gross_margin", "Gross margin"),
     MetricDefinition("pe_ratio", "P/E ratio"),
+    MetricDefinition("ps_ratio", "P/S ratio"),
     MetricDefinition("ev_ebitda", "EV/EBITDA"),
     MetricDefinition("pb_ratio", "P/B ratio"),
     MetricDefinition("peg_ratio", "PEG ratio"),
@@ -199,6 +211,7 @@ PERCENTAGE_METRICS = {
     "profit_margin",
     "operating_margin",
     "net_margin",
+    "gross_margin",
     "return_on_assets",
     "return_on_equity",
     "return_on_invested_capital",
@@ -211,7 +224,12 @@ PERCENTAGE_METRICS = {
 
 MULTIPLE_METRICS = {
     "debt_to_equity",
+    "current_ratio",
+    "quick_ratio",
+    "interest_coverage",
+    "asset_turnover",
     "pe_ratio",
+    "ps_ratio",
     "ev_ebitda",
     "pb_ratio",
     "peg_ratio",
@@ -1315,6 +1333,29 @@ def _compute_derived_metrics(
     derived["ebitda_margin"] = _safe_div(ebitda, revenue)
     if adjusted_ebitda is not None:
         derived["adjusted_ebitda_margin"] = _safe_div(adjusted_ebitda, revenue)
+    
+    # Liquidity ratios
+    derived["current_ratio"] = _safe_div(current_assets, current_liabilities)
+    
+    # Quick ratio = (Current Assets - Inventory) / Current Liabilities
+    # Using cash + current_assets as a proxy if we don't have inventory separately
+    quick_assets = current_assets  # Simplified - could be improved with inventory data
+    derived["quick_ratio"] = _safe_div(quick_assets, current_liabilities)
+    
+    # Profitability
+    gross_profit = _first_non_none(value_map, "gross_profit")
+    derived["gross_margin"] = _safe_div(gross_profit, revenue)
+    
+    # Interest coverage = EBIT / Interest Expense
+    interest_expense = _first_non_none(value_map, "interest_expense")
+    derived["interest_coverage"] = _safe_div(ebit, interest_expense)
+    
+    # Asset turnover = Revenue / Total Assets
+    derived["asset_turnover"] = _safe_div(revenue, total_assets)
+    
+    # P/S ratio
+    market_cap = _first_non_none(value_map, "market_cap")
+    derived["ps_ratio"] = _safe_div(market_cap, revenue)
 
     invested_capital = None
     if total_assets is not None:

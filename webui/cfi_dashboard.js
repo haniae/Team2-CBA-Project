@@ -21,21 +21,62 @@
 
   const COLORS = {
     navy: "#0B2E59",
+    navyDark: "#082249",
     accent: "#1C7ED6",
+    accentLight: "#4DABF7",
+    accentDark: "#1864AB",
     orange: "#FF7F0E",
-    slate: "#5B6B82"
+    orangeLight: "#FFA94D",
+    green: "#10B981",
+    greenLight: "#51CF66",
+    red: "#EF4444",
+    slate: "#5B6B82",
+    slateLight: "#8C9BB0"
   };
   const BASE_LAYOUT = {
-    paper_bgcolor: "#ffffff",
+    paper_bgcolor: "rgba(250, 252, 254, 0.5)",
     plot_bgcolor: "#ffffff",
-    font: { family: "Inter, Open Sans, Roboto", color: COLORS.navy, size: 12 },
-    xaxis: { gridcolor: "#E1E8F5", zeroline: false, tickfont: { size: 11 } },
-    yaxis: { gridcolor: "#E1E8F5", zeroline: false, tickfont: { size: 11 } },
-    legend: { orientation: "h", y: 1.12, x: 1.0, xanchor: "right", font: { size: 10 } },
-    margin: { l: 40, r: 32, t: 26, b: 34 },
-    hoverlabel: { bgcolor: "#fff", bordercolor: "#d5def0", font: { family: "Inter, Open Sans, Roboto", size: 11 } }
+    font: { family: "Inter, Open Sans, Roboto", color: COLORS.navy, size: 12, weight: 500 },
+    xaxis: { 
+      gridcolor: "rgba(220, 228, 244, 0.4)", 
+      zeroline: false, 
+      tickfont: { size: 11 },
+      showline: true,
+      linecolor: "rgba(220, 228, 244, 0.6)",
+      linewidth: 1
+    },
+    yaxis: { 
+      gridcolor: "rgba(220, 228, 244, 0.4)", 
+      zeroline: false, 
+      tickfont: { size: 11 },
+      showline: true,
+      linecolor: "rgba(220, 228, 244, 0.6)",
+      linewidth: 1
+    },
+    legend: { 
+      orientation: "h", 
+      y: 1.14, 
+      x: 1.0, 
+      xanchor: "right", 
+      font: { size: 10 },
+      bgcolor: "rgba(255, 255, 255, 0.9)",
+      bordercolor: "rgba(220, 228, 244, 0.5)",
+      borderwidth: 1
+    },
+    margin: { l: 48, r: 36, t: 32, b: 40 },
+    hoverlabel: { 
+      bgcolor: "#ffffff", 
+      bordercolor: COLORS.accentLight, 
+      font: { family: "Inter, Open Sans, Roboto", size: 11 },
+      align: "left"
+    },
+    hovermode: "x unified"
   };
-  const CONFIG = { displayModeBar: false, responsive: true };
+  const CONFIG = { 
+    displayModeBar: false, 
+    responsive: true,
+    doubleClick: false
+  };
 
   const isNumber = (value) => value !== null && value !== undefined && Number.isFinite(Number(value));
 
@@ -848,14 +889,25 @@
       node.textContent = "No revenue data.";
       return;
     }
+    
+    // Create gradient colors for bars
+    const barColors = data.Revenue.map((_, idx) => {
+      const ratio = idx / (data.Revenue.length - 1);
+      return `rgba(11, 46, 89, ${0.7 + ratio * 0.3})`;
+    });
+    
     const traces = [
       {
         type: "bar",
         x: data.Year,
         y: data.Revenue,
         name: "Revenue ($M)",
-        marker: { color: COLORS.navy, line: { color: "#052142", width: 1 } },
-        hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>"
+        marker: { 
+          color: barColors,
+          line: { color: COLORS.navyDark, width: 1.5 },
+          pattern: { shape: "" }
+        },
+        hovertemplate: "<b>FY %{x}</b><br>Revenue: $%{y:,.0f}M<extra></extra>"
       }
     ];
     const multiples = data.EV_Rev || data["EV/Revenue"];
@@ -867,17 +919,28 @@
         y: multiples,
         name: "EV/Revenue (×)",
         yaxis: "y2",
-        line: { color: COLORS.accent, width: 2 },
-        marker: { size: 5, color: COLORS.accent },
-        hovertemplate: "FY %{x}: %{y:.2f}×<extra></extra>"
+        line: { color: COLORS.accent, width: 3, shape: "spline" },
+        marker: { 
+          size: 8, 
+          color: COLORS.accentLight,
+          line: { color: COLORS.accent, width: 2 }
+        },
+        hovertemplate: "<b>FY %{x}</b><br>EV/Revenue: %{y:.2f}×<extra></extra>"
       });
     }
     const layout = {
       ...BASE_LAYOUT,
-      title: { text: "Revenue vs EV/Revenue", x: 0.01, y: 0.99, font: { size: 14 } },
       yaxis: { ...BASE_LAYOUT.yaxis, title: "Revenue ($M)", tickprefix: "$", separatethousands: true },
-      yaxis2: { title: "EV/Revenue (×)", overlaying: "y", side: "right", showgrid: false, ticksuffix: "×" },
-      bargap: 0.3
+      yaxis2: { 
+        title: "EV/Revenue (×)", 
+        overlaying: "y", 
+        side: "right", 
+        showgrid: false, 
+        ticksuffix: "×",
+        linecolor: "rgba(220, 228, 244, 0.6)"
+      },
+      bargap: 0.25,
+      bargroupgap: 0.1
     };
     Plotly.newPlot(node, traces, layout, CONFIG);
   }
@@ -889,14 +952,24 @@
       node.textContent = "No EBITDA data.";
       return;
     }
+    
+    // Create gradient colors for bars (green tones)
+    const barColors = data.EBITDA.map((_, idx) => {
+      const ratio = idx / (data.EBITDA.length - 1);
+      return `rgba(16, 185, 129, ${0.6 + ratio * 0.4})`;
+    });
+    
     const traces = [
       {
         type: "bar",
         x: data.Year,
         y: data.EBITDA,
         name: "EBITDA ($M)",
-        marker: { color: COLORS.navy, line: { color: "#052142", width: 1 } },
-        hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>"
+        marker: { 
+          color: barColors,
+          line: { color: COLORS.green, width: 1.5 }
+        },
+        hovertemplate: "<b>FY %{x}</b><br>EBITDA: $%{y:,.0f}M<extra></extra>"
       }
     ];
     const multiples = data.EV_EBITDA || data["EV/EBITDA"];
@@ -908,17 +981,28 @@
         y: multiples,
         name: "EV/EBITDA (×)",
         yaxis: "y2",
-        line: { color: COLORS.accent, width: 2 },
-        marker: { size: 5, color: COLORS.accent },
-        hovertemplate: "FY %{x}: %{y:.2f}×<extra></extra>"
+        line: { color: COLORS.orange, width: 3, shape: "spline" },
+        marker: { 
+          size: 8, 
+          color: COLORS.orangeLight,
+          line: { color: COLORS.orange, width: 2 }
+        },
+        hovertemplate: "<b>FY %{x}</b><br>EV/EBITDA: %{y:.2f}×<extra></extra>"
       });
     }
     const layout = {
       ...BASE_LAYOUT,
-      title: { text: "EBITDA vs EV/EBITDA", x: 0.01, y: 0.99, font: { size: 14 } },
       yaxis: { ...BASE_LAYOUT.yaxis, title: "EBITDA ($M)", tickprefix: "$", separatethousands: true },
-      yaxis2: { title: "EV/EBITDA (×)", overlaying: "y", side: "right", showgrid: false, ticksuffix: "×" },
-      bargap: 0.3
+      yaxis2: { 
+        title: "EV/EBITDA (×)", 
+        overlaying: "y", 
+        side: "right", 
+        showgrid: false, 
+        ticksuffix: "×",
+        linecolor: "rgba(220, 228, 244, 0.6)"
+      },
+      bargap: 0.25,
+      bargroupgap: 0.1
     };
     Plotly.newPlot(node, traces, layout, CONFIG);
   }
@@ -931,11 +1015,13 @@
       return;
     }
     const traces = [];
-    [
-      ["Bull", COLORS.navy, "solid"],
-      ["Base", COLORS.accent, "dash"],
-      ["Bear", COLORS.slate, "dot"]
-    ].forEach(([key, color, dash]) => {
+    const scenarios = [
+      ["Bull", COLORS.green, "solid", "rgba(16, 185, 129, 0.15)"],
+      ["Base", COLORS.accent, "solid", "rgba(28, 126, 214, 0.15)"],
+      ["Bear", COLORS.red, "solid", "rgba(239, 68, 68, 0.15)"]
+    ];
+    
+    scenarios.forEach(([key, color, dash, fillColor]) => {
       if (Array.isArray(data[key])) {
         traces.push({
           type: "scatter",
@@ -943,19 +1029,32 @@
           x: data.Year,
           y: data[key],
           name: key,
-          line: { color, dash, width: 2.4 },
-          hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>"
+          line: { color, dash, width: 3, shape: "spline", smoothing: 0.8 },
+          fill: 'tonexty',
+          fillcolor: fillColor,
+          hovertemplate: "<b>%{fullData.name} Case</b><br>FY %{x}: $%{y:,.0f}<extra></extra>"
         });
       }
     });
+    
     if (!traces.length) {
       node.textContent = "No forecast data.";
       return;
     }
+    
+    // Remove fill from first trace
+    if (traces.length > 0) traces[0].fill = 'none';
+    
     const layout = {
       ...BASE_LAYOUT,
-      title: { text: "Share Price — Historical & Forecast", x: 0.01, y: 0.99, font: { size: 14 } },
-      yaxis: { ...BASE_LAYOUT.yaxis, title: "Share Price ($)", tickprefix: "$", separatethousands: true }
+      yaxis: { 
+        ...BASE_LAYOUT.yaxis, 
+        title: "Share Price ($)", 
+        tickprefix: "$", 
+        separatethousands: true,
+        rangemode: "tozero"
+      },
+      showlegend: true
     };
     Plotly.newPlot(node, traces, layout, CONFIG);
   }
@@ -967,22 +1066,44 @@
       node.textContent = "No valuation data.";
       return;
     }
+    
+    // Create color scheme for different valuation methods
+    const colorMap = {
+      "DCF": COLORS.accent,
+      "Comps": COLORS.green,
+      "52-Week": COLORS.orange,
+      "Bull": COLORS.greenLight,
+      "Bear": COLORS.red
+    };
+    
+    const barColors = data.Case.map(caseName => {
+      for (const [key, color] of Object.entries(colorMap)) {
+        if (caseName.includes(key)) return color;
+      }
+      return COLORS.navy;
+    });
+    
     const traces = [
       {
         type: "bar",
         x: data.Case,
         y: data.Value,
-        name: "Value",
-        marker: { color: COLORS.navy, line: { color: "#052142", width: 1 } },
+        name: "Valuation",
+        marker: { 
+          color: barColors,
+          line: { color: COLORS.navyDark, width: 1.5 },
+          opacity: 0.85
+        },
         text: data.Value.map((v) => formatMoney(v)),
         textposition: "outside",
+        textfont: { size: 11, weight: 600 },
         cliponaxis: false,
-        hovertemplate: "%{x}: %{y:$,.0f}<extra></extra>"
+        hovertemplate: "<b>%{x}</b><br>Value: $%{y:,.0f}<extra></extra>"
       }
     ];
     const { current, average } = meta || {};
     const referenceLines = [
-      ["Current", current, COLORS.slate, "dot"],
+      ["Current Price", current, COLORS.slate, "dot"],
       ["Average", average, COLORS.orange, "dash"]
     ].filter(([, value]) => isNumber(value));
     referenceLines.forEach(([label, value, color, dash]) => {
@@ -992,16 +1113,25 @@
         x: data.Case,
         y: data.Case.map(() => value),
         name: label,
-        line: { color, dash, width: 2 },
-        hovertemplate: `${label}: ${formatMoney(value)}<extra></extra>`
+        line: { color, dash, width: 2.5 },
+        hovertemplate: `<b>${label}</b><br>${formatMoney(value)}<extra></extra>`
       });
     });
     const layout = {
       ...BASE_LAYOUT,
-      title: { text: "Valuation Summary — Equity Value per Share ($)", x: 0.01, y: 0.99, font: { size: 14 } },
-      margin: { l: 40, r: 24, t: 24, b: 40 },
-      yaxis: { ...BASE_LAYOUT.yaxis, title: "$/Share", tickprefix: "$", separatethousands: true },
-      bargap: 0.32
+      margin: { l: 52, r: 32, t: 32, b: 80 },
+      yaxis: { 
+        ...BASE_LAYOUT.yaxis, 
+        title: "$/Share", 
+        tickprefix: "$", 
+        separatethousands: true 
+      },
+      xaxis: {
+        ...BASE_LAYOUT.xaxis,
+        tickangle: -35
+      },
+      bargap: 0.28,
+      showlegend: true
     };
     Plotly.newPlot(node, traces, layout, CONFIG);
   }
@@ -1055,6 +1185,358 @@
     }
   }
 
+  // ============================================================
+  // DASHBOARD ENHANCEMENTS - JavaScript Functionality
+  // ============================================================
+  
+  // KPI Categories for grouping (Improvement #8)
+  const KPI_CATEGORIES = {
+    growth: {
+      title: "Growth & Performance",
+      icon: "📈",
+      metrics: ["revenue_cagr", "revenue_cagr_3y", "eps_cagr", "eps_cagr_3y", "ebitda_growth"]
+    },
+    profitability: {
+      title: "Profitability Margins",
+      icon: "💰",
+      metrics: ["ebitda_margin", "adjusted_ebitda_margin", "gross_margin", "operating_margin", "net_margin", "profit_margin", "free_cash_flow_margin"]
+    },
+    liquidity: {
+      title: "Liquidity & Solvency",
+      icon: "🏦",
+      metrics: ["current_ratio", "quick_ratio", "debt_to_equity", "interest_coverage", "cash_conversion"]
+    },
+    efficiency: {
+      title: "Returns & Efficiency",
+      icon: "🎯",
+      metrics: ["return_on_assets", "return_on_equity", "return_on_invested_capital", "asset_turnover"]
+    },
+    valuation: {
+      title: "Valuation Multiples",
+      icon: "💎",
+      metrics: ["pe_ratio", "ps_ratio", "ev_ebitda", "pb_ratio", "peg_ratio"]
+    },
+    shareholder: {
+      title: "Shareholder Returns",
+      icon: "💸",
+      metrics: ["tsr", "dividend_yield", "share_buyback_intensity"]
+    }
+  };
+
+  // Improvement #8: Enhanced KPI rendering with categories
+  function renderKpiSummaryGrouped(containerId, items) {
+    const container = scopedQuery(containerId);
+    if (!container) return;
+    
+    // Clear skeleton
+    container.innerHTML = "";
+    
+    if (!Array.isArray(items) || items.length === 0) {
+      container.innerHTML = '<p class="cfi-kpi-empty">No KPIs available</p>';
+      return;
+    }
+    
+    console.log("📊 Rendering KPIs:", items.length, "items");
+    
+    // Group KPIs by category
+    const grouped = {};
+    const uncategorized = [];
+    
+    items.forEach(item => {
+      // Extract metric ID - try multiple field names
+      let metricId = item.id || item.metric || item.name || "";
+      
+      // If still no ID, try to derive from label
+      if (!metricId && item.label) {
+        metricId = item.label.toLowerCase()
+          .replace(/ cagr/g, "_cagr")
+          .replace(/ /g, "_")
+          .replace(/[()]/g, "");
+      }
+      
+      // Add ID back to item for later use
+      if (!item.id && !item.metric) {
+        item.id = metricId;
+      }
+      
+      let found = false;
+      
+      for (const [catKey, catDef] of Object.entries(KPI_CATEGORIES)) {
+        if (catDef.metrics.includes(metricId)) {
+          if (!grouped[catKey]) grouped[catKey] = [];
+          grouped[catKey].push(item);
+          found = true;
+          break;
+        }
+      }
+      
+      if (!found) {
+        uncategorized.push(item);
+      }
+    });
+    
+    console.log("📂 Grouped:", Object.keys(grouped).length, "categories, Uncategorized:", uncategorized.length);
+    
+    // Render each category
+    Object.entries(grouped).forEach(([catKey, catItems]) => {
+      const catDef = KPI_CATEGORIES[catKey];
+      const catDiv = document.createElement("div");
+      catDiv.className = "kpi-category";
+      catDiv.dataset.category = catKey;
+      
+      const header = document.createElement("div");
+      header.className = "kpi-category-header";
+      header.innerHTML = `
+        <div class="kpi-category-title">
+          <span class="kpi-category-icon">${catDef.icon}</span>
+          <span>${catDef.title}</span>
+          <span style="color: var(--muted); font-size: 11px; font-weight: 500;">(${catItems.length})</span>
+        </div>
+        <div class="kpi-category-toggle">▼</div>
+      `;
+      
+      header.addEventListener("click", () => {
+        catDiv.classList.toggle("collapsed");
+      });
+      
+      const content = document.createElement("div");
+      content.className = "kpi-category-content";
+      
+      catItems.forEach(item => {
+        const kpiEl = createKpiItem(item);
+        content.appendChild(kpiEl);
+      });
+      
+      catDiv.appendChild(header);
+      catDiv.appendChild(content);
+      container.appendChild(catDiv);
+    });
+    
+    // ALWAYS show uncategorized section - it will contain all metrics if categorization fails
+    if (uncategorized.length > 0 || Object.keys(grouped).length === 0) {
+      console.log("📊 Uncategorized metrics:", uncategorized.length);
+      uncategorized.forEach(item => {
+        console.log("  -", item.label || item.id, "ID:", item.id || item.metric);
+      });
+      
+      const catDiv = document.createElement("div");
+      catDiv.className = "kpi-category";
+      catDiv.innerHTML = `
+        <div class="kpi-category-header">
+          <div class="kpi-category-title">
+            <span class="kpi-category-icon">📊</span>
+            <span>Other Metrics</span>
+            <span style="color: var(--muted); font-size: 11px; font-weight: 500;">(${uncategorized.length})</span>
+          </div>
+          <div class="kpi-category-toggle">▼</div>
+        </div>
+        <div class="kpi-category-content"></div>
+      `;
+      
+      const content = catDiv.querySelector(".kpi-category-content");
+      uncategorized.forEach(item => {
+        const kpiEl = createKpiItem(item);
+        content.appendChild(kpiEl);
+      });
+      
+      container.appendChild(catDiv);
+    }
+    
+    // If no data at all, show empty state
+    if (Object.keys(grouped).length === 0 && uncategorized.length === 0) {
+      container.innerHTML = '<p class="cfi-kpi-empty">No KPIs available. Data may still be loading.</p>';
+    }
+  }
+  
+  function createKpiItem(item) {
+    const div = document.createElement("div");
+    div.className = "cfi-kpi-item";
+    div.dataset.kpiId = item.id || item.metric || "";
+    div.dataset.kpiLabel = (item.label || "").toLowerCase();
+    
+    const label = document.createElement("div");
+    label.className = "cfi-kpi-label";
+    label.textContent = item.label || "";
+    
+    const value = document.createElement("div");
+    value.className = "cfi-kpi-value";
+    const formatted = formatKpiValue(item.value, item.type);
+    value.textContent = formatted;
+    
+    // Add positive/negative class
+    if (isNumber(item.value)) {
+      const numVal = Number(item.value);
+      if (numVal > 0 && (item.type === "percent" || item.label.toLowerCase().includes("growth"))) {
+        value.classList.add("positive");
+      } else if (numVal < 0) {
+        value.classList.add("negative");
+      }
+    }
+    
+    // Add metadata with trend
+    const meta = document.createElement("div");
+    meta.className = "cfi-kpi-meta";
+    if (item.period) {
+      meta.textContent = item.period;
+    }
+    
+    div.appendChild(label);
+    div.appendChild(value);
+    div.appendChild(meta);
+    
+    return div;
+  }
+  
+  // Improvement #2: Search functionality
+  function setupSearch() {
+    const searchInput = scopedQuery("dashboard-search");
+    if (!searchInput) return;
+    
+    searchInput.addEventListener("input", (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      const kpiItems = scopedSelectAll(".cfi-kpi-item");
+      const categories = scopedSelectAll(".kpi-category");
+      
+      kpiItems.forEach(item => {
+        const label = item.dataset.kpiLabel || "";
+        const matches = !query || label.includes(query);
+        item.style.display = matches ? "" : "none";
+      });
+      
+      // Show/hide categories based on visible items
+      categories.forEach(cat => {
+        const visibleItems = cat.querySelectorAll(".cfi-kpi-item:not([style*='display: none'])");
+        cat.style.display = visibleItems.length > 0 ? "" : "none";
+      });
+    });
+  }
+  
+  // Improvement #1: Data freshness tracking
+  function updateDataFreshness(timestamp) {
+    const freshnessEl = scopedQuery("data-freshness");
+    if (!freshnessEl) return;
+    
+    const dot = freshnessEl.querySelector(".freshness-dot");
+    const text = freshnessEl.querySelector(".freshness-text");
+    if (!dot || !text) return;
+    
+    const now = Date.now();
+    const dataTime = timestamp ? new Date(timestamp).getTime() : now;
+    const ageMs = now - dataTime;
+    const ageMin = Math.floor(ageMs / 60000);
+    
+    if (ageMin < 5) {
+      dot.className = "freshness-dot fresh";
+      text.textContent = "Updated just now";
+    } else if (ageMin < 60) {
+      dot.className = "freshness-dot recent";
+      text.textContent = `Updated ${ageMin} min ago`;
+    } else if (ageMin < 1440) {
+      const ageHr = Math.floor(ageMin / 60);
+      dot.className = "freshness-dot recent";
+      text.textContent = `Updated ${ageHr}h ago`;
+    } else {
+      const ageDays = Math.floor(ageMin / 1440);
+      dot.className = "freshness-dot stale";
+      text.textContent = `Updated ${ageDays}d ago`;
+    }
+  }
+  
+  // Improvement #1: Refresh handler
+  function setupRefreshButton() {
+    const refreshBtn = scopedQuery("refresh-dashboard");
+    if (!refreshBtn) return;
+    
+    refreshBtn.addEventListener("click", async () => {
+      refreshBtn.disabled = true;
+      refreshBtn.style.opacity = "0.6";
+      
+      try {
+        const payload = window.__cfiDashboardLastPayload;
+        if (payload && payload.meta && payload.meta.ticker) {
+          // Trigger re-fetch
+          if (window.CFI && typeof window.CFI.render === "function") {
+            window.CFI.render(payload);
+          }
+        }
+        updateDataFreshness(new Date());
+      } catch (error) {
+        console.error("Refresh failed:", error);
+      } finally {
+        setTimeout(() => {
+          refreshBtn.disabled = false;
+          refreshBtn.style.opacity = "1";
+        }, 1000);
+      }
+    });
+  }
+  
+  // Improvement #10: Export preview modal
+  function setupExportPreview() {
+    const exportButtons = scopedSelectAll(".export-button");
+    const modal = document.getElementById("export-preview-modal");
+    const confirmBtn = document.getElementById("confirm-export-btn");
+    
+    if (!modal || !confirmBtn) return;
+    
+    let pendingExport = null;
+    
+    exportButtons.forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const format = btn.dataset.exportFormat || "pdf";
+        const payload = window.__cfiDashboardLastPayload;
+        
+        if (!payload) return;
+        
+        // Show modal with preview
+        document.getElementById("preview-format").textContent = format.toUpperCase();
+        document.getElementById("preview-company").textContent = 
+          payload.meta?.company || payload.meta?.ticker || "Unknown";
+        
+        modal.style.display = "flex";
+        
+        pendingExport = { format, btn, payload };
+      });
+    });
+    
+    confirmBtn.addEventListener("click", () => {
+      if (!pendingExport) return;
+      
+      modal.style.display = "none";
+      
+      // Trigger actual export
+      const { format, btn } = pendingExport;
+      if (window.handleExport && typeof window.handleExport === "function") {
+        window.handleExport({ type: format, ...pendingExport.payload });
+      }
+      
+      pendingExport = null;
+    });
+  }
+  
+  // Improvement #9: Dashboard switcher
+  function setupDashboardSwitcher() {
+    const switcher = scopedQuery("dashboard-switcher");
+    if (!switcher) return;
+    
+    switcher.addEventListener("change", (e) => {
+      const viewType = e.target.value;
+      const payload = window.__cfiDashboardLastPayload;
+      
+      if (!payload) return;
+      
+      // Trigger view change
+      if (window.showCfiDashboard && viewType === "cfi-classic") {
+        window.showCfiDashboard({ payload });
+      } else if (window.showCfiCompareDashboard && viewType === "cfi-compare") {
+        window.showCfiCompareDashboard({ payload });
+      } else if (window.showCfiDenseDashboard && viewType === "cfi-dense") {
+        window.showCfiDenseDashboard({ payload });
+      }
+    });
+  }
+
   window.CFI = {
     render(payload) {
       if (!payload) return;
@@ -1077,8 +1559,11 @@
       renderValuationTable("cfi-valuation-table", payload.valuation_table || []);
       renderValuationNotes("cfi-valuation-notes", payload.valuation_data?.notes || payload.valuation_notes || []);
       renderKeyFinancials("cfi-keyfin", payload.key_financials || {});
+      
+      // Use grouped KPI rendering (Improvement #8)
       const kpiItems = payload.kpi_summary || payload.kpis || [];
-      renderKpiSummary("cfi-kpi", kpiItems);
+      renderKpiSummaryGrouped("cfi-kpi", kpiItems);
+      
       window.__cfiDashboardLastPayload = payload;
       setupDrilldownListeners();
       setupTrendExplorer(payload);
@@ -1093,6 +1578,81 @@
       plotEbitdaChart(charts.ebitda_ev || null);
       plotValuationBar(charts.valuation_bar || null, payload.valuation_data || {});
       plotForecastChart(charts.forecast || null);
+      
+      // Initialize enhancements
+      setupSearch();
+      setupRefreshButton();
+      setupExportPreview();
+      setupDashboardSwitcher();
+      setupKeyboardShortcuts();
+      updateDataFreshness(meta.date || meta.updated_at || new Date());
     }
   };
+  
+  // Keyboard shortcuts for power users
+  function setupKeyboardShortcuts() {
+    if (window.__cfiKeyboardHandlerAttached) return;
+    window.__cfiKeyboardHandlerAttached = true;
+    
+    // Wire up help button
+    const helpBtn = scopedQuery("show-shortcuts");
+    if (helpBtn) {
+      helpBtn.addEventListener("click", () => {
+        const modal = document.getElementById("keyboard-shortcuts-modal");
+        if (modal) modal.style.display = "flex";
+      });
+    }
+    
+    document.addEventListener("keydown", (e) => {
+      // Don't trigger if typing in an input
+      if (e.target.matches("input, textarea, select")) return;
+      
+      // '/' - Focus search
+      if (e.key === "/") {
+        e.preventDefault();
+        const searchInput = scopedQuery("dashboard-search");
+        if (searchInput) searchInput.focus();
+      }
+      
+      // 'r' or 'R' - Refresh dashboard
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        const refreshBtn = scopedQuery("refresh-dashboard");
+        if (refreshBtn) refreshBtn.click();
+      }
+      
+      // 'e' or 'E' - Open export modal
+      if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        const exportBtn = scopedSelectAll(".export-button")[0];
+        if (exportBtn) exportBtn.click();
+      }
+      
+      // 'Escape' - Close any open modals
+      if (e.key === "Escape") {
+        const modal = document.getElementById("export-preview-modal");
+        if (modal && modal.style.display === "flex") {
+          modal.style.display = "none";
+        }
+      }
+      
+      // Numbers 1-6 - Toggle KPI categories
+      if (e.key >= "1" && e.key <= "6") {
+        const categories = scopedSelectAll(".kpi-category");
+        const index = parseInt(e.key) - 1;
+        if (categories[index]) {
+          categories[index].classList.toggle("collapsed");
+        }
+      }
+      
+      // '?' - Show keyboard shortcuts help
+      if (e.key === "?") {
+        e.preventDefault();
+        const modal = document.getElementById("keyboard-shortcuts-modal");
+        if (modal) {
+          modal.style.display = "flex";
+        }
+      }
+    });
+  }
 })();

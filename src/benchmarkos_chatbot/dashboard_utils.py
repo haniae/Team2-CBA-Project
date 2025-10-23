@@ -11,29 +11,49 @@ from . import database
 from .analytics_engine import METRIC_LABELS, MULTIPLE_METRICS, PERCENTAGE_METRICS
 
 DASHBOARD_KPI_ORDER: Tuple[str, ...] = (
+    # Growth Metrics
     "revenue_cagr",
+    "revenue_cagr_3y",
     "eps_cagr",
+    "eps_cagr_3y",
     "ebitda_growth",
+    
+    # Profitability Metrics
     "ebitda_margin",
+    "adjusted_ebitda_margin",
     "gross_margin",
     "operating_margin",
     "net_margin",
     "profit_margin",
+    
+    # Returns
     "return_on_assets",
     "return_on_equity",
     "return_on_invested_capital",
+    
+    # Cash Flow Metrics
     "free_cash_flow_margin",
     "cash_conversion",
+    
+    # Liquidity Metrics
     "current_ratio",
     "quick_ratio",
+    
+    # Leverage Metrics
     "debt_to_equity",
     "interest_coverage",
+    
+    # Efficiency Metrics
     "asset_turnover",
+    
+    # Valuation Metrics
     "pe_ratio",
     "ps_ratio",
     "ev_ebitda",
     "pb_ratio",
     "peg_ratio",
+    
+    # Shareholder Returns
     "dividend_yield",
     "tsr",
     "share_buyback_intensity",

@@ -1,3 +1,14 @@
+Metadata-Version: 2.4
+Name: benchmarkos-chatbot
+Version: 0.1.0
+Summary: Starter codebase for an institutional-grade finance chatbot
+Author: BenchmarkOS
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: python-dotenv>=1.0.1
+Requires-Dist: requests>=2.32.0
+Requires-Dist: psycopg2-binary>=2.9.9
+
 # BenchmarkOS Chatbot Platform
 
 BenchmarkOS is an institutional-grade copilot for finance teams. It pairs deterministic market analytics with a conversational interface so analysts can ask natural-language questions, inspect lineage, and keep data pipelines auditable.
