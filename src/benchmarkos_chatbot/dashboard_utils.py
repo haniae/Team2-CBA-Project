@@ -201,12 +201,17 @@ def _build_kpi_series(
 
 def _collect_sources(
     latest: Dict[str, database.MetricRecord],
+    engine: Optional["AnalyticsEngine"] = None,
 ) -> List[Dict[str, Any]]:
-    """Summarise source provenance for dashboard metrics."""
+    """Summarise source provenance for dashboard metrics with clickable URLs."""
+    import json
+    
     sources: List[Dict[str, Any]] = []
     for metric_id, record in latest.items():
         if not record or not getattr(record, "source", None):
             continue
+        
+        # Build basic entry
         entry: Dict[str, Any] = {
             "metric": metric_id,
             "label": METRIC_LABELS.get(metric_id, metric_id.replace("_", " ").title()),
@@ -221,6 +226,60 @@ def _collect_sources(
                 entry["period"] = f"FY{year}"
         if record.updated_at:
             entry["updated_at"] = record.updated_at.isoformat()
+        
+        # Try to add SEC EDGAR URL if engine is available
+        if engine:
+            try:
+                fiscal_year = record.end_year or _metric_year(record)
+                if fiscal_year:
+                    fact_records = engine.financial_facts(
+                        ticker=record.ticker,
+                        fiscal_year=fiscal_year,
+                        metric=metric_id,
+                        limit=1,
+                    )
+                    if fact_records:
+                        fact = fact_records[0]
+                        raw_payload = fact.raw or {}
+                        if isinstance(raw_payload, str):
+                            try:
+                                raw_payload = json.loads(raw_payload)
+                            except Exception:
+                                raw_payload = {}
+                        
+                        # Extract accession and form
+                        accession = None
+                        if isinstance(raw_payload, dict):
+                            accession = raw_payload.get("accn") or raw_payload.get("accession")
+                            if raw_payload.get("form"):
+                                entry["form"] = raw_payload.get("form")
+                        accession = accession or fact.source_filing
+                        
+                        # Build SEC EDGAR URLs
+                        if accession and fact.cik:
+                            clean_cik = fact.cik.lstrip("0") or fact.cik
+                            accession_no_dash = accession.replace("-", "")
+                            detail_url = (
+                                f"https://www.sec.gov/cgi-bin/viewer"
+                                f"?action=view&cik={clean_cik}&accession_number={accession}&"
+                                f"xbrl_type=v&primary_doc={accession_no_dash}/{accession}-index.html"
+                            )
+                            entry["url"] = detail_url
+                        
+                        # Build text descriptor for chatbot-style citation
+                        parts = [
+                            record.ticker,
+                            entry["label"],
+                            entry.get("period"),
+                            str(record.value) if record.value is not None else None,
+                            entry.get("form"),
+                        ]
+                        descriptor = " • ".join(str(p) for p in parts if p)
+                        entry["text"] = descriptor
+            except Exception:
+                # Silently skip URL generation if it fails
+                pass
+        
         sources.append(entry)
     sources.sort(key=lambda item: item.get("label") or item["metric"])
     return sources
@@ -612,7 +671,7 @@ def build_cfi_dashboard_payload(
     kpi_series = _build_kpi_series(records)
     interactions = _build_interactions(kpi_series)
     peer_config = _build_peer_config(engine, display_ticker)
-    sources = _collect_sources(latest)
+    sources = _collect_sources(latest, engine)
 
     payload = {
         "meta": meta,
