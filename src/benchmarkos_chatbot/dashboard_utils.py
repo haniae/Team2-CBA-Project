@@ -265,6 +265,7 @@ def _collect_sources(
                                 f"xbrl_type=v&primary_doc={accession_no_dash}/{accession}-index.html"
                             )
                             entry["url"] = detail_url
+                            print(f"✓ Generated URL for {entry['label']}: {detail_url[:80]}...")
                         
                         # Build text descriptor for chatbot-style citation
                         parts = [
@@ -276,9 +277,9 @@ def _collect_sources(
                         ]
                         descriptor = " • ".join(str(p) for p in parts if p)
                         entry["text"] = descriptor
-            except Exception:
-                # Silently skip URL generation if it fails
-                pass
+            except Exception as e:
+                # Log the error for debugging
+                print(f"Warning: Could not generate URL for {entry.get('label', metric_id)}: {e}")
         
         sources.append(entry)
     sources.sort(key=lambda item: item.get("label") or item["metric"])
