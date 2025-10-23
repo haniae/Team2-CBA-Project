@@ -227,7 +227,15 @@ def _collect_sources(
         if record.updated_at:
             entry["updated_at"] = record.updated_at.isoformat()
         
-        # Try to add SEC EDGAR URL if engine is available
+        # Build text descriptor for chatbot-style citation (ALWAYS, not just when URL exists)
+        parts = [
+            record.ticker,
+            entry["label"],
+            entry.get("period"),
+            str(record.value) if record.value is not None else None,
+        ]
+        
+        # Try to add SEC EDGAR URL and form if engine is available
         if engine:
             try:
                 fiscal_year = record.end_year or _metric_year(record)
@@ -253,6 +261,7 @@ def _collect_sources(
                             accession = raw_payload.get("accn") or raw_payload.get("accession")
                             if raw_payload.get("form"):
                                 entry["form"] = raw_payload.get("form")
+                                parts.append(entry["form"])  # Add form to text descriptor
                         accession = accession or fact.source_filing
                         
                         # Build SEC EDGAR URLs
@@ -266,20 +275,13 @@ def _collect_sources(
                             )
                             entry["url"] = detail_url
                             print(f"✓ Generated URL for {entry['label']}: {detail_url[:80]}...")
-                        
-                        # Build text descriptor for chatbot-style citation
-                        parts = [
-                            record.ticker,
-                            entry["label"],
-                            entry.get("period"),
-                            str(record.value) if record.value is not None else None,
-                            entry.get("form"),
-                        ]
-                        descriptor = " • ".join(str(p) for p in parts if p)
-                        entry["text"] = descriptor
             except Exception as e:
                 # Log the error for debugging
                 print(f"Warning: Could not generate URL for {entry.get('label', metric_id)}: {e}")
+        
+        # Always set the text descriptor
+        descriptor = " • ".join(str(p) for p in parts if p)
+        entry["text"] = descriptor
         
         sources.append(entry)
     sources.sort(key=lambda item: item.get("label") or item["metric"])
