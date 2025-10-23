@@ -39,7 +39,7 @@ def _format_percent(value: Any) -> str:
     try:
         number = float(value)
     except (TypeError, ValueError):
-        return "—"
+        return "N/A"
     return f"{number * 100:.1f}%"
 
 
@@ -47,15 +47,15 @@ def _format_multiple(value: Any) -> str:
     try:
         number = float(value)
     except (TypeError, ValueError):
-        return "—"
-    return f"{number:.1f}×"
+        return "N/A"
+    return f"{number:.1f}x"
 
 
 def _format_currency(value: Any) -> str:
     try:
         number = float(value)
     except (TypeError, ValueError):
-        return "—"
+        return "N/A"
     magnitude = abs(number)
     if magnitude >= 1_000_000_000:
         return f"${number / 1_000_000_000:.1f}B"
@@ -70,7 +70,7 @@ def _format_value(entry: Dict[str, Any]) -> str:
     value = entry.get("value")
     entry_type = entry.get("type")
     if value in (None, ""):
-        return "—"
+        return "N/A"
     if entry_type == "percent":
         return _format_percent(value)
     if entry_type == "multiple":
@@ -119,10 +119,10 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     pdf.cell(0, 10, f"{company} {f'({ticker})' if ticker else ''}".strip(), ln=1)
 
     pdf.set_font("Helvetica", "", 11)
-    rec = meta.get("recommendation") or "—"
+    rec = meta.get("recommendation") or "N/A"
     target_price = _format_currency(meta.get("target_price"))
     scenario = meta.get("scenario") or meta.get("live_scenario") or "Consensus"
-    pdf.multi_cell(0, 6, f"Recommendation: {rec} • Target Price: {target_price} • Scenario: {scenario}")
+    pdf.multi_cell(0, 6, f"Recommendation: {rec} | Target Price: {target_price} | Scenario: {scenario}")
     if meta.get("date"):
         pdf.multi_cell(0, 6, f"Report Date: {meta['date']}")
 
@@ -152,7 +152,7 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             market = _format_currency(row.get("Market"))
             dcf = _format_currency(row.get("DCF"))
             comps = _format_currency(row.get("Comps"))
-            pdf.multi_cell(0, 6, f"- {label}: Market {market} • DCF {dcf} • Comps {comps}")
+            pdf.multi_cell(0, 6, f"- {label}: Market {market} | DCF {dcf} | Comps {comps}")
 
     key_financials = payload.get("key_financials") or {}
     columns = key_financials.get("columns") or []
@@ -171,7 +171,7 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
                 if isinstance(value, (int, float)):
                     formatted.append(f"{value:,.0f}")
                 else:
-                    formatted.append(str(value or "—"))
+                    formatted.append(str(value or "N/A"))
             pdf.multi_cell(0, 5, f"{entry.get('label')}: " + ", ".join(formatted))
 
     pdf.ln(2)
@@ -186,7 +186,7 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             if period:
                 line += f" ({period})"
             if source:
-                line += f" — {source}"
+                line += f" - {source}"
             pdf.multi_cell(0, 5, line)
 
     pdf_output = pdf.output(dest="S").encode("latin1")
