@@ -206,6 +206,7 @@ def _collect_sources(
     """Summarise source provenance for dashboard metrics with clickable URLs."""
     import json
     
+    print(f"\n🔍 Processing {len(latest)} metrics for source URLs...")
     sources: List[Dict[str, Any]] = []
     for metric_id, record in latest.items():
         if not record or not getattr(record, "source", None):
@@ -239,14 +240,18 @@ def _collect_sources(
         if engine:
             try:
                 fiscal_year = record.end_year or _metric_year(record)
-                if fiscal_year:
+                if not fiscal_year:
+                    print(f"⚠ {entry['label']}: No fiscal year found")
+                else:
                     fact_records = engine.financial_facts(
                         ticker=record.ticker,
                         fiscal_year=fiscal_year,
                         metric=metric_id,
                         limit=1,
                     )
-                    if fact_records:
+                    if not fact_records:
+                        print(f"⚠ {entry['label']}: No financial_facts found for FY{fiscal_year}")
+                    else:
                         fact = fact_records[0]
                         raw_payload = fact.raw or {}
                         if isinstance(raw_payload, str):
@@ -264,8 +269,12 @@ def _collect_sources(
                                 parts.append(entry["form"])  # Add form to text descriptor
                         accession = accession or fact.source_filing
                         
-                        # Build SEC EDGAR URLs
-                        if accession and fact.cik:
+                        if not accession:
+                            print(f"⚠ {entry['label']}: No accession number in fact record")
+                        elif not fact.cik:
+                            print(f"⚠ {entry['label']}: No CIK in fact record")
+                        else:
+                            # Build SEC EDGAR URLs
                             clean_cik = fact.cik.lstrip("0") or fact.cik
                             accession_no_dash = accession.replace("-", "")
                             detail_url = (
@@ -277,7 +286,7 @@ def _collect_sources(
                             print(f"✓ Generated URL for {entry['label']}: {detail_url[:80]}...")
             except Exception as e:
                 # Log the error for debugging
-                print(f"Warning: Could not generate URL for {entry.get('label', metric_id)}: {e}")
+                print(f"⚠ {entry.get('label', metric_id)}: Exception - {str(e)[:100]}")
         
         # Always set the text descriptor
         descriptor = " • ".join(str(p) for p in parts if p)
@@ -285,6 +294,10 @@ def _collect_sources(
         
         sources.append(entry)
     sources.sort(key=lambda item: item.get("label") or item["metric"])
+    
+    url_count = sum(1 for s in sources if s.get("url"))
+    print(f"📊 Source URL Summary: {url_count}/{len(sources)} sources have clickable SEC URLs\n")
+    
     return sources
 
 
