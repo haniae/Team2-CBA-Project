@@ -94,14 +94,36 @@ def _collect_kpi_rows(
 
 def _collect_source_rows(
     sources: Iterable[Dict[str, Any]],
-    limit: int = 20,
+    limit: int = 50,
 ) -> List[Tuple[str, str, str]]:
+    """Collect source rows with text, url, and display text."""
     rows: List[Tuple[str, str, str]] = []
     for entry in list(sources or [])[:limit]:
-        label = entry.get("label") or entry.get("metric") or "Metric"
-        period = entry.get("period") or ""
-        source = entry.get("source") or ""
-        rows.append((label, period, source))
+        # Support both old format (label/period/source) and new format (text/url)
+        text = entry.get("text") or ""
+        url = entry.get("url") or ""
+        
+        # Fallback to old format
+        if not text:
+            label = entry.get("label") or entry.get("metric") or "Metric"
+            period = entry.get("period") or ""
+            source = entry.get("source") or ""
+            parts = [label]
+            if period:
+                parts.append(f"({period})")
+            if source:
+                parts.append(f"- {source}")
+            text = " ".join(parts)
+        
+        # Extract ticker from text if present (format: "TICKER • ...")
+        display_text = text
+        if " • " in text:
+            parts = text.split(" • ")
+            ticker = parts[0] if len(parts) > 0 else ""
+            rest = " • ".join(parts[1:]) if len(parts) > 1 else ""
+            display_text = f"{ticker}: {rest}" if rest else ticker
+        
+        rows.append((display_text, url, text))
     return rows
 
 
@@ -176,18 +198,33 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
 
     pdf.ln(2)
     pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 8, "Source Footnotes", ln=1)
-    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 8, "Sources & Citations", ln=1)
+    pdf.set_font("Helvetica", "", 9)
     if not sources:
         pdf.multi_cell(0, 5, "Source details unavailable.")
     else:
-        for label, period, source in _collect_source_rows(sources):
-            line = f"- {label}"
-            if period:
-                line += f" ({period})"
-            if source:
-                line += f" - {source}"
-            pdf.multi_cell(0, 5, line)
+        for display_text, url, full_text in _collect_source_rows(sources):
+            # If URL is available, make it clickable
+            if url:
+                # Add bullet point
+                pdf.cell(5, 5, "-")
+                # Add clickable link
+                pdf.set_text_color(0, 0, 255)  # Blue text for links
+                pdf.set_font("Helvetica", "U", 9)  # Underlined
+                pdf.cell(0, 5, display_text[:100], ln=1, link=url)  # Truncate long text
+                pdf.set_text_color(0, 0, 0)  # Reset to black
+                pdf.set_font("Helvetica", "", 9)  # Reset font
+                # Add URL on next line
+                pdf.cell(5, 4, "")  # Indent
+                pdf.set_font("Helvetica", "I", 8)
+                pdf.set_text_color(100, 100, 100)  # Gray
+                pdf.multi_cell(0, 4, f"Link: {url[:80]}...")  # Show URL
+                pdf.set_text_color(0, 0, 0)  # Reset
+                pdf.set_font("Helvetica", "", 9)
+            else:
+                # No URL, just show text
+                pdf.multi_cell(0, 5, f"- {display_text[:120]}")
+            pdf.ln(1)
 
     pdf_output = pdf.output(dest="S").encode("latin1")
     return pdf_output
@@ -252,22 +289,38 @@ def _build_excel(payload: Dict[str, Any]) -> bytes:
                 cell.number_format = "#,##0.00"
 
     ws_sources = wb.create_sheet("Sources")
-    ws_sources.append(("Metric", "Period", "Source", "Last Updated", "Value"))
-    for entry in payload.get("sources", []):
-        ws_sources.append(
-            (
-                entry.get("label") or entry.get("metric"),
-                entry.get("period"),
-                entry.get("source"),
-                entry.get("updated_at"),
-                entry.get("value"),
-            )
-        )
-    for column in ("A", "B", "C", "D", "E"):
-        ws_sources.column_dimensions[column].width = 26
-    for row in ws_sources.iter_rows(min_row=2, max_col=5):
+    ws_sources.append(("Citation", "Link", "Details"))
+    
+    # Add comprehensive sources with clickable links
+    source_rows = _collect_source_rows(payload.get("sources", []))
+    for display_text, url, full_text in source_rows:
+        row_num = ws_sources.max_row + 1
+        
+        # Add display text in column A
+        ws_sources.cell(row=row_num, column=1, value=display_text)
+        
+        # Add clickable hyperlink in column B
+        if url:
+            cell = ws_sources.cell(row=row_num, column=2, value="Click here")
+            cell.hyperlink = url
+            cell.font = Font(color="0563C1", underline="single")  # Blue underlined
+            cell.style = "Hyperlink"
+            
+            # Add full URL text in column C for reference
+            ws_sources.cell(row=row_num, column=3, value=url)
+        else:
+            ws_sources.cell(row=row_num, column=2, value="N/A")
+            ws_sources.cell(row=row_num, column=3, value="No link available")
+    
+    # Set column widths
+    ws_sources.column_dimensions["A"].width = 60  # Citation text
+    ws_sources.column_dimensions["B"].width = 15  # Link
+    ws_sources.column_dimensions["C"].width = 80  # Full URL
+    
+    # Format cells
+    for row in ws_sources.iter_rows(min_row=2, max_col=3):
         for cell in row:
-            cell.alignment = Alignment(wrap_text=True)
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
 
     series_map = payload.get("kpi_series") or {}
     if series_map:

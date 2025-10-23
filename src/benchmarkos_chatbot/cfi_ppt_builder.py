@@ -1387,33 +1387,86 @@ def build_cfi_ppt(payload: Dict[str, Any]) -> bytes:
     add_navy_header(slide12, "Data Sources & Appendix", f"{ticker} | {as_of.upper()}")
     add_footer(slide12, 12)
     
-    sources_text = [
-        "SEC EDGAR Company Filings",
-        "https://www.sec.gov/edgar/searchedgar/companysearch.html",
-        "",
-        "SEC Financial Statement & Notes Datasets",
-        "https://www.sec.gov/dera/data/financial-statement-and-notes-data-sets.html",
-        "",
-        "Yahoo Finance Market Data",
-        "https://finance.yahoo.com",
-        "",
-        "BenchmarkOS GitHub Repository",
-        "https://github.com/haniae/Team2-CBA-Project",
-        "",
-        f"Analysis Date: {as_of}",
-        "Prepared by: Team 2 | BenchmarkOS Intelligence Platform"
-    ]
+    # Add comprehensive sources from payload with clickable links
+    from .export_pipeline import _collect_source_rows
     
-    sources_box = slide12.shapes.add_textbox(Inches(1), Inches(1.8), Inches(8), Inches(5))
+    sources_data = payload.get("sources", [])
+    source_rows = _collect_source_rows(sources_data, limit=30)
+    
+    sources_box = slide12.shapes.add_textbox(Inches(0.7), Inches(1.5), Inches(8.6), Inches(5.2))
     stf = sources_box.text_frame
-    for i, line in enumerate(sources_text):
-        p = stf.add_paragraph() if i > 0 else stf.paragraphs[0]
-        p.text = line
-        p.font.size = Pt(11 if "http" in line else 12)
-        p.font.color.rgb = NAVY_LIGHT if "http" in line else GREY_DARK
-        p.font.bold = "http" not in line and line != ""
-        if line == "":
-            p.font.size = Pt(6)
+    stf.word_wrap = True
+    
+    if source_rows:
+        for idx, (display_text, url, full_text) in enumerate(source_rows):
+            p = stf.add_paragraph() if idx > 0 else stf.paragraphs[0]
+            
+            # Add bullet and text
+            run = p.add_run()
+            run.text = f"* {display_text[:100]}"  # Truncate long text
+            run.font.size = Pt(9)
+            run.font.color.rgb = GREY_DARK
+            
+            # If URL exists, add it as a hyperlink
+            if url:
+                p.add_line_break()
+                link_run = p.add_run()
+                link_run.text = f"  Link: {url[:70]}..."  # Truncate long URLs
+                link_run.font.size = Pt(8)
+                link_run.font.color.rgb = NAVY_LIGHT
+                link_run.font.underline = True
+                # Add hyperlink
+                link_run.hyperlink.address = url
+            
+            # Add spacing between entries
+            if idx < len(source_rows) - 1:
+                p = stf.add_paragraph()
+                p.text = ""
+                p.font.size = Pt(4)
+    else:
+        # Fallback to default sources if none provided
+        default_sources = [
+            ("SEC EDGAR Company Filings", "https://www.sec.gov/edgar/searchedgar/companysearch.html"),
+            ("SEC Financial Statement & Notes Datasets", "https://www.sec.gov/dera/data/financial-statement-and-notes-data-sets.html"),
+            ("Yahoo Finance Market Data", "https://finance.yahoo.com"),
+            ("BenchmarkOS GitHub Repository", "https://github.com/haniae/Team2-CBA-Project"),
+        ]
+        
+        for idx, (label, url) in enumerate(default_sources):
+            p = stf.add_paragraph() if idx > 0 else stf.paragraphs[0]
+            
+            # Add label
+            run = p.add_run()
+            run.text = f"* {label}"
+            run.font.size = Pt(11)
+            run.font.color.rgb = GREY_DARK
+            run.font.bold = True
+            
+            # Add URL as hyperlink
+            p.add_line_break()
+            link_run = p.add_run()
+            link_run.text = f"  {url}"
+            link_run.font.size = Pt(9)
+            link_run.font.color.rgb = NAVY_LIGHT
+            link_run.font.underline = True
+            link_run.hyperlink.address = url
+            
+            # Add spacing
+            if idx < len(default_sources) - 1:
+                p = stf.add_paragraph()
+                p.text = ""
+                p.font.size = Pt(6)
+    
+    # Add footer note
+    footer_p = stf.add_paragraph()
+    footer_p.text = ""
+    footer_p.font.size = Pt(8)
+    footer_p = stf.add_paragraph()
+    footer_run = footer_p.add_run()
+    footer_run.text = f"\nAnalysis Date: {as_of} | Prepared by: Team 2 | BenchmarkOS Intelligence Platform"
+    footer_run.font.size = Pt(9)
+    footer_run.font.color.rgb = GREY_LIGHT
+    footer_run.font.italic = True
     
     buffer = io.BytesIO()
     prs.save(buffer)
