@@ -94,10 +94,101 @@ python scripts/ingestion/backfill_metrics.py
 ---
 
 ## Dashboard & Export Experience
-- Default landing page uses the CFI Compare layout (multi-company KPIs, valuation football field, trend explorer, peer comparison).
-- Audit drawer surfaces lineage per metric (filing accession, quote timestamp, transformation applied).
-- `/api/export/cfi` produces PDF/PPTX/Excel using the same payload delivered to the web UI.
-- Demo payloads under `webui/data/` allow offline presentations when the API is unavailable.
+- **Default landing page** uses the CFI Compare layout (multi-company KPIs, valuation football field, trend explorer, peer comparison).
+- **Audit drawer** surfaces lineage per metric (filing accession, quote timestamp, transformation applied).
+- **Export functionality** (`/api/export/cfi`) produces client-ready PDF, PowerPoint, and Excel reports using the same payload delivered to the web UI.
+- **Demo payloads** under `webui/data/` allow offline presentations when the API is unavailable.
+
+### PowerPoint Export & Analyst Documentation
+
+The PowerPoint export generates a comprehensive **12-slide CFI-style presentation** suitable for client presentations, investment committee meetings, and academic deliverables. Each deck is automatically generated from live dashboard data with zero manual formatting required.
+
+**Slide Structure (12 pages):**
+1. **Cover Page** – Company name, ticker, date, Team 2 branding with diagonal accent
+2. **Executive Summary** – 3-5 data-driven analyst bullets + 8-KPI panel (Revenue, EBITDA, FCF, EPS, EV/EBITDA, P/E, Net Debt, ROIC)
+3. **Revenue & EBITDA Growth** – Column chart for revenue + commentary with YoY growth and CAGR calculations
+4. **Valuation Multiples vs Time** – Line chart for EV/EBITDA and P/E trends vs 5-year average
+5. **Share Price Performance** – Price chart with 50/200-DMA and 52-week high/low analysis
+6. **Cash Flow & Leverage** – Free cash flow chart + leverage metrics table (Net Debt/EBITDA, Coverage)
+7. **Forecast vs Actuals** – Earnings surprise analysis (EPS & Revenue vs consensus estimates)
+8. **Segment / Geographic Mix** – Business unit breakdown with revenue contribution analysis
+9. **DCF & Scenario Analysis** – Bull/Base/Bear valuation scenarios with WACC and terminal growth assumptions
+10. **Peer Comparison** – Scatter plot of EV/EBITDA vs EBITDA Margin with focal company highlighted
+11. **Risk Considerations** – 3-5 automated risk bullets derived from leverage, margin trends, and valuation signals
+12. **Data Sources & Appendix** – Clickable hyperlinks to SEC EDGAR, Yahoo Finance, and internal database
+
+**Visual Standards (CFI Style):**
+- **Color Palette:** Deep navy `#0B214A`, mid blue `#1E5AA8`, slate grey for gridlines and text
+- **Typography:** Titles 20-24pt semibold, body 11-14pt, small-caps labels, clean margins
+- **Layout:** Navy title bar with company + date; footer with page numbers and "Prepared by Team 2"
+- **Charts:** Thin gridlines, transparent backgrounds, compact numeric labels ($2.1B / 13.4%)
+
+**Analytics Auto-Generated:**
+- **Growth Metrics:** YoY and CAGR (3y/5y) for Revenue, EBITDA, FCF with momentum tagging
+- **Profitability:** EBITDA margin trend with ±150 bps change flags
+- **Valuation:** EV/EBITDA and P/E vs 5-year average with rich/cheap/in-line interpretation
+- **Cash Quality:** FCF trend analysis with leverage ratio warnings (Net Debt/EBITDA > 3.5x)
+- **Risk Signals:** Automated bullets for margin compression, negative FCF, elevated leverage
+
+**Data Sources (Embedded as Hyperlinks):**
+- [SEC EDGAR Company Filings](https://www.sec.gov/edgar/searchedgar/companysearch.html)
+- [SEC Financial Statement & Notes Datasets](https://www.sec.gov/dera/data/financial-statement-and-notes-data-sets.html)
+- [Yahoo Finance Market Data](https://finance.yahoo.com)
+- [BenchmarkOS GitHub Repository](https://github.com/haniae/Team2-CBA-Project)
+
+**Usage Examples:**
+
+*Via API (Direct Download):*
+```bash
+# Generate PowerPoint for Apple
+curl -o AAPL_deck.pptx "http://localhost:8000/api/export/cfi?format=pptx&ticker=AAPL"
+
+# Generate PDF report for Microsoft
+curl -o MSFT_report.pdf "http://localhost:8000/api/export/cfi?format=pdf&ticker=MSFT"
+
+# Generate Excel workbook for Tesla
+curl -o TSLA_data.xlsx "http://localhost:8000/api/export/cfi?format=xlsx&ticker=TSLA"
+```
+
+*Via Dashboard (UI):*
+1. Navigate to `http://localhost:8000`
+2. Ask: "Show me [Company Name]'s financial performance"
+3. Scroll to bottom of dashboard
+4. Click **"Export PowerPoint"** button
+5. File downloads automatically: `benchmarkos-{ticker}-{date}.pptx`
+
+*Programmatic (Python SDK):*
+```python
+from benchmarkos_chatbot import AnalyticsEngine, load_settings
+from benchmarkos_chatbot.export_pipeline import generate_dashboard_export
+
+# Initialize engine
+settings = load_settings()
+engine = AnalyticsEngine(settings)
+
+# Generate PowerPoint
+result = generate_dashboard_export(engine, "AAPL", "pptx")
+
+# Save to file
+with open("AAPL_analysis.pptx", "wb") as f:
+    f.write(result.content)
+```
+
+**Quality Assurance Checklist:**
+- [ ] Company name and ticker are correct on cover slide
+- [ ] As-of date reflects latest data refresh
+- [ ] Charts render correctly (no placeholders) for Revenue, EBITDA, Valuation
+- [ ] KPI values are reasonable (no `NaN`, `Infinity`, negative multiples)
+- [ ] Commentary bullets are grammatically correct and data-driven
+- [ ] Footer page numbers are sequential (Page 1 of 12, 2 of 12, ...)
+- [ ] Color palette matches CFI standard (Navy #0B214A, Blue #1E5AA8)
+- [ ] File size < 10 MB for email distribution
+
+**Target Audience:**
+- **Financial Analysts** – Equity research, investment banking, corporate finance
+- **Investment Committees** – Board presentations, portfolio reviews
+- **Academic Use** – MBA case studies, finance courses, professor deliverables
+- **Client Presentations** – Pitch decks, quarterly business reviews
 
 ---
 
