@@ -1,7 +1,8 @@
 import requests, psycopg2
 from psycopg2.extras import execute_batch
 
-PG = dict(host="localhost", port=5432, dbname="secdb", user="postgres", password="hania123")
+import os
+PG = dict(host="localhost", port=5432, dbname="secdb", user="postgres", password=os.getenv("PGPASSWORD", ""))
 UA = {"User-Agent": "Hania MSBA / secdb loader (hania@gwu.edu)"}  # put your email
 
 URL = "https://www.sec.gov/files/company_tickers.json"

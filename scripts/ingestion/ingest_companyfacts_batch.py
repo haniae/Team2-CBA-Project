@@ -13,7 +13,7 @@ PG = dict(
     port=int(os.getenv("PGPORT", "5432")),
     dbname=os.getenv("PGDATABASE", "secdb"),
     user=os.getenv("PGUSER", "postgres"),
-    password=os.getenv("PGPASSWORD", "hania123"),
+    password=os.getenv("PGPASSWORD", ""),
 )
 
 UA_STR = os.getenv("SEC_API_USER_AGENT", "Hania MSBA / SEC loader (hania@gwu.edu)")

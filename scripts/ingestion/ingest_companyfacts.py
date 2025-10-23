@@ -2,7 +2,8 @@ import requests, psycopg2, time
 from psycopg2.extras import execute_batch
 from dateutil import parser
 
-PG = dict(host="localhost", port=5432, dbname="secdb", user="postgres", password="hania123")
+import os
+PG = dict(host="localhost", port=5432, dbname="secdb", user="postgres", password=os.getenv("PGPASSWORD", ""))
 UA = {"User-Agent": "Hania MSBA / companyfacts ingester (hania@gwu.edu)"}  # use your email
 
 BASE = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"

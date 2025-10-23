@@ -72,7 +72,7 @@ class PostgresSettings:
     port: int = int(os.getenv("PGPORT", "5432"))
     dbname: str = os.getenv("PGDATABASE", "secdb")
     user: str = os.getenv("PGUSER", "postgres")
-    password: str = os.getenv("PGPASSWORD", "hania123")
+    password: str = os.getenv("PGPASSWORD", "")
 
     def dsn(self) -> str:
         """Return the psycopg connection string for the configured Postgres target."""

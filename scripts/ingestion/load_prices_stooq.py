@@ -5,7 +5,7 @@ PG = dict(host=os.getenv("PGHOST","localhost"),
           port=int(os.getenv("PGPORT","5432")),
           dbname=os.getenv("PGDATABASE","secdb"),
           user=os.getenv("PGUSER","postgres"),
-          password=os.getenv("PGPASSWORD","hania123"))
+          password=os.getenv("PGPASSWORD",""))
 
 ENV_TICKERS = [t.strip().upper() for t in os.getenv("SEC_TICKERS","MSFT,GE,AAPL,AMZN").split(",") if t.strip()]
 DAYS = int(os.getenv("PRICE_DAYS","1200"))  # ~5 years

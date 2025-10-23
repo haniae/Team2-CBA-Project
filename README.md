@@ -306,7 +306,7 @@ pip install yfinance  # one-time
 $env:SEC_TICKERS = (Get-Content data/tickers/universe_sp500.txt) -join ','
 # Optional Postgres target
 $env:PGHOST='127.0.0.1'; $env:PGPORT='5432'
-$env:PGDATABASE='secdb'; $env:PGUSER='postgres'; $env:PGPASSWORD='hania123'
+$env:PGDATABASE='secdb'; $env:PGUSER='postgres'; $env:PGPASSWORD='your_password_here'
 python scripts/ingestion/load_prices_yfinance.py
 
 $env:PYTHONPATH = (Resolve-Path .\src).Path
