@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List
 
 # Add src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from benchmarkos_chatbot import AnalyticsEngine, load_settings
 from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
