@@ -353,12 +353,17 @@ def _collect_sources(
         entry["text"] = descriptor
         
         # Add calculation info for derived metrics that don't have direct SEC URLs
-        # This includes metrics marked as "edgar" or "SEC" that are actually calculated
-        if not entry.get("url") and record.source in ("edgar", "SEC"):
+        # This includes metrics marked as "edgar", "SEC", "derived", or any calculated metric
+        if not entry.get("url") and record.source in ("edgar", "SEC", "derived"):
             calculation_info = _get_calculation_info(metric_id)
             if calculation_info:
                 entry["calculation"] = calculation_info
                 entry["note"] = "Calculated from SEC filing components"
+        
+        # Add attribution for market data sources
+        if not entry.get("url") and record.source in ("market_data", "IMF", "imf"):
+            entry["note"] = "Market data / External source"
+            entry["source_type"] = "market_data"
         
         sources.append(entry)
     sources.sort(key=lambda item: item.get("label") or item["metric"])
@@ -508,11 +513,19 @@ def _valuation_per_share(
 def _get_calculation_info(metric_id: str) -> Optional[Dict[str, Any]]:
     """Return calculation formula and component metrics for derived metrics."""
     calculations = {
+        # Cash Flow Metrics
         "free_cash_flow": {
             "formula": "Cash from Operations - Capital Expenditures",
             "components": ["cash_from_operations", "capital_expenditures"],
             "display": "FCF = CFO - CapEx"
         },
+        "cash_from_operations": {
+            "formula": "From Cash Flow Statement",
+            "components": ["net_income"],
+            "display": "Operating Cash Flow"
+        },
+        
+        # Dividend Metrics
         "dividends_per_share": {
             "formula": "Total Dividends Paid / Weighted Average Shares",
             "components": ["dividends_paid", "weighted_avg_diluted_shares"],
@@ -523,30 +536,46 @@ def _get_calculation_info(metric_id: str) -> Optional[Dict[str, Any]]:
             "components": ["cash_from_financing"],
             "display": "Dividends from CFS"
         },
+        
+        # Depreciation & Amortization
         "depreciation_and_amortization": {
             "formula": "Derived from Cash Flow Statement",
             "components": ["cash_from_operations"],
             "display": "D&A from CFS"
         },
+        
+        # EBITDA Metrics
         "ebitda": {
             "formula": "Operating Income + Depreciation & Amortization",
             "components": ["operating_income", "depreciation_and_amortization"],
             "display": "EBITDA = EBIT + D&A"
+        },
+        "ebitda_margin": {
+            "formula": "EBITDA / Revenue",
+            "components": ["ebitda", "revenue"],
+            "display": "EBITDA Margin = EBITDA / Revenue"
+        },
+        "ebitda_growth": {
+            "formula": "(Current EBITDA - Prior EBITDA) / Prior EBITDA",
+            "components": ["ebitda"],
+            "display": "EBITDA Growth = ΔEB ITDA / Prior EBITDA"
+        },
+        
+        # Profitability Margins
+        "gross_margin": {
+            "formula": "Gross Profit / Revenue",
+            "components": ["gross_profit", "revenue"],
+            "display": "Gross Margin = GP / Revenue"
         },
         "gross_profit": {
             "formula": "Revenue - Cost of Goods Sold",
             "components": ["revenue", "cost_of_goods_sold"],
             "display": "Gross Profit = Revenue - COGS"
         },
-        "short_term_debt": {
-            "formula": "Current portion of long-term debt from Balance Sheet",
-            "components": ["long_term_debt_current", "current_liabilities"],
-            "display": "Short-term Debt from BS"
-        },
-        "cash_and_cash_equivalents": {
-            "formula": "Cash and equivalents from Balance Sheet",
-            "components": ["current_assets"],
-            "display": "Cash from BS"
+        "operating_margin": {
+            "formula": "Operating Income / Revenue",
+            "components": ["operating_income", "revenue"],
+            "display": "Operating Margin = OI / Revenue"
         },
         "net_margin": {
             "formula": "Net Income / Revenue",
@@ -558,10 +587,174 @@ def _get_calculation_info(metric_id: str) -> Optional[Dict[str, Any]]:
             "components": ["net_income", "revenue"],
             "display": "Profit Margin = NI / Revenue"
         },
+        "free_cash_flow_margin": {
+            "formula": "Free Cash Flow / Revenue",
+            "components": ["free_cash_flow", "revenue"],
+            "display": "FCF Margin = FCF / Revenue"
+        },
+        
+        # Growth Metrics
         "revenue_cagr": {
             "formula": "Compound Annual Growth Rate of Revenue",
             "components": ["revenue"],
             "display": "CAGR = (Ending/Beginning)^(1/years) - 1"
+        },
+        "eps_cagr": {
+            "formula": "Compound Annual Growth Rate of EPS",
+            "components": ["net_income", "shares_outstanding"],
+            "display": "EPS CAGR"
+        },
+        "revenue_cagr_(3y)": {
+            "formula": "3-Year Compound Annual Growth Rate of Revenue",
+            "components": ["revenue"],
+            "display": "3Y Revenue CAGR"
+        },
+        "revenue_cagr_3y": {
+            "formula": "3-Year Compound Annual Growth Rate of Revenue",
+            "components": ["revenue"],
+            "display": "3Y Revenue CAGR"
+        },
+        "eps_cagr_(3y)": {
+            "formula": "3-Year Compound Annual Growth Rate of EPS",
+            "components": ["net_income", "shares_outstanding"],
+            "display": "3Y EPS CAGR"
+        },
+        "eps_cagr_3y": {
+            "formula": "3-Year Compound Annual Growth Rate of EPS",
+            "components": ["net_income", "shares_outstanding"],
+            "display": "3Y EPS CAGR"
+        },
+        "ev/ebitda": {
+            "formula": "Enterprise Value / EBITDA",
+            "components": ["enterprise_value", "ebitda"],
+            "display": "EV/EBITDA Multiple"
+        },
+        "ev_ebitda": {
+            "formula": "Enterprise Value / EBITDA",
+            "components": ["enterprise_value", "ebitda"],
+            "display": "EV/EBITDA Multiple"
+        },
+        "p/e_ratio": {
+            "formula": "Price / Earnings Per Share",
+            "components": ["market_cap", "net_income"],
+            "display": "P/E = Price / EPS"
+        },
+        "pe_ratio": {
+            "formula": "Price / Earnings Per Share",
+            "components": ["market_cap", "net_income"],
+            "display": "P/E = Price / EPS"
+        },
+        "p/b_ratio": {
+            "formula": "Price / Book Value Per Share",
+            "components": ["market_cap", "shareholders_equity"],
+            "display": "P/B = Market Cap / Book Value"
+        },
+        "pb_ratio": {
+            "formula": "Price / Book Value Per Share",
+            "components": ["market_cap", "shareholders_equity"],
+            "display": "P/B = Market Cap / Book Value"
+        },
+        
+        # Return Metrics
+        "return_on_assets": {
+            "formula": "Net Income / Total Assets",
+            "components": ["net_income", "total_assets"],
+            "display": "ROA = NI / Total Assets"
+        },
+        "roa": {
+            "formula": "Net Income / Total Assets",
+            "components": ["net_income", "total_assets"],
+            "display": "ROA = NI / Total Assets"
+        },
+        "return_on_equity": {
+            "formula": "Net Income / Shareholders' Equity",
+            "components": ["net_income", "shareholders_equity"],
+            "display": "ROE = NI / Equity"
+        },
+        "roe": {
+            "formula": "Net Income / Shareholders' Equity",
+            "components": ["net_income", "shareholders_equity"],
+            "display": "ROE = NI / Equity"
+        },
+        "return_on_invested_capital": {
+            "formula": "NOPAT / Invested Capital",
+            "components": ["operating_income", "total_assets", "current_liabilities"],
+            "display": "ROIC = NOPAT / Invested Capital"
+        },
+        "roic": {
+            "formula": "NOPAT / Invested Capital",
+            "components": ["operating_income", "total_assets", "current_liabilities"],
+            "display": "ROIC = NOPAT / Invested Capital"
+        },
+        
+        # Liquidity Ratios
+        "current_ratio": {
+            "formula": "Current Assets / Current Liabilities",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "Current Ratio = CA / CL"
+        },
+        "quick_ratio": {
+            "formula": "(Current Assets - Inventory) / Current Liabilities",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "Quick Ratio = (CA - Inv) / CL"
+        },
+        "cash_ratio": {
+            "formula": "Cash / Current Liabilities",
+            "components": ["cash_and_cash_equivalents", "current_liabilities"],
+            "display": "Cash Ratio = Cash / CL"
+        },
+        
+        # Leverage Ratios
+        "debt_to_equity": {
+            "formula": "Total Debt / Shareholders' Equity",
+            "components": ["long_term_debt", "shareholders_equity"],
+            "display": "D/E = Debt / Equity"
+        },
+        "interest_coverage": {
+            "formula": "Operating Income / Interest Expense",
+            "components": ["operating_income", "interest_expense"],
+            "display": "Interest Coverage = OI / Interest"
+        },
+        
+        # Efficiency Ratios
+        "asset_turnover": {
+            "formula": "Revenue / Average Total Assets",
+            "components": ["revenue", "total_assets"],
+            "display": "Asset Turnover = Revenue / Assets"
+        },
+        "cash_conversion": {
+            "formula": "Operating Cash Flow / Net Income",
+            "components": ["cash_from_operations", "net_income"],
+            "display": "Cash Conversion = CFO / NI"
+        },
+        
+        # Working Capital
+        "working_capital": {
+            "formula": "Current Assets - Current Liabilities",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "WC = CA - CL"
+        },
+        "working_capital_change": {
+            "formula": "Change in Working Capital",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "ΔWC = WC(t) - WC(t-1)"
+        },
+        
+        # Other Calculated Metrics
+        "short_term_debt": {
+            "formula": "Current portion of long-term debt from Balance Sheet",
+            "components": ["long_term_debt_current", "current_liabilities"],
+            "display": "Short-term Debt from BS"
+        },
+        "cash_and_cash_equivalents": {
+            "formula": "Cash and equivalents from Balance Sheet",
+            "components": ["current_assets"],
+            "display": "Cash from BS"
+        },
+        "share_buyback_intensity": {
+            "formula": "Share Repurchases / Market Cap",
+            "components": ["share_repurchases", "shares_outstanding"],
+            "display": "Buyback Intensity = Repurchases / Market Cap"
         },
     }
     return calculations.get(metric_id)
