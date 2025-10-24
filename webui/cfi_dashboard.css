@@ -309,9 +309,10 @@ body {
 }
 
 .source-link {
-  font: 500 12px/1.4 "Inter", "Open Sans", Roboto;
-  color: var(--accent);
-  text-decoration: none;
+  font: 600 12px/1.4 "Inter", "Open Sans", Roboto;
+  color: #1c7ed6;
+  text-decoration: underline;
+  text-decoration-color: rgba(28, 126, 214, 0.3);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -325,13 +326,14 @@ body {
 }
 
 .source-link:hover {
-  color: var(--accent-dark);
+  color: #1864ab;
   gap: 8px;
-  text-decoration: underline;
+  text-decoration-color: #1864ab;
+  text-decoration-thickness: 2px;
 }
 
 .source-link:active {
-  color: var(--navy);
+  color: #0b2e59;
 }
 
 .source-link svg {

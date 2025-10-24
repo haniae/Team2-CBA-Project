@@ -238,6 +238,7 @@ def _collect_sources(
         
         # Build basic entry
         entry: Dict[str, Any] = {
+            "ticker": record.ticker,
             "metric": metric_id,
             "label": METRIC_LABELS.get(metric_id, metric_id.replace("_", " ").title()),
             "source": record.source,
@@ -306,7 +307,12 @@ def _collect_sources(
                                 f"?action=view&cik={clean_cik}&accession_number={accession}&"
                                 f"xbrl_type=v&primary_doc={accession_no_dash}/{accession}-index.html"
                             )
-                            entry["url"] = detail_url
+                            # Store in both formats for compatibility
+                            entry["url"] = detail_url  # Flat format
+                            entry["urls"] = {
+                                "detail": detail_url,
+                                "interactive": detail_url
+                            }
                             print(f"✓ Generated URL for {entry['label']}: {detail_url[:80]}...")
             except Exception as e:
                 # Log the error for debugging

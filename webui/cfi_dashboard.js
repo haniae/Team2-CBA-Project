@@ -2187,6 +2187,16 @@
     }
 
     console.log('[renderDataSources] Rendering', sources?.length || 0, 'sources');
+    
+    // Debug: Check first source structure
+    if (sources && sources.length > 0) {
+      const first = sources[0];
+      console.log('[renderDataSources] First source structure:', {
+        hasUrls: !!first.urls,
+        hasUrl: !!first.url,
+        urlValue: first.urls?.detail || first.urls?.interactive || first.url || 'NONE'
+      });
+    }
 
     if (!sources || sources.length === 0) {
       container.innerHTML = `
@@ -2212,9 +2222,10 @@
         displayValue = formatSourceValue(source.value, label);
       }
       
-      // Use actual SEC filing URLs from urls.detail or urls.interactive
-      // This matches the audit drawer and citation system exactly
-      const filingUrl = source.urls?.detail || source.urls?.interactive || null;
+      // Use actual SEC filing URLs - support both formats:
+      // 1. Nested: source.urls.detail / source.urls.interactive (audit drawer format)
+      // 2. Flat: source.url (dashboard_utils.py format)
+      const filingUrl = source.urls?.detail || source.urls?.interactive || source.url || null;
       const sourceText = source.source || (filingUrl ? 'View filing' : 'Internal data');
       
       // Build descriptor parts (ticker • label • period • value)
