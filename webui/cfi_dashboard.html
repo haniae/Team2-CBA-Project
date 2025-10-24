@@ -6,11 +6,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="cfi_dashboard.css?v=20241024b"/>
+  <link rel="stylesheet" href="cfi_dashboard.css?v=202410241"/>
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 </head>
 <body>
-  <div id="cfi-root" class="cfi-grid">
+  <!-- Skip to Content Link -->
+  <a href="#main-content" class="skip-to-content">Skip to main content</a>
+  
+  <!-- Loading Progress Bar -->
+  <div class="loading-progress" id="loading-progress">
+    <div class="loading-progress-bar" id="loading-progress-bar"></div>
+  </div>
+  <div id="cfi-root" class="cfi-grid" data-density="compact">
     <!-- Improvement #9: Dashboard Navigation Toolbar -->
     <div class="dashboard-toolbar">
       <div class="toolbar-left">
@@ -26,11 +33,64 @@
         </div>
       </div>
       <div class="toolbar-right">
+        <!-- Density Controls -->
+        <div class="density-control">
+          <button class="density-btn" data-density="comfortable" aria-label="Comfortable view">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="3" y="6" width="18" height="3"/>
+              <rect x="3" y="12" width="18" height="3"/>
+              <rect x="3" y="18" width="18" height="3"/>
+            </svg>
+          </button>
+          <button class="density-btn active" data-density="compact" aria-label="Compact view">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="3" y="5" width="18" height="2"/>
+              <rect x="3" y="11" width="18" height="2"/>
+              <rect x="3" y="17" width="18" height="2"/>
+            </svg>
+          </button>
+          <button class="density-btn" data-density="dense" aria-label="Dense view">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="3" y="4" width="18" height="1.5"/>
+              <rect x="3" y="8" width="18" height="1.5"/>
+              <rect x="3" y="12" width="18" height="1.5"/>
+              <rect x="3" y="16" width="18" height="1.5"/>
+              <rect x="3" y="20" width="18" height="1.5"/>
+            </svg>
+          </button>
+        </div>
+        
+        <!-- Currency Selector -->
+        <div class="currency-selector">
+          <button class="currency-btn active" data-currency="USD">$</button>
+          <button class="currency-btn" data-currency="EUR">€</button>
+          <button class="currency-btn" data-currency="GBP">£</button>
+        </div>
+        
         <!-- Improvement #1: Real-time indicators -->
         <div class="data-freshness" id="data-freshness">
           <span class="freshness-dot fresh"></span>
           <span class="freshness-text">Updated just now</span>
         </div>
+        
+        <!-- Theme Toggle -->
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode (D)">
+          <svg class="theme-icon-light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <svg class="theme-icon-dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+        
         <button type="button" class="toolbar-button" id="refresh-dashboard" aria-label="Refresh data" title="Refresh data (R)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
@@ -125,17 +185,17 @@
       <div class="cfi-strip">Key Financials</div>
       <div id="cfi-keyfin" class="cfi-body tight"></div>
     </div>
-    <!-- Improvement #8: Grouped KPI Scorecard -->
-    <div class="cfi-panel" data-area="kpi">
-      <div class="cfi-strip">
-        KPI Scorecard
-        <button class="strip-action" id="toggle-all-kpis" title="Expand/Collapse All">
+    <!-- Improvement #8: Grouped KPI Scorecard - Now Collapsible! -->
+    <div class="cfi-panel collapsible-panel" data-area="kpi" id="kpi-panel">
+      <div class="cfi-strip collapsible-header" id="kpi-panel-header">
+        <span>KPI Scorecard</span>
+        <button class="strip-action toggle-panel-btn" id="toggle-kpi-panel" title="Expand/Collapse KPI Section">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
       </div>
-      <div id="cfi-kpi" class="cfi-body tight">
+      <div id="cfi-kpi" class="cfi-body tight collapsible-content">
         <!-- Improvement #4: Loading state -->
         <div class="skeleton-kpi-grid">
           <div class="skeleton-kpi-item"></div>
@@ -167,20 +227,6 @@
       </div>
     </div>
 
-    <div class="cfi-panel" data-area="peers">
-      <div class="cfi-strip">Peer Comparison</div>
-      <div class="cfi-body peers-body">
-        <form id="cfi-peer-form" class="peer-form">
-          <label for="cfi-peer-group">Peer Group</label>
-          <select id="cfi-peer-group"></select>
-          <label for="cfi-peer-custom">Custom Tickers (comma separated)</label>
-          <input id="cfi-peer-custom" type="text" placeholder="e.g. MSFT, GOOGL, NVDA"/>
-          <button type="submit">Update Peers</button>
-        </form>
-        <div id="cfi-peer-status" class="peer-status"></div>
-        <div id="cfi-peer-compare" class="peer-compare embed"></div>
-      </div>
-    </div>
 
     <div class="cfi-panel" data-area="rev">
       <div class="cfi-strip">Revenue vs EV/Revenue</div>
@@ -193,6 +239,18 @@
     <div class="cfi-panel" data-area="valbar">
       <div class="cfi-strip">Valuation Summary — Equity Value per Share ($)</div>
       <div id="cfi-valbar" class="cfi-body tight plot"></div>
+    </div>
+
+    <div class="cfi-panel" data-area="sources">
+      <div class="cfi-strip">
+        Data Sources & References
+        <span class="strip-action" style="font-size: 11px; opacity: 0.8;">Click any source to view details</span>
+      </div>
+      <div class="cfi-body tight">
+        <div id="cfi-sources-grid" class="sources-grid">
+          <!-- Sources will be populated by JavaScript -->
+        </div>
+      </div>
     </div>
   </div>
 
@@ -293,7 +351,38 @@
     </div>
   </div>
 
-  <script src="cfi_dashboard.js?v=20241024b"></script>
+  <!-- Back to Top Button -->
+  <button class="back-to-top" id="back-to-top" aria-label="Back to top">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 19V5M5 12l7-7 7 7"/>
+    </svg>
+  </button>
+
+  <!-- Notification Toast -->
+  <div class="notification-toast" id="notification-toast">
+    <div class="notification-icon" id="notification-icon">✓</div>
+    <div class="notification-content">
+      <div class="notification-title" id="notification-title">Success</div>
+      <div class="notification-message" id="notification-message">Operation completed successfully</div>
+    </div>
+    <button class="notification-close" id="notification-close" aria-label="Close notification">&times;</button>
+  </div>
+
+  <script src="cfi_dashboard.js?v=202410241"></script>
+  <script>
+    // Register Service Worker for offline support
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/webui/service-worker.js')
+          .then((registration) => {
+            console.log('ServiceWorker registered:', registration.scope);
+          })
+          .catch((error) => {
+            console.log('ServiceWorker registration failed:', error);
+          });
+      });
+    }
+  </script>
   <script>
     (function demo(){
       if (!window.CFI) return;

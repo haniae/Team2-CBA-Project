@@ -1199,7 +1199,7 @@
     profitability: {
       title: "Profitability Margins",
       icon: "💰",
-      metrics: ["ebitda_margin", "adjusted_ebitda_margin", "gross_margin", "operating_margin", "net_margin", "profit_margin", "free_cash_flow_margin"]
+      metrics: ["ebitda_margin", "gross_margin", "operating_margin", "net_margin", "profit_margin", "free_cash_flow_margin"]
     },
     liquidity: {
       title: "Liquidity & Solvency",
@@ -1214,7 +1214,7 @@
     valuation: {
       title: "Valuation Multiples",
       icon: "💎",
-      metrics: ["pe_ratio", "ps_ratio", "ev_ebitda", "pb_ratio", "peg_ratio"]
+      metrics: ["pe_ratio", "ev_ebitda", "pb_ratio", "peg_ratio"]
     },
     shareholder: {
       title: "Shareholder Returns",
@@ -1572,6 +1572,12 @@
       window.__cfiDashboardPeerConfig = payload.peer_config || null;
       window.__cfiDashboardSeries = window.__cfiDashboardSeries || {};
       window.__cfiDashboardSeries.kpi = payload.kpi_series || {};
+      
+      // Render data sources section
+      if (payload.sources && window.DashboardEnhancements) {
+        window.DashboardEnhancements.renderDataSources(payload.sources);
+      }
+      
       attachExportHandlers(payload);
       const charts = payload.charts || {};
       plotRevenueChart(charts.revenue_ev || null);
@@ -1586,6 +1592,55 @@
       setupDashboardSwitcher();
       setupKeyboardShortcuts();
       updateDataFreshness(meta.date || meta.updated_at || new Date());
+      
+      // Setup collapsible panels after a short delay to ensure DOM is ready
+      setTimeout(() => {
+        const kpiPanelHeader = scopedQuery("kpi-panel-header");
+        const kpiPanelContent = scopedQuery("cfi-kpi");
+        const kpiPanel = scopedQuery("kpi-panel");
+        const toggleButton = scopedQuery("toggle-kpi-panel");
+
+        if (kpiPanelHeader && kpiPanelContent && toggleButton && kpiPanel) {
+          // Load saved state from localStorage
+          const savedState = localStorage.getItem('kpiPanelCollapsed');
+          if (savedState === 'true') {
+            kpiPanelHeader.classList.add('collapsed');
+            kpiPanelContent.classList.add('collapsed');
+            kpiPanel.classList.add('collapsed');
+          }
+
+          // Toggle function
+          function toggleKpiPanel() {
+            const isCollapsed = kpiPanelHeader.classList.toggle('collapsed');
+            kpiPanelContent.classList.toggle('collapsed');
+            kpiPanel.classList.toggle('collapsed');
+            
+            // Save state to localStorage
+            localStorage.setItem('kpiPanelCollapsed', isCollapsed);
+          }
+
+          // Add click listeners
+          kpiPanelHeader.addEventListener('click', toggleKpiPanel);
+          toggleButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleKpiPanel();
+          });
+
+          // Keyboard accessibility
+          kpiPanelHeader.setAttribute('tabindex', '0');
+          kpiPanelHeader.setAttribute('role', 'button');
+          kpiPanelHeader.setAttribute('aria-expanded', !kpiPanelHeader.classList.contains('collapsed'));
+          kpiPanelHeader.setAttribute('aria-controls', 'cfi-kpi');
+          
+          kpiPanelHeader.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggleKpiPanel();
+              kpiPanelHeader.setAttribute('aria-expanded', !kpiPanelHeader.classList.contains('collapsed'));
+            }
+          });
+        }
+      }, 100);
     }
   };
   
@@ -1648,11 +1703,597 @@
       // '?' - Show keyboard shortcuts help
       if (e.key === "?") {
         e.preventDefault();
-        const modal = document.getElementById("keyboard-shortcuts-modal");
+        const modal = document.getElementById("keyboard-shortcuts-modal");      
         if (modal) {
           modal.style.display = "flex";
         }
       }
+
+      // 'd' or 'D' - Toggle dark mode
+      if (e.key === "d" || e.key === "D") {
+        e.preventDefault();
+        const themeToggle = document.getElementById("theme-toggle");
+        if (themeToggle) themeToggle.click();
+      }
     });
   }
+
+  // ========================================
+  //  COMPREHENSIVE NEW FEATURES
+  // ========================================
+
+  // State Management & Local Storage
+  const DashboardState = {
+    theme: localStorage.getItem('cfi-theme') || 'light',
+    density: localStorage.getItem('cfi-density') || 'compact',
+    currency: localStorage.getItem('cfi-currency') || 'USD',
+    searchHistory: JSON.parse(localStorage.getItem('cfi-search-history') || '[]'),
+    
+    save(key, value) {
+      this[key] = value;
+      localStorage.setItem(`cfi-${key}`, typeof value === 'object' ? JSON.stringify(value) : value);
+    },
+    
+    get(key) {
+      return this[key];
+    }
+  };
+
+  // Theme Toggle Functionality
+  function initThemeToggle() {
+    const toggle = document.getElementById('theme-toggle');
+    if (!toggle) return;
+
+    // Apply saved theme
+    const savedTheme = DashboardState.get('theme');
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    toggle.addEventListener('click', () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      DashboardState.save('theme', newTheme);
+      
+      showNotification('Theme Changed', `Switched to ${newTheme} mode`, 'info');
+    });
+  }
+
+  // Density Controls
+  function initDensityControls() {
+    const densityBtns = document.querySelectorAll('.density-btn');
+    const root = document.getElementById('cfi-root');
+    if (!root) return;
+
+    // Apply saved density
+    const savedDensity = DashboardState.get('density');
+    root.setAttribute('data-density', savedDensity);
+
+    densityBtns.forEach(btn => {
+      const density = btn.getAttribute('data-density');
+      if (density === savedDensity) {
+        btn.classList.add('active');
+      }
+
+      btn.addEventListener('click', () => {
+        densityBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        root.setAttribute('data-density', density);
+        DashboardState.save('density', density);
+        
+        showNotification('View Changed', `Switched to ${density} view`, 'info');
+      });
+    });
+  }
+
+  // Currency Selector
+  function initCurrencySelector() {
+    const currencyBtns = document.querySelectorAll('.currency-btn');
+    
+    // Apply saved currency
+    const savedCurrency = DashboardState.get('currency');
+    
+    currencyBtns.forEach(btn => {
+      const currency = btn.getAttribute('data-currency');
+      if (currency === savedCurrency) {
+        btn.classList.add('active');
+      }
+
+      btn.addEventListener('click', () => {
+        currencyBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        DashboardState.save('currency', currency);
+        
+        showNotification('Currency Changed', `Switched to ${currency}`, 'info');
+        
+        // In a real implementation, you'd reload data with new currency
+        // For now, just show the notification
+      });
+    });
+  }
+
+  // Back to Top Button
+  function initBackToTop() {
+    const btn = document.getElementById('back-to-top');
+    if (!btn) return;
+
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 300) {
+        btn.classList.add('visible');
+      } else {
+        btn.classList.remove('visible');
+      }
+    });
+
+    btn.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  // Notification System
+  function showNotification(title, message, type = 'info') {
+    const toast = document.getElementById('notification-toast');
+    const titleEl = document.getElementById('notification-title');
+    const messageEl = document.getElementById('notification-message');
+    const iconEl = document.getElementById('notification-icon');
+    
+    if (!toast) return;
+
+    // Set content
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    // Set icon
+    const icons = {
+      success: '✓',
+      error: '⚠',
+      info: 'ℹ',
+    };
+    iconEl.textContent = icons[type] || 'ℹ';
+    
+    // Set type class
+    toast.className = 'notification-toast visible ' + type;
+    
+    // Auto-hide after 4 seconds
+    setTimeout(() => {
+      toast.classList.remove('visible');
+    }, 4000);
+  }
+
+  // Notification Close Button
+  function initNotificationClose() {
+    const closeBtn = document.getElementById('notification-close');
+    const toast = document.getElementById('notification-toast');
+    
+    if (closeBtn && toast) {
+      closeBtn.addEventListener('click', () => {
+        toast.classList.remove('visible');
+      });
+    }
+  }
+
+  // Loading Progress Bar
+  function showLoadingProgress() {
+    const progress = document.getElementById('loading-progress');
+    const bar = document.getElementById('loading-progress-bar');
+    
+    if (!progress || !bar) return;
+    
+    progress.classList.add('active');
+    bar.classList.add('indeterminate');
+  }
+
+  function hideLoadingProgress() {
+    const progress = document.getElementById('loading-progress');
+    const bar = document.getElementById('loading-progress-bar');
+    
+    if (!progress || !bar) return;
+    
+    setTimeout(() => {
+      progress.classList.remove('active');
+      bar.classList.remove('indeterminate');
+    }, 300);
+  }
+
+  // Enhanced Search with Fuzzy Matching
+  function initEnhancedSearch() {
+    const searchInput = document.getElementById('dashboard-search');
+    if (!searchInput) return;
+
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        const query = e.target.value.toLowerCase();
+        performSearch(query);
+      }, 300);
+    });
+  }
+
+  function performSearch(query) {
+    if (!query) {
+      clearSearchHighlights();
+      return;
+    }
+
+    // Save to history
+    const history = DashboardState.get('searchHistory');
+    if (!history.includes(query)) {
+      history.unshift(query);
+      if (history.length > 10) history.pop();
+      DashboardState.save('searchHistory', history);
+    }
+
+    // Fuzzy search through all metric labels
+    const allLabels = document.querySelectorAll('.cfi-kpi-label, .cfi-table td:first-child, .overview-table .kv-label');
+    let matchCount = 0;
+
+    allLabels.forEach(label => {
+      const text = label.textContent.toLowerCase();
+      const matches = fuzzyMatch(query, text);
+      
+      const panel = label.closest('.cfi-panel');
+      if (matches) {
+        matchCount++;
+        if (panel) panel.classList.add('highlight-related');
+        label.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
+      } else {
+        if (panel) panel.classList.remove('highlight-related');
+        label.style.backgroundColor = '';
+      }
+    });
+
+    if (matchCount > 0) {
+      showNotification('Search', `Found ${matchCount} matches`, 'info');
+    }
+  }
+
+  function fuzzyMatch(needle, haystack) {
+    const nLen = needle.length;
+    const hLen = haystack.length;
+    
+    if (nLen > hLen) return false;
+    if (nLen === hLen) return needle === haystack;
+    
+    let nIndex = 0;
+    let hIndex = 0;
+    
+    while (nIndex < nLen && hIndex < hLen) {
+      if (needle[nIndex] === haystack[hIndex]) {
+        nIndex++;
+      }
+      hIndex++;
+    }
+    
+    return nIndex === nLen;
+  }
+
+  function clearSearchHighlights() {
+    document.querySelectorAll('.cfi-panel').forEach(panel => {
+      panel.classList.remove('highlight-related');
+    });
+    document.querySelectorAll('.cfi-kpi-label, .cfi-table td:first-child, .overview-table .kv-label').forEach(label => {
+      label.style.backgroundColor = '';
+    });
+  }
+
+  // Sparkline Generation
+  function createSparkline(data, container, isPositive = true) {
+    if (!data || data.length < 2) return;
+
+    const width = container.offsetWidth;
+    const height = 24;
+    const padding = 2;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('kpi-sparkline-svg');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min || 1;
+
+    const points = data.map((val, i) => {
+      const x = (i / (data.length - 1)) * (width - 2 * padding) + padding;
+      const y = height - padding - ((val - min) / range) * (height - 2 * padding);
+      return { x, y };
+    });
+
+    // Area
+    const areaPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const areaD = `M ${points[0].x},${height} ${points.map(p => `L ${p.x},${p.y}`).join(' ')} L ${points[points.length-1].x},${height} Z`;
+    areaPath.setAttribute('d', areaD);
+    areaPath.classList.add('sparkline-area');
+    if (isPositive) areaPath.classList.add('positive');
+    else areaPath.classList.add('negative');
+    svg.appendChild(areaPath);
+
+    // Line
+    const linePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const lineD = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`;
+    linePath.setAttribute('d', lineD);
+    linePath.classList.add('sparkline-path');
+    if (isPositive) linePath.classList.add('positive');
+    else linePath.classList.add('negative');
+    svg.appendChild(linePath);
+
+    // Last point dot
+    const lastPoint = points[points.length - 1];
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.classList.add('sparkline-dot');
+    dot.setAttribute('cx', lastPoint.x);
+    dot.setAttribute('cy', lastPoint.y);
+    dot.setAttribute('r', '3');
+    svg.appendChild(dot);
+
+    container.appendChild(svg);
+  }
+
+  // Add sparklines to KPI cards
+  function addSparklinestoKPIs(kpiSeries) {
+    if (!kpiSeries) return;
+
+    Object.keys(kpiSeries).forEach(key => {
+      const seriesData = kpiSeries[key];
+      if (!seriesData || !seriesData.values) return;
+
+      const kpiItems = document.querySelectorAll('.cfi-kpi-item');
+      kpiItems.forEach(item => {
+        const label = item.querySelector('.cfi-kpi-label');
+        if (!label) return;
+        
+        const labelText = label.textContent.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const keyText = key.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        
+        if (labelText.includes(keyText) || keyText.includes(labelText)) {
+          const existingSparkline = item.querySelector('.kpi-sparkline');
+          if (existingSparkline) return;
+
+          const sparklineContainer = document.createElement('div');
+          sparklineContainer.classList.add('kpi-sparkline');
+          item.appendChild(sparklineContainer);
+
+          const lastValue = seriesData.values[seriesData.values.length - 1];
+          const firstValue = seriesData.values[0];
+          const isPositive = lastValue >= firstValue;
+
+          createSparkline(seriesData.values, sparklineContainer, isPositive);
+        }
+      });
+    });
+  }
+
+  // URL Deep Linking
+  function initDeepLinking() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Check for section parameter
+    const section = urlParams.get('section');
+    if (section) {
+      setTimeout(() => {
+        const panel = document.querySelector(`[data-area="${section}"]`);
+        if (panel) {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          panel.classList.add('deep-link-active');
+          setTimeout(() => panel.classList.remove('deep-link-active'), 6000);
+        }
+      }, 500);
+    }
+
+    // Check for metric parameter
+    const metric = urlParams.get('metric');
+    if (metric) {
+      setTimeout(() => {
+        performSearch(metric);
+      }, 500);
+    }
+  }
+
+  // Screenshot functionality
+  function initScreenshotMode() {
+    // Add keyboard shortcut Ctrl+Shift+S for screenshot
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'S') {
+        e.preventDefault();
+        captureScreenshot();
+      }
+    });
+  }
+
+  function captureScreenshot() {
+    showNotification('Screenshot', 'Screenshot feature requires html2canvas library', 'info');
+    // In a real implementation, you would use html2canvas or similar
+    // to capture the dashboard and download it as an image
+  }
+
+  // Number animation
+  function animateNumber(element, start, end, duration = 1000) {
+    const range = end - start;
+    const increment = range / (duration / 16);
+    let current = start;
+
+    element.classList.add('number-changing');
+
+    const timer = setInterval(() => {
+      current += increment;
+      if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+        current = end;
+        clearInterval(timer);
+        element.classList.remove('number-changing');
+      }
+      element.textContent = Math.round(current).toLocaleString();
+    }, 16);
+  }
+
+  // Cross-panel highlighting
+  function initCrossPanelHighlighting() {
+    const kpiItems = document.querySelectorAll('.cfi-kpi-item');
+    
+    kpiItems.forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const label = item.querySelector('.cfi-kpi-label');
+        if (!label) return;
+        
+        const metric = label.textContent.toLowerCase();
+        
+        // Highlight related panels
+        document.querySelectorAll('.cfi-table td:first-child').forEach(cell => {
+          if (cell.textContent.toLowerCase().includes(metric.split(' ')[0])) {
+            const row = cell.closest('tr');
+            if (row) row.classList.add('highlight-related');
+          }
+        });
+      });
+      
+      item.addEventListener('mouseleave', () => {
+        document.querySelectorAll('.highlight-related').forEach(el => {
+          el.classList.remove('highlight-related');
+        });
+      });
+    });
+  }
+
+  // Initialize all new features
+  function initAllEnhancements() {
+    initThemeToggle();
+    initDensityControls();
+    initCurrencySelector();
+    initBackToTop();
+    initNotificationClose();
+    initEnhancedSearch();
+    initDeepLinking();
+    initScreenshotMode();
+    initCrossPanelHighlighting();
+
+    // Show welcome notification
+    setTimeout(() => {
+      showNotification('Dashboard Ready', 'All features loaded successfully', 'success');
+    }, 1000);
+  }
+
+  // Initialize on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAllEnhancements);
+  } else {
+    initAllEnhancements();
+  }
+
+  // Render Data Sources Section - Using same citation format as audit drawer
+  function renderDataSources(sources) {
+    const container = document.getElementById('cfi-sources-grid');
+    if (!container) {
+      console.warn('[renderDataSources] Container #cfi-sources-grid not found');
+      return;
+    }
+
+    console.log('[renderDataSources] Rendering', sources?.length || 0, 'sources');
+
+    if (!sources || sources.length === 0) {
+      container.innerHTML = `
+        <div class="sources-empty">
+          <div class="sources-empty-icon">📊</div>
+          <p>No data sources available</p>
+        </div>
+      `;
+      return;
+    }
+
+    const sourcesHTML = sources.map(source => {
+      // Use same structure as citations in app.js (lines 3246-3273, 3521-3550)
+      const ticker = source.ticker || '';
+      const label = source.label || source.metric || 'Unknown';
+      const period = source.period || source.date || 'N/A';
+      
+      // Format value using same logic as citations
+      let displayValue = '';
+      if (source.formatted_value) {
+        displayValue = source.formatted_value;
+      } else if (source.value !== undefined) {
+        displayValue = formatSourceValue(source.value, label);
+      }
+      
+      // Use actual SEC filing URLs from urls.detail or urls.interactive
+      // This matches the audit drawer and citation system exactly
+      const filingUrl = source.urls?.detail || source.urls?.interactive || null;
+      const sourceText = source.source || (filingUrl ? 'View filing' : 'Internal data');
+      
+      // Build descriptor parts (ticker • label • period • value)
+      const descriptorParts = [ticker, label, period, displayValue].filter(Boolean);
+      const descriptor = descriptorParts.join(' • ');
+      
+      return `
+        <div class="source-item">
+          <div class="source-header">
+            <span class="source-metric">${ticker ? `${ticker} • ${label}` : label}</span>
+            <span class="source-period">${period}</span>
+          </div>
+          ${displayValue ? `<div class="source-value">${displayValue}</div>` : ''}
+          ${filingUrl ? `
+            <a href="${filingUrl}" target="_blank" rel="noopener noreferrer" class="source-link">
+              ${sourceText}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+            </a>
+          ` : `
+            <div class="source-link" style="color: var(--muted); cursor: default; pointer-events: none;">
+              ${sourceText}
+            </div>
+          `}
+          ${source.description ? `<div class="source-description">${source.description}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = sourcesHTML;
+    
+    // Debug: Check if links are properly created
+    setTimeout(() => {
+      const links = container.querySelectorAll('.source-link');
+      console.log(`[renderDataSources] Created ${links.length} source links`);
+      links.forEach((link, i) => {
+        if (link.href) {
+          console.log(`  Link ${i+1}:`, link.href, 'clickable:', link.style.pointerEvents !== 'none');
+          
+          // Add click listener for debugging
+          link.addEventListener('click', (e) => {
+            console.log(`✅ Click on link ${i+1}:`, link.href);
+          });
+        }
+      });
+    }, 100);
+  }
+
+  function formatSourceValue(value, label) {
+    const lowerLabel = String(label || '').toLowerCase();
+    
+    if (lowerLabel.includes('shares') || lowerLabel.includes('employees')) {
+      return formatInteger(value);
+    }
+    
+    if (lowerLabel.includes('margin') || lowerLabel.includes('return') || 
+        lowerLabel.includes('yield') || lowerLabel.includes('%')) {
+      return formatPercent(value);
+    }
+    
+    if (lowerLabel.includes('ratio') || lowerLabel.includes('multiple') ||
+        lowerLabel.includes('ev/') || lowerLabel.includes('p/')) {
+      return formatMultiple(value);
+    }
+    
+    return formatMoney(value);
+  }
+
+  // Expose functions for external use
+  window.DashboardEnhancements = {
+    showNotification,
+    showLoadingProgress,
+    hideLoadingProgress,
+    createSparkline,
+    addSparklinestoKPIs,
+    animateNumber,
+    renderDataSources
+  };
 })();

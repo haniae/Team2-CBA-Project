@@ -48,6 +48,7 @@ Picture a Monday 8 a.m. stand-up in GW's practicum lab. Hania, acting as the ana
 
 - [Practicum context](#practicum-context)
 - [Overview](#overview)
+- [Current Data Coverage](#current-data-coverage)
 - [Core capabilities](#core-capabilities)
 - [Architecture map](#architecture-map)
 - [Retrieval & ML internals](#retrieval--ml-internals)
@@ -72,6 +73,24 @@ BenchmarkOS ships as a batteries-included template for building finance copilots
 - Flexible LLM integration with a deterministic echo model for testing or OpenAI for production deployments.
 - Multi-channel experiences (CLI REPL, FastAPI REST service, single-page web UI) so you can prototype quickly and scale later.
 - Rich documentation (docs/orchestration_playbook.md) that explains how to scale "any company" requests and replicate the workflows in production.
+
+## Current Data Coverage
+
+The database currently contains **390,016 total rows** of financial data across 475 S&P 500 companies:
+
+| Table | Rows | Description |
+|-------|------|-------------|
+| metric_snapshots | 319,891 | Pre-calculated analytics and KPIs |
+| financial_facts | 33,684 | Raw SEC filing data (revenue, expenses, etc.) |
+| company_filings | 23,743 | SEC filing metadata (10-K, 10-Q forms) |
+| kpi_values | 9,980 | KPI backfill and override values |
+| audit_events | 2,065 | Data ingestion and processing logs |
+| ticker_aliases | 475 | Company ticker mappings |
+| conversations | 132 | Chat history and user interactions |
+| market_quotes | 46 | Latest market prices and quotes |
+| scenario_results | 0 | Saved scenario analysis results |
+
+**Data spans multiple years** with comprehensive coverage for years 2019-2024, and includes over 16,000 financial fact records ingested from SEC EDGAR APIs with full audit trails and lineage tracking.
 
 ## Core capabilities
 
@@ -317,7 +336,7 @@ pip install yfinance  # one-time
 $env:SEC_TICKERS = (Get-Content data/tickers/universe_sp500.txt) -join ','
 # Optional Postgres target
 $env:PGHOST='127.0.0.1'; $env:PGPORT='5432'
-$env:PGDATABASE='secdb'; $env:PGUSER='postgres'; $env:PGPASSWORD='hania123'
+$env:PGDATABASE='secdb'; $env:PGUSER='postgres'; $env:PGPASSWORD='your_password_here'
 python scripts/ingestion/load_prices_yfinance.py
 
 $env:PYTHONPATH = (Resolve-Path .\src).Path
