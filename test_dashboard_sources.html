@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Dashboard Sources Display</title>
+    <style>
+        body { font-family: system-ui; padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .status { padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        .source-item { border: 1px solid #ddd; padding: 12px; margin: 8px 0; border-radius: 6px; }
+        .formula { background: #f0f8ff; padding: 8px; margin: 4px 0; border-left: 3px solid #007bff; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Dashboard Sources Display Test</h1>
+    
+    <div class="status info">
+        <strong>Testing Apple (AAPL) Dashboard Sources</strong><br>
+        This page verifies that source attribution is working correctly.
+    </div>
+
+    <h2>📊 Test Results</h2>
+    <div id="results">Loading...</div>
+
+    <h2>📄 Sample Sources (First 10)</h2>
+    <div id="sources">Loading...</div>
+
+    <h2>🔧 Technical Details</h2>
+    <pre id="technical"></pre>
+
+    <script>
+        async function testSources() {
+            try {
+                // Load the test payload
+                const response = await fetch('test_single_company_payload.json');
+                const payload = await response.json();
+                
+                const sources = payload.sources || [];
+                const total = sources.length;
+                
+                // Categorize
+                let withUrls = 0, withFormulas = 0, withMarketData = 0, incomplete = 0;
+                sources.forEach(source => {
+                    if (source.url) withUrls++;
+                    else if (source.calculation) withFormulas++;
+                    else if (source.source === 'IMF' || source.source === 'market_data' || (source.note && source.note.includes('Market data'))) withMarketData++;
+                    else incomplete++;
+                });
+                
+                const complete = withUrls + withFormulas + withMarketData;
+                const percentage = (complete / total * 100).toFixed(1);
+                
+                // Display results
+                const resultsDiv = document.getElementById('results');
+                if (percentage == 100) {
+                    resultsDiv.innerHTML = `
+                        <div class="status success">
+                            <h3>🎉 100% ATTRIBUTION COMPLETE!</h3>
+                            <ul>
+                                <li>✅ SEC URLs (Direct filings): ${withUrls}/${total}</li>
+                                <li>✅ Calculated (With formulas): ${withFormulas}/${total}</li>
+                                <li>✅ Market Data (External): ${withMarketData}/${total}</li>
+                                <li>✅ Incomplete: ${incomplete}/${total}</li>
+                            </ul>
+                            <p><strong>Total: ${complete}/${total} = ${percentage}%</strong></p>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="status error">
+                            <h3>⚠️ Incomplete Attribution</h3>
+                            <p>${percentage}% complete (${complete}/${total})</p>
+                        </div>
+                    `;
+                }
+                
+                // Display sample sources
+                const sourcesDiv = document.getElementById('sources');
+                let samplesHTML = '';
+                sources.slice(0, 10).forEach((source, i) => {
+                    const hasUrl = !!source.url;
+                    const hasCalc = !!source.calculation;
+                    const type = source.source || 'unknown';
+                    
+                    samplesHTML += `
+                        <div class="source-item">
+                            <strong>${i+1}. ${source.label || source.metric}</strong>
+                            <br>Type: ${type} | Period: ${source.period || 'N/A'}
+                            ${hasUrl ? `<br>✅ Has SEC URL: ${source.url.substring(0, 80)}...` : ''}
+                            ${hasCalc ? `
+                                <div class="formula">
+                                    📐 Formula: ${source.calculation.display}<br>
+                                    ${source.note ? `<em>${source.note}</em>` : ''}
+                                </div>
+                            ` : ''}
+                            ${!hasUrl && !hasCalc && type === 'IMF' ? '<br>📊 Market Data Source' : ''}
+                            ${!hasUrl && !hasCalc && type !== 'IMF' ? '<br>⚠️ No attribution' : ''}
+                        </div>
+                    `;
+                });
+                sourcesDiv.innerHTML = samplesHTML;
+                
+                // Technical details
+                document.getElementById('technical').textContent = JSON.stringify({
+                    totalSources: total,
+                    breakdown: {
+                        secUrls: withUrls,
+                        calculated: withFormulas,
+                        marketData: withMarketData,
+                        incomplete: incomplete
+                    },
+                    completeness: `${percentage}%`,
+                    payloadKeys: Object.keys(payload),
+                    firstSource: sources[0]
+                }, null, 2);
+                
+            } catch (error) {
+                document.getElementById('results').innerHTML = `
+                    <div class="status error">
+                        <strong>Error:</strong> ${error.message}<br>
+                        Make sure test_single_company_payload.json exists in the same directory.
+                    </div>
+                `;
+                document.getElementById('technical').textContent = error.stack;
+            }
+        }
+        
+        testSources();
+    </script>
+</body>
+</html>
+

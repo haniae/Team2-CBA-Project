@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 # Add src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import yfinance as yf
 from benchmarkos_chatbot import database
