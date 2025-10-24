@@ -1,0 +1,297 @@
+# BenchmarkOS Chatbot Setup Guide
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.10 or higher
+- Node.js 16+ (for web dashboard)
+- Git
+
+### 1. Clone Repository
+```bash
+git clone <repository-url>
+cd Team2-CBA-Project-1
+```
+
+### 2. Python Environment Setup
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+
+# Install Python dependencies
+pip install -r requirements.txt
+```
+
+### 3. Environment Configuration
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env file with your configuration
+# Required variables:
+# - OPENAI_API_KEY=your_openai_api_key
+# - DATABASE_URL=your_database_url
+# - SEC_API_KEY=your_sec_api_key (optional)
+```
+
+### 4. Database Setup
+```bash
+# Initialize database
+python -c "from src.benchmarkos_chatbot.database import init_db; init_db()"
+
+# Load sample data (optional)
+python scripts/utility/load_sample_data.py
+```
+
+### 5. Web Dashboard Setup
+```bash
+# Install Node.js dependencies
+cd webui
+npm install
+
+# Start web server
+npm start
+# or
+python -m http.server 8000
+```
+
+### 6. Run Chatbot
+```bash
+# Start chatbot server
+python run_chatbot.py
+
+# Or use the web interface
+python serve_chatbot.py
+```
+
+## 📦 Dependencies
+
+### Python Dependencies (requirements.txt)
+- **Core Framework**: FastAPI, Uvicorn
+- **Database**: SQLAlchemy, psycopg2-binary
+- **AI/ML**: OpenAI, python-dotenv
+- **Data Processing**: requests, openpyxl
+- **Documentation**: fpdf2, python-pptx
+- **Testing**: pytest
+
+### Node.js Dependencies (webui/package.json)
+- **Web Framework**: Express.js
+- **Frontend**: Vanilla JavaScript, CSS3
+- **Charts**: Chart.js (for financial visualizations)
+- **HTTP Client**: Axios
+
+## 🔧 Configuration Files
+
+### .env.example
+```env
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4
+
+# Database Configuration
+DATABASE_URL=sqlite:///data/sqlite/benchmarkos_chatbot.sqlite3
+# For PostgreSQL:
+# DATABASE_URL=postgresql://user:password@localhost:5432/benchmarkos
+
+# SEC API Configuration (optional)
+SEC_API_KEY=your_sec_api_key_here
+SEC_USER_AGENT=your_company_name
+
+# Web Server Configuration
+HOST=0.0.0.0
+PORT=8000
+DEBUG=True
+
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=logs/chatbot.log
+```
+
+### package.json (for webui)
+```json
+{
+  "name": "benchmarkos-webui",
+  "version": "1.0.0",
+  "description": "BenchmarkOS Chatbot Web Interface",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "build": "webpack --mode production"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "chart.js": "^4.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0",
+    "webpack": "^5.89.0"
+  }
+}
+```
+
+## 🗂️ Project Structure
+
+```
+Team2-CBA-Project-1/
+├── src/
+│   └── benchmarkos_chatbot/
+│       ├── __init__.py
+│       ├── analytics_engine.py
+│       ├── chatbot.py
+│       ├── database.py
+│       ├── web.py
+│       └── ...
+├── webui/
+│   ├── index.html
+│   ├── app.js
+│   ├── styles.css
+│   ├── cfi_dashboard.html
+│   ├── cfi_compare.html
+│   └── data/
+├── data/
+│   ├── sqlite/
+│   └── external/
+├── scripts/
+│   ├── utility/
+│   └── ingestion/
+├── tests/
+├── requirements.txt
+├── pyproject.toml
+├── package.json
+├── .env.example
+└── README.md
+```
+
+## 🚀 Running the Application
+
+### Option 1: Python Only
+```bash
+# Start chatbot server
+python run_chatbot.py
+
+# Access at http://localhost:8000
+```
+
+### Option 2: With Web Dashboard
+```bash
+# Terminal 1: Start Python backend
+python serve_chatbot.py
+
+# Terminal 2: Start web dashboard
+cd webui
+npm start
+
+# Access dashboard at http://localhost:3000
+```
+
+### Option 3: Development Mode
+```bash
+# Start with auto-reload
+uvicorn src.benchmarkos_chatbot.web:app --reload --host 0.0.0.0 --port 8000
+```
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Error**
+   ```bash
+   # Check database file exists
+   ls -la data/sqlite/
+   
+   # Recreate database
+   python -c "from src.benchmarkos_chatbot.database import init_db; init_db()"
+   ```
+
+2. **OpenAI API Error**
+   ```bash
+   # Check API key
+   echo $OPENAI_API_KEY
+   
+   # Test API connection
+   python -c "import openai; print('API Key valid')"
+   ```
+
+3. **Port Already in Use**
+   ```bash
+   # Find process using port
+   lsof -i :8000
+   
+   # Kill process
+   kill -9 <PID>
+   ```
+
+4. **Node.js Dependencies**
+   ```bash
+   # Clear npm cache
+   npm cache clean --force
+   
+   # Reinstall dependencies
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+### Logs
+```bash
+# Check application logs
+tail -f logs/chatbot.log
+
+# Check error logs
+grep ERROR logs/chatbot.log
+```
+
+## 📊 Features
+
+### Chatbot Features
+- ✅ Single ticker analysis
+- ✅ Multi-ticker comparison
+- ✅ Time period filtering
+- ✅ KPI calculations
+- ✅ Professional formatting
+
+### Web Dashboard Features
+- ✅ CFI Dashboard
+- ✅ Company comparison
+- ✅ Interactive charts
+- ✅ Data export
+- ✅ Responsive design
+
+## 🔐 Security Notes
+
+1. **Never commit .env files**
+2. **Use environment variables for secrets**
+3. **Rotate API keys regularly**
+4. **Use HTTPS in production**
+5. **Validate all user inputs**
+
+## 📈 Performance Tips
+
+1. **Database Indexing**: Ensure proper indexes on frequently queried columns
+2. **Caching**: Use Redis for session management
+3. **Rate Limiting**: Implement API rate limiting
+4. **Monitoring**: Use logging and monitoring tools
+5. **Scaling**: Consider using load balancers for production
+
+## 🆘 Support
+
+For issues and questions:
+1. Check this setup guide
+2. Review error logs
+3. Check GitHub issues
+4. Contact team members
+
+## 📝 Development Notes
+
+- Use `black` for code formatting
+- Use `pytest` for testing
+- Follow PEP 8 style guide
+- Document all functions and classes
+- Use type hints where possible

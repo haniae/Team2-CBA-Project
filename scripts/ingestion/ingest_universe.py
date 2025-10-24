@@ -10,9 +10,6 @@ import time
 from pathlib import Path
 from typing import Iterable, List
 
-# Add src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
 from benchmarkos_chatbot import AnalyticsEngine, load_settings
 from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
 from benchmarkos_chatbot.ticker_universe import (
@@ -117,6 +114,8 @@ def ingest_universe(
 
     print("Refreshing cached metrics ...")
     engine = AnalyticsEngine(settings)
+    engine.refresh_metrics(force=True)
+    print("Done.")
     engine.refresh_metrics(force=True)
     print("Done.")
 
