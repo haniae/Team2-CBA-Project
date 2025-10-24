@@ -117,6 +117,38 @@ After this completes, you can:
 - **Extensible LLM layer** – toggle between the local echo model and OpenAI via LLM_PROVIDER, or extend llm_client.py for other vendors.
 - **Task orchestration hooks** – tasks.py provides a queue abstraction you can plug into ingestion or long-running commands.
 
+## 🚀 Advanced Analytics (Phase 1 - NEW)
+
+Four sophisticated analytics modules deliver institutional-grade capabilities:
+
+### 1. Sector Benchmarking (`sector_analytics.py`)
+- Compare companies within 11 GICS sectors (Technology, Financials, Healthcare, etc.)
+- Calculate sector-wide averages/medians for all key metrics
+- Identify top performers and percentile rankings
+- **Example:** "Apple ranks 100th percentile for revenue in Technology with $391B vs sector avg $49B"
+
+### 2. Anomaly Detection (`anomaly_detection.py`)
+- Statistical detection using Z-score analysis with configurable thresholds
+- Identifies outliers in revenue growth, margins, cash flow, balance sheet ratios
+- Severity classification (low/medium/high/critical) with confidence scores
+- **Example:** "Revenue growth spike: 51.2% vs historical avg 23.5% (3.2 std devs, high severity)"
+
+### 3. Predictive Analytics (`predictive_analytics.py`)
+- Forecast metrics using linear regression and CAGR projections
+- Confidence intervals and trend classification (increasing/decreasing/stable/volatile)
+- Scenario analysis (optimistic/base/pessimistic)
+- **Example:** "MSFT revenue forecast 2026: $280.9B (CAGR: 13.78%, increasing trend, 66% confidence)"
+
+### 4. Advanced KPI Calculator (`advanced_kpis.py`)
+- 30+ sophisticated ratios: ROE, ROA, ROIC, ROCE, debt-to-equity, interest coverage, FCF metrics
+- Categorized outputs: profitability, liquidity, leverage, efficiency, cash flow
+- **Example:** "Apple: ROE 164.59%, ROIC 49.60%, FCF-to-Revenue 32.66%, Debt-to-Equity 5.41"
+
+**Documentation:** See `docs/PHASE1_ANALYTICS_FEATURES.md` for complete API reference and integration examples.  
+**Test Suite:** Run `python test_new_analytics.py` to see live demonstrations with real S&P 500 data.
+
+These modules transform BenchmarkOS into a professional analytics platform comparable to Bloomberg Terminal and FactSet.
+
 ## Architecture map
 
 See docs/architecture.md for the component diagram. The latest revision includes the structured parsing pipeline (alias_builder.py, parse.py, time_grammar.py) and the retrieval layer that feeds grounded artefacts into the LLM alongside the existing CLI, FastAPI, analytics, and ingestion components.

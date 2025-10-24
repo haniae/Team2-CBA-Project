@@ -20,7 +20,6 @@ DASHBOARD_KPI_ORDER: Tuple[str, ...] = (
     
     # Profitability Metrics
     "ebitda_margin",
-    "adjusted_ebitda_margin",
     "gross_margin",
     "operating_margin",
     "net_margin",
@@ -48,7 +47,6 @@ DASHBOARD_KPI_ORDER: Tuple[str, ...] = (
     
     # Valuation Metrics
     "pe_ratio",
-    "ps_ratio",
     "ev_ebitda",
     "pb_ratio",
     "peg_ratio",

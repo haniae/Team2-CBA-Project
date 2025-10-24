@@ -105,9 +105,9 @@ def _collect_source_rows(
         
         # Fallback to old format
         if not text:
-            label = entry.get("label") or entry.get("metric") or "Metric"
-            period = entry.get("period") or ""
-            source = entry.get("source") or ""
+        label = entry.get("label") or entry.get("metric") or "Metric"
+        period = entry.get("period") or ""
+        source = entry.get("source") or ""
             parts = [label]
             if period:
                 parts.append(f"({period})")
