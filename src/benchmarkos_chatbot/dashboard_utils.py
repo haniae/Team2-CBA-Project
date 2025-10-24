@@ -230,7 +230,11 @@ def _collect_sources(
     """Summarise source provenance for dashboard metrics with clickable URLs."""
     import json
     
-    print(f"\n🔍 Processing {len(latest)} metrics for source URLs...")
+    # Suppress debug output in production by checking if we're in verbose mode
+    verbose = False  # Set to True for debugging
+    if verbose:
+        print(f"\n🔍 Processing {len(latest)} metrics for source URLs...")
+    
     sources: List[Dict[str, Any]] = []
     for metric_id, record in latest.items():
         if not record or not getattr(record, "source", None):
@@ -262,20 +266,29 @@ def _collect_sources(
         ]
         
         # Try to add SEC EDGAR URL and form if engine is available
-        if engine:
+        if engine and hasattr(engine, 'financial_facts'):
             try:
                 fiscal_year = record.end_year or _metric_year(record)
                 if not fiscal_year:
-                    print(f"⚠ {entry['label']}: No fiscal year found")
+                    if verbose:
+                        print(f"⚠ {entry['label']}: No fiscal year found")
                 else:
-                    fact_records = engine.financial_facts(
-                        ticker=record.ticker,
-                        fiscal_year=fiscal_year,
-                        metric=metric_id,
-                        limit=1,
-                    )
+                    # Try to find financial facts for this year or earlier years (up to 2 years back)
+                    fact_records = None
+                    for year_offset in range(3):  # Try current year, then -1, then -2
+                        try_year = fiscal_year - year_offset
+                        fact_records = engine.financial_facts(
+                            ticker=record.ticker,
+                            fiscal_year=try_year,
+                            metric=metric_id,
+                            limit=1,
+                        )
+                        if fact_records:
+                            break
+                    
                     if not fact_records:
-                        print(f"⚠ {entry['label']}: No financial_facts found for FY{fiscal_year}")
+                        if verbose:
+                            print(f"⚠ {entry['label']}: No financial_facts found for FY{fiscal_year} or earlier")
                     else:
                         fact = fact_records[0]
                         raw_payload = fact.raw or {}
@@ -295,38 +308,64 @@ def _collect_sources(
                         accession = accession or fact.source_filing
                         
                         if not accession:
-                            print(f"⚠ {entry['label']}: No accession number in fact record")
+                            if verbose:
+                                print(f"⚠ {entry['label']}: No accession number in fact record")
                         elif not fact.cik:
-                            print(f"⚠ {entry['label']}: No CIK in fact record")
+                            if verbose:
+                                print(f"⚠ {entry['label']}: No CIK in fact record")
                         else:
-                            # Build SEC EDGAR URLs
+                            # Build SEC EDGAR URLs (matching web.py format)
                             clean_cik = fact.cik.lstrip("0") or fact.cik
                             accession_no_dash = accession.replace("-", "")
-                            detail_url = (
+                            
+                            # Interactive viewer URL
+                            interactive_url = (
                                 f"https://www.sec.gov/cgi-bin/viewer"
-                                f"?action=view&cik={clean_cik}&accession_number={accession}&"
-                                f"xbrl_type=v&primary_doc={accession_no_dash}/{accession}-index.html"
+                                f"?action=view&cik={clean_cik}&accession_number={accession}&xbrl_type=v"
                             )
+                            
+                            # Detail/archive URL
+                            detail_url = (
+                                f"https://www.sec.gov/Archives/edgar/data/{clean_cik}/{accession_no_dash}/{accession}-index.html"
+                            )
+                            
+                            # Search URL
+                            search_url = (
+                                f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={clean_cik}"
+                            )
+                            
                             # Store in both formats for compatibility
-                            entry["url"] = detail_url  # Flat format
+                            entry["url"] = interactive_url  # Flat format - use interactive as primary
                             entry["urls"] = {
+                                "interactive": interactive_url,
                                 "detail": detail_url,
-                                "interactive": detail_url
+                                "search": search_url
                             }
-                            print(f"✓ Generated URL for {entry['label']}: {detail_url[:80]}...")
+                            if verbose:
+                                print(f"✓ Generated URLs for {entry['label']}: {interactive_url[:80]}...")
             except Exception as e:
-                # Log the error for debugging
-                print(f"⚠ {entry.get('label', metric_id)}: Exception - {str(e)[:100]}")
+                # Log the error for debugging (only in verbose mode)
+                if verbose:
+                    print(f"⚠ {entry.get('label', metric_id)}: Exception - {str(e)[:100]}")
         
         # Always set the text descriptor
         descriptor = " • ".join(str(p) for p in parts if p)
         entry["text"] = descriptor
         
+        # Add calculation info for derived metrics that don't have direct SEC URLs
+        # This includes metrics marked as "edgar" or "SEC" that are actually calculated
+        if not entry.get("url") and record.source in ("edgar", "SEC"):
+            calculation_info = _get_calculation_info(metric_id)
+            if calculation_info:
+                entry["calculation"] = calculation_info
+                entry["note"] = "Calculated from SEC filing components"
+        
         sources.append(entry)
     sources.sort(key=lambda item: item.get("label") or item["metric"])
     
-    url_count = sum(1 for s in sources if s.get("url"))
-    print(f"📊 Source URL Summary: {url_count}/{len(sources)} sources have clickable SEC URLs\n")
+    if verbose:
+        url_count = sum(1 for s in sources if s.get("url"))
+        print(f"📊 Source URL Summary: {url_count}/{len(sources)} sources have clickable SEC URLs\n")
     
     return sources
 
@@ -464,6 +503,68 @@ def _valuation_per_share(
         "comps": _round_two(comps_value),
         "market": _round_two(market_price),
     }
+
+
+def _get_calculation_info(metric_id: str) -> Optional[Dict[str, Any]]:
+    """Return calculation formula and component metrics for derived metrics."""
+    calculations = {
+        "free_cash_flow": {
+            "formula": "Cash from Operations - Capital Expenditures",
+            "components": ["cash_from_operations", "capital_expenditures"],
+            "display": "FCF = CFO - CapEx"
+        },
+        "dividends_per_share": {
+            "formula": "Total Dividends Paid / Weighted Average Shares",
+            "components": ["dividends_paid", "weighted_avg_diluted_shares"],
+            "display": "DPS = Dividends / Shares"
+        },
+        "dividends_paid": {
+            "formula": "Total Cash Dividends from Cash Flow Statement",
+            "components": ["cash_from_financing"],
+            "display": "Dividends from CFS"
+        },
+        "depreciation_and_amortization": {
+            "formula": "Derived from Cash Flow Statement",
+            "components": ["cash_from_operations"],
+            "display": "D&A from CFS"
+        },
+        "ebitda": {
+            "formula": "Operating Income + Depreciation & Amortization",
+            "components": ["operating_income", "depreciation_and_amortization"],
+            "display": "EBITDA = EBIT + D&A"
+        },
+        "gross_profit": {
+            "formula": "Revenue - Cost of Goods Sold",
+            "components": ["revenue", "cost_of_goods_sold"],
+            "display": "Gross Profit = Revenue - COGS"
+        },
+        "short_term_debt": {
+            "formula": "Current portion of long-term debt from Balance Sheet",
+            "components": ["long_term_debt_current", "current_liabilities"],
+            "display": "Short-term Debt from BS"
+        },
+        "cash_and_cash_equivalents": {
+            "formula": "Cash and equivalents from Balance Sheet",
+            "components": ["current_assets"],
+            "display": "Cash from BS"
+        },
+        "net_margin": {
+            "formula": "Net Income / Revenue",
+            "components": ["net_income", "revenue"],
+            "display": "Net Margin = NI / Revenue"
+        },
+        "profit_margin": {
+            "formula": "Net Income / Revenue",
+            "components": ["net_income", "revenue"],
+            "display": "Profit Margin = NI / Revenue"
+        },
+        "revenue_cagr": {
+            "formula": "Compound Annual Growth Rate of Revenue",
+            "components": ["revenue"],
+            "display": "CAGR = (Ending/Beginning)^(1/years) - 1"
+        },
+    }
+    return calculations.get(metric_id)
 
 
 def _collect_series(
