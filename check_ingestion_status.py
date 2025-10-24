@@ -30,7 +30,7 @@ def load_progress(progress_file: Path = Path(".ingestion_progress.json")) -> Set
 def get_ingested_tickers(db_path: Path) -> Set[str]:
     """Get tickers that have data in the database."""
     try:
-        with database.connect(db_path) as conn:
+        with database.temporary_connection(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT DISTINCT ticker FROM financial_facts WHERE ticker IS NOT NULL")
             return {row[0].upper() for row in cursor.fetchall()}
@@ -42,7 +42,7 @@ def get_ticker_stats(db_path: Path) -> Dict[str, Dict]:
     """Get detailed statistics for each ticker in the database."""
     stats = {}
     try:
-        with database.connect(db_path) as conn:
+        with database.temporary_connection(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT 
@@ -70,7 +70,7 @@ def get_ticker_stats(db_path: Path) -> Dict[str, Dict]:
 def get_price_data_status(db_path: Path) -> Dict[str, int]:
     """Get count of tickers with price data."""
     try:
-        with database.connect(db_path) as conn:
+        with database.temporary_connection(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(DISTINCT ticker) FROM market_quotes WHERE ticker IS NOT NULL")
             count = cursor.fetchone()[0]

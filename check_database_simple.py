@@ -36,7 +36,7 @@ def get_table_counts(db_path: Path) -> Dict[str, int]:
     ]
     
     try:
-        with database.connect(db_path) as conn:
+        with database.temporary_connection(db_path) as conn:
             cursor = conn.cursor()
             for table in tables:
                 try:
@@ -62,7 +62,7 @@ def get_ticker_coverage(db_path: Path) -> Dict[str, any]:
     }
     
     try:
-        with database.connect(db_path) as conn:
+        with database.temporary_connection(db_path) as conn:
             cursor = conn.cursor()
             
             # Tickers with facts
@@ -74,8 +74,11 @@ def get_ticker_coverage(db_path: Path) -> Dict[str, any]:
             price_tickers = {row[0].upper() for row in cursor.fetchall()}
             
             # Tickers with filings
-            cursor.execute("SELECT DISTINCT ticker FROM filings WHERE ticker IS NOT NULL")
-            filing_tickers = {row[0].upper() for row in cursor.fetchall()}
+            try:
+                cursor.execute("SELECT DISTINCT ticker FROM filings WHERE ticker IS NOT NULL")
+                filing_tickers = {row[0].upper() for row in cursor.fetchall()}
+            except Exception:
+                filing_tickers = set()
             
             all_tickers = facts_tickers | price_tickers | filing_tickers
             
@@ -94,7 +97,7 @@ def get_ticker_coverage(db_path: Path) -> Dict[str, any]:
 def get_metric_distribution(db_path: Path) -> List[Tuple[str, int]]:
     """Get distribution of metrics in the database."""
     try:
-        with database.connect(db_path) as conn:
+        with database.temporary_connection(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT metric, COUNT(*) as count
@@ -112,7 +115,7 @@ def get_metric_distribution(db_path: Path) -> List[Tuple[str, int]]:
 def get_year_coverage(db_path: Path) -> List[Tuple[int, int]]:
     """Get data coverage by year."""
     try:
-        with database.connect(db_path) as conn:
+        with database.temporary_connection(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT fiscal_year, COUNT(DISTINCT ticker) as ticker_count
@@ -137,7 +140,7 @@ def get_data_quality_metrics(db_path: Path) -> Dict[str, any]:
     }
     
     try:
-        with database.connect(db_path) as conn:
+        with database.temporary_connection(db_path) as conn:
             cursor = conn.cursor()
             
             # Average facts per ticker
@@ -188,7 +191,7 @@ def get_data_quality_metrics(db_path: Path) -> Dict[str, any]:
 def get_recent_activity(db_path: Path) -> List[Tuple[str, int]]:
     """Get recent ingestion activity."""
     try:
-        with database.connect(db_path) as conn:
+        with database.temporary_connection(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT 
@@ -306,7 +309,7 @@ def main():
         if sample:
             print("  S&P 500 tickers with data:\n")
             try:
-                with database.connect(db_path) as conn:
+                with database.temporary_connection(db_path) as conn:
                     cursor = conn.cursor()
                     for ticker in sample:
                         cursor.execute("""
@@ -327,11 +330,16 @@ def main():
             
             if len(coverage["tickers"] & sp500_tickers) > 10:
                 print(f"\n  ... and {len(coverage['tickers'] & sp500_tickers) - 10} more")
+        else:
+            for ticker in sample:
+                print(f"  {ticker}")
     
     # Summary and next steps
     print_header("✅ Summary")
     
-    if coverage["total_tickers"] == 0:
+    total_facts = counts.get('financial_facts', 0)
+    
+    if coverage["total_tickers"] == 0 and total_facts == 0:
         print("  ❌ Database is empty")
         print("\n  Next step:")
         print("  $ python scripts/ingestion/ingest_sp500_15years.py")
