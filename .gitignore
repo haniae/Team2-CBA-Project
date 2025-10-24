@@ -9,3 +9,11 @@ cache/companyfacts_bulk/
 .ipynb_checkpoints/
 benchmarkos_chatbot.sqlite3-shm
 benchmarkos_chatbot.sqlite3-wal
+
+# Test outputs
+tests/outputs/*.txt
+tests/outputs/*.json
+tests/outputs/*.log
+*_test_results.txt
+*_test_output.txt
+*_payload.json
