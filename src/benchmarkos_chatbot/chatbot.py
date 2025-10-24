@@ -31,10 +31,6 @@ from .help_content import HELP_TEXT
 from .llm_client import LLMClient, build_llm_client
 from .parsing.parse import parse_to_structured
 from .table_renderer import METRIC_DEFINITIONS, render_table_command
-from .professional_formatter import ProfessionalFormatter
-from .enhanced_formatter import EnhancedProfessionalFormatter
-from .html_renderer import HTMLRenderer
-from .web_component_renderer import WebComponentRenderer
 from .dashboard_utils import (
     build_cfi_dashboard_payload,
     build_cfi_compare_payload,
@@ -476,6 +472,27 @@ _COMMON_WORDS = {
     "IN",
     "TO",
     "HELP",
+    # Corporate suffixes that shouldn't be treated as tickers
+    "INC",
+    "CORP",
+    "CO",
+    "LTD",
+    "LLC",
+    "LP",
+    "PLC",
+    "SA",
+    "AG",
+    "NV",
+    "GROUP",
+    "CORPORATION",
+    "INCORPORATED",
+    "LIMITED",
+    "COMPANY",
+    "HOLDINGS",
+    "HOLDING",
+    "SYSTEMS",
+    "TECHNOLOGIES",
+    "SERVICES",
 }
 
 _METRICS_PATTERN = re.compile(r"^metrics(?:(?:\s+for)?\s+)(.+)$", re.IGNORECASE)
@@ -762,16 +779,28 @@ class BenchmarkOSChatbot:
             return None
 
         tickers = self._detect_tickers(user_input)
-        if len(tickers) != 1:
+        if not tickers:
             return None
-        ticker = tickers[0].upper()
-        try:
-            records = self._fetch_metrics_cached(ticker)
-        except Exception:
-            return None
-        if not records:
-            return None
-        return ticker
+        
+        # If multiple tickers detected, filter to those with actual data
+        # and prefer the last one mentioned (likely the subject of the query)
+        valid_tickers = []
+        for ticker in tickers:
+            ticker_upper = ticker.upper()
+            try:
+                records = self._fetch_metrics_cached(ticker_upper)
+                if records:
+                    valid_tickers.append(ticker_upper)
+            except Exception:
+                continue
+        
+        if len(valid_tickers) == 1:
+            return valid_tickers[0]
+        elif len(valid_tickers) > 1:
+            # Prefer the last valid ticker (typically the actual company mentioned)
+            return valid_tickers[-1]
+        
+        return None
 
     def _prepare_llm_messages(self, rag_context: Optional[str]) -> List[Mapping[str, str]]:
         """Trim history before sending to the LLM and append optional RAG context."""
@@ -1449,11 +1478,29 @@ class BenchmarkOSChatbot:
                 summary_target = self._detect_summary_target(user_input, normalized_command)
                 if summary_target:
                     emit("summary_attempt", f"Compiling snapshot for {summary_target}")
-                    reply = self._get_ticker_summary(summary_target)
-                    if reply:
-                        emit("summary_complete", f"Snapshot prepared for {summary_target}")
+                    # Try to build dashboard first
+                    dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, summary_target)
+                    if dashboard_payload:
+                        display = _display_ticker_symbol(_normalise_ticker_symbol(summary_target))
+                        self.last_structured_response["dashboard"] = {
+                            "kind": "cfi-classic",
+                            "ticker": display,
+                            "payload": dashboard_payload,
+                        }
+                        # Return brief message since dashboard shows all the data
+                        company_name = dashboard_payload.get("meta", {}).get("company", "")
+                        if company_name and company_name.upper() != display.upper():
+                            reply = f"Displaying financial dashboard for {company_name} ({display})."
+                        else:
+                            reply = f"Displaying financial dashboard for {display}."
+                        emit("summary_complete", f"Dashboard prepared for {summary_target}")
                     else:
-                        emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
+                        # Fallback to text summary if dashboard unavailable
+                        reply = self._get_ticker_summary(summary_target)
+                        if reply:
+                            emit("summary_complete", f"Snapshot prepared for {summary_target}")
+                        else:
+                            emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
 
             if reply is None:
                 emit("context_build_start", "Gathering enhanced financial context")
@@ -1715,39 +1762,25 @@ class BenchmarkOSChatbot:
         """Fetch metrics and build a response message for the chat."""
         if not tickers:
             return "Provide at least one ticker for metrics."
-        
-        # Use enhanced professional formatter for single ticker requests
-        if len(tickers) == 1:
+        if len(tickers) == 1 and not period_filters:
             ticker = tickers[0]
-            formatter = EnhancedProfessionalFormatter(self.analytics_engine)
-            html_renderer = HTMLRenderer(self.analytics_engine)
-            
-            # Determine period specification for professional formatting
-            period_spec = None
-            if period_filters:
-                if len(period_filters) == 1:
-                    start_year, end_year = period_filters[0]
-                    if start_year == end_year:
-                        period_spec = str(start_year)
-                    else:
-                        period_spec = f"{start_year}-{end_year}"
-            
-            # Get company name
-            company_name = self._get_company_name(ticker)
-            
-            # Use enhanced professional formatter with beautiful HTML
-            html_response = formatter.format_single_ticker_response(
-                ticker=ticker,
-                period_filters=period_filters,
-                period_spec=period_spec,
-                company_name=company_name
-            )
-            
-            # Render as web component for proper display
-            web_renderer = WebComponentRenderer(self.analytics_engine)
-            return web_renderer.render_as_web_component(html_response)
-        
-        # For multiple tickers, use existing table format
+            dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, ticker)
+            if dashboard_payload:
+                display = _display_ticker_symbol(_normalise_ticker_symbol(ticker))
+                self.last_structured_response["dashboard"] = {
+                    "kind": "cfi-classic",
+                    "ticker": display,
+                    "payload": dashboard_payload,
+                }
+                # Return brief message since dashboard shows all the data
+                company_name = dashboard_payload.get("meta", {}).get("company", "")
+                if company_name and company_name.upper() != display.upper():
+                    return f"Displaying financial dashboard for {company_name} ({display})."
+                return f"Displaying financial dashboard for {display}."
+            else:
+                self.last_structured_response["dashboard"] = None
+                # Dashboard unavailable - return full text summary as fallback
+                return self.analytics_engine.generate_summary(ticker)
         return self._format_metrics_table(
             tickers,
             period_filters=period_filters,
@@ -2685,8 +2718,8 @@ class BenchmarkOSChatbot:
         conclusion = ""
 
         dashboard_descriptor = None
-        # Only build dashboard if no metric filter is applied (user wants full comparison)
-        if len(ordered_tickers) >= 2 and not metric_filter:
+        # Build dashboard for multi-ticker comparisons or single ticker vs benchmark
+        if len(display_tickers) >= 2 and not metric_filter:
             try:
                 dashboard_payload = build_cfi_compare_payload(
                     self.analytics_engine,

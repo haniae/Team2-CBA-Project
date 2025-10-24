@@ -227,6 +227,7 @@ body {
   grid-area: valbar;
 }
 
+/* Sources Panel Styles */
 .cfi-panel[data-area="sources"] {
   grid-area: sources;
 }
@@ -323,6 +324,52 @@ body {
   pointer-events: auto;
   padding: 4px 0;
   margin: -4px 0;
+}
+
+.source-metadata {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.source-type-badge {
+  font: 600 10px/1 "Inter", "Open Sans", Roboto;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.source-type-edgar,
+.source-type-sec {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.source-type-derived {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.source-type-imf {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.source-calculation {
+  margin-top: 6px;
+  padding: 10px;
+  background: rgba(28, 126, 214, 0.05);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.source-calculation strong {
+  color: var(--navy);
+  font-weight: 600;
 }
 
 .source-link:hover {

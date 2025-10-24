@@ -230,7 +230,11 @@ def _collect_sources(
     """Summarise source provenance for dashboard metrics with clickable URLs."""
     import json
     
-    print(f"\n🔍 Processing {len(latest)} metrics for source URLs...")
+    # Suppress debug output in production by checking if we're in verbose mode
+    verbose = False  # Set to True for debugging
+    if verbose:
+        print(f"\n🔍 Processing {len(latest)} metrics for source URLs...")
+    
     sources: List[Dict[str, Any]] = []
     for metric_id, record in latest.items():
         if not record or not getattr(record, "source", None):
@@ -262,20 +266,29 @@ def _collect_sources(
         ]
         
         # Try to add SEC EDGAR URL and form if engine is available
-        if engine:
+        if engine and hasattr(engine, 'financial_facts'):
             try:
                 fiscal_year = record.end_year or _metric_year(record)
                 if not fiscal_year:
-                    print(f"⚠ {entry['label']}: No fiscal year found")
+                    if verbose:
+                        print(f"⚠ {entry['label']}: No fiscal year found")
                 else:
-                    fact_records = engine.financial_facts(
-                        ticker=record.ticker,
-                        fiscal_year=fiscal_year,
-                        metric=metric_id,
-                        limit=1,
-                    )
+                    # Try to find financial facts for this year or earlier years (up to 2 years back)
+                    fact_records = None
+                    for year_offset in range(3):  # Try current year, then -1, then -2
+                        try_year = fiscal_year - year_offset
+                        fact_records = engine.financial_facts(
+                            ticker=record.ticker,
+                            fiscal_year=try_year,
+                            metric=metric_id,
+                            limit=1,
+                        )
+                        if fact_records:
+                            break
+                    
                     if not fact_records:
-                        print(f"⚠ {entry['label']}: No financial_facts found for FY{fiscal_year}")
+                        if verbose:
+                            print(f"⚠ {entry['label']}: No financial_facts found for FY{fiscal_year} or earlier")
                     else:
                         fact = fact_records[0]
                         raw_payload = fact.raw or {}
@@ -295,38 +308,69 @@ def _collect_sources(
                         accession = accession or fact.source_filing
                         
                         if not accession:
-                            print(f"⚠ {entry['label']}: No accession number in fact record")
+                            if verbose:
+                                print(f"⚠ {entry['label']}: No accession number in fact record")
                         elif not fact.cik:
-                            print(f"⚠ {entry['label']}: No CIK in fact record")
+                            if verbose:
+                                print(f"⚠ {entry['label']}: No CIK in fact record")
                         else:
-                            # Build SEC EDGAR URLs
+                            # Build SEC EDGAR URLs (matching web.py format)
                             clean_cik = fact.cik.lstrip("0") or fact.cik
                             accession_no_dash = accession.replace("-", "")
-                            detail_url = (
+                            
+                            # Interactive viewer URL
+                            interactive_url = (
                                 f"https://www.sec.gov/cgi-bin/viewer"
-                                f"?action=view&cik={clean_cik}&accession_number={accession}&"
-                                f"xbrl_type=v&primary_doc={accession_no_dash}/{accession}-index.html"
+                                f"?action=view&cik={clean_cik}&accession_number={accession}&xbrl_type=v"
                             )
+                            
+                            # Detail/archive URL
+                            detail_url = (
+                                f"https://www.sec.gov/Archives/edgar/data/{clean_cik}/{accession_no_dash}/{accession}-index.html"
+                            )
+                            
+                            # Search URL
+                            search_url = (
+                                f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={clean_cik}"
+                            )
+                            
                             # Store in both formats for compatibility
-                            entry["url"] = detail_url  # Flat format
+                            entry["url"] = interactive_url  # Flat format - use interactive as primary
                             entry["urls"] = {
+                                "interactive": interactive_url,
                                 "detail": detail_url,
-                                "interactive": detail_url
+                                "search": search_url
                             }
-                            print(f"✓ Generated URL for {entry['label']}: {detail_url[:80]}...")
+                            if verbose:
+                                print(f"✓ Generated URLs for {entry['label']}: {interactive_url[:80]}...")
             except Exception as e:
-                # Log the error for debugging
-                print(f"⚠ {entry.get('label', metric_id)}: Exception - {str(e)[:100]}")
+                # Log the error for debugging (only in verbose mode)
+                if verbose:
+                    print(f"⚠ {entry.get('label', metric_id)}: Exception - {str(e)[:100]}")
         
         # Always set the text descriptor
         descriptor = " • ".join(str(p) for p in parts if p)
         entry["text"] = descriptor
         
+        # Add calculation info for derived metrics that don't have direct SEC URLs
+        # This includes metrics marked as "edgar", "SEC", "derived", or any calculated metric
+        if not entry.get("url") and record.source in ("edgar", "SEC", "derived"):
+            calculation_info = _get_calculation_info(metric_id)
+            if calculation_info:
+                entry["calculation"] = calculation_info
+                entry["note"] = "Calculated from SEC filing components"
+        
+        # Add attribution for market data sources
+        if not entry.get("url") and record.source in ("market_data", "IMF", "imf"):
+            entry["note"] = "Market data / External source"
+            entry["source_type"] = "market_data"
+        
         sources.append(entry)
     sources.sort(key=lambda item: item.get("label") or item["metric"])
     
-    url_count = sum(1 for s in sources if s.get("url"))
-    print(f"📊 Source URL Summary: {url_count}/{len(sources)} sources have clickable SEC URLs\n")
+    if verbose:
+        url_count = sum(1 for s in sources if s.get("url"))
+        print(f"📊 Source URL Summary: {url_count}/{len(sources)} sources have clickable SEC URLs\n")
     
     return sources
 
@@ -464,6 +508,256 @@ def _valuation_per_share(
         "comps": _round_two(comps_value),
         "market": _round_two(market_price),
     }
+
+
+def _get_calculation_info(metric_id: str) -> Optional[Dict[str, Any]]:
+    """Return calculation formula and component metrics for derived metrics."""
+    calculations = {
+        # Cash Flow Metrics
+        "free_cash_flow": {
+            "formula": "Cash from Operations - Capital Expenditures",
+            "components": ["cash_from_operations", "capital_expenditures"],
+            "display": "FCF = CFO - CapEx"
+        },
+        "cash_from_operations": {
+            "formula": "From Cash Flow Statement",
+            "components": ["net_income"],
+            "display": "Operating Cash Flow"
+        },
+        
+        # Dividend Metrics
+        "dividends_per_share": {
+            "formula": "Total Dividends Paid / Weighted Average Shares",
+            "components": ["dividends_paid", "weighted_avg_diluted_shares"],
+            "display": "DPS = Dividends / Shares"
+        },
+        "dividends_paid": {
+            "formula": "Total Cash Dividends from Cash Flow Statement",
+            "components": ["cash_from_financing"],
+            "display": "Dividends from CFS"
+        },
+        
+        # Depreciation & Amortization
+        "depreciation_and_amortization": {
+            "formula": "Derived from Cash Flow Statement",
+            "components": ["cash_from_operations"],
+            "display": "D&A from CFS"
+        },
+        
+        # EBITDA Metrics
+        "ebitda": {
+            "formula": "Operating Income + Depreciation & Amortization",
+            "components": ["operating_income", "depreciation_and_amortization"],
+            "display": "EBITDA = EBIT + D&A"
+        },
+        "ebitda_margin": {
+            "formula": "EBITDA / Revenue",
+            "components": ["ebitda", "revenue"],
+            "display": "EBITDA Margin = EBITDA / Revenue"
+        },
+        "ebitda_growth": {
+            "formula": "(Current EBITDA - Prior EBITDA) / Prior EBITDA",
+            "components": ["ebitda"],
+            "display": "EBITDA Growth = ΔEB ITDA / Prior EBITDA"
+        },
+        
+        # Profitability Margins
+        "gross_margin": {
+            "formula": "Gross Profit / Revenue",
+            "components": ["gross_profit", "revenue"],
+            "display": "Gross Margin = GP / Revenue"
+        },
+        "gross_profit": {
+            "formula": "Revenue - Cost of Goods Sold",
+            "components": ["revenue", "cost_of_goods_sold"],
+            "display": "Gross Profit = Revenue - COGS"
+        },
+        "operating_margin": {
+            "formula": "Operating Income / Revenue",
+            "components": ["operating_income", "revenue"],
+            "display": "Operating Margin = OI / Revenue"
+        },
+        "net_margin": {
+            "formula": "Net Income / Revenue",
+            "components": ["net_income", "revenue"],
+            "display": "Net Margin = NI / Revenue"
+        },
+        "profit_margin": {
+            "formula": "Net Income / Revenue",
+            "components": ["net_income", "revenue"],
+            "display": "Profit Margin = NI / Revenue"
+        },
+        "free_cash_flow_margin": {
+            "formula": "Free Cash Flow / Revenue",
+            "components": ["free_cash_flow", "revenue"],
+            "display": "FCF Margin = FCF / Revenue"
+        },
+        
+        # Growth Metrics
+        "revenue_cagr": {
+            "formula": "Compound Annual Growth Rate of Revenue",
+            "components": ["revenue"],
+            "display": "CAGR = (Ending/Beginning)^(1/years) - 1"
+        },
+        "eps_cagr": {
+            "formula": "Compound Annual Growth Rate of EPS",
+            "components": ["net_income", "shares_outstanding"],
+            "display": "EPS CAGR"
+        },
+        "revenue_cagr_(3y)": {
+            "formula": "3-Year Compound Annual Growth Rate of Revenue",
+            "components": ["revenue"],
+            "display": "3Y Revenue CAGR"
+        },
+        "revenue_cagr_3y": {
+            "formula": "3-Year Compound Annual Growth Rate of Revenue",
+            "components": ["revenue"],
+            "display": "3Y Revenue CAGR"
+        },
+        "eps_cagr_(3y)": {
+            "formula": "3-Year Compound Annual Growth Rate of EPS",
+            "components": ["net_income", "shares_outstanding"],
+            "display": "3Y EPS CAGR"
+        },
+        "eps_cagr_3y": {
+            "formula": "3-Year Compound Annual Growth Rate of EPS",
+            "components": ["net_income", "shares_outstanding"],
+            "display": "3Y EPS CAGR"
+        },
+        "ev/ebitda": {
+            "formula": "Enterprise Value / EBITDA",
+            "components": ["enterprise_value", "ebitda"],
+            "display": "EV/EBITDA Multiple"
+        },
+        "ev_ebitda": {
+            "formula": "Enterprise Value / EBITDA",
+            "components": ["enterprise_value", "ebitda"],
+            "display": "EV/EBITDA Multiple"
+        },
+        "p/e_ratio": {
+            "formula": "Price / Earnings Per Share",
+            "components": ["market_cap", "net_income"],
+            "display": "P/E = Price / EPS"
+        },
+        "pe_ratio": {
+            "formula": "Price / Earnings Per Share",
+            "components": ["market_cap", "net_income"],
+            "display": "P/E = Price / EPS"
+        },
+        "p/b_ratio": {
+            "formula": "Price / Book Value Per Share",
+            "components": ["market_cap", "shareholders_equity"],
+            "display": "P/B = Market Cap / Book Value"
+        },
+        "pb_ratio": {
+            "formula": "Price / Book Value Per Share",
+            "components": ["market_cap", "shareholders_equity"],
+            "display": "P/B = Market Cap / Book Value"
+        },
+        
+        # Return Metrics
+        "return_on_assets": {
+            "formula": "Net Income / Total Assets",
+            "components": ["net_income", "total_assets"],
+            "display": "ROA = NI / Total Assets"
+        },
+        "roa": {
+            "formula": "Net Income / Total Assets",
+            "components": ["net_income", "total_assets"],
+            "display": "ROA = NI / Total Assets"
+        },
+        "return_on_equity": {
+            "formula": "Net Income / Shareholders' Equity",
+            "components": ["net_income", "shareholders_equity"],
+            "display": "ROE = NI / Equity"
+        },
+        "roe": {
+            "formula": "Net Income / Shareholders' Equity",
+            "components": ["net_income", "shareholders_equity"],
+            "display": "ROE = NI / Equity"
+        },
+        "return_on_invested_capital": {
+            "formula": "NOPAT / Invested Capital",
+            "components": ["operating_income", "total_assets", "current_liabilities"],
+            "display": "ROIC = NOPAT / Invested Capital"
+        },
+        "roic": {
+            "formula": "NOPAT / Invested Capital",
+            "components": ["operating_income", "total_assets", "current_liabilities"],
+            "display": "ROIC = NOPAT / Invested Capital"
+        },
+        
+        # Liquidity Ratios
+        "current_ratio": {
+            "formula": "Current Assets / Current Liabilities",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "Current Ratio = CA / CL"
+        },
+        "quick_ratio": {
+            "formula": "(Current Assets - Inventory) / Current Liabilities",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "Quick Ratio = (CA - Inv) / CL"
+        },
+        "cash_ratio": {
+            "formula": "Cash / Current Liabilities",
+            "components": ["cash_and_cash_equivalents", "current_liabilities"],
+            "display": "Cash Ratio = Cash / CL"
+        },
+        
+        # Leverage Ratios
+        "debt_to_equity": {
+            "formula": "Total Debt / Shareholders' Equity",
+            "components": ["long_term_debt", "shareholders_equity"],
+            "display": "D/E = Debt / Equity"
+        },
+        "interest_coverage": {
+            "formula": "Operating Income / Interest Expense",
+            "components": ["operating_income", "interest_expense"],
+            "display": "Interest Coverage = OI / Interest"
+        },
+        
+        # Efficiency Ratios
+        "asset_turnover": {
+            "formula": "Revenue / Average Total Assets",
+            "components": ["revenue", "total_assets"],
+            "display": "Asset Turnover = Revenue / Assets"
+        },
+        "cash_conversion": {
+            "formula": "Operating Cash Flow / Net Income",
+            "components": ["cash_from_operations", "net_income"],
+            "display": "Cash Conversion = CFO / NI"
+        },
+        
+        # Working Capital
+        "working_capital": {
+            "formula": "Current Assets - Current Liabilities",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "WC = CA - CL"
+        },
+        "working_capital_change": {
+            "formula": "Change in Working Capital",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "ΔWC = WC(t) - WC(t-1)"
+        },
+        
+        # Other Calculated Metrics
+        "short_term_debt": {
+            "formula": "Current portion of long-term debt from Balance Sheet",
+            "components": ["long_term_debt_current", "current_liabilities"],
+            "display": "Short-term Debt from BS"
+        },
+        "cash_and_cash_equivalents": {
+            "formula": "Cash and equivalents from Balance Sheet",
+            "components": ["current_assets"],
+            "display": "Cash from BS"
+        },
+        "share_buyback_intensity": {
+            "formula": "Share Repurchases / Market Cap",
+            "components": ["share_repurchases", "shares_outstanding"],
+            "display": "Buyback Intensity = Repurchases / Market Cap"
+        },
+    }
+    return calculations.get(metric_id)
 
 
 def _collect_series(

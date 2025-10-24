@@ -2226,11 +2226,11 @@
       // 1. Nested: source.urls.detail / source.urls.interactive (audit drawer format)
       // 2. Flat: source.url (dashboard_utils.py format)
       const filingUrl = source.urls?.detail || source.urls?.interactive || source.url || null;
-      const sourceText = source.source || (filingUrl ? 'View filing' : 'Internal data');
+      const sourceType = source.source || 'N/A';
+      const sourceText = filingUrl ? '📄 View SEC Filing' : sourceType;
       
-      // Build descriptor parts (ticker • label • period • value)
-      const descriptorParts = [ticker, label, period, displayValue].filter(Boolean);
-      const descriptor = descriptorParts.join(' • ');
+      // Check if metric has a calculation formula
+      const hasCalculation = source.calculation && source.calculation.display;
       
       return `
         <div class="source-item">
@@ -2239,20 +2239,25 @@
             <span class="source-period">${period}</span>
           </div>
           ${displayValue ? `<div class="source-value">${displayValue}</div>` : ''}
-          ${filingUrl ? `
-            <a href="${filingUrl}" target="_blank" rel="noopener noreferrer" class="source-link">
-              ${sourceText}
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15 3 21 3 21 9"/>
-                <line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
-            </a>
-          ` : `
-            <div class="source-link" style="color: var(--muted); cursor: default; pointer-events: none;">
-              ${sourceText}
+          <div class="source-metadata">
+            <span class="source-type-badge source-type-${sourceType.toLowerCase()}">${sourceType}</span>
+            ${filingUrl ? `
+              <a href="${filingUrl}" target="_blank" rel="noopener noreferrer" class="source-link">
+                ${sourceText}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </a>
+            ` : ''}
+          </div>
+          ${hasCalculation ? `
+            <div class="source-calculation">
+              <strong>Formula:</strong> ${source.calculation.display}
+              ${source.note ? `<div style="font-size: 11px; color: var(--muted); margin-top: 4px;">${source.note}</div>` : ''}
             </div>
-          `}
+          ` : ''}
           ${source.description ? `<div class="source-description">${source.description}</div>` : ''}
         </div>
       `;
