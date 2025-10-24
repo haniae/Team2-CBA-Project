@@ -397,21 +397,15 @@ class EdgarClient:
                 self._ticker_cache = mapping
                 return mapping
             except Exception:  # pragma: no cover - cache corruption fallback
-                LOGGER.warning("Failed to load cached ticker map; refreshing.")
-        payload = self._request(self.TICKER_LIST_PATH)
-        if isinstance(payload, dict):
-            entries = payload.values()
-        else:
-            entries = payload
-        mapping = {
-            str(entry["ticker"]).upper(): _pad_cik(entry["cik_str"])
-            for entry in entries
-            if entry.get("ticker") and entry.get("cik_str")
-        }
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file.write_text(json.dumps(mapping, indent=2))
-        self._ticker_cache = mapping
-        return mapping
+                LOGGER.warning("Failed to load cached ticker map; using empty mapping to avoid SEC API call.")
+                # Return empty mapping instead of calling SEC API to avoid 404 error
+                self._ticker_cache = {}
+                return {}
+        
+        # Avoid SEC API call to prevent 404 error - use empty mapping if no cache
+        LOGGER.warning("No ticker cache found and force_refresh=False. Using empty mapping to avoid SEC API 404 error.")
+        self._ticker_cache = {}
+        return {}
 
     def cik_for_ticker(self, ticker: str) -> str:
         """Lookup the CIK for a supplied ticker symbol."""

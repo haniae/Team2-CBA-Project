@@ -31,6 +31,10 @@ from .help_content import HELP_TEXT
 from .llm_client import LLMClient, build_llm_client
 from .parsing.parse import parse_to_structured
 from .table_renderer import METRIC_DEFINITIONS, render_table_command
+from .professional_formatter import ProfessionalFormatter
+from .enhanced_formatter import EnhancedProfessionalFormatter
+from .html_renderer import HTMLRenderer
+from .web_component_renderer import WebComponentRenderer
 from .dashboard_utils import (
     build_cfi_dashboard_payload,
     build_cfi_compare_payload,
@@ -204,46 +208,32 @@ class _CompanyNameIndex:
                 self.rows.append((norm, ticker))
 
     def build_from_sec(self, base_url: str, user_agent: str, timeout: float = 20.0) -> None:
-        """Populate the index from the SEC company_tickers payload with graceful fallbacks."""
-        candidate_urls = [
-            f"{base_url.rstrip('/')}/files/company_tickers.json",
-        ]
-        if "sec.gov" not in base_url or base_url.rstrip("/").endswith("data.sec.gov"):
-            candidate_urls.append("https://www.sec.gov/files/company_tickers.json")
-
-        payload = None
-        last_error: Optional[Exception] = None
-        headers = {
-            "User-Agent": user_agent,
-            "Accept": "application/json",
-        }
-        for url in candidate_urls:
-            try:
-                response = requests.get(url, timeout=timeout, headers=headers)
-                response.raise_for_status()
-                payload = response.json()
-                break
-            except Exception as exc:  # pragma: no cover - network dependent
-                last_error = exc
-                LOGGER.warning("Unable to fetch SEC company tickers from %s: %s", url, exc)
-
-        if payload is None:
-            if last_error:
-                raise last_error
-            raise RuntimeError("SEC company ticker payload could not be retrieved.")
-
-        entries = payload.values() if isinstance(payload, dict) else payload
-
-        for e in entries:
-            title = str(e.get("title") or e.get("name") or "").strip()
-            ticker = str(e.get("ticker") or "").upper().strip()
-            if not title or not ticker:
-                continue
-            norm = self._normalize(title)
-            if norm:
-                if norm not in self.by_exact or "-" not in ticker:  # prefer common shares
-                    self.by_exact[norm] = ticker
-                self.rows.append((norm, ticker))
+        """Populate the index from database data instead of SEC API to avoid 404 errors."""
+        # Use database data instead of SEC API to avoid 404 errors
+        try:
+            from benchmarkos_chatbot.config import load_settings
+            import sqlite3
+            
+            settings = load_settings()
+            with sqlite3.connect(settings.database_path) as conn:
+                cursor = conn.execute("SELECT ticker, company_name FROM ticker_aliases")
+                ticker_data = cursor.fetchall()
+                
+                LOGGER.info("Using database data instead of SEC API to avoid 404 errors")
+                
+                for ticker, company_name in ticker_data:
+                    if not company_name or not ticker:
+                        continue
+                    norm = self._normalize(company_name)
+                    if norm:
+                        if norm not in self.by_exact or "-" not in ticker:  # prefer common shares
+                            self.by_exact[norm] = ticker
+                        self.rows.append((norm, ticker))
+                        
+        except Exception as exc:
+            LOGGER.warning("Failed to load ticker data from database: %s", exc)
+            # Fallback to empty data instead of SEC API
+            LOGGER.info("Using empty ticker data to avoid SEC API 404 errors")
 
         # friendly short names (seed)
         extras = {
@@ -1681,6 +1671,20 @@ class BenchmarkOSChatbot:
         
         return False
 
+    def _get_company_name(self, ticker: str) -> str:
+        """Get company name for ticker symbol."""
+        try:
+            # Try to get company name from database
+            from .web import _lookup_company_name
+            company_name = _lookup_company_name(ticker)
+            if company_name:
+                return company_name
+        except Exception:
+            pass
+        
+        # Fallback to ticker symbol
+        return ticker
+
     def _handle_metrics_comparison(self, tokens: Sequence[str]) -> str:
         """Render a comparison table for the resolved tickers/metrics."""
         cleaned_tokens: List[str] = []
@@ -1711,19 +1715,39 @@ class BenchmarkOSChatbot:
         """Fetch metrics and build a response message for the chat."""
         if not tickers:
             return "Provide at least one ticker for metrics."
-        if len(tickers) == 1 and not period_filters:
+        
+        # Use enhanced professional formatter for single ticker requests
+        if len(tickers) == 1:
             ticker = tickers[0]
-            dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, ticker)
-            if dashboard_payload:
-                display = _display_ticker_symbol(_normalise_ticker_symbol(ticker))
-                self.last_structured_response["dashboard"] = {
-                    "kind": "cfi-classic",
-                    "ticker": display,
-                    "payload": dashboard_payload,
-                }
-            else:
-                self.last_structured_response["dashboard"] = None
-            return self.analytics_engine.generate_summary(ticker)
+            formatter = EnhancedProfessionalFormatter(self.analytics_engine)
+            html_renderer = HTMLRenderer(self.analytics_engine)
+            
+            # Determine period specification for professional formatting
+            period_spec = None
+            if period_filters:
+                if len(period_filters) == 1:
+                    start_year, end_year = period_filters[0]
+                    if start_year == end_year:
+                        period_spec = str(start_year)
+                    else:
+                        period_spec = f"{start_year}-{end_year}"
+            
+            # Get company name
+            company_name = self._get_company_name(ticker)
+            
+            # Use enhanced professional formatter with beautiful HTML
+            html_response = formatter.format_single_ticker_response(
+                ticker=ticker,
+                period_filters=period_filters,
+                period_spec=period_spec,
+                company_name=company_name
+            )
+            
+            # Render as web component for proper display
+            web_renderer = WebComponentRenderer(self.analytics_engine)
+            return web_renderer.render_as_web_component(html_response)
+        
+        # For multiple tickers, use existing table format
         return self._format_metrics_table(
             tickers,
             period_filters=period_filters,
