@@ -1574,9 +1574,21 @@
       window.__cfiDashboardSeries.kpi = payload.kpi_series || {};
       
       // Render data sources section
-      if (payload.sources && window.DashboardEnhancements) {
-        window.DashboardEnhancements.renderDataSources(payload.sources);
-        setupSourcesToggle();
+      console.log('[CFI] Checking sources...', {
+        sourcesCount: payload.sources?.length || 0,
+        hasEnhancements: !!window.DashboardEnhancements
+      });
+      
+      if (payload.sources && payload.sources.length > 0) {
+        if (window.DashboardEnhancements && window.DashboardEnhancements.renderDataSources) {
+          window.DashboardEnhancements.renderDataSources(payload.sources);
+          setupSourcesToggle();
+          console.log('[CFI] ✅ Sources rendered successfully');
+        } else {
+          console.error('[CFI] ❌ DashboardEnhancements.renderDataSources not available');
+        }
+      } else {
+        console.warn('[CFI] ⚠️ No sources in payload');
       }
       
       attachExportHandlers(payload);
@@ -2181,13 +2193,16 @@
 
   // Render Data Sources Section - Using same citation format as audit drawer
   function renderDataSources(sources) {
+    console.log('[renderDataSources] START - Received sources:', sources?.length || 0);
+    
     const container = document.getElementById('cfi-sources-grid');
     if (!container) {
-      console.warn('[renderDataSources] Container #cfi-sources-grid not found');
+      console.error('[renderDataSources] ❌ Container #cfi-sources-grid NOT FOUND in DOM!');
+      alert('ERROR: Sources container not found! Check browser console.');
       return;
     }
 
-    console.log('[renderDataSources] Rendering', sources?.length || 0, 'sources');
+    console.log('[renderDataSources] ✅ Container found, rendering', sources?.length || 0, 'sources');
     
     // Debug: Check first source structure
     if (sources && sources.length > 0) {
@@ -2317,33 +2332,52 @@
 
 // Setup toggle button for sources section
 function setupSourcesToggle() {
+  console.log('[setupSourcesToggle] Initializing toggle button...');
+  
   const toggleBtn = document.getElementById('toggle-sources-btn');
   const sourcesBody = document.getElementById('sources-body');
+  const sourcesPanel = document.querySelector('.cfi-panel[data-area="sources"]');
   const toggleText = toggleBtn?.querySelector('.toggle-text');
   
+  console.log('[setupSourcesToggle] Elements found:', {
+    toggleBtn: !!toggleBtn,
+    sourcesBody: !!sourcesBody,
+    sourcesPanel: !!sourcesPanel,
+    toggleText: !!toggleText
+  });
+  
   if (!toggleBtn || !sourcesBody) {
-    console.warn('[setupSourcesToggle] Toggle button or sources body not found');
+    console.error('[setupSourcesToggle] ❌ Required elements not found!');
     return;
+  }
+  
+  // Make absolutely sure sources panel is visible
+  if (sourcesPanel) {
+    sourcesPanel.style.display = 'flex';
+    sourcesPanel.style.visibility = 'visible';
+    console.log('[setupSourcesToggle] ✅ Forced sources panel visibility');
   }
   
   // Start with sources expanded by default
   let isCollapsed = false;
+  sourcesBody.classList.remove('collapsed');
   
-  toggleBtn.addEventListener('click', () => {
+  toggleBtn.addEventListener('click', (e) => {
+    e.preventDefault();
     isCollapsed = !isCollapsed;
     
     if (isCollapsed) {
       sourcesBody.classList.add('collapsed');
       toggleBtn.classList.add('collapsed');
       if (toggleText) toggleText.textContent = 'Show';
+      console.log('[setupSourcesToggle] ➖ Sources collapsed');
     } else {
       sourcesBody.classList.remove('collapsed');
       toggleBtn.classList.remove('collapsed');
       if (toggleText) toggleText.textContent = 'Hide';
+      console.log('[setupSourcesToggle] ➕ Sources expanded');
     }
-    
-    console.log(`[setupSourcesToggle] Sources ${isCollapsed ? 'collapsed' : 'expanded'}`);
   });
   
-  console.log('[setupSourcesToggle] Toggle button initialized');
+  console.log('[setupSourcesToggle] ✅ Toggle button initialized and sources VISIBLE');
 }

@@ -242,48 +242,58 @@ body {
   display: none;
 }
 
-/* Data Sources Section */
+/* Data Sources Section - MUST BE VISIBLE */
 .cfi-panel[data-area="sources"] {
-  border: 2px solid var(--accent);
-  box-shadow: 0 4px 12px rgba(28, 126, 214, 0.15);
+  border: 3px solid var(--accent) !important;
+  box-shadow: 0 6px 20px rgba(28, 126, 214, 0.25) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 200px !important;
+  background: white !important;
 }
 
 .cfi-panel[data-area="sources"] .cfi-strip {
-  background: linear-gradient(135deg, #1c7ed6 0%, #2b8ce3 100%);
-  color: white;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 20px;
-  font-weight: 600;
+  background: linear-gradient(135deg, #1c7ed6 0%, #2b8ce3 100%) !important;
+  color: white !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 16px 24px !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
+  visibility: visible !important;
 }
 
 .toggle-sources-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  padding: 6px 12px;
-  border-radius: 6px;
+  gap: 8px;
+  background: white;
+  border: none;
+  color: var(--accent);
+  padding: 8px 16px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .toggle-sources-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px);
+  background: #f8f9fa;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .toggle-sources-btn .chevron-icon {
   transition: transform 0.3s ease;
+  flex-shrink: 0;
 }
 
 .toggle-sources-btn.collapsed .chevron-icon {
-  transform: rotate(-90deg);
+  transform: rotate(180deg);
 }
 
 .cfi-panel[data-area="sources"] #sources-body {
