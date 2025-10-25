@@ -61,6 +61,11 @@ temp/
 # OS
 .DS_Store
 Thumbs.db
+.ipynb_checkpoints/
+
+# Database files
+benchmarkos_chatbot.sqlite3-shm
+benchmarkos_chatbot.sqlite3-wal
 
 # Node.js
 node_modules/
@@ -92,3 +97,11 @@ scripts/ingestion/.ingestion_progress.json
 setup.py
 install_node_deps.sh
 start_all.sh
+
+# Test outputs
+tests/outputs/*.txt
+tests/outputs/*.json
+tests/outputs/*.log
+*_test_results.txt
+*_test_output.txt
+*_payload.json
