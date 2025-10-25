@@ -105,9 +105,9 @@ def _collect_source_rows(
         
         # Fallback to old format
         if not text:
-        label = entry.get("label") or entry.get("metric") or "Metric"
-        period = entry.get("period") or ""
-        source = entry.get("source") or ""
+            label = entry.get("label") or entry.get("metric") or "Metric"
+            period = entry.get("period") or ""
+            source = entry.get("source") or ""
             parts = [label]
             if period:
                 parts.append(f"({period})")
@@ -115,13 +115,15 @@ def _collect_source_rows(
                 parts.append(f"- {source}")
             text = " ".join(parts)
         
-        # Extract ticker from text if present (format: "TICKER • ...")
+        # Extract ticker from text if present (support both bullet and bell separators)
         display_text = text
-        if " • " in text:
-            parts = text.split(" • ")
-            ticker = parts[0] if len(parts) > 0 else ""
-            rest = " • ".join(parts[1:]) if len(parts) > 1 else ""
-            display_text = f"{ticker}: {rest}" if rest else ticker
+        for delimiter in (" \u2022 ", " \x07 "):
+            if delimiter in text:
+                parts = text.split(delimiter)
+                ticker = parts[0] if parts else ""
+                rest = delimiter.join(parts[1:]) if len(parts) > 1 else ""
+                display_text = f"{ticker}: {rest}" if rest else ticker
+                break
         
         rows.append((display_text, url, text))
     return rows

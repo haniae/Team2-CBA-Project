@@ -180,8 +180,40 @@
     return { text: cleaned, numeric: null };
   }
 
+  function toNumericValue(value, label) {
+    if (isNumber(value)) {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    }
+    if (typeof value === "string") {
+      const coerced = coerceFromText(label, value);
+      if (coerced && isNumber(coerced.numeric)) {
+        return Number(coerced.numeric);
+      }
+      const normalized = value.replace(/[^0-9.\-]/g, "");
+      if (normalized) {
+        const parsed = Number(normalized);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+    return null;
+  }
+
+  function buildNumericSeries(categories = [], values = [], labelPrefix = "") {
+    if (!Array.isArray(categories) || !Array.isArray(values)) return [];
+    const safe = [];
+    const count = Math.min(categories.length, values.length);
+    for (let idx = 0; idx < count; idx += 1) {
+      const label = labelPrefix ? `${labelPrefix} ${categories[idx] ?? ""}` : categories[idx];
+      const numeric = toNumericValue(values[idx], label);
+      if (numeric === null) continue;
+      safe.push({ x: categories[idx], y: numeric });
+    }
+    return safe;
+  }
+
   function formatValue(label, value) {
-    if (value === null || value === undefined || value === "") return "—";
+    if (value === null || value === undefined || value === "") return "-";
     if (typeof value === "string") {
       const coerced = coerceFromText(label, value);
       if (coerced.numeric !== null) {
@@ -889,18 +921,25 @@
       node.textContent = "No revenue data.";
       return;
     }
-    
-    // Create gradient colors for bars
-    const barColors = data.Revenue.map((_, idx) => {
-      const ratio = idx / (data.Revenue.length - 1);
+
+    const revenueSeries = buildNumericSeries(data.Year, data.Revenue, "Revenue");
+    if (!revenueSeries.length) {
+      node.textContent = "No revenue data.";
+      return;
+    }
+    const xValues = revenueSeries.map((point) => point.x);
+    const yValues = revenueSeries.map((point) => point.y);
+    const denominator = Math.max(yValues.length - 1, 1);
+    const barColors = yValues.map((_, idx) => {
+      const ratio = denominator === 0 ? 0 : idx / denominator;
       return `rgba(11, 46, 89, ${0.7 + ratio * 0.3})`;
     });
     
     const traces = [
       {
         type: "bar",
-        x: data.Year,
-        y: data.Revenue,
+        x: xValues,
+        y: yValues,
         name: "Revenue ($M)",
         marker: { 
           color: barColors,
@@ -910,13 +949,14 @@
         hovertemplate: "<b>FY %{x}</b><br>Revenue: $%{y:,.0f}M<extra></extra>"
       }
     ];
-    const multiples = data.EV_Rev || data["EV/Revenue"];
-    if (Array.isArray(multiples) && multiples.length) {
+    const multiplesSource = data.EV_Rev || data["EV/Revenue"] || [];
+    const multiplesSeries = buildNumericSeries(data.Year, multiplesSource, "EV/Revenue");
+    if (multiplesSeries.length) {
       traces.push({
         type: "scatter",
         mode: "lines+markers",
-        x: data.Year,
-        y: multiples,
+        x: multiplesSeries.map((point) => point.x),
+        y: multiplesSeries.map((point) => point.y),
         name: "EV/Revenue (×)",
         yaxis: "y2",
         line: { color: COLORS.accent, width: 3, shape: "spline" },
@@ -953,17 +993,24 @@
       return;
     }
     
-    // Create gradient colors for bars (green tones)
-    const barColors = data.EBITDA.map((_, idx) => {
-      const ratio = idx / (data.EBITDA.length - 1);
+    const ebitdaSeries = buildNumericSeries(data.Year, data.EBITDA, "EBITDA");
+    if (!ebitdaSeries.length) {
+      node.textContent = "No EBITDA data.";
+      return;
+    }
+    const xValues = ebitdaSeries.map((point) => point.x);
+    const yValues = ebitdaSeries.map((point) => point.y);
+    const denominator = Math.max(yValues.length - 1, 1);
+    const barColors = yValues.map((_, idx) => {
+      const ratio = denominator === 0 ? 0 : idx / denominator;
       return `rgba(16, 185, 129, ${0.6 + ratio * 0.4})`;
     });
     
     const traces = [
       {
         type: "bar",
-        x: data.Year,
-        y: data.EBITDA,
+        x: xValues,
+        y: yValues,
         name: "EBITDA ($M)",
         marker: { 
           color: barColors,
@@ -972,13 +1019,14 @@
         hovertemplate: "<b>FY %{x}</b><br>EBITDA: $%{y:,.0f}M<extra></extra>"
       }
     ];
-    const multiples = data.EV_EBITDA || data["EV/EBITDA"];
-    if (Array.isArray(multiples) && multiples.length) {
+    const multiplesSource = data.EV_EBITDA || data["EV/EBITDA"] || [];
+    const multiplesSeries = buildNumericSeries(data.Year, multiplesSource, "EV/EBITDA");
+    if (multiplesSeries.length) {
       traces.push({
         type: "scatter",
         mode: "lines+markers",
-        x: data.Year,
-        y: multiples,
+        x: multiplesSeries.map((point) => point.x),
+        y: multiplesSeries.map((point) => point.y),
         name: "EV/EBITDA (×)",
         yaxis: "y2",
         line: { color: COLORS.orange, width: 3, shape: "spline" },
@@ -1014,6 +1062,7 @@
       node.textContent = "No forecast data.";
       return;
     }
+    const years = data.Year.slice();
     const traces = [];
     const scenarios = [
       ["Bull", COLORS.green, "solid", "rgba(16, 185, 129, 0.15)"],
@@ -1023,11 +1072,19 @@
     
     scenarios.forEach(([key, color, dash, fillColor]) => {
       if (Array.isArray(data[key])) {
+        const yValues = years.map((year, idx) => {
+          const raw = data[key][idx];
+          const numeric = toNumericValue(raw, `${key} ${year ?? idx}`);
+          return numeric === null ? null : numeric;
+        });
+        if (!yValues.some((value) => value !== null)) {
+          return;
+        }
         traces.push({
           type: "scatter",
           mode: "lines",
-          x: data.Year,
-          y: data[key],
+          x: years,
+          y: yValues,
           name: key,
           line: { color, dash, width: 3, shape: "spline", smoothing: 0.8 },
           fill: 'tonexty',
@@ -1066,6 +1123,13 @@
       node.textContent = "No valuation data.";
       return;
     }
+    const entries = buildNumericSeries(data.Case, data.Value, "Valuation");
+    if (!entries.length) {
+      node.textContent = "No valuation data.";
+      return;
+    }
+    const xValues = entries.map((entry) => entry.x);
+    const yValues = entries.map((entry) => entry.y);
     
     // Create color scheme for different valuation methods
     const colorMap = {
@@ -1076,9 +1140,9 @@
       "Bear": COLORS.red
     };
     
-    const barColors = data.Case.map(caseName => {
+    const barColors = xValues.map((caseName) => {
       for (const [key, color] of Object.entries(colorMap)) {
-        if (caseName.includes(key)) return color;
+        if (caseName && caseName.includes(key)) return color;
       }
       return COLORS.navy;
     });
@@ -1086,32 +1150,33 @@
     const traces = [
       {
         type: "bar",
-        x: data.Case,
-        y: data.Value,
+        x: xValues,
+        y: yValues,
         name: "Valuation",
         marker: { 
           color: barColors,
           line: { color: COLORS.navyDark, width: 1.5 },
           opacity: 0.85
         },
-        text: data.Value.map((v) => formatMoney(v)),
+        text: yValues.map((value) => formatMoney(value)),
         textposition: "outside",
         textfont: { size: 11, weight: 600 },
         cliponaxis: false,
         hovertemplate: "<b>%{x}</b><br>Value: $%{y:,.0f}<extra></extra>"
       }
     ];
-    const { current, average } = meta || {};
+    const currentValue = toNumericValue(meta?.current, "Current Price");
+    const averageValue = toNumericValue(meta?.average, "Average");
     const referenceLines = [
-      ["Current Price", current, COLORS.slate, "dot"],
-      ["Average", average, COLORS.orange, "dash"]
-    ].filter(([, value]) => isNumber(value));
+      ["Current Price", currentValue, COLORS.slate, "dot"],
+      ["Average", averageValue, COLORS.orange, "dash"]
+    ].filter(([, value]) => value !== null);
     referenceLines.forEach(([label, value, color, dash]) => {
       traces.push({
         type: "scatter",
         mode: "lines",
-        x: data.Case,
-        y: data.Case.map(() => value),
+        x: xValues,
+        y: xValues.map(() => value),
         name: label,
         line: { color, dash, width: 2.5 },
         hovertemplate: `<b>${label}</b><br>${formatMoney(value)}<extra></extra>`

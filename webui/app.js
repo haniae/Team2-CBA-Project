@@ -6977,19 +6977,52 @@ async function ensureStylesheetOnce(id, href) {
   });
 }
 
+const scriptLoadPromises = new Map();
+
 async function ensureScriptOnce(id, src) {
-  if (document.getElementById(id)) {
-    return;
+  if (scriptLoadPromises.has(id)) {
+    return scriptLoadPromises.get(id);
   }
-  return new Promise((resolve, reject) => {
+  const existing = document.getElementById(id);
+  if (existing) {
+    if (existing.dataset.loaded === "true" || !existing.dataset.loading) {
+      return Promise.resolve();
+    }
+    const existingPromise = new Promise((resolve, reject) => {
+      const handleLoad = () => {
+        existing.dataset.loaded = "true";
+        resolve();
+      };
+      const handleError = () => {
+        scriptLoadPromises.delete(id);
+        reject(new Error(`Failed to load script ${src}`));
+      };
+      existing.addEventListener("load", handleLoad, { once: true });
+      existing.addEventListener("error", handleError, { once: true });
+    });
+    scriptLoadPromises.set(id, existingPromise);
+    return existingPromise;
+  }
+  const loadPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.id = id;
     script.src = resolveStaticAsset(src);
     script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load script ${src}`));
+    script.dataset.loading = "true";
+    script.onload = () => {
+      script.dataset.loading = "false";
+      script.dataset.loaded = "true";
+      resolve();
+    };
+    script.onerror = () => {
+      scriptLoadPromises.delete(id);
+      script.remove();
+      reject(new Error(`Failed to load script ${src}`));
+    };
     document.head.appendChild(script);
   });
+  scriptLoadPromises.set(id, loadPromise);
+  return loadPromise;
 }
 
 async function ensurePlotlyLoaded() {
