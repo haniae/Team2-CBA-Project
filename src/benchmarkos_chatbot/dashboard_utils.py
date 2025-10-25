@@ -172,6 +172,30 @@ def _round_two(value: Optional[float]) -> Optional[float]:
     return round(value, 2)
 
 
+def _format_kpi_value(value: Optional[float], value_type: str) -> str:
+    """Format KPI values based on their type."""
+    if value is None:
+        return "N/A"
+    
+    if value_type == "percent":
+        # Convert decimal to percentage (e.g., 0.12 -> 12.0%)
+        return f"{value * 100:.1f}%"
+    elif value_type == "multiple":
+        # Format multiples with 2 decimal places (e.g., 1.5x)
+        return f"{value:.2f}x"
+    else:
+        # Format large numbers with suffixes
+        abs_value = abs(value)
+        if abs_value >= 1_000_000_000:
+            return f"${value/1_000_000_000:.1f}B"
+        elif abs_value >= 1_000_000:
+            return f"${value/1_000_000:.1f}M"
+        elif abs_value >= 1_000:
+            return f"${value/1_000:.1f}K"
+        else:
+            return f"${value:.2f}"
+
+
 def _build_kpi_summary(
     latest: Dict[str, database.MetricRecord],
 ) -> List[Dict[str, Any]]:
@@ -180,15 +204,18 @@ def _build_kpi_summary(
     for metric_id in DASHBOARD_KPI_ORDER:
         record = latest.get(metric_id)
         value = _latest_metric_value(latest, metric_id)
+        
+        # Determine value type
+        value_type = "percent" if metric_id in PERCENTAGE_METRICS else \
+                     "multiple" if metric_id in MULTIPLE_METRICS else \
+                     "number"
+        
         entry: Dict[str, Any] = {
             "id": metric_id,
             "label": METRIC_LABELS.get(metric_id, metric_id.replace("_", " ").title()),
             "value": value,
-            "type": "percent"
-            if metric_id in PERCENTAGE_METRICS
-            else "multiple"
-            if metric_id in MULTIPLE_METRICS
-            else "number",
+            "formatted_value": _format_kpi_value(value, value_type),
+            "type": value_type,
         }
         if record:
             period_label = record.period

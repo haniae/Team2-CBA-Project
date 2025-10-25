@@ -1,0 +1,60 @@
+ccc996c - chore: Auto-commit uncommitted changes
+
+ README_SP500_INGESTION.md          | 147 [32m++++++++++[m
+ SP500_INGESTION_SYSTEM_COMPLETE.md | 552 [32m+++++++++++++++++++++++++++++++++++++[m
+ check_database_simple.py           |  28 [32m+[m[31m-[m
+ check_ingestion_status.py          |   6 [32m+[m[31m-[m
+ docs/TEAM_SETUP_GUIDE.md           | 547 [32m++++++++++++++++++++++++++++++++++[m[31m--[m
+ 5 files changed, 1239 insertions(+), 41 deletions(-)
+
+11c70b3 - docs: Add comprehensive dashboard sources documentation and verification tools
+
+ DASHBOARD_SOURCES_INSTRUCTIONS.md                  | 149 [32m+++++++++[m
+ check_database_simple.py                           | 363 [32m+++++++++++++++++++++[m
+ check_ingestion_status.py                          | 192 [32m+++++++++++[m
+ scripts/ingestion/ingest_sp500_15years.py          |   2 [32m+[m[31m-[m
+ .../ingestion/load_historical_prices_15years.py    |   2 [32m+[m[31m-[m
+ show_complete_attribution.py                       |  94 [32m++++++[m
+ test_dashboard_sources.html                        | 134 [32m++++++++[m
+ tests/test_source_completeness.py                  | 122 [32m+++++++[m
+ 8 files changed, 1056 insertions(+), 2 deletions(-)
+
+3f1ba7d - Clean up repository and add essential files
+
+ .gitignore                           | 105 [32m++++++++[m[31m--[m
+ INSTALLATION_GUIDE.md                | 284 [32m++++++++++++++++++++++++++[m
+ PLOTLY_INTEGRATION.md                | 265 [32m+++++++++++++++++++++++++[m
+ README_SETUP.md                      | 280 [32m++++++++++++++++++++++++++[m
+ SETUP_GUIDE.md                       | 297 [32m++++++++++++++++++++++++++++[m
+ env.example                          | 175 [32m++++++++++++++++[m
+ plotly_demo.py                       | 372 [32m+++++++++++++++++++++++++++++++++++[m
+ requirements.txt                     |  90 [32m++++++++[m[31m-[m
+ scripts/ingestion/ingest_universe.py |   5 [32m+[m[31m-[m
+ webui/package.json                   |  64 [32m++++++[m
+ webui/start_dashboard.js             | 105 [32m++++++++++[m
+ 11 files changed, 2019 insertions(+), 23 deletions(-)
+
+e8a3c5c - Add duplicate files analysis report
+
+ duplicate_files_report.md | 51 [32m+++++++++++++++++++++++++++++++++++++++++++++++[m
+ 1 file changed, 51 insertions(+)
+
+6f735e1 - chore: Move verification scripts to tests folder
+
+ check_sources.py => tests/check_sources.py                             | 0
+ verify_100_percent_complete.py => tests/verify_100_percent_complete.py | 0
+ 2 files changed, 0 insertions(+), 0 deletions(-)
+
+0b3d0ad - Move chatbot scripts to root directory
+
+ analysis/scripts/run_chatbot.py                    | 119 [31m-------------------[m
+ run_chatbot.py                                     | 129 [32m+++++++++++++++++++++[m
+ .../scripts/serve_chatbot.py => serve_chatbot.py   |   0
+ 3 files changed, 129 insertions(+), 119 deletions(-)
+
+3aad03c - feat: Achieve 100% source attribution for all companies
+
+ check_sources.py                           |  13 [32m++[m
+ src/benchmarkos_chatbot/dashboard_utils.py | 215 [32m+++++++++++++++++++++++++++[m[31m--[m
+ verify_100_percent_complete.py             |  85 [32m++++++++++++[m
+ 3 files changed, 302 insertions(+), 11 deletions(-)

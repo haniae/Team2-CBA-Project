@@ -88,36 +88,43 @@ def main():
     print(f"  - Total price records: {len(all_rows):,}")
     
     if all_rows:
-        print(f"\n💾 Saving latest quotes to database...")
+        print(f"\n💾 Saving ALL historical quotes to database...")
         
-        # Convert to MarketQuote objects for latest prices
-        latest_quotes = []
-        ticker_latest = {}
+        # Convert ALL historical data to MarketQuote objects
+        all_quotes = []
         
         for ticker, date_str, close, adj_close, volume in all_rows:
-            if ticker not in ticker_latest or date_str > ticker_latest[ticker][0]:
-                ticker_latest[ticker] = (date_str, close, volume)
-        
-        for ticker, (date_str, close, volume) in ticker_latest.items():
-            latest_quotes.append(MarketQuote(
+            # Parse the date string to create a proper timestamp
+            date_obj = datetime.fromisoformat(date_str)
+            timestamp = datetime.combine(date_obj, datetime.min.time()).replace(tzinfo=timezone.utc)
+            
+            all_quotes.append(MarketQuote(
                 ticker=ticker,
                 price=close,
                 currency="USD",
                 volume=volume,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=timestamp,
                 source="yfinance_historical",
-                raw={"date": date_str, "price": close, "volume": volume}
+                raw={"date": date_str, "close": close, "adj_close": adj_close, "volume": volume}
             ))
         
-        # Insert latest quotes
-        inserted = database.bulk_insert_market_quotes(settings.database_path, latest_quotes)
-        print(f"  ✅ Inserted {inserted} latest quotes")
+        print(f"  📦 Prepared {len(all_quotes):,} market quotes for insertion...")
+        
+        # Insert all historical quotes in batches to avoid memory issues
+        batch_size = 10000
+        total_inserted = 0
+        
+        for i in range(0, len(all_quotes), batch_size):
+            batch = all_quotes[i:i+batch_size]
+            inserted = database.bulk_insert_market_quotes(settings.database_path, batch)
+            total_inserted += inserted
+            print(f"  ✅ Inserted batch {i//batch_size + 1}/{math.ceil(len(all_quotes)/batch_size)}: {inserted:,} quotes (Total: {total_inserted:,})")
         
         print(f"\n📊 Data Summary:")
         print(f"  - Historical records fetched: {len(all_rows):,}")
-        print(f"  - Latest quotes saved: {inserted}")
+        print(f"  - Total quotes saved to database: {total_inserted:,}")
         print(f"  - Time period: 15 years")
-        print(f"  - Note: Full historical data available in memory")
+        print(f"  - ✅ Full historical data now persisted in database!")
     
     print(f"\n✅ Historical price loading completed!")
     print(f"Next step: python check_database_simple.py")

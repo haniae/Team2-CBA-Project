@@ -1576,6 +1576,7 @@
       // Render data sources section
       if (payload.sources && window.DashboardEnhancements) {
         window.DashboardEnhancements.renderDataSources(payload.sources);
+        setupSourcesToggle();
       }
       
       attachExportHandlers(payload);
@@ -2313,3 +2314,36 @@
     renderDataSources
   };
 })();
+
+// Setup toggle button for sources section
+function setupSourcesToggle() {
+  const toggleBtn = document.getElementById('toggle-sources-btn');
+  const sourcesBody = document.getElementById('sources-body');
+  const toggleText = toggleBtn?.querySelector('.toggle-text');
+  
+  if (!toggleBtn || !sourcesBody) {
+    console.warn('[setupSourcesToggle] Toggle button or sources body not found');
+    return;
+  }
+  
+  // Start with sources expanded by default
+  let isCollapsed = false;
+  
+  toggleBtn.addEventListener('click', () => {
+    isCollapsed = !isCollapsed;
+    
+    if (isCollapsed) {
+      sourcesBody.classList.add('collapsed');
+      toggleBtn.classList.add('collapsed');
+      if (toggleText) toggleText.textContent = 'Show';
+    } else {
+      sourcesBody.classList.remove('collapsed');
+      toggleBtn.classList.remove('collapsed');
+      if (toggleText) toggleText.textContent = 'Hide';
+    }
+    
+    console.log(`[setupSourcesToggle] Sources ${isCollapsed ? 'collapsed' : 'expanded'}`);
+  });
+  
+  console.log('[setupSourcesToggle] Toggle button initialized');
+}

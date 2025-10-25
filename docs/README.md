@@ -33,6 +33,12 @@ This directory contains all project documentation organized by topic.
 - **[command_routing_analysis_report.md](./command_routing_analysis_report.md)** - Command routing analysis
 - **[prompt_processing_analysis.md](./prompt_processing_analysis.md)** - Prompt processing analysis
 
+### Data & Database
+- **[DATABASE_DATA_SUMMARY.md](./DATABASE_DATA_SUMMARY.md)** - Complete database status: **1.7M+ rows** of financial data
+  - Historical price data ingestion methodology
+  - Coverage statistics (97.3% of S&P 500)
+  - Reproducibility guide
+
 ## 🗂️ Organization
 
 ```
@@ -50,10 +56,12 @@ docs/
 │   ├── architecture.md
 │   ├── product_design_spec.md
 │   └── ui_design_philosophy.md
-└── Analytics/
-    ├── PHASE1_ANALYTICS_FEATURES.md
-    ├── command_routing_analysis_report.md
-    └── prompt_processing_analysis.md
+├── Analytics/
+│   ├── PHASE1_ANALYTICS_FEATURES.md
+│   ├── command_routing_analysis_report.md
+│   └── prompt_processing_analysis.md
+└── Data & Database/
+    └── DATABASE_DATA_SUMMARY.md       # 1.7M+ rows of data
 ```
 
 ## 📖 Quick Links
@@ -73,8 +81,15 @@ docs/
 2. [SEC_URLS_FIX_SUMMARY.md](./SEC_URLS_FIX_SUMMARY.md)
 3. [RAW_SEC_PARSER_IMPLEMENTATION_GUIDE.md](./RAW_SEC_PARSER_IMPLEMENTATION_GUIDE.md)
 
+**For Database & Data Management:**
+1. [DATABASE_DATA_SUMMARY.md](./DATABASE_DATA_SUMMARY.md) - **1.7M+ rows** of S&P 500 data
+   - Historical price ingestion methodology
+   - Database setup and verification
+   - Step-by-step reproduction guide
+
 ## 🔄 Recently Added
 
+- **2025-10-25**: Database data summary - **1.7M+ rows** ingested (historical price data)
 - **2025-10-24**: Source attribution documentation (100% completeness)
 - **2025-10-24**: Dashboard source display enhancements
 - **2025-10-24**: SEC URL integration documentation

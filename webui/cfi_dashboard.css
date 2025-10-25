@@ -243,6 +243,61 @@ body {
 }
 
 /* Data Sources Section */
+.cfi-panel[data-area="sources"] {
+  border: 2px solid var(--accent);
+  box-shadow: 0 4px 12px rgba(28, 126, 214, 0.15);
+}
+
+.cfi-panel[data-area="sources"] .cfi-strip {
+  background: linear-gradient(135deg, #1c7ed6 0%, #2b8ce3 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  font-weight: 600;
+}
+
+.toggle-sources-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.toggle-sources-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.toggle-sources-btn .chevron-icon {
+  transition: transform 0.3s ease;
+}
+
+.toggle-sources-btn.collapsed .chevron-icon {
+  transform: rotate(-90deg);
+}
+
+.cfi-panel[data-area="sources"] #sources-body {
+  max-height: 2000px;
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.3s ease;
+  opacity: 1;
+}
+
+.cfi-panel[data-area="sources"] #sources-body.collapsed {
+  max-height: 0;
+  opacity: 0;
+}
+
 .sources-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
