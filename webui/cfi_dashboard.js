@@ -2280,11 +2280,36 @@
     }).join('');
 
     container.innerHTML = sourcesHTML;
+    console.log('[renderDataSources] ✅ HTML inserted into container, innerHTML length:', sourcesHTML.length);
+    
+    // Make absolutely sure the container is visible
+    container.style.display = 'grid';
+    container.style.visibility = 'visible';
+    container.style.opacity = '1';
+    
+    // Show count in header
+    const sourcesPanel = document.querySelector('.cfi-panel[data-area="sources"]');
+    if (sourcesPanel) {
+      const headerText = sourcesPanel.querySelector('.cfi-strip');
+      if (headerText && !headerText.querySelector('.sources-count')) {
+        const countBadge = document.createElement('span');
+        countBadge.className = 'sources-count';
+        countBadge.textContent = `${sources.length} items`;
+        headerText.insertBefore(countBadge, headerText.querySelector('.toggle-sources-btn'));
+      }
+    }
     
     // Debug: Check if links are properly created
     setTimeout(() => {
       const links = container.querySelectorAll('.source-link');
-      console.log(`[renderDataSources] Created ${links.length} source links`);
+      const items = container.querySelectorAll('.source-item');
+      console.log(`[renderDataSources] Created ${items.length} source items and ${links.length} links`);
+      
+      if (items.length === 0) {
+        console.error('[renderDataSources] ❌ NO SOURCE ITEMS RENDERED! Check sourcesHTML');
+        console.log('[renderDataSources] sourcesHTML sample:', sourcesHTML.substring(0, 500));
+      }
+      
       links.forEach((link, i) => {
         if (link.href) {
           console.log(`  Link ${i+1}:`, link.href, 'clickable:', link.style.pointerEvents !== 'none');

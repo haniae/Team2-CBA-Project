@@ -266,34 +266,60 @@ body {
   visibility: visible !important;
 }
 
+.sources-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: auto;
+  margin-right: 12px;
+}
+
 .toggle-sources-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: white;
-  border: none;
-  color: var(--accent);
-  padding: 8px 16px;
-  border-radius: 8px;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  color: #1c7ed6;
+  padding: 6px 14px;
+  border-radius: 20px;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s ease;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .toggle-sources-btn:hover {
-  background: #f8f9fa;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background: white;
+  border-color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.toggle-sources-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .toggle-sources-btn .chevron-icon {
-  transition: transform 0.3s ease;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
+  width: 14px;
+  height: 14px;
 }
 
 .toggle-sources-btn.collapsed .chevron-icon {
   transform: rotate(180deg);
+}
+
+.toggle-sources-btn .toggle-text {
+  font-size: 12px;
 }
 
 .cfi-panel[data-area="sources"] #sources-body {
@@ -309,9 +335,22 @@ body {
 }
 
 .sources-grid {
-  display: grid;
+  display: grid !important;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
+  padding: 20px;
+  min-height: 100px;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.sources-grid:empty::before {
+  content: "Loading sources...";
+  display: block;
+  text-align: center;
+  color: #666;
+  padding: 40px;
+  font-size: 16px;
 }
 
 .source-item {
