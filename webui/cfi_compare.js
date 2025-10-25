@@ -243,9 +243,26 @@
       node.innerHTML = "<div class=\"cfi-error\">No data available</div>";
       return;
     }
-    const traces = entries.map(([ticker,vals])=>({
-      type:"scatter", x:years, y:vals, mode:"lines", name:ticker
-    }));
+    // Filter out NaN/null values for each trace
+    const traces = entries.map(([ticker,vals])=>{
+      const cleanedPairs = (years || [])
+        .map((year, idx) => {
+          const val = vals[idx];
+          return (val !== null && val !== undefined && Number.isFinite(Number(val))) ? {year, val: Number(val)} : null;
+        })
+        .filter(Boolean);
+      return {
+        type:"scatter", 
+        x: cleanedPairs.map(p => p.year), 
+        y: cleanedPairs.map(p => p.val), 
+        mode:"lines", 
+        name:ticker
+      };
+    }).filter(trace => trace.x.length > 0);
+    if (!traces.length) {
+      node.innerHTML = "<div class=\"cfi-error\">No valid data available</div>";
+      return;
+    }
     Plotly.newPlot(node, traces, {...L, yaxis:{...L.yaxis,title:label}}, {displayModeBar:false,responsive:true});
   }
 
@@ -349,9 +366,19 @@
       node.innerHTML = "<div class=\"cfi-error\">No valuation summary</div>";
       return;
     }
-    const traces = tickers.map(t=>({
-      type:"bar", x:cases, y:perCompany[t], name:t, marker:{line:{width:0}}
-    }));
+    // Clean data to remove NaN/null values
+    const traces = tickers.map(t=>{
+      const yValues = (perCompany[t] || []).map(v => 
+        (v !== null && v !== undefined && Number.isFinite(Number(v))) ? Number(v) : null
+      );
+      return {
+        type:"bar", 
+        x:cases, 
+        y:yValues, 
+        name:t, 
+        marker:{line:{width:0}}
+      };
+    });
     Plotly.newPlot(node, traces, {...L, yaxis:{...L.yaxis,title:"$/Share"}}, {displayModeBar:false,responsive:true});
   }
 
