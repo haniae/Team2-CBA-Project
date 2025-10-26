@@ -2427,14 +2427,26 @@ function setupSourcesToggle() {
   const toggleBtn = document.getElementById('toggle-sources-btn');
   const sourcesBody = document.getElementById('sources-body');
   const sourcesPanel = document.querySelector('.cfi-panel[data-area="sources"]');
+  const sourcesGrid = document.getElementById('cfi-sources-grid');
   const toggleText = toggleBtn?.querySelector('.toggle-text');
   
   console.log('[setupSourcesToggle] Elements found:', {
     toggleBtn: !!toggleBtn,
     sourcesBody: !!sourcesBody,
     sourcesPanel: !!sourcesPanel,
+    sourcesGrid: !!sourcesGrid,
     toggleText: !!toggleText
   });
+  
+  // Check if sources were rendered
+  if (sourcesGrid) {
+    const sourceItems = sourcesGrid.querySelectorAll('.source-item');
+    console.log('[setupSourcesToggle] Source items in grid:', sourceItems.length);
+    if (sourceItems.length === 0) {
+      console.warn('[setupSourcesToggle] ⚠️ No source items found! Sources may not have been rendered.');
+      console.log('[setupSourcesToggle] Grid HTML:', sourcesGrid.innerHTML.substring(0, 200));
+    }
+  }
   
   if (!toggleBtn || !sourcesBody) {
     console.error('[setupSourcesToggle] ❌ Required elements not found!');
@@ -2448,14 +2460,17 @@ function setupSourcesToggle() {
     console.log('[setupSourcesToggle] ✅ Forced sources panel visibility');
   }
   
-  // Start with sources collapsed by default
-  let isCollapsed = true;
-  sourcesBody.classList.add('collapsed');
-  toggleBtn.classList.add('collapsed');
-  if (toggleText) toggleText.textContent = 'Show';
+  // Start with sources expanded by default (as it was originally)
+  let isCollapsed = false;
+  sourcesBody.classList.remove('collapsed');
+  toggleBtn.classList.remove('collapsed');
+  if (toggleText) toggleText.textContent = 'Hide';
   
   toggleBtn.addEventListener('click', (e) => {
+    console.log('[setupSourcesToggle] 🖱️ BUTTON CLICKED!', { isCollapsed });
     e.preventDefault();
+    e.stopPropagation();
+    
     isCollapsed = !isCollapsed;
     
     if (isCollapsed) {
@@ -2468,8 +2483,23 @@ function setupSourcesToggle() {
       toggleBtn.classList.remove('collapsed');
       if (toggleText) toggleText.textContent = 'Hide';
       console.log('[setupSourcesToggle] ➕ Sources expanded');
+      
+      // Log what's in the sources body
+      setTimeout(() => {
+        const items = sourcesBody.querySelectorAll('.source-item');
+        console.log('[setupSourcesToggle] Sources expanded, items visible:', items.length);
+      }, 100);
     }
+    
+    console.log('[setupSourcesToggle] After toggle:', {
+      isCollapsed,
+      bodyHasCollapsed: sourcesBody.classList.contains('collapsed'),
+      btnHasCollapsed: toggleBtn.classList.contains('collapsed'),
+      buttonText: toggleText?.textContent
+    });
   });
   
   console.log('[setupSourcesToggle] ✅ Toggle button initialized and sources COLLAPSED (click to show)');
+  console.log('[setupSourcesToggle] Button element:', toggleBtn);
+  console.log('[setupSourcesToggle] Try clicking the button now!');
 }
