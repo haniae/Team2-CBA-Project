@@ -2448,9 +2448,11 @@ function setupSourcesToggle() {
     console.log('[setupSourcesToggle] ✅ Forced sources panel visibility');
   }
   
-  // Start with sources expanded by default
-  let isCollapsed = false;
-  sourcesBody.classList.remove('collapsed');
+  // Start with sources collapsed by default
+  let isCollapsed = true;
+  sourcesBody.classList.add('collapsed');
+  toggleBtn.classList.add('collapsed');
+  if (toggleText) toggleText.textContent = 'Show';
   
   toggleBtn.addEventListener('click', (e) => {
     e.preventDefault();
@@ -2469,5 +2471,5 @@ function setupSourcesToggle() {
     }
   });
   
-  console.log('[setupSourcesToggle] ✅ Toggle button initialized and sources VISIBLE');
+  console.log('[setupSourcesToggle] ✅ Toggle button initialized and sources COLLAPSED (click to show)');
 }
