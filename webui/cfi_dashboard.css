@@ -250,7 +250,7 @@ body {
   flex-direction: column !important;
   visibility: visible !important;
   opacity: 1 !important;
-  min-height: 200px !important;
+  min-height: auto !important;
   background: white !important;
 }
 
@@ -325,13 +325,15 @@ body {
 .cfi-panel[data-area="sources"] #sources-body {
   max-height: 2000px;
   overflow: hidden;
-  transition: max-height 0.4s ease, opacity 0.3s ease;
+  transition: max-height 0.4s ease, opacity 0.3s ease, padding 0.4s ease;
   opacity: 1;
+  padding: 20px;
 }
 
 .cfi-panel[data-area="sources"] #sources-body.collapsed {
   max-height: 0;
   opacity: 0;
+  padding: 0;
 }
 
 .sources-grid {
