@@ -37,6 +37,7 @@ from .dashboard_utils import (
     _display_ticker_symbol,
     _normalise_ticker_symbol,
 )
+from .routing import enhance_structured_parse, should_build_dashboard, EnhancedIntent
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1586,6 +1587,21 @@ class BenchmarkOSChatbot:
         # Priority 1: Try structured metrics parsing FIRST
         structured = parse_to_structured(text)
         self.last_structured_response["parser"] = structured
+
+        # Optional: Enhanced routing layer (only if enabled in config)
+        enhanced_routing = None
+        if self.settings.enable_enhanced_routing:
+            enhanced_routing = enhance_structured_parse(text, structured)
+            self.last_structured_response["enhanced_routing"] = {
+                "intent": enhanced_routing.intent.value,
+                "confidence": enhanced_routing.confidence,
+                "force_dashboard": enhanced_routing.force_dashboard,
+                "force_text_only": enhanced_routing.force_text_only,
+            }
+            
+            # If low confidence, let LLM handle it
+            if enhanced_routing.confidence < 0.7:
+                return None
 
         # If structured parsing detected compare intent with multiple tickers, handle it directly
         if (structured and 

@@ -108,6 +108,7 @@ class Settings:
     stooq_symbol_suffix: str = ".us"
     stooq_timeout: float = 20.0
     ingestion_year_buffer: int = 2
+    enable_enhanced_routing: bool = False
 
     @property
     def sqlite_uri(self) -> str:
@@ -324,6 +325,7 @@ def load_settings() -> Settings:
         stooq_symbol_suffix=stooq_symbol_suffix,
         stooq_timeout=stooq_timeout,
         ingestion_year_buffer=ingestion_year_buffer,
+        enable_enhanced_routing=_env_flag("ENABLE_ENHANCED_ROUTING", default=False),
     )
 
 
