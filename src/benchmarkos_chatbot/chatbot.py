@@ -1568,8 +1568,8 @@ class BenchmarkOSChatbot:
                 # Check if this is a question - if so, skip summary and let LLM handle it
                 lowered_input = user_input.lower()
                 question_patterns = [
-                    r'\bwhat\s+(?:is|are|was|were)\b',
-                    r'\bhow\s+(?:much|many|does|did|is|are)\b',
+                    r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would)\b',
+                    r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would)\b',
                     r'\bwhy\b',
                     r'\bexplain\b',
                     r'\btell\s+me\s+(?:about|why|how)\b',
@@ -1578,6 +1578,8 @@ class BenchmarkOSChatbot:
                     r'\bcan\s+you\b',
                     r'\bdoes\s+\w+\s+have\b',
                     r'\bshould\s+i\b',
+                    r'\bwhen\s+(?:is|are|was|were|did|will)\b',
+                    r'\bwhere\s+(?:is|are|can|do)\b',
                 ]
                 is_question = any(re.search(pattern, lowered_input) for pattern in question_patterns)
                 
@@ -1696,8 +1698,8 @@ class BenchmarkOSChatbot:
         
         # 4. Check if this is a natural language QUESTION (not a table request)
         question_patterns = [
-            r'\bwhat\s+(?:is|are|was|were)\b',
-            r'\bhow\s+(?:much|many|does|did|is|are)\b',
+            r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would)\b',
+            r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would)\b',
             r'\bwhy\b',
             r'\bexplain\b',
             r'\btell\s+me\s+(?:about|why|how)\b',
@@ -1706,6 +1708,8 @@ class BenchmarkOSChatbot:
             r'\bcan\s+you\b',
             r'\bdoes\s+\w+\s+have\b',
             r'\bshould\s+i\b',
+            r'\bwhen\s+(?:is|are|was|were|did|will)\b',
+            r'\bwhere\s+(?:is|are|can|do)\b',
         ]
         
         is_question = any(re.search(pattern, lowered) for pattern in question_patterns)
