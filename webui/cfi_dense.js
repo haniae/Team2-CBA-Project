@@ -40,6 +40,24 @@ window.CFI_DENSE = (function () {
     return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
   };
 
+  // Helper to filter valid numeric pairs for charts
+  function filterValidPairs(xArray, yArray) {
+    if (!Array.isArray(xArray) || !Array.isArray(yArray)) {
+      return { x: [], y: [] };
+    }
+    const filtered = xArray
+      .map((x, idx) => ({ x, y: yArray[idx] }))
+      .filter(pair => {
+        const xValid = pair.x !== null && pair.x !== undefined;
+        const yValid = pair.y !== null && pair.y !== undefined && Number.isFinite(Number(pair.y));
+        return xValid && yValid;
+      });
+    return {
+      x: filtered.map(p => p.x),
+      y: filtered.map(p => Number(p.y))
+    };
+  }
+
   function normaliseEntries(obj) {
     if (!obj) return [];
     if (Array.isArray(obj)) {
@@ -221,29 +239,39 @@ window.CFI_DENSE = (function () {
       host.textContent = "No revenue data.";
       return;
     }
+    // Clean and filter data to remove NaN/null values
+    const cleanedRevenue = filterValidPairs(data.Year, data.Revenue);
+    if (!cleanedRevenue.x.length) {
+      host.textContent = "No valid revenue data.";
+      return;
+    }
+    
     const lineValues = data.EV_Rev || data["EV/Revenue"];
     const traces = [
       {
         type: "bar",
-        x: data.Year,
-        y: data.Revenue,
+        x: cleanedRevenue.x,
+        y: cleanedRevenue.y,
         name: "Revenue ($M)",
         marker: { color: "#003366" },
         hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>",
       },
     ];
     if (Array.isArray(lineValues) && lineValues.length) {
-      traces.push({
-        type: "scatter",
-        mode: "lines+markers",
-        name: "EV/Revenue (×)",
-        x: data.Year,
-        y: lineValues,
-        yaxis: "y2",
-        line: { color: "#FF7F0E", width: 2 },
-        marker: { size: 5, color: "#FF7F0E" },
-        hovertemplate: "FY %{x}: %{y:.2f}×<extra></extra>",
-      });
+      const cleanedLine = filterValidPairs(data.Year, lineValues);
+      if (cleanedLine.x.length) {
+        traces.push({
+          type: "scatter",
+          mode: "lines+markers",
+          name: "EV/Revenue (×)",
+          x: cleanedLine.x,
+          y: cleanedLine.y,
+          yaxis: "y2",
+          line: { color: "#FF7F0E", width: 2 },
+          marker: { size: 5, color: "#FF7F0E" },
+          hovertemplate: "FY %{x}: %{y:.2f}×<extra></extra>",
+        });
+      }
     }
     const layout = {
       ...THEME.layout,
@@ -265,29 +293,39 @@ window.CFI_DENSE = (function () {
       host.textContent = "No EBITDA data.";
       return;
     }
+    // Clean and filter data to remove NaN/null values
+    const cleanedEbitda = filterValidPairs(data.Year, data.EBITDA);
+    if (!cleanedEbitda.x.length) {
+      host.textContent = "No valid EBITDA data.";
+      return;
+    }
+    
     const lineValues = data.EV_EBITDA || data["EV/EBITDA"];
     const traces = [
       {
         type: "bar",
-        x: data.Year,
-        y: data.EBITDA,
+        x: cleanedEbitda.x,
+        y: cleanedEbitda.y,
         name: "EBITDA ($M)",
         marker: { color: "#003366" },
         hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>",
       },
     ];
     if (Array.isArray(lineValues) && lineValues.length) {
-      traces.push({
-        type: "scatter",
-        mode: "lines+markers",
-        name: "EV/EBITDA (×)",
-        x: data.Year,
-        y: lineValues,
-        yaxis: "y2",
-        line: { color: "#FF7F0E", width: 2 },
-        marker: { size: 5, color: "#FF7F0E" },
-        hovertemplate: "FY %{x}: %{y:.2f}×<extra></extra>",
-      });
+      const cleanedLine = filterValidPairs(data.Year, lineValues);
+      if (cleanedLine.x.length) {
+        traces.push({
+          type: "scatter",
+          mode: "lines+markers",
+          name: "EV/EBITDA (×)",
+          x: cleanedLine.x,
+          y: cleanedLine.y,
+          yaxis: "y2",
+          line: { color: "#FF7F0E", width: 2 },
+          marker: { size: 5, color: "#FF7F0E" },
+          hovertemplate: "FY %{x}: %{y:.2f}×<extra></extra>",
+        });
+      }
     }
     const layout = {
       ...THEME.layout,
@@ -305,12 +343,18 @@ window.CFI_DENSE = (function () {
       host.textContent = "No valuation details.";
       return;
     }
+    // Clean and filter data to remove NaN/null values
+    const cleanedData = filterValidPairs(data.Case, data.Value);
+    if (!cleanedData.x.length) {
+      host.textContent = "No valid valuation data.";
+      return;
+    }
     const bar = {
       type: "bar",
-      x: data.Case,
-      y: data.Value,
+      x: cleanedData.x,
+      y: cleanedData.y,
       marker: { color: "#003366" },
-      text: data.Value.map((v) => fmtMoney(v)),
+      text: cleanedData.y.map((v) => fmtMoney(v)),
       textposition: "outside",
       hovertemplate: "%{x}: %{y:$,.0f}<extra></extra>",
     };
@@ -320,7 +364,7 @@ window.CFI_DENSE = (function () {
         type: "line",
         xref: "x",
         x0: -0.5,
-        x1: data.Case.length - 0.5,
+        x1: cleanedData.x.length - 0.5,
         y0: current,
         y1: current,
         line: { color: "#FF7F0E", dash: "dot", width: 2 },
@@ -343,12 +387,24 @@ window.CFI_DENSE = (function () {
       return;
     }
     const traces = [];
-    if (Array.isArray(data.Bull))
-      traces.push({ type: "scatter", mode: "lines+markers", x: data.Year, y: data.Bull, name: "Bull", line: { color: "#003366", width: 2 }, marker: { size: 5, color: "#003366" }, hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>" });
-    if (Array.isArray(data.Base))
-      traces.push({ type: "scatter", mode: "lines+markers", x: data.Year, y: data.Base, name: "Base", line: { color: "#FF7F0E", dash: "dash", width: 2 }, marker: { size: 5, color: "#FF7F0E" }, hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>" });
-    if (Array.isArray(data.Bear))
-      traces.push({ type: "scatter", mode: "lines+markers", x: data.Year, y: data.Bear, name: "Bear", line: { color: "#6B7A90", dash: "dot", width: 2 }, marker: { size: 5, color: "#6B7A90" }, hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>" });
+    if (Array.isArray(data.Bull)) {
+      const cleaned = filterValidPairs(data.Year, data.Bull);
+      if (cleaned.x.length) {
+        traces.push({ type: "scatter", mode: "lines+markers", x: cleaned.x, y: cleaned.y, name: "Bull", line: { color: "#003366", width: 2 }, marker: { size: 5, color: "#003366" }, hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>" });
+      }
+    }
+    if (Array.isArray(data.Base)) {
+      const cleaned = filterValidPairs(data.Year, data.Base);
+      if (cleaned.x.length) {
+        traces.push({ type: "scatter", mode: "lines+markers", x: cleaned.x, y: cleaned.y, name: "Base", line: { color: "#FF7F0E", dash: "dash", width: 2 }, marker: { size: 5, color: "#FF7F0E" }, hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>" });
+      }
+    }
+    if (Array.isArray(data.Bear)) {
+      const cleaned = filterValidPairs(data.Year, data.Bear);
+      if (cleaned.x.length) {
+        traces.push({ type: "scatter", mode: "lines+markers", x: cleaned.x, y: cleaned.y, name: "Bear", line: { color: "#6B7A90", dash: "dot", width: 2 }, marker: { size: 5, color: "#6B7A90" }, hovertemplate: "FY %{x}: %{y:$,.0f}<extra></extra>" });
+      }
+    }
     if (!traces.length) {
       host.textContent = "No forecast data.";
       return;

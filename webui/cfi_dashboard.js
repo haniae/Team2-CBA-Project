@@ -1346,7 +1346,7 @@
     Object.entries(grouped).forEach(([catKey, catItems]) => {
       const catDef = KPI_CATEGORIES[catKey];
       const catDiv = document.createElement("div");
-      catDiv.className = "kpi-category";
+      catDiv.className = "kpi-category collapsed"; // Start collapsed
       catDiv.dataset.category = catKey;
       
       const header = document.createElement("div");
@@ -1385,7 +1385,7 @@
       });
       
       const catDiv = document.createElement("div");
-      catDiv.className = "kpi-category";
+      catDiv.className = "kpi-category collapsed"; // Start collapsed
       catDiv.innerHTML = `
         <div class="kpi-category-header">
           <div class="kpi-category-title">
@@ -2448,9 +2448,11 @@ function setupSourcesToggle() {
     console.log('[setupSourcesToggle] ✅ Forced sources panel visibility');
   }
   
-  // Start with sources expanded by default
-  let isCollapsed = false;
-  sourcesBody.classList.remove('collapsed');
+  // Start with sources collapsed by default
+  let isCollapsed = true;
+  sourcesBody.classList.add('collapsed');
+  toggleBtn.classList.add('collapsed');
+  if (toggleText) toggleText.textContent = 'Show';
   
   toggleBtn.addEventListener('click', (e) => {
     e.preventDefault();
@@ -2469,5 +2471,5 @@ function setupSourcesToggle() {
     }
   });
   
-  console.log('[setupSourcesToggle] ✅ Toggle button initialized and sources VISIBLE');
+  console.log('[setupSourcesToggle] ✅ Toggle button initialized and sources COLLAPSED (click to show)');
 }
