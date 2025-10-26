@@ -1478,28 +1478,32 @@ class BenchmarkOSChatbot:
             if reply is None:
                 summary_target = self._detect_summary_target(user_input, normalized_command)
                 if summary_target:
-                    emit("summary_attempt", f"Compiling snapshot for {summary_target}")
-                    # Try to build dashboard first
-                    dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, summary_target)
-                    if dashboard_payload:
-                        display = _display_ticker_symbol(_normalise_ticker_symbol(summary_target))
-                        self.last_structured_response["dashboard"] = {
-                            "kind": "cfi-classic",
-                            "ticker": display,
-                            "payload": dashboard_payload,
-                        }
-                        # Return brief message since dashboard shows all the data
-                        company_name = dashboard_payload.get("meta", {}).get("company", "")
-                        if company_name and company_name.upper() != display.upper():
-                            reply = f"Displaying financial dashboard for {company_name} ({display})."
+                    # Only build dashboard if explicitly requested with "dashboard" keyword
+                    if "dashboard" in user_input.lower():
+                        emit("summary_attempt", f"Compiling dashboard for {summary_target}")
+                        dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, summary_target)
+                        if dashboard_payload:
+                            display = _display_ticker_symbol(_normalise_ticker_symbol(summary_target))
+                            self.last_structured_response["dashboard"] = {
+                                "kind": "cfi-classic",
+                                "ticker": display,
+                                "payload": dashboard_payload,
+                            }
+                            # Return brief message since dashboard shows all the data
+                            company_name = dashboard_payload.get("meta", {}).get("company", "")
+                            if company_name and company_name.upper() != display.upper():
+                                reply = f"Displaying financial dashboard for {company_name} ({display})."
+                            else:
+                                reply = f"Displaying financial dashboard for {display}."
+                            emit("summary_complete", f"Dashboard prepared for {summary_target}")
                         else:
-                            reply = f"Displaying financial dashboard for {display}."
-                        emit("summary_complete", f"Dashboard prepared for {summary_target}")
+                            emit("summary_unavailable", f"Dashboard unavailable for {summary_target}")
                     else:
-                        # Fallback to text summary if dashboard unavailable
+                        # Use text summary for regular ticker queries
+                        emit("summary_attempt", f"Compiling text summary for {summary_target}")
                         reply = self._get_ticker_summary(summary_target)
                         if reply:
-                            emit("summary_complete", f"Snapshot prepared for {summary_target}")
+                            emit("summary_complete", f"Text snapshot prepared for {summary_target}")
                         else:
                             emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
 
@@ -1778,25 +1782,9 @@ class BenchmarkOSChatbot:
         """Fetch metrics and build a response message for the chat."""
         if not tickers:
             return "Provide at least one ticker for metrics."
-        if len(tickers) == 1 and not period_filters:
-            ticker = tickers[0]
-            dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, ticker)
-            if dashboard_payload:
-                display = _display_ticker_symbol(_normalise_ticker_symbol(ticker))
-                self.last_structured_response["dashboard"] = {
-                    "kind": "cfi-classic",
-                    "ticker": display,
-                    "payload": dashboard_payload,
-                }
-                # Return brief message since dashboard shows all the data
-                company_name = dashboard_payload.get("meta", {}).get("company", "")
-                if company_name and company_name.upper() != display.upper():
-                    return f"Displaying financial dashboard for {company_name} ({display})."
-                return f"Displaying financial dashboard for {display}."
-            else:
-                self.last_structured_response["dashboard"] = None
-                # Dashboard unavailable - return full text summary as fallback
-                return self.analytics_engine.generate_summary(ticker)
+        
+        # Always use text table format for chat responses
+        # Dashboards are only built via explicit "dashboard" keyword
         return self._format_metrics_table(
             tickers,
             period_filters=period_filters,

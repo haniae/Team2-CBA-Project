@@ -78,7 +78,7 @@ The router classifies queries into these intents:
 
 | Intent | Example | Dashboard | Output |
 |--------|---------|-----------|--------|
-| `METRICS_SINGLE` | "Show Apple KPIs" | Auto (existing logic) | Dashboard or text |
+| `METRICS_SINGLE` | "Show Apple KPIs" | Never | Text table only |
 | `METRICS_MULTI` | "Show Apple and Microsoft KPIs" | Never | Text table only |
 | `COMPARE_TWO` | "Compare Apple vs Microsoft" | Never | Text table only |
 | `COMPARE_MULTI` | "Compare Apple, Microsoft, Google" | Never | Text table only |
@@ -122,15 +122,14 @@ EnhancedRouting(
 )
 ```
 
-### Respect Existing Logic
+### Force Text Only
 ```python
 # User: "Show Apple KPIs"
 EnhancedRouting(
     intent=METRICS_SINGLE,
-    force_dashboard=False,
-    force_text_only=False
+    force_text_only=True
 )
-# Existing code decides: single ticker + no period filters = dashboard
+# Always returns text table, never dashboard (unless explicit)
 ```
 
 ## Testing Enhanced Routing
@@ -175,10 +174,10 @@ print(f"Routing: {routing_info}")
 ### ✅ Deterministic Patterns (High Confidence)
 
 ```python
-# METRICS_SINGLE
-"Show Apple KPIs" → METRICS_SINGLE (0.9)
-"Show Apple metrics" → METRICS_SINGLE (0.9)
-"Show AAPL KPIs for 2023" → METRICS_SINGLE (0.9)
+# METRICS_SINGLE (text table only)
+"Show Apple KPIs" → METRICS_SINGLE (0.9) → Text table
+"Show Apple metrics" → METRICS_SINGLE (0.9) → Text table
+"Show AAPL KPIs for 2023" → METRICS_SINGLE (0.9) → Text table
 
 # METRICS_MULTI
 "Show Apple and Microsoft KPIs" → METRICS_MULTI (0.9)
@@ -236,12 +235,37 @@ When enhanced routing is enabled, the chatbot adds routing metadata to `last_str
 }
 ```
 
+## Dashboard Triggering
+
+### Chat Responses (Text Only by Default)
+
+All chat queries return **compact text tables** by default:
+- "Show Apple KPIs" → Text table
+- "Show Apple and Microsoft KPIs" → Text table
+- "Compare Apple vs Microsoft" → Text table
+
+### Explicit Dashboard Requests
+
+To get a full dashboard in chat, use the "dashboard" keyword:
+- "Dashboard AAPL" → Full dashboard
+- "Show me dashboard for Apple" → Full dashboard
+- "Comprehensive dashboard for Microsoft" → Full dashboard
+
+### API Endpoints (Dashboard Available)
+
+Dashboards are always available via direct API access:
+- `GET /api/dashboard/cfi?ticker=AAPL` → Returns dashboard payload
+- `GET /api/dashboard/cfi-compare?tickers=AAPL,MSFT` → Returns comparison dashboard
+
+This separation ensures chat responses are fast and focused, while full dashboards are accessible when needed.
+
 ## Benefits
 
 ### For Users
-- ✅ More consistent responses
+- ✅ Fast, focused chat responses
 - ✅ Explicit dashboard control ("Dashboard AAPL")
-- ✅ Predictable behavior for common queries
+- ✅ Consistent text table format across all queries
+- ✅ No scrolling through large dashboards in chat
 
 ### For Developers
 - ✅ Clear intent classification

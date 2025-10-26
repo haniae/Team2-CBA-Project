@@ -107,10 +107,10 @@ def enhance_structured_parse(
                 confidence=0.9
             )
         else:
-            # Single ticker - existing logic decides dashboard vs text
+            # Single ticker - force text table unless dashboard explicitly requested
             return EnhancedRouting(
                 intent=EnhancedIntent.METRICS_SINGLE,
-                force_dashboard=False,  # Let existing logic decide
+                force_text_only=True,  # Changed: always use text table for chat
                 confidence=0.9
             )
     
@@ -164,7 +164,7 @@ def enhance_structured_parse(
         if len(tickers) == 1:
             return EnhancedRouting(
                 intent=EnhancedIntent.METRICS_SINGLE,
-                force_dashboard=False,  # Let existing logic decide
+                force_text_only=True,  # Changed: always text table for single ticker
                 confidence=0.8
             )
         elif len(tickers) >= 2:
