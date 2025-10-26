@@ -109,6 +109,7 @@ class Settings:
     stooq_timeout: float = 20.0
     ingestion_year_buffer: int = 2
     enable_enhanced_routing: bool = False
+    prefer_conversational_mode: bool = True
 
     @property
     def sqlite_uri(self) -> str:
@@ -326,6 +327,7 @@ def load_settings() -> Settings:
         stooq_timeout=stooq_timeout,
         ingestion_year_buffer=ingestion_year_buffer,
         enable_enhanced_routing=_env_flag("ENABLE_ENHANCED_ROUTING", default=False),
+        prefer_conversational_mode=_env_flag("PREFER_CONVERSATIONAL_MODE", default=True),
     )
 
 

@@ -93,7 +93,8 @@ def enhance_structured_parse(
     # ========================================
     
     # "Show X KPIs" pattern (single or multiple tickers)
-    show_kpi_match = re.search(r'\bshow\s+([\w\s,]+?)\s+(?:kpis?|metrics?)(?:\s+for\s+)?', lowered)
+    # Lower confidence to prefer LLM for conversational mode
+    show_kpi_match = re.search(r'\bshow\s+([\w\s,]+?)\s+(?:kpis?|metrics?|table)', lowered)
     if show_kpi_match:
         entities_text = show_kpi_match.group(1)
         # Check if it's multiple tickers
@@ -104,14 +105,14 @@ def enhance_structured_parse(
             return EnhancedRouting(
                 intent=EnhancedIntent.METRICS_MULTI,
                 force_text_only=True,  # Multi-ticker = text table
-                confidence=0.9
+                confidence=0.7  # Lowered from 0.9
             )
         else:
-            # Single ticker - force text table unless dashboard explicitly requested
+            # Single ticker - only route to table if explicit "kpis/metrics/table"
             return EnhancedRouting(
                 intent=EnhancedIntent.METRICS_SINGLE,
-                force_text_only=True,  # Changed: always use text table for chat
-                confidence=0.9
+                force_text_only=True,
+                confidence=0.6  # Lowered from 0.9 - prefer LLM
             )
     
     # "Compare X vs Y" pattern (exactly 2)
@@ -161,17 +162,17 @@ def enhance_structured_parse(
             )
     
     elif existing_intent in ["lookup", "trend"]:
+        # Prefer natural language for these - lower confidence
         if len(tickers) == 1:
             return EnhancedRouting(
-                intent=EnhancedIntent.METRICS_SINGLE,
-                force_text_only=True,  # Changed: always text table for single ticker
-                confidence=0.8
+                intent=EnhancedIntent.NATURAL_LANGUAGE,  # Changed: route to LLM
+                confidence=0.5  # Lowered to prefer LLM
             )
         elif len(tickers) >= 2:
             return EnhancedRouting(
                 intent=EnhancedIntent.METRICS_MULTI,
                 force_text_only=True,
-                confidence=0.8
+                confidence=0.6  # Lowered from 0.8
             )
     
     elif existing_intent == "rank":

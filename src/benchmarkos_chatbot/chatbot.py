@@ -38,6 +38,7 @@ from .dashboard_utils import (
     _normalise_ticker_symbol,
 )
 from .routing import enhance_structured_parse, should_build_dashboard, EnhancedIntent
+from .context_builder import build_financial_context
 
 LOGGER = logging.getLogger(__name__)
 
@@ -537,10 +538,22 @@ class Conversation:
 
 
 SYSTEM_PROMPT = (
-    "You are BenchmarkOS, an institutional-grade finance analyst.\n"
-    "You deliver precise, compliant insights grounded in the latest SEC filings,"
-    " market data, and risk controls. Provide actionable intelligence in clear "
-    "professional language. If you are unsure, request clarification or state "
+    "You are BenchmarkOS, an institutional-grade finance copilot designed for "
+    "sophisticated institutional investors, analysts, and CFOs.\n\n"
+    "When answering questions:\n"
+    "1. Answer the SPECIFIC question asked - don't dump irrelevant data\n"
+    "2. Use the financial data provided in context from SEC filings\n"
+    "3. Be concise and direct for simple questions (1-2 sentences)\n"
+    "4. Provide analysis and context for complex questions\n"
+    "5. Always cite the period/source when mentioning numbers (e.g., 'TTM', 'FY2023')\n"
+    "6. If data is missing or unavailable, say so clearly\n"
+    "7. For comparison questions, directly state which is better/higher/lower\n\n"
+    "Examples of good responses:\n"
+    "- Q: 'What is Apple's revenue?' → 'Apple's revenue (TTM as of Q3 FY2024) is $394.3B, up 7.2% year-over-year.'\n"
+    "- Q: 'Is Microsoft more profitable than Apple?' → 'Yes, Microsoft has higher profitability margins. Microsoft's EBITDA margin is 45.8% compared to Apple's 30.2%.'\n"
+    "- Q: 'Why is Apple's margin declining?' → 'Based on recent SEC filings, Apple's EBITDA margin decreased by 80 basis points YoY to 30.2% in FY2023, primarily driven by...'\n\n"
+    "You deliver precise, compliant insights grounded in the latest SEC filings, "
+    "market data, and risk controls. If you are unsure, request clarification or state "
     "explicitly that more data is required."
 )
 
@@ -1557,42 +1570,86 @@ class BenchmarkOSChatbot:
     # Intent handling helpers
     # ----------------------------------------------------------------------------------
     def _handle_financial_intent(self, text: str) -> Optional[str]:
-        """Handle natural-language requests that map to metrics workflows."""
+        """Route based on query type - prefer natural language for questions."""
         
-        # Priority 2: Check for legacy commands FIRST
         lowered = text.strip().lower()
+        
+        # 1. Help command
         if lowered == "help":
             return HELP_TEXT
         
-        # More specific legacy command detection
-        if lowered.startswith("compare ") and self._is_legacy_compare_command(text):
-            tokens = text.split()[1:]
-            return self._handle_metrics_comparison(tokens)
+        # 2. Explicit legacy commands (highest priority - exact matches)
+        if lowered.startswith("fact "):
+            return self._handle_fact_command(text)
+        if lowered.startswith("fact-range "):
+            return self._handle_fact_range_command(text)
         if lowered.startswith("table "):
             table_output = render_table_command(text, self.analytics_engine)
             if table_output is None:
                 return "Unable to generate a table for that request."
             return table_output
-        if lowered.startswith("fact "):
-            return self._handle_fact_command(text)
-        if lowered.startswith("fact-range "):
-            return self._handle_fact_range_command(text)
         if lowered.startswith("audit "):
             return self._handle_audit_command(text)
         if lowered.startswith("ingest "):
             return self._handle_ingest_command(text)
         if lowered.startswith("scenario "):
             return self._handle_scenario_command(text)
-
-        # Check for complex natural language queries that should bypass structured parsing
-        if self._is_complex_natural_language_query(text):
-            return None  # Will trigger LLM fallback
         
-        # Priority 1: Try structured metrics parsing FIRST
+        # 3. Explicit comparison with "vs" (table format)
+        if lowered.startswith("compare ") and self._is_legacy_compare_command(text):
+            tokens = text.split()[1:]
+            return self._handle_metrics_comparison(tokens)
+        
+        # 4. Check if this is a natural language QUESTION (not a table request)
+        question_patterns = [
+            r'\bwhat\s+(?:is|are|was|were)\b',
+            r'\bhow\s+(?:much|many|does|did|is|are)\b',
+            r'\bwhy\b',
+            r'\bexplain\b',
+            r'\btell\s+me\s+(?:about|why|how)\b',
+            r'\bis\s+\w+\s+(?:more|less|better|worse|higher|lower)',
+            r'\bwhich\s+(?:company|stock|one|is)\b',
+            r'\bcan\s+you\b',
+            r'\bdoes\s+\w+\s+have\b',
+            r'\bshould\s+i\b',
+        ]
+        
+        is_question = any(re.search(pattern, lowered) for pattern in question_patterns)
+        
+        if is_question:
+            # Natural language question - let LLM handle with context
+            self._progress("intent_question", "Natural language question detected")
+            return None  # Will trigger LLM with enhanced context
+        
+        # 5. Check for explicit "show X kpis/metrics/table" pattern (table request)
+        if re.search(r'\bshow\s+.*\s+(?:kpis?|metrics?|table)', lowered):
+            structured = parse_to_structured(text)
+            self.last_structured_response["parser"] = structured
+            
+            # Optional: Enhanced routing
+            if self.settings.enable_enhanced_routing:
+                enhanced_routing = enhance_structured_parse(text, structured)
+                self.last_structured_response["enhanced_routing"] = {
+                    "intent": enhanced_routing.intent.value,
+                    "confidence": enhanced_routing.confidence,
+                }
+                # Lower threshold for table commands
+                if enhanced_routing.confidence < 0.5:
+                    return None
+            
+            structured_reply = self._handle_structured_metrics(structured)
+            if structured_reply:
+                return structured_reply
+        
+        # 6. Check for complex natural language that should use LLM
+        if self._is_complex_natural_language_query(text):
+            return None
+        
+        # 7. Try structured parsing as fallback (but with lower priority)
         structured = parse_to_structured(text)
         self.last_structured_response["parser"] = structured
-
-        # Optional: Enhanced routing layer (only if enabled in config)
+        
+        # Optional: Enhanced routing
         enhanced_routing = None
         if self.settings.enable_enhanced_routing:
             enhanced_routing = enhance_structured_parse(text, structured)
@@ -1603,46 +1660,23 @@ class BenchmarkOSChatbot:
                 "force_text_only": enhanced_routing.force_text_only,
             }
             
-            # If low confidence, let LLM handle it
-            if enhanced_routing.confidence < 0.7:
+            # Higher threshold now - prefer LLM unless very confident
+            if enhanced_routing.confidence < 0.8:
                 return None
-
-        # If structured parsing detected compare intent with multiple tickers, handle it directly
+        
+        # If structured parsing detected compare intent, handle it
         if (structured and 
             structured.get('intent') == 'compare' and 
             len(structured.get('tickers', [])) >= 2):
-            
             structured_reply = self._handle_structured_metrics(structured)
             if structured_reply:
                 return structured_reply
-
-        structured_reply = self._handle_structured_metrics(structured)
-        if structured_reply:
-            return structured_reply
-
+        
         # Check for natural language fallback conditions
         if self._should_fallback_to_llm(structured):
-            return None  # Will trigger LLM fallback
-
-        # Legacy metrics request parsing (fallback)
-        metrics_request = self._parse_metrics_request(text)
-        if metrics_request is not None:
-            tickers_summary = ", ".join(metrics_request.tickers) if metrics_request.tickers else ""
-            if tickers_summary:
-                self._progress("intent_metrics_detected", f"Metrics request for {tickers_summary}")
-            else:
-                self._progress("intent_metrics_missing", "Metrics request detected without tickers")
-            if not metrics_request.tickers:
-                return "Provide at least one ticker for metrics."
-            resolution = self._resolve_tickers(metrics_request.tickers)
-            if resolution.missing:
-                self._progress("intent_metrics_missing", f"Missing tickers: {', '.join(resolution.missing)}")
-                return self._format_missing_message(metrics_request.tickers, resolution.available)
-            self._progress("metrics_dispatch", f"Dispatching metrics workflow for {', '.join(resolution.available)}")
-            return self._dispatch_metrics_request(
-                resolution.available, metrics_request.period_filters
-            )
-
+            return None
+        
+        # 8. Default: Let LLM handle with context
         return None
 
     def _is_legacy_compare_command(self, text: str) -> bool:
@@ -2969,6 +3003,20 @@ class BenchmarkOSChatbot:
 
     def _build_enhanced_rag_context(self, user_input: str) -> Optional[str]:
         """Enhanced RAG context building with comprehensive financial data."""
+        # First, try the smart context builder for natural language formatting
+        try:
+            financial_context = build_financial_context(
+                query=user_input,
+                analytics_engine=self.analytics_engine,
+                database_path=self.settings.database_path,
+                max_tickers=3
+            )
+            if financial_context:
+                return financial_context
+        except Exception as e:
+            LOGGER.debug(f"Smart context builder failed, falling back: {e}")
+        
+        # Fallback to existing context building
         tickers = self._detect_tickers(user_input)
         if not tickers:
             return None
