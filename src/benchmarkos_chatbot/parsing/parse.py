@@ -45,7 +45,7 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
 
     ticker_matches, ticker_warnings = resolve_tickers_freeform(text)
     metric_matches = resolve_metrics(text, lowered_full)
-    periods = parse_periods(norm, prefer_fiscal=True)
+    periods = parse_periods(norm, prefer_fiscal=False)
 
     intent = classify_intent(norm, ticker_matches, metric_matches, periods)
 
