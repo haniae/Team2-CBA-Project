@@ -2507,7 +2507,10 @@ function setupSourcesToggle() {
   if (toggleText) toggleText.textContent = 'Show';
   
   toggleBtn.addEventListener('click', (e) => {
+    console.log('[setupSourcesToggle] 🖱️ BUTTON CLICKED!', { isCollapsed });
     e.preventDefault();
+    e.stopPropagation();
+    
     isCollapsed = !isCollapsed;
     
     if (isCollapsed) {
@@ -2520,8 +2523,23 @@ function setupSourcesToggle() {
       toggleBtn.classList.remove('collapsed');
       if (toggleText) toggleText.textContent = 'Hide';
       console.log('[setupSourcesToggle] ➕ Sources expanded');
+      
+      // Log what's in the sources body
+      setTimeout(() => {
+        const items = sourcesBody.querySelectorAll('.source-item');
+        console.log('[setupSourcesToggle] Sources expanded, items visible:', items.length);
+      }, 100);
     }
+    
+    console.log('[setupSourcesToggle] After toggle:', {
+      isCollapsed,
+      bodyHasCollapsed: sourcesBody.classList.contains('collapsed'),
+      btnHasCollapsed: toggleBtn.classList.contains('collapsed'),
+      buttonText: toggleText?.textContent
+    });
   });
   
   console.log('[setupSourcesToggle] ✅ Toggle button initialized and sources COLLAPSED (click to show)');
+  console.log('[setupSourcesToggle] Button element:', toggleBtn);
+  console.log('[setupSourcesToggle] Try clicking the button now!');
 }
