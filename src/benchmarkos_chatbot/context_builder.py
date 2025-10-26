@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Dict, Any, List, Optional
 from datetime import datetime
+import os
 
 from .parsing.parse import parse_to_structured
 from . import database
@@ -13,6 +14,14 @@ if TYPE_CHECKING:
     from .analytics_engine import AnalyticsEngine
 
 LOGGER = logging.getLogger(__name__)
+
+# Try to import multi-source aggregator
+try:
+    from .multi_source_aggregator import get_multi_source_context
+    MULTI_SOURCE_AVAILABLE = True
+except ImportError:
+    MULTI_SOURCE_AVAILABLE = False
+    LOGGER.warning("Multi-source aggregator not available - only SEC data will be used")
 
 
 def format_currency(value: Optional[float]) -> str:
@@ -443,22 +452,41 @@ def build_financial_context(
         if not context_parts:
             return ""
         
+        # Add multi-source data (Yahoo Finance, FRED, etc.) if available
+        if MULTI_SOURCE_AVAILABLE and tickers:
+            for ticker in tickers[:1]:  # Add for first ticker to avoid context overload
+                try:
+                    fred_api_key = os.getenv('FRED_API_KEY')
+                    multi_source_context = get_multi_source_context(
+                        ticker=ticker,
+                        fred_api_key=fred_api_key,
+                        include_yahoo=True,
+                        include_fred=bool(fred_api_key),  # Only if API key available
+                        include_imf=False  # Optional: can enable if needed
+                    )
+                    if multi_source_context:
+                        context_parts.append(multi_source_context)
+                except Exception as e:
+                    LOGGER.warning(f"Could not fetch multi-source data for {ticker}: {e}")
+        
         # Add comprehensive context header with detailed instructions
         header = (
             "╔═══════════════════════════════════════════════════════════════════════════════╗\n"
             "║                    COMPREHENSIVE FINANCIAL DATA CONTEXT                      ║\n"
             "╚═══════════════════════════════════════════════════════════════════════════════╝\n\n"
             "📋 **DATA SOURCES**:\n"
-            "All data is from official SEC EDGAR filings (10-K, 10-Q) and regulated exchanges. "
-            "Each company section includes SEC filing URLs formatted as markdown links [Filing Name](URL).\n\n"
+            "SEC EDGAR filings (10-K, 10-Q), Yahoo Finance (real-time data, analyst ratings, news), "
+            "FRED economic indicators (optional), and IMF macroeconomic data (optional). "
+            "Each section includes source URLs formatted as markdown links [Source Name](URL).\n\n"
             "📖 **RESPONSE INSTRUCTIONS**:\n"
             "1. **Write like ChatGPT**: Natural, conversational, engaging - not robotic or formal\n"
             "2. **Use markdown formatting**: **bold** for emphasis, bullets, clear headers\n"
             "3. **Answer first**: Lead with the direct answer, then explain\n"
             "4. **Tell a story**: Connect metrics into a narrative, explain WHY things changed\n"
-            "5. **Add perspective**: Industry context, trends, forward outlook\n"
-            "6. **Cite sources**: Copy the markdown links [10-K FY2023](URL) from the sources section below\n"
-            "7. **NEVER show full URLs**: Always use markdown link format [text](url)\n\n"
+            "5. **Add perspective**: Industry context, analyst views, market sentiment, trends, outlook\n"
+            "6. **Cite ALL sources**: SEC filings, Yahoo Finance, analyst ratings - include ALL markdown links\n"
+            "7. **NEVER show full URLs**: Always use markdown link format [text](url)\n"
+            "8. **Incorporate diverse data**: Use SEC fundamentals, Yahoo metrics, analyst ratings, news, etc.\n\n"
             "═══════════════════════════════════════════════════════════════════════════════\n\n"
         )
         
