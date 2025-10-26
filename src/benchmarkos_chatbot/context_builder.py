@@ -461,8 +461,8 @@ def build_financial_context(
                         ticker=ticker,
                         fred_api_key=fred_api_key,
                         include_yahoo=True,
-                        include_fred=bool(fred_api_key),  # Only if API key available
-                        include_imf=False  # Optional: can enable if needed
+                        include_fred=True,  # Always try to fetch FRED data (graceful degradation if no key)
+                        include_imf=True  # Enable IMF macroeconomic data
                     )
                     if multi_source_context:
                         context_parts.append(multi_source_context)

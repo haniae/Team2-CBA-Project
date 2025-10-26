@@ -64,7 +64,75 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = (BASE_DIR.parent / "webui").resolve()
 PACKAGE_STATIC = (BASE_DIR / "static").resolve()
 
-# prefer project-level /webui build; fall back to packaged static
+
+# Custom handlers with no-cache headers to prevent stale JavaScript
+# IMPORTANT: These MUST be defined BEFORE app.mount() to take precedence
+
+@app.get("/")
+async def serve_index():
+    """Serve index.html with no-cache headers to ensure fresh JavaScript."""
+    index_path = PACKAGE_STATIC / "index.html" if PACKAGE_STATIC.exists() else FRONTEND_DIR / "index.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="index.html not found")
+    
+    with open(index_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    return Response(
+        content=content,
+        media_type="text/html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+
+
+@app.get("/static/app.js")
+async def serve_app_js():
+    """Serve app.js with no-cache headers."""
+    js_path = PACKAGE_STATIC / "app.js" if PACKAGE_STATIC.exists() else FRONTEND_DIR / "app.js"
+    if not js_path.exists():
+        raise HTTPException(status_code=404, detail="app.js not found")
+    
+    with open(js_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    return Response(
+        content=content,
+        media_type="application/javascript",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+
+
+@app.get("/static/styles.css")
+async def serve_styles_css():
+    """Serve styles.css with no-cache headers."""
+    css_path = PACKAGE_STATIC / "styles.css" if PACKAGE_STATIC.exists() else FRONTEND_DIR / "styles.css"
+    if not css_path.exists():
+        raise HTTPException(status_code=404, detail="styles.css not found")
+    
+    with open(css_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    return Response(
+        content=content,
+        media_type="text/css",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+
+
+# Mount static files for other assets (images, fonts, etc.)
+# The specific routes above will take precedence for app.js, styles.css, and index.html
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 elif PACKAGE_STATIC.exists():

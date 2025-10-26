@@ -320,10 +320,37 @@ function showTypingIndicator() {
 	scrollToBottom(true)
 }
 
-function hideTypingIndicator() {
-	isTyping = false
+function updateProgressIndicator(text) {
 	const indicator = document.getElementById('typingIndicator')
 	if (indicator) {
+		const textEl = indicator.querySelector('.text')
+		if (textEl) {
+			textEl.innerHTML = `<div style="color:#8b949e;font-size:13px;">${text}</div>`
+		}
+	}
+}
+
+function hideTypingIndicator(options = {}) {
+	isTyping = false
+	const indicator = document.getElementById('typingIndicator')
+	if (!indicator) return
+	
+	const { showCompletion = false, duration = 0 } = options
+	
+	if (showCompletion && duration > 0) {
+		// Show completion time before hiding
+		const timeText = duration < 1000 
+			? `Completed in ${duration}ms` 
+			: `Completed in ${(duration / 1000).toFixed(1)}s`
+		updateProgressIndicator(`✓ ${timeText}`)
+		
+		// Auto-hide after 3 seconds
+		setTimeout(() => {
+			indicator.style.opacity = '0'
+			setTimeout(() => indicator.remove(), 300)
+		}, 3000)
+	} else {
+		// Hide immediately
 		indicator.style.opacity = '0'
 		setTimeout(() => indicator.remove(), 300)
 	}
@@ -382,8 +409,13 @@ $composer.addEventListener('submit', async (ev)=>{
 	$input.value = ''
 	$input.disabled = true
 	
-	// Show typing indicator
+	// Show typing indicator and track start time
+	const startTime = Date.now()
 	showTypingIndicator()
+	
+	// Track progress updates
+	let progressStage = 'Processing...'
+	let progressInterval = null
 	
 	try{
 		const res = await fetch('/chat', {
@@ -397,18 +429,40 @@ $composer.addEventListener('submit', async (ev)=>{
 		const data = await res.json()
 		const replyText = typeof data.reply === 'string' ? data.reply : (data.answer || JSON.stringify(data))
 		
-		// Simulate natural typing delay
-		await new Promise(resolve => setTimeout(resolve, 500))
+		// Calculate duration
+		const duration = Date.now() - startTime
 		
-		hideTypingIndicator()
-		appendMessage({role:'bot',text:replyText,ts:Date.now()})
+		// Show progress updates if available
+		if (data.progress_events && data.progress_events.length > 0) {
+			const lastEvent = data.progress_events[data.progress_events.length - 1]
+			if (lastEvent.label) {
+				progressStage = lastEvent.label
+			}
+		}
+		
+		// Update progress with final stage
+		updateProgressIndicator(`${progressStage}...`)
+		
+		// Simulate natural typing delay
+		await new Promise(resolve => setTimeout(resolve, 300))
+		
+		// Show completion time for 3 seconds before hiding
+		hideTypingIndicator({ showCompletion: true, duration })
+		
+		// Add bot response after brief delay
+		setTimeout(() => {
+			appendMessage({role:'bot',text:replyText,ts:Date.now()})
+		}, 200)
+		
 		setApiStatus(true)
 	}catch(e){
 		console.error('Chat error:', e)
-		hideTypingIndicator()
+		const duration = Date.now() - startTime
+		hideTypingIndicator({ showCompletion: false })
 		setApiStatus(false)
 		appendMessage({role:'bot',text:'I apologize, but I\'m having trouble connecting to the server. Please check your connection and try again.',ts:Date.now()})
 	} finally {
+		if (progressInterval) clearInterval(progressInterval)
 		$input.disabled = false
 		$input.focus()
 	}

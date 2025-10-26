@@ -51,10 +51,15 @@ class MultiSourceAggregator:
         
         Returns:
         - Current price and market data
-        - Analyst recommendations
+        - Analyst recommendations and estimates
         - Company info and metrics
         - Recent news
         - Historical performance
+        - Institutional holdings
+        - Major holders
+        - Earnings calendar
+        - Financial statements (income, balance sheet, cash flow)
+        - ESG scores
         """
         if yf is None:
             return {}
@@ -70,17 +75,98 @@ class MultiSourceAggregator:
             try:
                 recommendations = stock.recommendations
                 if recommendations is not None and not recommendations.empty:
-                    recent_recs = recommendations.tail(5).to_dict('records')
+                    recent_recs = recommendations.tail(10).to_dict('records')
                 else:
                     recent_recs = None
             except Exception:
                 recent_recs = None
             
+            # Get institutional holders
+            institutional_holders = None
+            try:
+                holders_df = stock.institutional_holders
+                if holders_df is not None and not holders_df.empty:
+                    institutional_holders = holders_df.head(10).to_dict('records')
+            except Exception as e:
+                LOGGER.debug(f"Could not fetch institutional holders for {ticker}: {e}")
+            
+            # Get major holders
+            major_holders = None
+            try:
+                major_holders_df = stock.major_holders
+                if major_holders_df is not None and not major_holders_df.empty:
+                    major_holders = major_holders_df.to_dict('records')
+            except Exception as e:
+                LOGGER.debug(f"Could not fetch major holders for {ticker}: {e}")
+            
+            # Get insider transactions
+            insider_transactions = None
+            try:
+                insider_df = stock.insider_transactions
+                if insider_df is not None and not insider_df.empty:
+                    insider_transactions = insider_df.head(10).to_dict('records')
+            except Exception as e:
+                LOGGER.debug(f"Could not fetch insider transactions for {ticker}: {e}")
+            
+            # Get earnings estimates
+            earnings_estimates = None
+            try:
+                earnings = stock.earnings_dates
+                if earnings is not None and not earnings.empty:
+                    earnings_estimates = earnings.head(5).to_dict('records')
+            except Exception as e:
+                LOGGER.debug(f"Could not fetch earnings estimates for {ticker}: {e}")
+            
+            # Get quarterly earnings
+            quarterly_earnings = None
+            try:
+                qe = stock.quarterly_earnings
+                if qe is not None and not qe.empty:
+                    quarterly_earnings = qe.tail(8).to_dict('records')
+            except Exception as e:
+                LOGGER.debug(f"Could not fetch quarterly earnings for {ticker}: {e}")
+            
+            # Get financials (income statement)
+            financials = None
+            try:
+                fin = stock.financials
+                if fin is not None and not fin.empty:
+                    financials = fin.to_dict()
+            except Exception as e:
+                LOGGER.debug(f"Could not fetch financials for {ticker}: {e}")
+            
+            # Get balance sheet
+            balance_sheet = None
+            try:
+                bs = stock.balance_sheet
+                if bs is not None and not bs.empty:
+                    balance_sheet = bs.to_dict()
+            except Exception as e:
+                LOGGER.debug(f"Could not fetch balance sheet for {ticker}: {e}")
+            
+            # Get cash flow
+            cash_flow = None
+            try:
+                cf = stock.cashflow
+                if cf is not None and not cf.empty:
+                    cash_flow = cf.to_dict()
+            except Exception as e:
+                LOGGER.debug(f"Could not fetch cash flow for {ticker}: {e}")
+            
+            # Get sustainability/ESG scores
+            sustainability = None
+            try:
+                esg = stock.sustainability
+                if esg is not None and not esg.empty:
+                    sustainability = esg.to_dict()
+            except Exception as e:
+                LOGGER.debug(f"Could not fetch sustainability data for {ticker}: {e}")
+            
             # Get news
             news = []
             try:
                 news_items = stock.news or []
-                for item in news_items[:5]:  # Latest 5 news items
+                for item in news_items[:10]:  # Latest 10 news items
                     news.append({
                         'title': item.get('title'),
                         'publisher': item.get('publisher'),
@@ -142,6 +228,15 @@ class MultiSourceAggregator:
                 'ticker': ticker,
                 'key_stats': key_stats,
                 'analyst_recommendations': recent_recs,
+                'institutional_holders': institutional_holders,
+                'major_holders': major_holders,
+                'insider_transactions': insider_transactions,
+                'earnings_estimates': earnings_estimates,
+                'quarterly_earnings': quarterly_earnings,
+                'financials': financials,
+                'balance_sheet': balance_sheet,
+                'cash_flow': cash_flow,
+                'sustainability': sustainability,
                 'news': news,
                 'fetched_at': datetime.now(),
                 'source_url': f'https://finance.yahoo.com/quote/{ticker}'
@@ -167,13 +262,42 @@ class MultiSourceAggregator:
         # Default indicators if none specified
         if indicators is None:
             indicators = [
+                # Macro Economic Indicators
                 'GDP',  # Gross Domestic Product
+                'GDPC1',  # Real GDP
                 'UNRATE',  # Unemployment Rate
+                'PAYEMS',  # Total Nonfarm Payroll
+                
+                # Inflation & Prices
                 'CPIAUCSL',  # Consumer Price Index
+                'PCEPI',  # Personal Consumption Expenditures Price Index
+                'CPILFESL',  # Core CPI (ex food & energy)
+                
+                # Interest Rates & Yields
                 'FEDFUNDS',  # Federal Funds Rate
                 'DGS10',  # 10-Year Treasury Rate
-                'DEXUSEU',  # USD/EUR Exchange Rate
+                'DGS2',  # 2-Year Treasury Rate
+                'T10Y2Y',  # 10-Year minus 2-Year Treasury Spread (recession indicator)
+                
+                # Market Indicators
                 'VIXCLS',  # VIX Volatility Index
+                'SP500',  # S&P 500 Index
+                'DEXUSEU',  # USD/EUR Exchange Rate
+                'DTWEXBGS',  # Trade Weighted U.S. Dollar Index
+                
+                # Consumer & Business
+                'UMCSENT',  # University of Michigan Consumer Sentiment
+                'RSXFS',  # Retail Sales
+                'HOUST',  # Housing Starts
+                'INDPRO',  # Industrial Production Index
+                
+                # Credit & Money Supply
+                'M2SL',  # M2 Money Stock
+                'TOTALSL',  # Total Consumer Credit Outstanding
+                
+                # Corporate & Markets
+                'CORPPCRP',  # Corporate Profits After Tax
+                'CBBTCUSD',  # Coinbase Bitcoin USD (if tech-related)
             ]
         
         results = {}
@@ -408,15 +532,89 @@ class MultiSourceAggregator:
                 lines.append(f"  • Employees: {stats['full_time_employees']:,}")
             lines.append("")
         
+        # Institutional Ownership
+        institutional = data.get('institutional_holders', [])
+        if institutional:
+            lines.append("**Top Institutional Holders:**")
+            for holder in institutional[:5]:
+                holder_name = holder.get('Holder', 'N/A')
+                shares = holder.get('Shares', 0)
+                pct = holder.get('% Out', 0)
+                if isinstance(shares, (int, float)) and shares > 0:
+                    lines.append(f"  • {holder_name}: {shares:,.0f} shares ({pct:.2%} of outstanding)")
+                else:
+                    lines.append(f"  • {holder_name}")
+            lines.append("")
+        
+        # Major Holders Summary
+        major_holders = data.get('major_holders', [])
+        if major_holders:
+            lines.append("**Ownership Structure:**")
+            for holder_info in major_holders:
+                for key, value in holder_info.items():
+                    if isinstance(value, (int, float)):
+                        lines.append(f"  • {key}: {value:.2%}")
+                    else:
+                        lines.append(f"  • {value}")
+            lines.append("")
+        
+        # Insider Transactions
+        insider_txns = data.get('insider_transactions', [])
+        if insider_txns:
+            lines.append("**Recent Insider Transactions:**")
+            for txn in insider_txns[:5]:
+                insider_name = txn.get('Insider', 'N/A')
+                transaction = txn.get('Transaction', 'N/A')
+                shares = txn.get('Shares', 0)
+                lines.append(f"  • {insider_name}: {transaction} - {shares:,.0f} shares")
+            lines.append("")
+        
+        # Earnings Estimates
+        earnings_est = data.get('earnings_estimates', [])
+        if earnings_est:
+            lines.append("**Upcoming Earnings:**")
+            for est in earnings_est[:3]:
+                # earnings_est is typically a dict with date keys
+                for date_key, est_data in est.items():
+                    if hasattr(est_data, 'get'):
+                        eps_est = est_data.get('Earnings Estimate', 'N/A')
+                        lines.append(f"  • {date_key}: EPS Estimate ${eps_est}")
+            lines.append("")
+        
+        # Quarterly Earnings
+        quarterly = data.get('quarterly_earnings', [])
+        if quarterly:
+            lines.append("**Recent Quarterly Earnings:**")
+            for q in quarterly[:4]:
+                quarter = q.get('quarter', 'N/A')
+                revenue = q.get('Revenue', 0)
+                earnings = q.get('Earnings', 0)
+                if revenue and earnings:
+                    lines.append(f"  • {quarter}: Revenue ${revenue:,.0f}, Earnings ${earnings:,.0f}")
+            lines.append("")
+        
+        # ESG/Sustainability Scores
+        sustainability = data.get('sustainability', {})
+        if sustainability:
+            lines.append("**ESG/Sustainability Scores:**")
+            for metric, value in sustainability.items():
+                if isinstance(value, (int, float)):
+                    lines.append(f"  • {metric}: {value:.2f}")
+                else:
+                    lines.append(f"  • {metric}: {value}")
+            lines.append("")
+        
         # Recent News
         news = data.get('news', [])
         if news:
-            lines.append("**Recent News:**")
-            for item in news[:3]:
+            lines.append("**Recent News & Market Sentiment:**")
+            for item in news[:5]:
                 if item.get('title'):
                     news_line = f"  • {item['title']}"
                     if item.get('publisher'):
                         news_line += f" ({item['publisher']})"
+                    if item.get('link'):
+                        news_line += f" [Link]({item['link']})"
                     lines.append(news_line)
             lines.append("")
         
