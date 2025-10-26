@@ -172,12 +172,117 @@ function createMessageElement(msg) {
 	
 	const text = document.createElement('div')
 	text.className = 'text'
-	text.innerText = msg.text
+	
+	// For bot messages, render markdown
+	if (msg.role === 'bot') {
+		text.innerHTML = renderMarkdown(msg.text)
+	} else {
+		// User messages stay as plain text
+		text.innerText = msg.text
+	}
 	
 	el.appendChild(meta)
 	el.appendChild(text)
 	
 	return el
+}
+
+// Simple markdown renderer for bot messages
+function renderMarkdown(text) {
+	if (!text) return ''
+	
+	// Escape HTML to prevent XSS
+	let html = text
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+	
+	// Split into lines for processing
+	const lines = html.split('\n')
+	let result = []
+	let inList = false
+	let listType = null
+	
+	for (let i = 0; i < lines.length; i++) {
+		let line = lines[i]
+		
+		// Headers
+		if (line.match(/^### (.+)$/)) {
+			if (inList) { result.push(`</${listType}>`); inList = false; }
+			result.push(line.replace(/^### (.+)$/, '<h3>$1</h3>'))
+		} else if (line.match(/^## (.+)$/)) {
+			if (inList) { result.push(`</${listType}>`); inList = false; }
+			result.push(line.replace(/^## (.+)$/, '<h2>$1</h2>'))
+		} else if (line.match(/^# (.+)$/)) {
+			if (inList) { result.push(`</${listType}>`); inList = false; }
+			result.push(line.replace(/^# (.+)$/, '<h1>$1</h1>'))
+		}
+		// Bullet lists
+		else if (line.match(/^[\-•]\s+(.+)$/)) {
+			if (!inList || listType !== 'ul') {
+				if (inList) result.push(`</${listType}>`)
+				result.push('<ul>')
+				listType = 'ul'
+				inList = true
+			}
+			result.push(line.replace(/^[\-•]\s+(.+)$/, '<li>$1</li>'))
+		}
+		// Numbered lists
+		else if (line.match(/^\d+\.\s+(.+)$/)) {
+			if (!inList || listType !== 'ol') {
+				if (inList) result.push(`</${listType}>`)
+				result.push('<ol>')
+				listType = 'ol'
+				inList = true
+			}
+			result.push(line.replace(/^\d+\.\s+(.+)$/, '<li>$1</li>'))
+		}
+		// Empty line
+		else if (line.trim() === '') {
+			if (inList) {
+				result.push(`</${listType}>`)
+				inList = false
+				listType = null
+			}
+			result.push('</p><p>')
+		}
+		// Regular line
+		else {
+			if (inList) { result.push(`</${listType}>`); inList = false; listType = null; }
+			result.push(line)
+		}
+	}
+	
+	// Close any open list
+	if (inList) {
+		result.push(`</${listType}>`)
+	}
+	
+	// Join and wrap in paragraphs
+	html = result.join('\n')
+	
+	// Bold (**text**)
+	html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+	
+	// Links [text](url)
+	html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+	
+	// Wrap in paragraphs
+	html = '<p>' + html + '</p>'
+	
+	// Clean up paragraph tags around headers and lists
+	html = html.replace(/<p>\s*<h([123])>/g, '<h$1>')
+	html = html.replace(/<\/h([123])>\s*<\/p>/g, '</h$1>')
+	html = html.replace(/<p>\s*<ul>/g, '<ul>')
+	html = html.replace(/<\/ul>\s*<\/p>/g, '</ul>')
+	html = html.replace(/<p>\s*<ol>/g, '<ol>')
+	html = html.replace(/<\/ol>\s*<\/p>/g, '</ol>')
+	
+	// Clean up empty paragraphs and multiple breaks
+	html = html.replace(/<p>\s*<\/p>/g, '')
+	html = html.replace(/<\/p>\s*<p>/g, '</p><p>')
+	
+	return html
 }
 
 function appendMessage(msg){
