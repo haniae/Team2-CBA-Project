@@ -2427,14 +2427,26 @@ function setupSourcesToggle() {
   const toggleBtn = document.getElementById('toggle-sources-btn');
   const sourcesBody = document.getElementById('sources-body');
   const sourcesPanel = document.querySelector('.cfi-panel[data-area="sources"]');
+  const sourcesGrid = document.getElementById('cfi-sources-grid');
   const toggleText = toggleBtn?.querySelector('.toggle-text');
   
   console.log('[setupSourcesToggle] Elements found:', {
     toggleBtn: !!toggleBtn,
     sourcesBody: !!sourcesBody,
     sourcesPanel: !!sourcesPanel,
+    sourcesGrid: !!sourcesGrid,
     toggleText: !!toggleText
   });
+  
+  // Check if sources were rendered
+  if (sourcesGrid) {
+    const sourceItems = sourcesGrid.querySelectorAll('.source-item');
+    console.log('[setupSourcesToggle] Source items in grid:', sourceItems.length);
+    if (sourceItems.length === 0) {
+      console.warn('[setupSourcesToggle] ⚠️ No source items found! Sources may not have been rendered.');
+      console.log('[setupSourcesToggle] Grid HTML:', sourcesGrid.innerHTML.substring(0, 200));
+    }
+  }
   
   if (!toggleBtn || !sourcesBody) {
     console.error('[setupSourcesToggle] ❌ Required elements not found!');
