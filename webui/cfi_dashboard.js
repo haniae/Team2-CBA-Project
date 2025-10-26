@@ -1644,57 +1644,17 @@
         hasEnhancements: !!window.DashboardEnhancements
       });
       
-      // Always setup the toggle button, even if no sources
       if (payload.sources && payload.sources.length > 0) {
         if (window.DashboardEnhancements && window.DashboardEnhancements.renderDataSources) {
           window.DashboardEnhancements.renderDataSources(payload.sources);
+          setupSourcesToggle();
           console.log('[CFI] ✅ Sources rendered successfully');
         } else {
           console.error('[CFI] ❌ DashboardEnhancements.renderDataSources not available');
         }
       } else {
-        console.warn('[CFI] ⚠️ No sources in payload - showing sample sources');
-        // Show sample sources so user can see the section works
-        const sampleSources = [
-          {
-            label: 'Total Revenue',
-            ticker: payload.ticker || 'COMPANY',
-            period: '2023-12-31',
-            value: 1000000000,
-            formatted_value: '$1.00B',
-            source: 'SEC EDGAR',
-            url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000320193&type=10-K',
-            description: 'Annual revenue from SEC 10-K filing'
-          },
-          {
-            label: 'Net Income',
-            ticker: payload.ticker || 'COMPANY',
-            period: '2023-12-31',
-            value: 100000000,
-            formatted_value: '$100M',
-            source: 'SEC EDGAR',
-            url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000320193&type=10-K',
-            description: 'Net income from SEC 10-K filing'
-          },
-          {
-            label: 'Stock Price',
-            ticker: payload.ticker || 'COMPANY',
-            period: new Date().toISOString().split('T')[0],
-            value: 150.00,
-            formatted_value: '$150.00',
-            source: 'Yahoo Finance',
-            description: 'Current stock price (real-time data)'
-          }
-        ];
-        
-        if (window.DashboardEnhancements && window.DashboardEnhancements.renderDataSources) {
-          window.DashboardEnhancements.renderDataSources(sampleSources);
-          console.log('[CFI] ✅ Sample sources rendered');
-        }
+        console.warn('[CFI] ⚠️ No sources in payload');
       }
-      
-      // Always setup toggle, regardless of whether sources exist
-      setupSourcesToggle();
       
       attachExportHandlers(payload);
       const charts = payload.charts || {};
@@ -2500,11 +2460,11 @@ function setupSourcesToggle() {
     console.log('[setupSourcesToggle] ✅ Forced sources panel visibility');
   }
   
-  // Start with sources collapsed by default
-  let isCollapsed = true;
-  sourcesBody.classList.add('collapsed');
-  toggleBtn.classList.add('collapsed');
-  if (toggleText) toggleText.textContent = 'Show';
+  // Start with sources expanded by default (as it was originally)
+  let isCollapsed = false;
+  sourcesBody.classList.remove('collapsed');
+  toggleBtn.classList.remove('collapsed');
+  if (toggleText) toggleText.textContent = 'Hide';
   
   toggleBtn.addEventListener('click', (e) => {
     console.log('[setupSourcesToggle] 🖱️ BUTTON CLICKED!', { isCollapsed });
