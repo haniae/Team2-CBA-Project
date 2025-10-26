@@ -711,15 +711,21 @@ On startup database.initialise() applies schema migrations idempotently. When ru
 
 ```
 Project/
-├── README.md
-├── pyproject.toml
-├── requirements.txt
-├── run_chatbot.py
-├── serve_chatbot.py
+├── README.md                          # Main project documentation
+├── pyproject.toml                     # Project metadata and dependencies
+├── requirements.txt                   # Python dependencies
+├── env.example                        # Environment configuration template
+├── run_chatbot.py                     # CLI chatbot entry point
+├── serve_chatbot.py                   # Web server entry point
+├── run_data_ingestion.ps1             # Windows ingestion script
+├── run_data_ingestion.sh              # Unix ingestion script
+├── fill_gaps_summary.json             # Ingestion progress tracking
+│
 ├── scripts/
-│   ├── generate_aliases.py
+│   ├── generate_aliases.py            # Regenerate ticker alias universe
 │   ├── ingestion/
 │   │   ├── fill_data_gaps.py          # ⭐ Recommended: Smart gap-filling script
+│   │   ├── ingest_20years_sp500.py    # Full historical ingestion
 │   │   ├── batch_ingest.py
 │   │   ├── ingest_companyfacts.py
 │   │   ├── ingest_companyfacts_batch.py
@@ -730,50 +736,126 @@ Project/
 │   │   ├── load_prices_yfinance.py
 │   │   └── load_ticker_cik.py
 │   └── utility/
+│       ├── check_database_simple.py   # Database verification
+│       ├── check_ingestion_status.py  # Ingestion status checker
+│       ├── check_kpi_values.py        # KPI validation
+│       ├── monitor_progress.py        # Progress monitoring
+│       ├── quick_status.py            # Quick status check
+│       ├── show_complete_attribution.py
+│       ├── plotly_demo.py             # Plotly chart examples
 │       ├── chat_metrics.py
 │       ├── data_sources_backup.py
 │       └── main.py
+│
 ├── src/
 │   └── benchmarkos_chatbot/
-│       ├── analytics_engine.py
-│       ├── chatbot.py
-│       ├── config.py
-│       ├── data_ingestion.py
-│       ├── data_sources.py
-│       ├── database.py
+│       ├── analytics_engine.py        # Core analytics engine
+│       ├── chatbot.py                 # Chatbot orchestration
+│       ├── config.py                  # Configuration management
+│       ├── data_ingestion.py          # Data ingestion pipeline
+│       ├── data_sources.py            # Data source integrations
+│       ├── database.py                # Database abstraction layer
+│       ├── cfi_ppt_builder.py         # PowerPoint export builder
 │       ├── parsing/
-│       │   ├── alias_builder.py
-│       │   ├── aliases.json
-│       │   ├── ontology.py
-│       │   ├── parse.py
-│       │   └── time_grammar.py
-│       ├── llm_client.py
-│       ├── table_renderer.py
-│       ├── tasks.py
-│       └── web.py
+│       │   ├── alias_builder.py       # Ticker alias resolution
+│       │   ├── aliases.json           # Generated ticker aliases
+│       │   ├── ontology.py            # Metric ontology
+│       │   ├── parse.py               # Natural language parser
+│       │   └── time_grammar.py        # Time period parser
+│       ├── llm_client.py              # LLM provider abstraction
+│       ├── table_renderer.py          # ASCII table rendering
+│       ├── tasks.py                   # Task queue management
+│       └── web.py                     # FastAPI web server
+│
 ├── docs/
-│   ├── orchestration_playbook.md
-│   └── ticker_names.md
+│   ├── README.md                      # Documentation index
+│   ├── architecture.md                # System architecture
+│   ├── orchestration_playbook.md      # Deployment guide
+│   ├── product_design_spec.md         # Product specifications
+│   ├── TEAM_SETUP_GUIDE.md            # Team onboarding
+│   ├── INSTALLATION_GUIDE.md          # Installation instructions
+│   ├── SETUP_GUIDE.md                 # Setup guide
+│   ├── README_SETUP.md                # Setup README
+│   ├── README_SP500_INGESTION.md      # S&P 500 ingestion guide
+│   ├── EXPAND_DATA_GUIDE.md           # Data expansion guide
+│   ├── DATA_INGESTION_PLAN.md         # Ingestion planning
+│   ├── PLOTLY_INTEGRATION.md          # Plotly integration docs
+│   ├── PHASE1_ANALYTICS_FEATURES.md   # Phase 1 features
+│   ├── PHASE1_COMPLETION_SUMMARY.md   # Phase 1 summary
+│   ├── ticker_names.md                # Ticker coverage list
+│   ├── ui_design_philosophy.md        # UI design principles
+│   ├── dashboard_interactions.md      # Dashboard UX patterns
+│   ├── chatbot_system_overview_en.md  # System overview
+│   ├── DASHBOARD_SOURCES_INSTRUCTIONS.md
+│   ├── DASHBOARD_IMPROVEMENTS_COMPLETE.md
+│   ├── DASHBOARD_SOURCES_DISPLAY_FIX.md
+│   ├── SOURCES_LOCATION_GUIDE.md
+│   ├── SOURCES_TROUBLESHOOTING.md
+│   ├── SOURCES_DISPLAY_FIXED.md
+│   ├── SOURCES_100_PERCENT_COMPLETE_SUMMARY.md
+│   ├── 100_PERCENT_SOURCE_COMPLETENESS.md
+│   ├── SEC_URLS_FIX_SUMMARY.md
+│   ├── SP500_INGESTION_SYSTEM_COMPLETE.md
+│   ├── duplicate_files_report.md      # Cleanup report
+│   ├── export_pipeline_scope.md
+│   ├── prompt_processing_analysis.md
+│   ├── command_routing_analysis_report.md
+│   ├── DATABASE_DATA_SUMMARY.md
+│   ├── EXTENDED_INGESTION_INFO.md
+│   ├── RAW_SEC_PARSER_IMPLEMENTATION_GUIDE.md
+│   ├── reports/                       # Generated reports
+│   │   └── (various analysis and improvement reports)
+│   └── analysis/                      # Analysis documentation
+│       └── (consolidated analysis reports and documentation)
+│
 ├── data/
-│   ├── sample_financials.csv
-│   ├── sqlite/benchmarkos_chatbot.sqlite3 (created on demand)
+│   ├── sample_financials.csv          # Sample data
+│   ├── external/
+│   │   └── imf_sector_kpis.json       # IMF sector benchmarks
+│   ├── sqlite/
+│   │   └── benchmarkos_chatbot.sqlite3 (created on demand)
 │   └── tickers/
-│       ├── universe_sp500.txt
-│       ├── sec_top100.txt
-│       └── sample_watchlist.txt
-├── cache/            # generated at runtime
+│       ├── universe_sp500.txt         # S&P 500 ticker list
+│       ├── sec_top100.txt             # Top 100 companies
+│       └── sample_watchlist.txt       # Sample watchlist
+│
+├── cache/                             # Generated at runtime
+│   └── edgar_tickers.json             # Cached EDGAR ticker data
+│
+├── analysis/
+│   ├── experiments/                   # Experimental code
+│   │   ├── enhanced_ticker_resolver.py
+│   │   ├── fixed_ticker_resolver.py
+│   │   └── (other experiments)
+│   └── scripts/                       # Analysis scripts
+│       └── (analysis and validation scripts)
+│
+├── tools/
+│   └── refresh_ticker_catalog.py     # Ticker catalog management
+│
 ├── webui/
+│   ├── index.html                     # Web UI entry point
+│   ├── app.js                         # Frontend application logic
+│   ├── styles.css                     # UI styling
+│   └── static/                        # Static assets
+│
 └── tests/
+    ├── README.md                      # Testing documentation
     ├── test_alias_resolution.py
     ├── test_analytics.py
     ├── test_analytics_engine.py
     ├── test_cli_tables.py
     ├── test_data_ingestion.py
     ├── test_database.py
-    ├── test_ingestion_perf.py
-    ├── test_kpi_backfill.py
+    ├── test_dashboard_flow.py
+    ├── test_new_analytics.py
     ├── test_nl_parser.py
-    └── test_time_grammar.py
+    ├── test_time_grammar.py
+    ├── regression/                    # Regression tests
+    │   ├── test_ticker_resolution.py
+    │   ├── final_comparison_test.py
+    │   └── system_integration_test.py
+    └── (additional test files)
 ```
 
 ## File reference
