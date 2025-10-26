@@ -89,6 +89,9 @@ htmlcov/
 # Progress files
 .ingestion_progress.json
 scripts/ingestion/.ingestion_progress.json
+cache/progress/*.json
+.ingestion_progress_*.json
+fill_gaps_summary.json
 
 # HTML files (generated)
 *.html

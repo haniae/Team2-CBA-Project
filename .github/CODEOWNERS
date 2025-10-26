@@ -1,0 +1,54 @@
+# Code Owners for BenchmarkOS Chatbot Platform
+# These owners will be automatically requested for review when someone opens a pull request.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repository
+* @haniae
+
+# Core source code
+/src/ @haniae
+/src/benchmarkos_chatbot/ @haniae
+
+# Configuration files
+*.yml @haniae
+*.yaml @haniae
+*.toml @haniae
+*.cfg @haniae
+requirements.txt @haniae
+pyproject.toml @haniae
+
+# Documentation
+/docs/ @haniae
+README.md @haniae
+CONTRIBUTING.md @haniae
+CHANGELOG.md @haniae
+
+# CI/CD and GitHub configuration
+/.github/ @haniae
+/.github/workflows/ @haniae
+
+# Tests
+/tests/ @haniae
+
+# Scripts
+/scripts/ @haniae
+
+# Security-sensitive files
+SECURITY.md @haniae
+CODE_OF_CONDUCT.md @haniae
+LICENSE @haniae
+
+# Data ingestion (requires careful review)
+/scripts/ingestion/ @haniae
+
+# Database migrations (if added in future)
+# /migrations/ @haniae
+
+# Web UI
+/webui/ @haniae
+
+# Analytics engine (critical component)
+/src/benchmarkos_chatbot/analytics_engine.py @haniae
+/src/benchmarkos_chatbot/database.py @haniae
+/src/benchmarkos_chatbot/data_ingestion.py @haniae
+

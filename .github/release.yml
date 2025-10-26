@@ -1,0 +1,83 @@
+# GitHub Release configuration
+# Automatically generates release notes from PRs
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - dependencies
+      - duplicate
+      - invalid
+      - wontfix
+    authors:
+      - dependabot
+
+  categories:
+    - title: 🚀 Features
+      labels:
+        - feature
+        - enhancement
+        - feat
+      
+    - title: 🐛 Bug Fixes
+      labels:
+        - bug
+        - fix
+        - bugfix
+      
+    - title: 📚 Documentation
+      labels:
+        - documentation
+        - docs
+      
+    - title: ⚡ Performance
+      labels:
+        - performance
+        - optimization
+      
+    - title: 🔒 Security
+      labels:
+        - security
+      
+    - title: 🧪 Tests
+      labels:
+        - test
+        - tests
+      
+    - title: 🔧 Infrastructure
+      labels:
+        - infrastructure
+        - ci
+        - cd
+        - devops
+      
+    - title: 🔄 Refactoring
+      labels:
+        - refactor
+        - refactoring
+      
+    - title: 📦 Dependencies
+      labels:
+        - dependencies
+        - deps
+      
+    - title: 🎨 UI/UX
+      labels:
+        - ui
+        - ux
+        - design
+      
+    - title: 📊 Analytics
+      labels:
+        - analytics
+        - data
+      
+    - title: 🎓 Academic
+      labels:
+        - academic
+        - practicum
+      
+    - title: 🔀 Other Changes
+      labels:
+        - "*"
+
