@@ -1489,36 +1489,54 @@ class BenchmarkOSChatbot:
                             emit("intent_complete", "Intent routing completed with no direct answer")
 
             if reply is None:
-                summary_target = self._detect_summary_target(user_input, normalized_command)
-                if summary_target:
-                    # Only build dashboard if explicitly requested with "dashboard" keyword
-                    if "dashboard" in user_input.lower():
-                        emit("summary_attempt", f"Compiling dashboard for {summary_target}")
-                        dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, summary_target)
-                        if dashboard_payload:
-                            display = _display_ticker_symbol(_normalise_ticker_symbol(summary_target))
-                            self.last_structured_response["dashboard"] = {
-                                "kind": "cfi-classic",
-                                "ticker": display,
-                                "payload": dashboard_payload,
-                            }
-                            # Return brief message since dashboard shows all the data
-                            company_name = dashboard_payload.get("meta", {}).get("company", "")
-                            if company_name and company_name.upper() != display.upper():
-                                reply = f"Displaying financial dashboard for {company_name} ({display})."
+                # Check if this is a question - if so, skip summary and let LLM handle it
+                lowered_input = user_input.lower()
+                question_patterns = [
+                    r'\bwhat\s+(?:is|are|was|were)\b',
+                    r'\bhow\s+(?:much|many|does|did|is|are)\b',
+                    r'\bwhy\b',
+                    r'\bexplain\b',
+                    r'\btell\s+me\s+(?:about|why|how)\b',
+                    r'\bis\s+\w+\s+(?:more|less|better|worse|higher|lower)',
+                    r'\bwhich\s+(?:company|stock|one|is)\b',
+                    r'\bcan\s+you\b',
+                    r'\bdoes\s+\w+\s+have\b',
+                    r'\bshould\s+i\b',
+                ]
+                is_question = any(re.search(pattern, lowered_input) for pattern in question_patterns)
+                
+                # Only do ticker summary for bare ticker mentions, NOT questions
+                if not is_question:
+                    summary_target = self._detect_summary_target(user_input, normalized_command)
+                    if summary_target:
+                        # Only build dashboard if explicitly requested with "dashboard" keyword
+                        if "dashboard" in lowered_input:
+                            emit("summary_attempt", f"Compiling dashboard for {summary_target}")
+                            dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, summary_target)
+                            if dashboard_payload:
+                                display = _display_ticker_symbol(_normalise_ticker_symbol(summary_target))
+                                self.last_structured_response["dashboard"] = {
+                                    "kind": "cfi-classic",
+                                    "ticker": display,
+                                    "payload": dashboard_payload,
+                                }
+                                # Return brief message since dashboard shows all the data
+                                company_name = dashboard_payload.get("meta", {}).get("company", "")
+                                if company_name and company_name.upper() != display.upper():
+                                    reply = f"Displaying financial dashboard for {company_name} ({display})."
+                                else:
+                                    reply = f"Displaying financial dashboard for {display}."
+                                emit("summary_complete", f"Dashboard prepared for {summary_target}")
                             else:
-                                reply = f"Displaying financial dashboard for {display}."
-                            emit("summary_complete", f"Dashboard prepared for {summary_target}")
+                                emit("summary_unavailable", f"Dashboard unavailable for {summary_target}")
                         else:
-                            emit("summary_unavailable", f"Dashboard unavailable for {summary_target}")
-                    else:
-                        # Use text summary for regular ticker queries
-                        emit("summary_attempt", f"Compiling text summary for {summary_target}")
-                        reply = self._get_ticker_summary(summary_target)
-                        if reply:
-                            emit("summary_complete", f"Text snapshot prepared for {summary_target}")
-                        else:
-                            emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
+                            # Use text summary for regular ticker queries (bare mentions only)
+                            emit("summary_attempt", f"Compiling text summary for {summary_target}")
+                            reply = self._get_ticker_summary(summary_target)
+                            if reply:
+                                emit("summary_complete", f"Text snapshot prepared for {summary_target}")
+                            else:
+                                emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
 
             if reply is None:
                 emit("context_build_start", "Gathering enhanced financial context")
