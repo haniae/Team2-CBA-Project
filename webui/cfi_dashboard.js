@@ -1346,7 +1346,7 @@
     Object.entries(grouped).forEach(([catKey, catItems]) => {
       const catDef = KPI_CATEGORIES[catKey];
       const catDiv = document.createElement("div");
-      catDiv.className = "kpi-category";
+      catDiv.className = "kpi-category collapsed"; // Start collapsed
       catDiv.dataset.category = catKey;
       
       const header = document.createElement("div");
@@ -1385,7 +1385,7 @@
       });
       
       const catDiv = document.createElement("div");
-      catDiv.className = "kpi-category";
+      catDiv.className = "kpi-category collapsed"; // Start collapsed
       catDiv.innerHTML = `
         <div class="kpi-category-header">
           <div class="kpi-category-title">
