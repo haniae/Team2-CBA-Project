@@ -190,13 +190,15 @@ def build_financial_context(
                         sec_url = filing.get("sec_url")
                         
                         if sec_url:
-                            # Format: "10-K FY2023 (link)"
+                            # Format as markdown link: [10-K FY2023](URL)
                             if fy and fp:
-                                sec_urls.append(f"{form_type} FY{fy} {fp}: {sec_url}")
+                                link_text = f"{form_type} FY{fy} {fp}"
+                                sec_urls.append(f"[{link_text}]({sec_url})")
                             elif fy:
-                                sec_urls.append(f"{form_type} FY{fy}: {sec_url}")
+                                link_text = f"{form_type} FY{fy}"
+                                sec_urls.append(f"[{link_text}]({sec_url})")
                             else:
-                                sec_urls.append(f"{form_type}: {sec_url}")
+                                sec_urls.append(f"[{form_type}]({sec_url})")
                     
                     # Use first filing for header citation
                     first_filing = recent_filings[0]
@@ -215,10 +217,10 @@ def build_financial_context(
                 
                 # Add SEC Filing Sources section at the top for easy access
                 if sec_urls:
-                    ticker_context += "📄 **SEC FILING SOURCES (Clickable Links)** - COPY THESE EXACT URLS TO YOUR RESPONSE:\n"
+                    ticker_context += "📄 **SEC FILING SOURCES (Markdown Links)** - Copy these to your Sources section:\n"
                     for url_info in sec_urls:
                         ticker_context += f"  • {url_info}\n"
-                    ticker_context += "⚠️ IMPORTANT: Include these exact URLs in your 'Sources:' section. DO NOT use placeholders.\n\n"
+                    ticker_context += "⚠️ These are already formatted as markdown [text](url). Copy them EXACTLY to your Sources section.\n\n"
                 
                 # Income Statement Metrics
                 income_metrics = []
@@ -447,22 +449,16 @@ def build_financial_context(
             "║                    COMPREHENSIVE FINANCIAL DATA CONTEXT                      ║\n"
             "╚═══════════════════════════════════════════════════════════════════════════════╝\n\n"
             "📋 **DATA SOURCES**:\n"
-            "All data below is sourced from official SEC EDGAR filings (10-K annual reports, "
-            "10-Q quarterly reports) and real-time market data from regulated exchanges. "
-            "Each company section includes CLICKABLE SEC FILING URLs for direct verification.\n\n"
-            "📖 **INSTRUCTIONS FOR COMPREHENSIVE ANSWERS**:\n"
-            "1. **Always cite sources**: Reference the specific SEC filing type (10-K/10-Q), "
-            "fiscal period (FY2023, Q3 FY2024), and include the clickable SEC URL when discussing data\n"
-            "2. **Provide context**: Explain WHY metrics changed, not just WHAT changed. "
-            "Use the trend data, ratios, and growth metrics to tell the story\n"
-            "3. **Compare when relevant**: Use the historical trends (YoY, 3Y CAGR, 5Y CAGR) "
-            "to show progression over time\n"
-            "4. **Interpret ratios**: The ratios section includes typical ranges and interpretations - "
-            "use these to assess financial health\n"
-            "5. **Be specific**: If asked about one metric, provide that metric's value, trend, "
-            "and business context in a focused answer\n"
-            "6. **Structure your response**: Answer the question first, then provide supporting "
-            "details, then cite sources with clickable links\n\n"
+            "All data is from official SEC EDGAR filings (10-K, 10-Q) and regulated exchanges. "
+            "Each company section includes SEC filing URLs formatted as markdown links [Filing Name](URL).\n\n"
+            "📖 **RESPONSE INSTRUCTIONS**:\n"
+            "1. **Write like ChatGPT**: Natural, conversational, engaging - not robotic or formal\n"
+            "2. **Use markdown formatting**: **bold** for emphasis, bullets, clear headers\n"
+            "3. **Answer first**: Lead with the direct answer, then explain\n"
+            "4. **Tell a story**: Connect metrics into a narrative, explain WHY things changed\n"
+            "5. **Add perspective**: Industry context, trends, forward outlook\n"
+            "6. **Cite sources**: Copy the markdown links [10-K FY2023](URL) from the sources section below\n"
+            "7. **NEVER show full URLs**: Always use markdown link format [text](url)\n\n"
             "═══════════════════════════════════════════════════════════════════════════════\n\n"
         )
         
