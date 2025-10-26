@@ -1644,17 +1644,31 @@
         hasEnhancements: !!window.DashboardEnhancements
       });
       
+      // Always setup the toggle button, even if no sources
       if (payload.sources && payload.sources.length > 0) {
         if (window.DashboardEnhancements && window.DashboardEnhancements.renderDataSources) {
           window.DashboardEnhancements.renderDataSources(payload.sources);
-          setupSourcesToggle();
           console.log('[CFI] ✅ Sources rendered successfully');
         } else {
           console.error('[CFI] ❌ DashboardEnhancements.renderDataSources not available');
         }
       } else {
-        console.warn('[CFI] ⚠️ No sources in payload');
+        console.warn('[CFI] ⚠️ No sources in payload - showing empty state');
+        // Show empty state message
+        const sourcesGrid = document.getElementById('cfi-sources-grid');
+        if (sourcesGrid) {
+          sourcesGrid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: #666;">
+              <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
+              <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No Data Sources Available</div>
+              <div style="font-size: 14px;">Data sources will appear here once the dashboard is fully loaded.</div>
+            </div>
+          `;
+        }
       }
+      
+      // Always setup toggle, regardless of whether sources exist
+      setupSourcesToggle();
       
       attachExportHandlers(payload);
       const charts = payload.charts || {};
