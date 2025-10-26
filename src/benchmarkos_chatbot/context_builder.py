@@ -215,10 +215,10 @@ def build_financial_context(
                 
                 # Add SEC Filing Sources section at the top for easy access
                 if sec_urls:
-                    ticker_context += "📄 **SEC FILING SOURCES (Clickable Links)**:\n"
+                    ticker_context += "📄 **SEC FILING SOURCES (Clickable Links)** - COPY THESE EXACT URLS TO YOUR RESPONSE:\n"
                     for url_info in sec_urls:
                         ticker_context += f"  • {url_info}\n"
-                    ticker_context += "\n"
+                    ticker_context += "⚠️ IMPORTANT: Include these exact URLs in your 'Sources:' section. DO NOT use placeholders.\n\n"
                 
                 # Income Statement Metrics
                 income_metrics = []
