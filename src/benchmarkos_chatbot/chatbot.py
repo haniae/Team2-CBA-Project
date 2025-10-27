@@ -3030,7 +3030,6 @@ class BenchmarkOSChatbot:
                     single_payload = build_cfi_dashboard_payload(
                         self.analytics_engine,
                         ticker,
-                        strict=False,
                     )
                     if single_payload:
                         dashboards_list.append({
