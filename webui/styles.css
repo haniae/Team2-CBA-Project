@@ -4264,6 +4264,15 @@ body::-webkit-scrollbar {
   width: 100%;
 }
 
+/* Hide sources and exports sections from all dashboards */
+.cfi-panel[data-area="sources"] {
+  display: none !important;
+}
+
+.export-button {
+  display: none !important;
+}
+
 .message-artifacts {
   display: flex;
   flex-direction: column;
