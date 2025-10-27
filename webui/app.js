@@ -2973,58 +2973,18 @@ function renderDashboardArtifact(descriptor) {
       // Store render function for this dashboard
       host.renderDashboard = async () => {
         try {
-          console.log(`Starting render for ${dashboardItem.ticker}`);
-          console.log(`Payload preview:`, {
-            meta: dashboardItem.payload?.meta,
-            hasOverview: !!dashboardItem.payload?.overview,
-            hasSeries: !!dashboardItem.payload?.series,
-            keysCount: Object.keys(dashboardItem.payload || {}).length
-          });
-          
           const options = { 
             container: host,
             payload: dashboardItem.payload,
             ticker: dashboardItem.ticker
           };
           await showCfiDashboard(options);
-          console.log(`Completed render for ${dashboardItem.ticker}`);
           
-          // Verify data was rendered
-          const hasContent = host.querySelector('.cfi-grid, .cfi-dashboard-root, [data-cfi-section]');
-          if (!hasContent) {
-            console.error(`Dashboard rendered but no content found for ${dashboardItem.ticker}`);
-            // Show payload debug info
-            host.innerHTML = `
-              <div style="padding: 20px; font-family: monospace; font-size: 12px;">
-                <h3 style="color: #dc2626;">Dashboard Render Issue</h3>
-                <p><strong>Ticker:</strong> ${dashboardItem.ticker}</p>
-                <p><strong>Payload Keys:</strong> ${Object.keys(dashboardItem.payload || {}).join(', ')}</p>
-                <p><strong>Company:</strong> ${dashboardItem.payload?.meta?.company || 'N/A'}</p>
-                <details>
-                  <summary>Full Payload (click to expand)</summary>
-                  <pre style="max-height: 400px; overflow: auto; background: #f3f4f6; padding: 10px;">${JSON.stringify(dashboardItem.payload, null, 2)}</pre>
-                </details>
-              </div>
-            `;
-          } else {
-            // Fix duplicate IDs by making them unique per dashboard
-            makeIdsUnique(host, uniqueId);
-          }
+          // Fix duplicate IDs by making them unique per dashboard
+          makeIdsUnique(host, uniqueId);
         } catch (error) {
           console.error(`Failed to render dashboard for ${dashboardItem.ticker}:`, error);
-          host.innerHTML = `
-            <div class="cfi-error" style="padding: 20px;">
-              <p>Unable to render dashboard for ${dashboardItem.ticker}</p>
-              <details>
-                <summary>Error Details</summary>
-                <pre style="color: #dc2626; font-size: 11px;">${error.stack || error.message}</pre>
-              </details>
-              <details>
-                <summary>Payload Data</summary>
-                <pre style="max-height: 300px; overflow: auto; font-size: 11px;">${JSON.stringify(dashboardItem.payload, null, 2)}</pre>
-              </details>
-            </div>
-          `;
+          host.innerHTML = `<div class="cfi-error">Unable to render dashboard for ${dashboardItem.ticker}.</div>`;
         }
       };
       
