@@ -2858,29 +2858,46 @@ function renderDashboardArtifact(descriptor) {
     container.classList.add("message-dashboard--cfi");
   }
   
-  // Handle multi-classic: render multiple single-company dashboards
+  // Handle multi-classic: render multiple single-company dashboards with dropdown selector
   if (kind === "multi-classic" && descriptor.dashboards && Array.isArray(descriptor.dashboards)) {
     const multiContainer = document.createElement("div");
     multiContainer.className = "message-dashboard__multi";
     
+    // Create dropdown selector
+    const selectorWrapper = document.createElement("div");
+    selectorWrapper.className = "message-dashboard__selector";
+    
+    const selectorLabel = document.createElement("label");
+    selectorLabel.textContent = "Select Company: ";
+    selectorLabel.style.cssText = "font-weight: 600; margin-right: 12px; color: var(--navy);";
+    
+    const dropdown = document.createElement("select");
+    dropdown.className = "message-dashboard__dropdown";
+    
+    // Populate dropdown with company names
     descriptor.dashboards.forEach((dashboardItem, index) => {
-      // Create wrapper for each dashboard
-      const wrapper = document.createElement("div");
-      wrapper.className = "message-dashboard__multi-item";
-      if (index > 0) {
-        wrapper.style.marginTop = "2rem";
-      }
-      
-      // Add company header
-      const header = document.createElement("div");
-      header.className = "message-dashboard__multi-header";
-      header.textContent = dashboardItem.ticker || `Company ${index + 1}`;
-      wrapper.append(header);
-      
-      // Create host for dashboard
+      const option = document.createElement("option");
+      option.value = index;
+      // Extract company name from payload or use ticker as fallback
+      const companyName = dashboardItem.payload?.company_name || dashboardItem.ticker || `Company ${index + 1}`;
+      option.textContent = companyName;
+      dropdown.appendChild(option);
+    });
+    
+    selectorWrapper.appendChild(selectorLabel);
+    selectorWrapper.appendChild(dropdown);
+    multiContainer.appendChild(selectorWrapper);
+    
+    // Create container for dashboard (only one visible at a time)
+    const dashboardContainer = document.createElement("div");
+    dashboardContainer.className = "message-dashboard__switchable";
+    
+    // Create all dashboard hosts but hide all except first
+    const dashboardHosts = descriptor.dashboards.map((dashboardItem, index) => {
       const host = document.createElement("div");
       host.className = "message-dashboard__surface";
-      wrapper.append(host);
+      host.style.display = index === 0 ? "block" : "none"; // Show first, hide others
+      host.dataset.dashboardIndex = index;
       
       // Render single-company dashboard
       const options = { 
@@ -2902,10 +2919,20 @@ function renderDashboardArtifact(descriptor) {
         host.innerHTML = `<div class="cfi-error">Unable to render dashboard for ${dashboardItem.ticker}.</div>`;
       }
       
-      multiContainer.append(wrapper);
+      dashboardContainer.appendChild(host);
+      return host;
     });
     
-    container.append(multiContainer);
+    // Add change event to dropdown for instant switching
+    dropdown.addEventListener("change", (e) => {
+      const selectedIndex = parseInt(e.target.value, 10);
+      dashboardHosts.forEach((host, index) => {
+        host.style.display = index === selectedIndex ? "block" : "none";
+      });
+    });
+    
+    multiContainer.appendChild(dashboardContainer);
+    container.appendChild(multiContainer);
     return container;
   }
   
