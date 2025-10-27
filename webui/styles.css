@@ -4177,6 +4177,90 @@ body::-webkit-scrollbar {
   gap: 12px;
 }
 
+/* Dropdown container for large lists (500+ tickers) */
+.message-dashboard__dropdown-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.message-dashboard__company-search {
+  padding: 12px 16px;
+  border: 2px solid rgba(0, 102, 255, 0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  background: white;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.message-dashboard__company-search:focus {
+  outline: none;
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+.message-dashboard__company-search::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.message-dashboard__company-select {
+  padding: 12px 16px;
+  border: 2px solid rgba(0, 102, 255, 0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  min-height: 48px;
+}
+
+.message-dashboard__company-select:hover {
+  border-color: var(--indigo);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.message-dashboard__company-select:focus {
+  outline: none;
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+.message-dashboard__company-select option {
+  padding: 8px 12px;
+  font-size: 14px;
+  background: white;
+}
+
+.message-dashboard__company-select option:hover {
+  background: rgba(0, 102, 255, 0.08);
+}
+
+/* Dark mode support for dropdown */
+[data-theme="dark"] .message-dashboard__company-search,
+[data-theme="dark"] .message-dashboard__company-select {
+  background: rgba(31, 41, 55, 0.8);
+  color: rgba(249, 250, 251, 0.95);
+  border-color: rgba(75, 85, 99, 0.5);
+}
+
+[data-theme="dark"] .message-dashboard__company-search:focus,
+[data-theme="dark"] .message-dashboard__company-select:focus {
+  border-color: #4A90E2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+}
+
+[data-theme="dark"] .message-dashboard__company-select option {
+  background: rgba(31, 41, 55, 1);
+  color: rgba(249, 250, 251, 0.95);
+}
+
 .message-dashboard__company-btn {
   display: flex;
   flex-direction: column;

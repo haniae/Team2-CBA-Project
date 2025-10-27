@@ -206,10 +206,21 @@
     for (let idx = 0; idx < count; idx += 1) {
       const label = labelPrefix ? `${labelPrefix} ${categories[idx] ?? ""}` : categories[idx];
       const numeric = toNumericValue(values[idx], label);
-      if (numeric === null) continue;
+      // Strict validation: must be a finite number (not NaN, not Infinity)
+      if (numeric === null || !Number.isFinite(numeric)) continue;
       safe.push({ x: categories[idx], y: numeric });
     }
     return safe;
+  }
+  
+  // Helper function to sanitize array of numeric values
+  function sanitizeNumericArray(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.map(val => {
+      if (val === null || val === undefined) return null;
+      const num = Number(val);
+      return Number.isFinite(num) ? num : null;
+    });
   }
 
   function formatValue(label, value) {
@@ -665,7 +676,7 @@
       const cleanPoints = series.years
         .map((year, idx) => {
           const value = series.values?.[idx];
-          return isNumber(value) ? { year, value } : null;
+          return (isNumber(value) && Number.isFinite(value)) ? { year, value } : null;
         })
         .filter(Boolean);
       if (cleanPoints.length) {
@@ -680,6 +691,7 @@
               name: drilldown?.label || summary?.label || metricId,
               line: { color: "#1C7ED6", width: 3 },
               marker: { color: "#1C7ED6", size: 6 },
+              connectgaps: false,
             },
           ],
           {
@@ -764,17 +776,18 @@
     }
     const baseType = series.type || "number";
     let years = series.years.slice();
-    let values = series.values.slice();
+    let values = sanitizeNumericArray(series.values.slice());
     let type = baseType;
     if (mode === "growth") {
       const growth = [];
       for (let i = 1; i < values.length; i += 1) {
         const prev = values[i - 1];
         const curr = values[i];
-        if (!isNumber(prev) || !isNumber(curr) || prev === 0) {
+        if (!isNumber(prev) || !isNumber(curr) || !Number.isFinite(prev) || !Number.isFinite(curr) || prev === 0) {
           growth.push(null);
         } else {
-          growth.push(curr / prev - 1);
+          const growthVal = curr / prev - 1;
+          growth.push(Number.isFinite(growthVal) ? growthVal : null);
         }
       }
       years = years.slice(1);
@@ -784,7 +797,7 @@
     const cleanPoints = years
       .map((year, idx) => {
         const value = values[idx];
-        return isNumber(value) ? { year, value } : null;
+        return (isNumber(value) && Number.isFinite(value)) ? { year, value } : null;
       })
       .filter(Boolean);
     if (!cleanPoints.length) {
@@ -801,6 +814,7 @@
           y: cleanPoints.map((pt) => pt.value),
           line: { color: "#FF7F0E", width: 3 },
           marker: { color: "#FF7F0E", size: 6 },
+          connectgaps: false,
         },
       ],
       {
@@ -928,7 +942,13 @@
       return;
     }
     const xValues = revenueSeries.map((point) => point.x);
-    const yValues = revenueSeries.map((point) => point.y);
+    const yValues = revenueSeries.map((point) => point.y).filter(v => Number.isFinite(v));
+    
+    if (yValues.length === 0) {
+      node.textContent = "No valid revenue data.";
+      return;
+    }
+    
     const denominator = Math.max(yValues.length - 1, 1);
     const barColors = yValues.map((_, idx) => {
       const ratio = denominator === 0 ? 0 : idx / denominator;
@@ -952,21 +972,25 @@
     const multiplesSource = data.EV_Rev || data["EV/Revenue"] || [];
     const multiplesSeries = buildNumericSeries(data.Year, multiplesSource, "EV/Revenue");
     if (multiplesSeries.length) {
-      traces.push({
-        type: "scatter",
-        mode: "lines+markers",
-        x: multiplesSeries.map((point) => point.x),
-        y: multiplesSeries.map((point) => point.y),
-        name: "EV/Revenue (×)",
-        yaxis: "y2",
-        line: { color: COLORS.accent, width: 3, shape: "spline" },
-        marker: { 
-          size: 8, 
-          color: COLORS.accentLight,
-          line: { color: COLORS.accent, width: 2 }
-        },
-        hovertemplate: "<b>FY %{x}</b><br>EV/Revenue: %{y:.2f}×<extra></extra>"
-      });
+      const multipleYValues = multiplesSeries.map((point) => point.y).filter(v => Number.isFinite(v));
+      if (multipleYValues.length > 0) {
+        traces.push({
+          type: "scatter",
+          mode: "lines+markers",
+          x: multiplesSeries.map((point) => point.x),
+          y: multipleYValues,
+          name: "EV/Revenue (×)",
+          yaxis: "y2",
+          line: { color: COLORS.accent, width: 3, shape: "spline" },
+          marker: { 
+            size: 8, 
+            color: COLORS.accentLight,
+            line: { color: COLORS.accent, width: 2 }
+          },
+          connectgaps: false,
+          hovertemplate: "<b>FY %{x}</b><br>EV/Revenue: %{y:.2f}×<extra></extra>"
+        });
+      }
     }
     const layout = {
       ...BASE_LAYOUT,
@@ -999,7 +1023,13 @@
       return;
     }
     const xValues = ebitdaSeries.map((point) => point.x);
-    const yValues = ebitdaSeries.map((point) => point.y);
+    const yValues = ebitdaSeries.map((point) => point.y).filter(v => Number.isFinite(v));
+    
+    if (yValues.length === 0) {
+      node.textContent = "No valid EBITDA data.";
+      return;
+    }
+    
     const denominator = Math.max(yValues.length - 1, 1);
     const barColors = yValues.map((_, idx) => {
       const ratio = denominator === 0 ? 0 : idx / denominator;
@@ -1022,21 +1052,25 @@
     const multiplesSource = data.EV_EBITDA || data["EV/EBITDA"] || [];
     const multiplesSeries = buildNumericSeries(data.Year, multiplesSource, "EV/EBITDA");
     if (multiplesSeries.length) {
-      traces.push({
-        type: "scatter",
-        mode: "lines+markers",
-        x: multiplesSeries.map((point) => point.x),
-        y: multiplesSeries.map((point) => point.y),
-        name: "EV/EBITDA (×)",
-        yaxis: "y2",
-        line: { color: COLORS.orange, width: 3, shape: "spline" },
-        marker: { 
-          size: 8, 
-          color: COLORS.orangeLight,
-          line: { color: COLORS.orange, width: 2 }
-        },
-        hovertemplate: "<b>FY %{x}</b><br>EV/EBITDA: %{y:.2f}×<extra></extra>"
-      });
+      const multipleYValues = multiplesSeries.map((point) => point.y).filter(v => Number.isFinite(v));
+      if (multipleYValues.length > 0) {
+        traces.push({
+          type: "scatter",
+          mode: "lines+markers",
+          x: multiplesSeries.map((point) => point.x),
+          y: multipleYValues,
+          name: "EV/EBITDA (×)",
+          yaxis: "y2",
+          line: { color: COLORS.orange, width: 3, shape: "spline" },
+          marker: { 
+            size: 8, 
+            color: COLORS.orangeLight,
+            line: { color: COLORS.orange, width: 2 }
+          },
+          connectgaps: false,
+          hovertemplate: "<b>FY %{x}</b><br>EV/EBITDA: %{y:.2f}×<extra></extra>"
+        });
+      }
     }
     const layout = {
       ...BASE_LAYOUT,
@@ -1072,14 +1106,19 @@
     
     scenarios.forEach(([key, color, dash, fillColor]) => {
       if (Array.isArray(data[key])) {
-        const yValues = years.map((year, idx) => {
+        // Sanitize values and filter out invalid entries
+        const yValues = sanitizeNumericArray(years.map((year, idx) => {
           const raw = data[key][idx];
           const numeric = toNumericValue(raw, `${key} ${year ?? idx}`);
-          return numeric === null ? null : numeric;
-        });
-        if (!yValues.some((value) => value !== null)) {
+          return numeric;
+        }));
+        
+        // Check if we have at least some valid data
+        const validCount = yValues.filter(v => v !== null && Number.isFinite(v)).length;
+        if (validCount === 0) {
           return;
         }
+        
         traces.push({
           type: "scatter",
           mode: "lines",
@@ -1089,6 +1128,7 @@
           line: { color, dash, width: 3, shape: "spline", smoothing: 0.8 },
           fill: 'tonexty',
           fillcolor: fillColor,
+          connectgaps: false, // Don't connect across null values
           hovertemplate: "<b>%{fullData.name} Case</b><br>FY %{x}: $%{y:,.0f}<extra></extra>"
         });
       }
@@ -1132,10 +1172,11 @@
     
     for (let i = 0; i < Math.min(data.Case.length, data.Value.length); i++) {
       const val = data.Value[i];
-      // Only include valid numbers
-      if (typeof val === 'number' && Number.isFinite(val) && val !== null) {
+      const numVal = Number(val);
+      // Only include valid finite numbers
+      if (Number.isFinite(numVal) && numVal !== null && numVal !== undefined) {
         sanitizedData.Case.push(data.Case[i]);
-        sanitizedData.Value.push(val);
+        sanitizedData.Value.push(numVal);
       }
     }
     
@@ -1150,7 +1191,12 @@
       return;
     }
     const xValues = entries.map((entry) => entry.x);
-    const yValues = entries.map((entry) => entry.y);
+    const yValues = entries.map((entry) => entry.y).filter(v => Number.isFinite(v));
+    
+    if (yValues.length === 0) {
+      node.textContent = "No valid valuation values.";
+      return;
+    }
     
     // Create color scheme for different valuation methods
     const colorMap = {
@@ -1186,12 +1232,15 @@
         hovertemplate: "<b>%{x}</b><br>Value: $%{y:,.0f}<extra></extra>"
       }
     ];
+    
+    // Add reference lines only if they're valid
     const currentValue = toNumericValue(meta?.current, "Current Price");
     const averageValue = toNumericValue(meta?.average, "Average");
     const referenceLines = [
       ["Current Price", currentValue, COLORS.slate, "dot"],
       ["Average", averageValue, COLORS.orange, "dash"]
-    ].filter(([, value]) => value !== null);
+    ].filter(([, value]) => value !== null && Number.isFinite(value));
+    
     referenceLines.forEach(([label, value, color, dash]) => {
       traces.push({
         type: "scatter",
@@ -1203,6 +1252,7 @@
         hovertemplate: `<b>${label}</b><br>${formatMoney(value)}<extra></extra>`
       });
     });
+    
     const layout = {
       ...BASE_LAYOUT,
       margin: { l: 52, r: 32, t: 32, b: 80 },
@@ -1627,6 +1677,17 @@
     render(payload) {
       if (!payload) return;
       payload = deepSanitize(payload);
+      
+      // Check if this is a multi-ticker dashboard and hide toolbar if so
+      const scope = resolveScope();
+      const isMultiTicker = scope.dataset && scope.dataset.multiTicker === "true";
+      if (isMultiTicker) {
+        const toolbar = scopedSelect(".dashboard-toolbar");
+        if (toolbar) {
+          toolbar.style.display = "none";
+        }
+      }
+      
       const meta = { ...(payload.meta || {}) };
       const priceTicker = payload.price?.Ticker || payload.price?.ticker || payload.price?.symbol;
       if (!meta.ticker_label && priceTicker) meta.ticker_label = String(priceTicker);

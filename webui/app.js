@@ -2718,7 +2718,7 @@ function renderMessageArtifacts(wrapper, artifacts) {
   const inlineDashboard = renderDashboardArtifact(artifacts.dashboard);
   const dashboardKind = artifacts.dashboard?.kind || "";
   const isInlineClassic =
-    inlineDashboard && (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare" || dashboardKind === "multi-classic");
+    inlineDashboard && (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare" || dashboardKind === "multi-classic" || dashboardKind === "multi-cfi-classic");
   if (inlineDashboard) {
     hasDashboard = true;
     body.append(inlineDashboard);
@@ -2728,7 +2728,7 @@ function renderMessageArtifacts(wrapper, artifacts) {
     }
   }
   const dashboard = createDashboardLayout(artifacts);
-  if (dashboard && dashboardKind !== "cfi-classic" && dashboardKind !== "multi-classic") {
+  if (dashboard && dashboardKind !== "cfi-classic" && dashboardKind !== "multi-classic" && dashboardKind !== "multi-cfi-classic") {
     hasDashboard = true;
     body.append(dashboard);
     if (artifacts.comparisonTable) {
@@ -2893,62 +2893,120 @@ function renderDashboardArtifact(descriptor) {
   const kind = descriptor.kind || "cfi-classic";
   const container = document.createElement("div");
   container.className = "message-dashboard";
-  if (kind === "cfi-classic" || kind === "cfi-compare" || kind === "multi-classic") {
+  if (kind === "cfi-classic" || kind === "cfi-compare" || kind === "multi-classic" || kind === "multi-cfi-classic") {
     container.classList.add("message-dashboard--cfi");
   }
   
-  // Handle multi-classic: render multiple single-company dashboards with dropdown selector
-  if (kind === "multi-classic" && descriptor.dashboards && Array.isArray(descriptor.dashboards)) {
+  // Handle multi-classic and multi-cfi-classic: render multiple single-company dashboards with company switcher
+  if ((kind === "multi-classic" || kind === "multi-cfi-classic") && descriptor.dashboards && Array.isArray(descriptor.dashboards)) {
     const multiContainer = document.createElement("div");
     multiContainer.className = "message-dashboard__multi";
     
-    // Create button selector for companies
+    // Create selector for companies
     const selectorWrapper = document.createElement("div");
     selectorWrapper.className = "message-dashboard__selector";
     
     const selectorLabel = document.createElement("div");
     selectorLabel.className = "message-dashboard__selector-label";
-    selectorLabel.textContent = "Compare Companies:";
+    selectorLabel.textContent = `Compare Companies (${descriptor.dashboards.length}):`;
     
-    const buttonGroup = document.createElement("div");
-    buttonGroup.className = "message-dashboard__button-group";
+    // Determine if we should use buttons (small number) or dropdown (large number)
+    const useDropdown = descriptor.dashboards.length > 10;
     
-    // Create buttons for each company
-    const companyButtons = descriptor.dashboards.map((dashboardItem, index) => {
-      const button = document.createElement("button");
-      button.className = "message-dashboard__company-btn";
-      button.dataset.companyIndex = index;
+    if (useDropdown) {
+      // Create searchable dropdown for large lists
+      const dropdownContainer = document.createElement("div");
+      dropdownContainer.className = "message-dashboard__dropdown-container";
       
-      // Extract company name and ticker
-      const companyName = dashboardItem.payload?.meta?.company || dashboardItem.ticker || `Company ${index + 1}`;
-      const ticker = dashboardItem.ticker || dashboardItem.payload?.meta?.ticker || '';
+      const searchInput = document.createElement("input");
+      searchInput.type = "text";
+      searchInput.className = "message-dashboard__company-search";
+      searchInput.placeholder = "Search companies by name or ticker...";
+      searchInput.setAttribute("autocomplete", "off");
       
-      // Button content
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "company-btn-name";
-      nameSpan.textContent = companyName;
+      const selectElement = document.createElement("select");
+      selectElement.className = "message-dashboard__company-select";
+      selectElement.size = 1;
       
-      if (ticker) {
-        const tickerSpan = document.createElement("span");
-        tickerSpan.className = "company-btn-ticker";
-        tickerSpan.textContent = ticker;
-        button.appendChild(nameSpan);
-        button.appendChild(tickerSpan);
-      } else {
-        button.appendChild(nameSpan);
-      }
+      // Populate select options
+      descriptor.dashboards.forEach((dashboardItem, index) => {
+        const companyName = dashboardItem.payload?.meta?.company || dashboardItem.ticker || `Company ${index + 1}`;
+        const ticker = dashboardItem.ticker || dashboardItem.payload?.meta?.ticker || '';
+        const option = document.createElement("option");
+        option.value = index;
+        option.textContent = ticker ? `${ticker} - ${companyName}` : companyName;
+        option.dataset.ticker = ticker;
+        option.dataset.company = companyName;
+        selectElement.appendChild(option);
+      });
       
-      // First button is active by default
-      if (index === 0) {
-        button.classList.add('active');
-      }
+      dropdownContainer.appendChild(searchInput);
+      dropdownContainer.appendChild(selectElement);
+      selectorWrapper.appendChild(selectorLabel);
+      selectorWrapper.appendChild(dropdownContainer);
       
-      buttonGroup.appendChild(button);
-      return button;
-    });
+      // Setup search filtering
+      let allOptions = Array.from(selectElement.options);
+      searchInput.addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        
+        // Clear existing options
+        selectElement.innerHTML = "";
+        
+        // Filter and re-add matching options
+        const matchingOptions = allOptions.filter(option => {
+          const ticker = (option.dataset.ticker || "").toLowerCase();
+          const company = (option.dataset.company || "").toLowerCase();
+          return ticker.includes(query) || company.includes(query);
+        });
+        
+        matchingOptions.forEach(option => selectElement.appendChild(option));
+        
+        // Show count in label
+        selectorLabel.textContent = `Compare Companies (${matchingOptions.length} of ${descriptor.dashboards.length}):`;
+      });
+    } else {
+      // Use button group for small lists (original behavior)
+      const buttonGroup = document.createElement("div");
+      buttonGroup.className = "message-dashboard__button-group";
+      
+      // Create buttons for each company
+      descriptor.dashboards.forEach((dashboardItem, index) => {
+        const button = document.createElement("button");
+        button.className = "message-dashboard__company-btn";
+        button.dataset.companyIndex = index;
+        
+        // Extract company name and ticker
+        const companyName = dashboardItem.payload?.meta?.company || dashboardItem.ticker || `Company ${index + 1}`;
+        const ticker = dashboardItem.ticker || dashboardItem.payload?.meta?.ticker || '';
+        
+        // Button content
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "company-btn-name";
+        nameSpan.textContent = companyName;
+        
+        if (ticker) {
+          const tickerSpan = document.createElement("span");
+          tickerSpan.className = "company-btn-ticker";
+          tickerSpan.textContent = ticker;
+          button.appendChild(nameSpan);
+          button.appendChild(tickerSpan);
+        } else {
+          button.appendChild(nameSpan);
+        }
+        
+        // First button is active by default
+        if (index === 0) {
+          button.classList.add('active');
+        }
+        
+        buttonGroup.appendChild(button);
+      });
+      
+      selectorWrapper.appendChild(selectorLabel);
+      selectorWrapper.appendChild(buttonGroup);
+    }
     
-    selectorWrapper.appendChild(selectorLabel);
-    selectorWrapper.appendChild(buttonGroup);
     multiContainer.appendChild(selectorWrapper);
     
     // Create container for dashboard (only one visible at a time)
@@ -2990,7 +3048,8 @@ function renderDashboardArtifact(descriptor) {
           const options = { 
             container: host,
             payload: dashboardItem.payload,
-            ticker: dashboardItem.ticker
+            ticker: dashboardItem.ticker,
+            isMultiTicker: true  // Flag to indicate this is part of a multi-ticker dashboard
           };
           await showCfiDashboard(options);
           
@@ -3021,30 +3080,53 @@ function renderDashboardArtifact(descriptor) {
       });
     }, 100);
     
-    // Add click event to buttons for instant switching
-    companyButtons.forEach((button, btnIndex) => {
-      button.addEventListener("click", () => {
-        const selectedIndex = parseInt(button.dataset.companyIndex, 10);
-        
-        // Update active button state
-        companyButtons.forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
-        
-        // Switch dashboards
-        dashboardHosts.forEach((host, index) => {
-          if (index === selectedIndex) {
-            host.style.display = "block";
-            // Render on-demand if not already rendered
-            if (host.renderDashboard && !host.dataset.rendered) {
-              host.dataset.rendered = "true";
-              host.renderDashboard();
-            }
-          } else {
-            host.style.display = "none";
+    // Setup switching logic based on UI type
+    const switchToDashboard = (selectedIndex) => {
+      // Switch dashboards
+      dashboardHosts.forEach((host, index) => {
+        if (index === selectedIndex) {
+          host.style.display = "block";
+          // Render on-demand if not already rendered
+          if (host.renderDashboard && !host.dataset.rendered) {
+            host.dataset.rendered = "true";
+            host.renderDashboard();
           }
-        });
+        } else {
+          host.style.display = "none";
+        }
       });
-    });
+    };
+    
+    if (useDropdown) {
+      // Dropdown event handler
+      const selectElement = selectorWrapper.querySelector(".message-dashboard__company-select");
+      if (selectElement) {
+        selectElement.addEventListener("change", (e) => {
+          const selectedIndex = parseInt(e.target.value, 10);
+          switchToDashboard(selectedIndex);
+        });
+        
+        // Set initial selection
+        selectElement.selectedIndex = 0;
+      }
+    } else {
+      // Button event handlers (original behavior)
+      // Need to query after DOM is ready
+      setTimeout(() => {
+        const companyButtons = selectorWrapper.querySelectorAll(".message-dashboard__company-btn");
+        companyButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            const selectedIndex = parseInt(button.dataset.companyIndex, 10);
+            
+            // Update active button state
+            companyButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            switchToDashboard(selectedIndex);
+          });
+        });
+      }, 0);
+    }
     
     return container;
   }
@@ -7588,7 +7670,7 @@ const DEMO_CFIX_PAYLOAD = {
 
 
 async function showCfiDashboard(options = {}) {
-  const { container, payload: suppliedPayload, ...fetchOptions } = options || {};
+  const { container, payload: suppliedPayload, isMultiTicker, ...fetchOptions } = options || {};
   let host = null;
   if (container instanceof HTMLElement) {
     host = container;
@@ -7600,6 +7682,11 @@ async function showCfiDashboard(options = {}) {
   }
   if (!host) {
     throw new Error("Unable to resolve dashboard host container.");
+  }
+  
+  // Mark host as multi-ticker if applicable
+  if (isMultiTicker) {
+    host.dataset.multiTicker = "true";
   }
   // Only show loading message if we don't already have a payload (i.e., need to fetch)
   if (!suppliedPayload) {

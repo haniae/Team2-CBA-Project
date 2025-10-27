@@ -1748,19 +1748,51 @@ class BenchmarkOSChatbot:
                 
                 # Only do ticker summary for bare ticker mentions, NOT questions
                 if not is_question:
-                    summary_target = self._detect_summary_target(user_input, normalized_command)
-                    if summary_target:
-                        # Check if dashboard is explicitly requested
-                        # Look for dashboard keywords like "dashboard", "full dashboard", etc.
-                        dashboard_keywords = ["dashboard", "full dashboard", "comprehensive dashboard", 
-                                             "detailed dashboard", "show me dashboard", "give me dashboard"]
-                        should_build_dashboard = any(kw in lowered_input for kw in dashboard_keywords)
-                        
-                        if should_build_dashboard:
-                            emit("summary_attempt", f"Compiling dashboard for {summary_target}")
-                            dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, summary_target)
+                    # Check for dashboard keyword first
+                    dashboard_keywords = ["dashboard", "full dashboard", "comprehensive dashboard", 
+                                         "detailed dashboard", "show me dashboard", "give me dashboard"]
+                    should_build_dashboard = any(kw in lowered_input for kw in dashboard_keywords)
+                    
+                    if should_build_dashboard:
+                        # Dashboard request - detect all tickers
+                        all_tickers = self._detect_tickers(user_input)
+                        emit("ticker_detection", f"Detected tickers from '{user_input}': {all_tickers}")
+                        if len(all_tickers) >= 2:
+                            # Multi-ticker dashboard - build dashboards for each ticker
+                            emit("multi_ticker_dashboard", f"Building dashboards for {len(all_tickers)} companies")
+                            
+                            # Build individual dashboards for each ticker
+                            dashboards = []
+                            for ticker in all_tickers:
+                                dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, ticker)
+                                if dashboard_payload:
+                                    display = _display_ticker_symbol(_normalise_ticker_symbol(ticker))
+                                    dashboards.append({
+                                        "kind": "cfi-classic",
+                                        "ticker": display,
+                                        "payload": dashboard_payload,
+                                    })
+                            
+                            if dashboards:
+                                # Store all dashboards for multi-ticker display
+                                # Use a special structure to indicate multiple dashboards
+                                self.last_structured_response["dashboard"] = {
+                                    "kind": "multi-cfi-classic",
+                                    "dashboards": dashboards,
+                                }
+                                company_names = [d["payload"].get("meta", {}).get("company", d["ticker"]) for d in dashboards]
+                                reply = f"Displaying financial dashboards for {', '.join(company_names)}."
+                                emit("summary_complete", f"Dashboards prepared for {len(dashboards)} companies")
+                            else:
+                                reply = "Unable to build dashboards for the requested companies."
+                                emit("summary_unavailable", "Dashboard data unavailable")
+                        elif len(all_tickers) == 1:
+                            # Single-ticker dashboard
+                            ticker = all_tickers[0]
+                            emit("summary_attempt", f"Compiling dashboard for {ticker}")
+                            dashboard_payload = build_cfi_dashboard_payload(self.analytics_engine, ticker)
                             if dashboard_payload:
-                                display = _display_ticker_symbol(_normalise_ticker_symbol(summary_target))
+                                display = _display_ticker_symbol(_normalise_ticker_symbol(ticker))
                                 self.last_structured_response["dashboard"] = {
                                     "kind": "cfi-classic",
                                     "ticker": display,
@@ -1772,10 +1804,14 @@ class BenchmarkOSChatbot:
                                     reply = f"Displaying financial dashboard for {company_name} ({display})."
                                 else:
                                     reply = f"Displaying financial dashboard for {display}."
-                                emit("summary_complete", f"Dashboard prepared for {summary_target}")
+                                emit("summary_complete", f"Dashboard prepared for {ticker}")
                             else:
-                                emit("summary_unavailable", f"Dashboard unavailable for {summary_target}")
-                        else:
+                                emit("summary_unavailable", f"Dashboard unavailable for {ticker}")
+                        # If no tickers detected, fall through to other handlers
+                    else:
+                        # Not a dashboard request - check for regular summary
+                        summary_target = self._detect_summary_target(user_input, normalized_command)
+                        if summary_target:
                             # Use text summary for regular ticker queries (bare mentions only)
                             emit("summary_attempt", f"Compiling text summary for {summary_target}")
                             reply = self._get_ticker_summary(summary_target)
@@ -1858,7 +1894,7 @@ class BenchmarkOSChatbot:
             return self._handle_ingest_command(text)
         if lowered.startswith("scenario "):
             return self._handle_scenario_command(text)
-        
+
         # 3. Explicit comparison with "vs" (table format)
         if lowered.startswith("compare ") and self._is_legacy_compare_command(text):
             tokens = text.split()[1:]
@@ -1891,7 +1927,7 @@ class BenchmarkOSChatbot:
         if re.search(r'\bshow\s+.*\s+(?:kpis?|metrics?|table)', lowered):
             structured = parse_to_structured(text)
             self.last_structured_response["parser"] = structured
-            
+
             # Optional: Enhanced routing
             if self.settings.enable_enhanced_routing:
                 enhanced_routing = enhance_structured_parse(text, structured)
@@ -1906,7 +1942,7 @@ class BenchmarkOSChatbot:
             structured_reply = self._handle_structured_metrics(structured)
             if structured_reply:
                 return structured_reply
-        
+
         # 6. Check for complex natural language that should use LLM
         if self._is_complex_natural_language_query(text):
             return None
@@ -1937,7 +1973,7 @@ class BenchmarkOSChatbot:
             structured_reply = self._handle_structured_metrics(structured)
             if structured_reply:
                 return structured_reply
-        
+
         # Check for natural language fallback conditions
         if self._should_fallback_to_llm(structured):
             return None
@@ -3759,10 +3795,35 @@ class BenchmarkOSChatbot:
             phrase = match.strip()
             if not phrase:
                 continue
-            phrase = re.sub(r"(?:'s|’s)$", "", phrase, flags=re.IGNORECASE).strip()
+            phrase = re.sub(r"(?:'s|'s)$", "", phrase, flags=re.IGNORECASE).strip()
             if phrase.upper() in _COMMON_WORDS:
                 continue
+            # Debug: log phrase resolution attempts
+            print(f"[DEBUG] Trying to resolve phrase: '{phrase}'")
             ticker = self._name_to_ticker(phrase)
+            print(f"[DEBUG] Resolved '{phrase}' -> {ticker}")
+            if ticker and ticker not in seen:
+                seen.add(ticker)
+                candidates.append(ticker)
+
+        # Additional pass: try individual words in case multi-word phrases didn't resolve
+        # This helps when users say "dashboard apple microsoft" - try each word separately
+        command_words = {"dashboard", "show", "display", "compare", "view", "get", "give", "full", "comprehensive", "detailed"}
+        words = text.split()
+        for word in words:
+            word = word.strip()
+            if len(word) < 2:
+                continue
+            if word.lower() in command_words:
+                continue
+            if word.upper() in _COMMON_WORDS:
+                continue
+            if word.upper() in seen:
+                continue
+            # Try to resolve this individual word as a company name or ticker
+            print(f"[DEBUG] Trying individual word: '{word}'")
+            ticker = self._name_to_ticker(word)
+            print(f"[DEBUG] Resolved individual word '{word}' -> {ticker}")
             if ticker and ticker not in seen:
                 seen.add(ticker)
                 candidates.append(ticker)
