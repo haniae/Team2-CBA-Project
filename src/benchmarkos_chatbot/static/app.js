@@ -60,10 +60,57 @@ function renderConversations(list){
 		metaRow.className = 'meta-row'
 		
 		const titleDiv = document.createElement('div')
+		titleDiv.style.cssText = 'flex:1;display:flex;flex-direction:column;'
 		const title = c.title || c.id
 		const date = new Date(c.updated_at || Date.now())
 		const timeStr = formatRelativeTime(date)
-		titleDiv.innerHTML = `<strong style="font-size:13px;display:block;margin-bottom:4px;" class="convo-title">${escapeHtml(title)}</strong><div style="font-size:11px;color:rgba(255,255,255,0.6);">${timeStr}</div>`
+		
+		// Title container for inline editing
+		const titleContainer = document.createElement('div')
+		titleContainer.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:4px;'
+		
+		const titleText = document.createElement('strong')
+		titleText.className = 'convo-title'
+		titleText.style.cssText = 'font-size:13px;flex:1;'
+		titleText.textContent = title
+		
+		const titleInput = document.createElement('input')
+		titleInput.type = 'text'
+		titleInput.value = title
+		titleInput.style.cssText = 'font-size:13px;flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:4px 8px;color:#fff;display:none;'
+		
+		const editButtons = document.createElement('div')
+		editButtons.style.cssText = 'display:none;gap:4px;'
+		
+		const confirmBtn = document.createElement('button')
+		confirmBtn.className = 'delete-btn'
+		confirmBtn.title = 'Save'
+		confirmBtn.style.cssText = 'color:#10B981;'
+		confirmBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<polyline points="20 6 9 17 4 12"></polyline>
+		</svg>`
+		
+		const cancelBtn = document.createElement('button')
+		cancelBtn.className = 'delete-btn'
+		cancelBtn.title = 'Cancel'
+		cancelBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<line x1="18" y1="6" x2="6" y2="18"></line>
+			<line x1="6" y1="6" x2="18" y2="18"></line>
+		</svg>`
+		
+		editButtons.appendChild(confirmBtn)
+		editButtons.appendChild(cancelBtn)
+		
+		titleContainer.appendChild(titleText)
+		titleContainer.appendChild(titleInput)
+		titleContainer.appendChild(editButtons)
+		
+		const timeText = document.createElement('div')
+		timeText.style.cssText = 'font-size:11px;color:rgba(255,255,255,0.6);'
+		timeText.textContent = timeStr
+		
+		titleDiv.appendChild(titleContainer)
+		titleDiv.appendChild(timeText)
 		
 		const buttonGroup = document.createElement('div')
 		buttonGroup.style.cssText = 'display:flex;gap:4px;'
@@ -75,11 +122,33 @@ function renderConversations(list){
 			<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
 		</svg>`
 		
-		renameBtn.addEventListener('click', async (e)=>{
+		// Start editing mode
+		const startEditing = (e) => {
 			e.stopPropagation()
-			const currentTitle = c.title || c.id
-			const newTitle = prompt('Enter new name for this conversation:', currentTitle)
-			if(!newTitle || newTitle === currentTitle) return
+			titleText.style.display = 'none'
+			titleInput.style.display = 'block'
+			editButtons.style.display = 'flex'
+			renameBtn.style.display = 'none'
+			titleInput.focus()
+			titleInput.select()
+		}
+		
+		// Cancel editing
+		const cancelEditing = () => {
+			titleText.style.display = 'block'
+			titleInput.style.display = 'none'
+			editButtons.style.display = 'none'
+			renameBtn.style.display = 'flex'
+			titleInput.value = titleText.textContent
+		}
+		
+		// Save new title
+		const saveTitle = async () => {
+			const newTitle = titleInput.value.trim()
+			if(!newTitle || newTitle === titleText.textContent) {
+				cancelEditing()
+				return
+			}
 			
 			try{
 				const res = await fetch(`/conversations/${encodeURIComponent(c.id)}/rename`, {
@@ -89,22 +158,45 @@ function renderConversations(list){
 				})
 				if(!res.ok) throw new Error('rename failed')
 				
-				// Update title in UI immediately
-				const titleEl = titleDiv.querySelector('.convo-title')
-				if(titleEl) titleEl.textContent = newTitle
+				// Update UI
+				titleText.textContent = newTitle
 				c.title = newTitle
+				cancelEditing()
 				
 				// Show brief success feedback
-				renameBtn.style.color = '#10B981'
-				setTimeout(() => renameBtn.style.color = '', 1000)
+				confirmBtn.style.color = '#10B981'
+				setTimeout(() => confirmBtn.style.color = '', 1000)
 			}catch(err){
 				console.error('Rename failed:', err)
 				// Fallback: update in UI even if server fails
-				const titleEl = titleDiv.querySelector('.convo-title')
-				if(titleEl) titleEl.textContent = newTitle
+				titleText.textContent = newTitle
 				c.title = newTitle
+				cancelEditing()
+			}
+		}
+		
+		renameBtn.addEventListener('click', startEditing)
+		confirmBtn.addEventListener('click', (e) => {
+			e.stopPropagation()
+			saveTitle()
+		})
+		cancelBtn.addEventListener('click', (e) => {
+			e.stopPropagation()
+			cancelEditing()
+		})
+		
+		// Keyboard shortcuts for input
+		titleInput.addEventListener('keydown', (e) => {
+			if(e.key === 'Enter') {
+				e.preventDefault()
+				saveTitle()
+			} else if(e.key === 'Escape') {
+				e.preventDefault()
+				cancelEditing()
 			}
 		})
+		
+		titleInput.addEventListener('click', (e) => e.stopPropagation())
 		
 		const deleteBtn = document.createElement('button')
 		deleteBtn.className = 'delete-btn'
