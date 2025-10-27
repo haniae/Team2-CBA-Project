@@ -3022,23 +3022,29 @@ class BenchmarkOSChatbot:
         conclusion = ""
 
         dashboard_descriptor = None
-        # Build dashboard for multi-ticker comparisons or single ticker vs benchmark
+        # Build multiple single-company dashboards for multi-ticker requests
         if len(display_tickers) >= 2 and not metric_filter:
-            try:
-                dashboard_payload = build_cfi_compare_payload(
-                    self.analytics_engine,
-                    ordered_tickers,
-                    benchmark_label=benchmark_label,
-                    strict=False,
-                )
-            except Exception:
-                dashboard_payload = None
-            if dashboard_payload:
+            dashboards_list = []
+            for ticker in ordered_tickers[:3]:  # Limit to 3 tickers for performance
+                try:
+                    single_payload = build_cfi_dashboard_payload(
+                        self.analytics_engine,
+                        ticker,
+                        strict=False,
+                    )
+                    if single_payload:
+                        dashboards_list.append({
+                            "ticker": _display_ticker_symbol(ticker),
+                            "payload": single_payload,
+                        })
+                except Exception as e:
+                    LOGGER.warning(f"Failed to build dashboard for {ticker}: {e}")
+                    continue
+            
+            if dashboards_list:
                 dashboard_descriptor = {
-                    "kind": "cfi-compare",
-                    "tickers": dashboard_payload.get("meta", {}).get("tickers"),
-                    "benchmark": dashboard_payload.get("meta", {}).get("benchmark"),
-                    "payload": dashboard_payload,
+                    "kind": "multi-classic",
+                    "dashboards": dashboards_list,
                 }
 
         self.last_structured_response = {
