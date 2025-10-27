@@ -2899,8 +2899,16 @@ function renderDashboardArtifact(descriptor) {
       host.style.display = index === 0 ? "block" : "none"; // Show first, hide others
       host.dataset.dashboardIndex = index;
       
+      // Debug logging
+      console.log(`Multi-dashboard item ${index}:`, {
+        ticker: dashboardItem.ticker,
+        hasPayload: !!dashboardItem.payload,
+        payloadKeys: dashboardItem.payload ? Object.keys(dashboardItem.payload) : []
+      });
+      
       // Ensure payload exists before rendering
       if (!dashboardItem.payload) {
+        console.error(`No payload for ${dashboardItem.ticker}`);
         host.innerHTML = `<div class="cfi-error">No data available for ${dashboardItem.ticker}.</div>`;
         dashboardContainer.appendChild(host);
         return host;
@@ -2919,7 +2927,9 @@ function renderDashboardArtifact(descriptor) {
       // Render asynchronously without blocking
       setTimeout(async () => {
         try {
+          console.log(`Starting render for ${dashboardItem.ticker}`);
           await showCfiDashboard(options);
+          console.log(`Completed render for ${dashboardItem.ticker}`);
         } catch (error) {
           console.error(`Failed to render dashboard for ${dashboardItem.ticker}:`, error);
           host.innerHTML = `<div class="cfi-error">Unable to render dashboard for ${dashboardItem.ticker}.</div>`;
@@ -7450,6 +7460,17 @@ async function showCfiDashboard(options = {}) {
   }
 
   let payload = suppliedPayload || null;
+  
+  // Debug logging
+  if (payload) {
+    console.log('Dashboard payload received:', {
+      hasMeta: !!payload.meta,
+      hasOverview: !!payload.overview,
+      ticker: payload.meta?.ticker,
+      company: payload.meta?.company
+    });
+  }
+  
   if (!payload) {
     try {
       payload = await fetchCfiDashboardPayload(fetchOptions);
@@ -7459,18 +7480,20 @@ async function showCfiDashboard(options = {}) {
   }
 
   if (!payload || typeof payload !== 'object') {
+    console.warn('Invalid payload, using demo data');
     payload = DEMO_CFI_PAYLOAD;
   }
 
   try {
     if (window.CFI && typeof window.CFI.render === 'function') {
+      console.log('Rendering CFI dashboard with payload');
       window.CFI.render(payload);
       window.__cfiDashboardLastPayload = payload;
     } else {
       throw new Error('CFI renderer unavailable.');
     }
   } catch (error) {
-    console.error(error);
+    console.error('CFI render error:', error);
     host.innerHTML =
       '<div class="cfi-error">Unable to render CFI dashboard. Check console for details.</div>';
     if (typeof showToast === 'function') {
