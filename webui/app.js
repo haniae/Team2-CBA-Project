@@ -2964,9 +2964,6 @@ function renderDashboardArtifact(descriptor) {
         return host;
       }
       
-      // Set placeholder to show we're working
-      host.innerHTML = '<div class="cfi-loading" style="padding: 40px; text-align: center; color: #6366f1;">Preparing dashboard...</div>';
-      
       // Add to container FIRST before rendering
       dashboardContainer.appendChild(host);
       
