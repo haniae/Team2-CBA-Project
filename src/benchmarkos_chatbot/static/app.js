@@ -2979,14 +2979,6 @@ function renderDashboardArtifact(descriptor) {
           
           // Fix duplicate IDs by making them unique per dashboard
           makeIdsUnique(host, uniqueId);
-          
-          // Hide sources and exports sections for multi-ticker dashboards
-          const sourcesSection = host.querySelector('.cfi-section-wrapper');
-          if (sourcesSection) {
-            sourcesSection.style.display = 'none';
-          }
-          const exportButtons = host.querySelectorAll('.export-button');
-          exportButtons.forEach(btn => btn.style.display = 'none');
         } catch (error) {
           console.error(`Failed to render dashboard for ${dashboardItem.ticker}:`, error);
           host.innerHTML = `<div class="cfi-error">Unable to render dashboard for ${dashboardItem.ticker}.</div>`;
