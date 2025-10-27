@@ -6553,7 +6553,12 @@ chatForm.addEventListener("submit", async (event) => {
 
   setSending(true);
   const requestId = generateRequestId();
-  let pendingMessage = showAssistantTyping();
+  
+  // Check if this is a dashboard request (skip animation for dashboards)
+  const isDashboardRequest = /\b(?:dashboard|full dashboard|comprehensive dashboard|show me dashboard|show dashboard|view dashboard|display dashboard|open dashboard|build dashboard|create dashboard|generate dashboard)\b/i.test(prompt);
+  
+  // For dashboard requests, skip the typing animation
+  let pendingMessage = isDashboardRequest ? null : showAssistantTyping();
   const cachedEntry = getCachedPrompt(canonicalPrompt);
   if (cachedEntry && cachedEntry.reply) {
     const resolved = resolvePendingMessage(pendingMessage, "assistant", cachedEntry.reply, {
@@ -6567,7 +6572,8 @@ chatForm.addEventListener("submit", async (event) => {
     }
   }
 
-  if (pendingMessage && pendingMessage.classList.contains("typing")) {
+  // Skip progress tracking animation for dashboard requests
+  if (pendingMessage && pendingMessage.classList.contains("typing") && !isDashboardRequest) {
     startProgressTracking(requestId, pendingMessage);
   }
 
@@ -6596,7 +6602,10 @@ chatForm.addEventListener("submit", async (event) => {
     recordMessage("system", fallback);
     resolvePendingMessage(pendingMessage, "system", fallback, { forceScroll: true });
   } finally {
-    await stopProgressTracking(requestId, { flush: true });
+    // Skip progress summary for dashboard requests
+    if (!isDashboardRequest) {
+      await stopProgressTracking(requestId, { flush: true });
+    }
     setSending(false);
     chatInput.focus();
   }
