@@ -810,6 +810,8 @@ def _collect_series(
 
 def _sanitize_chart_data(chart_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Remove None/NaN values from chart data to prevent Plotly errors."""
+    import math
+    
     if not chart_dict:
         return chart_dict
     
@@ -829,11 +831,21 @@ def _sanitize_chart_data(chart_dict: Dict[str, Any]) -> Dict[str, Any]:
     
     data_arrays = {k: chart_dict[k] for k in data_keys}
     
-    # Filter out indices where ALL data values are None
+    def _is_valid_number(val):
+        """Check if value is a valid number (not None, NaN, or Inf)."""
+        if val is None:
+            return False
+        if not isinstance(val, (int, float)):
+            return False
+        if math.isnan(val) or math.isinf(val):
+            return False
+        return True
+    
+    # Filter out indices where ALL data values are invalid
     valid_indices = []
     for i in range(len(x_values)):
         has_valid_data = any(
-            data_arrays[k][i] is not None 
+            _is_valid_number(data_arrays[k][i]) 
             for k in data_keys 
             if i < len(data_arrays[k])
         )
@@ -844,14 +856,21 @@ def _sanitize_chart_data(chart_dict: Dict[str, Any]) -> Dict[str, Any]:
     if not valid_indices:
         return {k: [] for k in chart_dict.keys()}
     
-    # Build filtered chart data, replacing remaining None with 0 for Plotly
+    # Build filtered chart data, replacing invalid values with 0 for Plotly
     result = {x_key: [x_values[i] for i in valid_indices]}
     for k in data_keys:
-        # Replace None with 0 to avoid NaN in Plotly
-        result[k] = [
-            (data_arrays[k][i] if i < len(data_arrays[k]) and data_arrays[k][i] is not None else 0) 
-            for i in valid_indices
-        ]
+        clean_values = []
+        for i in valid_indices:
+            if i < len(data_arrays[k]):
+                val = data_arrays[k][i]
+                # Replace None, NaN, or Inf with 0
+                if _is_valid_number(val):
+                    clean_values.append(val)
+                else:
+                    clean_values.append(0)
+            else:
+                clean_values.append(0)
+        result[k] = clean_values
     
     return result
 
@@ -870,6 +889,34 @@ def _sanitize_table_values(values_list: List[Optional[float]]) -> List[Optional[
                 result.append(val)
         else:
             result.append(val)
+    return result
+
+
+def _sanitize_value(val: Optional[float]) -> Optional[float]:
+    """Ensure a single value is safe, replacing NaN/Inf with None."""
+    import math
+    if val is None:
+        return None
+    if not isinstance(val, (int, float)):
+        return None
+    if math.isnan(val) or math.isinf(val):
+        return None
+    return val
+
+
+def _sanitize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively sanitize all numeric values in a dictionary."""
+    import math
+    result = {}
+    for key, val in data.items():
+        if isinstance(val, dict):
+            result[key] = _sanitize_dict(val)
+        elif isinstance(val, list):
+            result[key] = [_sanitize_value(v) if isinstance(v, (int, float)) else v for v in val]
+        elif isinstance(val, (int, float)):
+            result[key] = _sanitize_value(val)
+        else:
+            result[key] = val
     return result
 
 
@@ -1123,21 +1170,22 @@ def build_cfi_dashboard_payload(
 
     payload = {
         "meta": meta,
-        "price": price_table,
+        "price": _sanitize_dict(price_table),
         "overview": overview,
-        "key_stats": key_stats,
-        "market_data": market_data,
-        "valuation_table": valuation_table,
+        "key_stats": _sanitize_dict(key_stats),
+        "market_data": _sanitize_dict(market_data),
+        "valuation_table": [_sanitize_dict(row) for row in valuation_table] if valuation_table else [],
         "key_financials": key_financials,
         "charts": charts,
-        "valuation_data": valuation_data,
+        "valuation_data": _sanitize_dict(valuation_data),
         "kpi_summary": kpi_summary,
         "kpi_series": kpi_series,
         "interactions": interactions,
         "peer_config": peer_config,
         "sources": sources,
     }
-    return payload
+    # Final pass: sanitize the entire payload to catch any remaining NaN values
+    return _sanitize_dict(payload)
 
 
 def build_cfi_compare_payload(
