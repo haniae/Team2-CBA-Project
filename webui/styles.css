@@ -4264,12 +4264,8 @@ body::-webkit-scrollbar {
   width: 100%;
 }
 
-/* Hide sources and exports sections from all dashboards */
+/* Hide sources panel at the bottom of dashboards */
 .cfi-panel[data-area="sources"] {
-  display: none !important;
-}
-
-.export-button {
   display: none !important;
 }
 
