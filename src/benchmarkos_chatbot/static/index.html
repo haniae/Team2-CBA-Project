@@ -1,108 +1,144 @@
-<!doctype html>
+﻿<!DOCTYPE html>
+
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width,initial-scale=1" />
-		<title>BenchmarkOS Analyst Copilot — AI-Powered Financial Analysis</title>
-		<meta name="description" content="Professional financial analysis powered by AI. Compare tickers, analyze KPIs, and get insights instantly." />
-		<link rel="stylesheet" href="/static/styles.css?v=20251027b" />
-		<link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
-		<link rel="preconnect" href="https://fonts.googleapis.com">
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	</head>
-	<body>
-		<div class="app">
-			<aside class="sidebar">
-				<div class="brand">
-					<div class="logo">
-						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
-							<path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z" fill="currentColor" opacity="0.9"/>
-						</svg>
-						BENCHMARKOS
-					</div>
-					<button id="newChatBtn" class="new-chat">
-						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
-							<line x1="12" y1="5" x2="12" y2="19"></line>
-							<line x1="5" y1="12" x2="19" y2="12"></line>
-						</svg>
-						New Chat
-					</button>
-				</div>
-				<div class="suggested">
-					<h4>Quick Start</h4>
-					<button class="prompt">
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px; opacity: 0.7;">
-							<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-						</svg>
-						Compare ticker fundamentals
-					</button>
-					<button class="prompt">
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px; opacity: 0.7;">
-							<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-							<line x1="9" y1="3" x2="9" y2="21"></line>
-						</svg>
-						Show ALP KPIs 2021-2023
-					</button>
-					<button class="prompt">
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px; opacity: 0.7;">
-							<line x1="12" y1="1" x2="12" y2="23"></line>
-							<path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-						</svg>
-						Model a bull case for BRV
-					</button>
-				</div>
-				<div class="conversations">
-					<h4>Recent Conversations</h4>
-					<div id="convoList">
-						<div style="text-align: center; padding: 20px; opacity: 0.5; font-size: 13px;">Loading...</div>
-					</div>
-				</div>
-			</aside>
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>BenchmarkOS Copilot</title>
+<link href="/static/styles.css?v=20241027d" rel="stylesheet"/>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+<div class="sidebar-brand-zone">
+<div class="brand-identity">
+<div aria-hidden="true" class="brand-badge">BO</div>
+<div class="brand-text">
+<span class="brand-name">BenchmarkOS</span>
+</div>
+</div>
+<div class="brand-status">
+<div class="status-connection">
+<span class="status-dot" id="api-status"></span>
+<span id="status-message">Checking API...</span>
+</div>
+</div>
+</div>
+<div class="sidebar-divider" role="presentation"></div>
+<nav aria-label="Analyst navigation" class="sidebar-nav">
+<button class="nav-item" data-action="new-analysis">
+<span aria-hidden="true" class="nav-icon">🔍</span>
+<span class="nav-label">New Analysis</span>
+</button>
+<button class="nav-item" data-action="saved-reports">
+<span aria-hidden="true" class="nav-icon">📁</span>
+<span class="nav-label">Saved Reports</span>
+</button>
+<button class="nav-item" data-action="open-kpi-library">
+<span aria-hidden="true" class="nav-icon">📊</span>
+<span class="nav-label">KPI Library</span>
+</button>
+<button class="nav-item" data-action="open-company-universe">
+<span aria-hidden="true" class="nav-icon">🏢</span>
+<span class="nav-label">Company Universe</span>
+</button>
+<button class="nav-item" data-action="open-filing-viewer">
+<span aria-hidden="true" class="nav-icon">📚</span>
+<span class="nav-label">Filing Source Viewer</span>
+</button>
+<button class="nav-item" data-action="open-help">
+<span aria-hidden="true" class="nav-icon">🆘</span>
+<span class="nav-label">Help Center</span>
+</button>
+</nav>
+<div class="sidebar-divider" role="presentation"></div>
+<nav aria-label="Workspace navigation" class="sidebar-nav secondary">
+<button class="nav-item" data-action="open-settings">
+<span aria-hidden="true" class="nav-icon">⚙️</span>
+<span class="nav-label">Settings</span>
+</button>
+<button class="nav-item" data-action="open-alerts">
+<span aria-hidden="true" class="nav-icon">🔔</span>
+<span class="nav-label">Alerts</span>
+</button>
+</nav>
+<section aria-labelledby="saved-reports-heading" class="sidebar-section saved-reports">
+<div class="section-header">
+<h2 id="saved-reports-heading">Saved Reports</h2>
+<button class="section-action" data-action="search-saved">
+<span aria-hidden="true">🔎</span>
+<span class="section-action-label">Search</span>
+</button>
+</div>
+<div class="sidebar-search hidden" id="chat-search" role="search">
+<label class="sr-only" for="chat-search-input">Search saved conversations</label>
+<input autocomplete="off" id="chat-search-input" placeholder="Filter reports..." type="search"/>
+<button aria-label="Clear search" class="search-clear" id="chat-search-clear" type="button">×</button>
+</div>
+<div class="conversation-list" id="conversation-list" role="list">
+<p class="empty-state">Saved analyses will appear here.</p>
+</div>
+</section>
+<footer class="sidebar-footer">
+<p>Grounded by BenchmarkOS analytics — audit-ready by design.</p>
+</footer>
+</aside>
+<main class="main-panel">
+<div class="content-container"><header class="top-bar top-bar--center">
+<div class="hero-copy">
+<h1>Analyst Copilot</h1>
+</div>
+<span class="top-bar__microtag" aria-label="by BenchmarkOS">by BenchmarkOS</span>
+</header></div>
+<div class="content-container"><section aria-live="polite" class="utility-panel hidden" id="utility-panel">
+<div class="utility-panel-header">
+<h2 id="utility-title"></h2>
+</div>
+<div class="utility-content" id="utility-content"></div>
+</section></div>
+<div class="content-container"><section class="chat-panel">
+<section class="chat-intro" id="chat-intro"></section>
+<div aria-live="polite" class="chat-log" id="chat-log"></div>
 
-			<main class="main">
-				<header class="topbar">
-					<div class="title">
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: middle; margin-right: 8px; opacity: 0.8;">
-							<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-						</svg>
-						BenchmarkOS Analyst Copilot
-					</div>
-					<div class="status">
-						<span style="font-size: 12px; color: #8B95A5; margin-right: 4px;">API</span>
-						<span id="apiDot" class="dot offline"></span>
-						<span id="apiStatus" style="font-size: 12px; margin-left: 6px; color: #8B95A5;">Connecting...</span>
-					</div>
-				</header>
-
-                <section class="chat-panel">
-                    <div id="messages" class="messages" tabindex="0" aria-live="polite">
-                        <!-- Welcome message will be inserted here -->
-                    </div>
-
-                    <button id="scrollBtn" title="Jump to latest" class="scroll-btn" aria-hidden="true">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </button>
-
-                    <form id="composer" class="composer">
-						<input 
-							id="inputBox" 
-							placeholder="Ask about financials, compare tickers, or analyze KPIs..." 
-							autocomplete="off" 
-							aria-label="Message input"
-						/>
-						<button type="submit" aria-label="Send message">
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-								<line x1="12" y1="19" x2="12" y2="5"></line>
-								<polyline points="5 12 12 5 19 12"></polyline>
-							</svg>
-						</button>
-					</form>
-				</section>
-			</main>
-		</div>
-
-		<script src="/static/app.js?v=20251027b"></script>
-	</body>
+<button id="scrollBtn" title="Jump to latest" class="scroll-btn" aria-hidden="true" aria-label="Scroll to latest messages">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+  <span class="sr-only">Jump to latest</span>
+  </button>
+<form autocomplete="off" class="chat-form" id="chat-form">
+<textarea id="chat-input" placeholder="Ask anything about tickers or metrics…" required="" rows="1"></textarea>
+<div class="chat-actions">
+<button id="send-button" type="submit" aria-label="Send message" title="Send">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="19" x2="12" y2="5"></line>
+    <polyline points="5 12 12 5 19 12"></polyline>
+  </svg>
+  </button>
+</div>
+</form>
+</section></div>
+</main>
+</div>
+<div id="audit-drawer" class="audit-drawer" aria-hidden="true">
+  <div class="audit-drawer__overlay" data-action="close-audit"></div>
+  <aside class="audit-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="audit-drawer-title">
+    <header class="audit-drawer__header">
+      <h2 id="audit-drawer-title">Audit Trail</h2>
+      <button type="button" class="audit-drawer__close" data-action="close-audit" aria-label="Close audit drawer">×</button>
+    </header>
+    <section class="audit-drawer__body">
+      <div class="audit-drawer__summary">
+        <p class="audit-drawer__status" id="audit-drawer-status">Select a metric to view lineage.</p>
+        <ol class="audit-drawer__list" id="audit-drawer-list"></ol>
+      </div>
+      <div class="audit-drawer__detail" id="audit-drawer-detail" aria-live="polite">
+        <p class="audit-drawer__placeholder">Select an audit event to inspect lineage details.</p>
+      </div>
+    </section>
+  </aside>
+</div>
+<script defer="" src="/static/app.js?v=20241027d"></script>
+</body>
 </html>

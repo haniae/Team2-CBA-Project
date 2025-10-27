@@ -5296,10 +5296,75 @@ function saveConversations() {
     if (!window.localStorage) {
       return;
     }
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+    
+    // Clean up conversations before saving to prevent quota issues
+    const cleanedConversations = cleanupConversationsForStorage();
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanedConversations));
   } catch (error) {
-    console.warn("Unable to persist conversations", error);
+    if (error.name === 'QuotaExceededError') {
+      console.warn("Storage quota exceeded. Clearing old conversations...");
+      // Clear old conversations and try again
+      const recentConversations = keepOnlyRecentConversations(5);
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(recentConversations));
+      } catch (retryError) {
+        console.error("Unable to persist even after cleanup", retryError);
+        // Last resort: clear all history
+        window.localStorage.removeItem(STORAGE_KEY);
+      }
+    } else {
+      console.warn("Unable to persist conversations", error);
+    }
   }
+}
+
+function cleanupConversationsForStorage() {
+  const MAX_CONVERSATIONS = 20;
+  const MAX_MESSAGES_PER_CONVERSATION = 50;
+  
+  // Sort conversations by timestamp (most recent first)
+  const sortedConvs = Object.entries(conversations)
+    .sort((a, b) => {
+      const aTime = a[1].messages[a[1].messages.length - 1]?.timestamp || 0;
+      const bTime = b[1].messages[b[1].messages.length - 1]?.timestamp || 0;
+      return bTime - aTime;
+    });
+  
+  // Keep only recent conversations
+  const recentConvs = sortedConvs.slice(0, MAX_CONVERSATIONS);
+  
+  // Limit messages per conversation
+  const cleaned = {};
+  recentConvs.forEach(([id, conv]) => {
+    cleaned[id] = {
+      ...conv,
+      messages: conv.messages.slice(-MAX_MESSAGES_PER_CONVERSATION)
+    };
+  });
+  
+  return cleaned;
+}
+
+function keepOnlyRecentConversations(count) {
+  const sortedConvs = Object.entries(conversations)
+    .sort((a, b) => {
+      const aTime = a[1].messages[a[1].messages.length - 1]?.timestamp || 0;
+      const bTime = b[1].messages[b[1].messages.length - 1]?.timestamp || 0;
+      return bTime - aTime;
+    })
+    .slice(0, count);
+  
+  const recent = {};
+  sortedConvs.forEach(([id, conv]) => {
+    recent[id] = {
+      ...conv,
+      messages: conv.messages.slice(-20) // Keep only last 20 messages
+    };
+  });
+  
+  // Update global conversations object
+  conversations = recent;
+  return recent;
 }
 
 function generateLocalId() {
