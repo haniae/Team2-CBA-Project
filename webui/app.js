@@ -2847,6 +2847,45 @@ function createDashboardLayout(artifacts) {
 }
 
 
+// Helper function to make all IDs unique within a dashboard instance
+function makeIdsUnique(container, uniqueSuffix) {
+  if (!container) return;
+  
+  // Find all elements with IDs and make them unique
+  const elementsWithIds = container.querySelectorAll('[id]');
+  const idMap = new Map(); // Track old ID -> new ID mappings
+  
+  elementsWithIds.forEach(element => {
+    const oldId = element.id;
+    const newId = `${oldId}-${uniqueSuffix}`;
+    element.id = newId;
+    idMap.set(oldId, newId);
+  });
+  
+  // Update all 'for' attributes in labels to match new IDs
+  const labels = container.querySelectorAll('label[for]');
+  labels.forEach(label => {
+    const oldFor = label.getAttribute('for');
+    const newFor = idMap.get(oldFor);
+    if (newFor) {
+      label.setAttribute('for', newFor);
+    }
+  });
+  
+  // Update all aria-labelledby and aria-describedby references
+  const elementsWithAria = container.querySelectorAll('[aria-labelledby], [aria-describedby]');
+  elementsWithAria.forEach(element => {
+    ['aria-labelledby', 'aria-describedby'].forEach(attr => {
+      const oldValue = element.getAttribute(attr);
+      if (oldValue) {
+        const ids = oldValue.split(/\s+/);
+        const newIds = ids.map(id => idMap.get(id) || id);
+        element.setAttribute(attr, newIds.join(' '));
+      }
+    });
+  });
+}
+
 function renderDashboardArtifact(descriptor) {
   if (!descriptor) {
     return null;
@@ -2863,16 +2902,23 @@ function renderDashboardArtifact(descriptor) {
     const multiContainer = document.createElement("div");
     multiContainer.className = "message-dashboard__multi";
     
-    // Create dropdown selector
+    // Create dropdown selector with proper accessibility attributes
     const selectorWrapper = document.createElement("div");
     selectorWrapper.className = "message-dashboard__selector";
     
+    // Generate unique ID for this dropdown
+    const dropdownId = `company-selector-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const selectorLabel = document.createElement("label");
     selectorLabel.textContent = "Select Company: ";
+    selectorLabel.htmlFor = dropdownId; // Associate label with dropdown
     selectorLabel.style.cssText = "font-weight: 600; margin-right: 12px; color: var(--navy);";
     
     const dropdown = document.createElement("select");
+    dropdown.id = dropdownId; // Add unique ID
+    dropdown.name = "company-selector"; // Add name attribute
     dropdown.className = "message-dashboard__dropdown";
+    dropdown.setAttribute("aria-label", "Select company to view dashboard");
     
     // Populate dropdown with company names
     descriptor.dashboards.forEach((dashboardItem, index) => {
@@ -2898,6 +2944,10 @@ function renderDashboardArtifact(descriptor) {
       host.className = "message-dashboard__surface";
       host.style.display = index === 0 ? "block" : "none"; // Show first, hide others
       host.dataset.dashboardIndex = index;
+      
+      // Add unique identifier to avoid duplicate IDs across dashboards
+      const uniqueId = `dash-${Date.now()}-${index}`;
+      host.dataset.dashboardId = uniqueId;
       
       // Debug logging
       console.log(`Multi-dashboard item ${index}:`, {
@@ -2930,6 +2980,9 @@ function renderDashboardArtifact(descriptor) {
           console.log(`Starting render for ${dashboardItem.ticker}`);
           await showCfiDashboard(options);
           console.log(`Completed render for ${dashboardItem.ticker}`);
+          
+          // Fix duplicate IDs by making them unique per dashboard
+          makeIdsUnique(host, uniqueId);
         } catch (error) {
           console.error(`Failed to render dashboard for ${dashboardItem.ticker}:`, error);
           host.innerHTML = `<div class="cfi-error">Unable to render dashboard for ${dashboardItem.ticker}.</div>`;
