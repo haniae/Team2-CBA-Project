@@ -808,6 +808,71 @@ def _collect_series(
     return series
 
 
+def _sanitize_chart_data(chart_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove None/NaN values from chart data to prevent Plotly errors."""
+    if not chart_dict:
+        return chart_dict
+    
+    # Find data keys (non-'Year' keys)
+    data_keys = [k for k in chart_dict.keys() if k != "Year" and k != "Case"]
+    if not data_keys:
+        return chart_dict
+    
+    # Get the x-axis (Year or Case)
+    x_key = "Year" if "Year" in chart_dict else ("Case" if "Case" in chart_dict else None)
+    if not x_key or x_key not in chart_dict:
+        return chart_dict
+    
+    x_values = chart_dict[x_key]
+    if not x_values:
+        return {k: [] for k in chart_dict.keys()}
+    
+    data_arrays = {k: chart_dict[k] for k in data_keys}
+    
+    # Filter out indices where ALL data values are None
+    valid_indices = []
+    for i in range(len(x_values)):
+        has_valid_data = any(
+            data_arrays[k][i] is not None 
+            for k in data_keys 
+            if i < len(data_arrays[k])
+        )
+        if has_valid_data:
+            valid_indices.append(i)
+    
+    # If no valid data, return empty structure
+    if not valid_indices:
+        return {k: [] for k in chart_dict.keys()}
+    
+    # Build filtered chart data, replacing remaining None with 0 for Plotly
+    result = {x_key: [x_values[i] for i in valid_indices]}
+    for k in data_keys:
+        # Replace None with 0 to avoid NaN in Plotly
+        result[k] = [
+            (data_arrays[k][i] if i < len(data_arrays[k]) and data_arrays[k][i] is not None else 0) 
+            for i in valid_indices
+        ]
+    
+    return result
+
+
+def _sanitize_table_values(values_list: List[Optional[float]]) -> List[Optional[float]]:
+    """Ensure table values are safe for display, replacing inf/nan with None."""
+    import math
+    result = []
+    for val in values_list:
+        if val is None:
+            result.append(None)
+        elif isinstance(val, (int, float)):
+            if math.isnan(val) or math.isinf(val):
+                result.append(None)
+            else:
+                result.append(val)
+        else:
+            result.append(val)
+    return result
+
+
 def build_cfi_dashboard_payload(
     engine: "AnalyticsEngine",
     ticker: str,
@@ -972,35 +1037,35 @@ def build_cfi_dashboard_payload(
     key_financials = {
         "columns": years,
         "rows": [
-            {"label": "Revenue", "values": _series_values(revenue_series)},
-            {"label": "Gross Profit", "values": _series_values(gross_profit_series)},
-            {"label": "EBITDA", "values": _series_values(ebitda_series)},
-            {"label": "Operating Income", "values": _series_values(operating_income_series)},
-            {"label": "Net Income", "values": _series_values(net_income_series)},
-            {"label": "EPS ($)", "values": _series_values(eps_series)},
-            {"label": "Free Cash Flow", "values": _series_values(fcf_series)},
-            {"label": "Total Assets", "values": _series_values(total_assets_series)},
-            {"label": "Total Debt", "values": _series_values(total_debt_series)},
-            {"label": "Shares Outstanding (M)", "values": _series_values(shares_series)},
-            {"label": "Gross Margin", "values": _series_values(gross_margin_series), "type": "percent"},
-            {"label": "Net Profit Margin", "values": _series_values(net_margin_series), "type": "percent"},
-            {"label": "EV/Revenue (×)", "values": _series_values(ev_revenue_series), "type": "multiple"},
-            {"label": "EV/EBITDA (×)", "values": _series_values(ev_ebitda_series), "type": "multiple"},
+            {"label": "Revenue", "values": _sanitize_table_values(_series_values(revenue_series))},
+            {"label": "Gross Profit", "values": _sanitize_table_values(_series_values(gross_profit_series))},
+            {"label": "EBITDA", "values": _sanitize_table_values(_series_values(ebitda_series))},
+            {"label": "Operating Income", "values": _sanitize_table_values(_series_values(operating_income_series))},
+            {"label": "Net Income", "values": _sanitize_table_values(_series_values(net_income_series))},
+            {"label": "EPS ($)", "values": _sanitize_table_values(_series_values(eps_series))},
+            {"label": "Free Cash Flow", "values": _sanitize_table_values(_series_values(fcf_series))},
+            {"label": "Total Assets", "values": _sanitize_table_values(_series_values(total_assets_series))},
+            {"label": "Total Debt", "values": _sanitize_table_values(_series_values(total_debt_series))},
+            {"label": "Shares Outstanding (M)", "values": _sanitize_table_values(_series_values(shares_series))},
+            {"label": "Gross Margin", "values": _sanitize_table_values(_series_values(gross_margin_series)), "type": "percent"},
+            {"label": "Net Profit Margin", "values": _sanitize_table_values(_series_values(net_margin_series)), "type": "percent"},
+            {"label": "EV/Revenue (×)", "values": _sanitize_table_values(_series_values(ev_revenue_series)), "type": "multiple"},
+            {"label": "EV/EBITDA (×)", "values": _sanitize_table_values(_series_values(ev_ebitda_series)), "type": "multiple"},
         ],
     }
 
     charts: Dict[str, Any] = {}
     if years:
-        charts["revenue_ev"] = {
+        charts["revenue_ev"] = _sanitize_chart_data({
             "Year": years,
             "Revenue": [revenue_series.get(year) for year in years],
             "EV_Rev": [ev_revenue_series.get(year) for year in years],
-        }
-        charts["ebitda_ev"] = {
+        })
+        charts["ebitda_ev"] = _sanitize_chart_data({
             "Year": years,
             "EBITDA": [ebitda_series.get(year) for year in years],
             "EV_EBITDA": [ev_ebitda_series.get(year) for year in years],
-        }
+        })
 
     current_year = datetime.utcnow().year
     forecast_years = [current_year, current_year + 1, current_year + 2]
@@ -1008,12 +1073,12 @@ def build_cfi_dashboard_payload(
         bull = valuations.get("dcf_bull") or price_target or price_current
         base = price_target or price_current
         bear = valuations.get("dcf_bear") or price_target or price_current
-        charts["forecast"] = {
+        charts["forecast"] = _sanitize_chart_data({
             "Year": forecast_years,
             "Bull": [price_current, bull, bull * 1.05 if bull else None],
             "Base": [price_current, base, base * 1.03 if base else None],
             "Bear": [price_current, bear, bear * 0.97 if bear else None],
-        }
+        })
 
     valuation_cases: List[str] = []
     valuation_values: List[Optional[float]] = []
@@ -1029,7 +1094,7 @@ def build_cfi_dashboard_payload(
             valuation_cases.append(label)
             valuation_values.append(value)
     if valuation_cases:
-        charts["valuation_bar"] = {"Case": valuation_cases, "Value": valuation_values}
+        charts["valuation_bar"] = _sanitize_chart_data({"Case": valuation_cases, "Value": valuation_values})
 
     valuation_notes = []
     if price_target is not None:
