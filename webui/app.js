@@ -7280,7 +7280,9 @@ function resolveStaticAsset(path) {
   if (path.startsWith("/")) {
     return path;
   }
-  return `/static/${path}`;
+  // Add cache-busting for critical scripts
+  const cacheBust = path.includes("cfi_dashboard.js") ? "?v=20241027k" : "";
+  return `/static/${path}${cacheBust}`;
 }
 
 function extractBodyMarkup(html) {

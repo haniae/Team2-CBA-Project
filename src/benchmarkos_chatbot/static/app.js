@@ -2718,7 +2718,7 @@ function renderMessageArtifacts(wrapper, artifacts) {
   const inlineDashboard = renderDashboardArtifact(artifacts.dashboard);
   const dashboardKind = artifacts.dashboard?.kind || "";
   const isInlineClassic =
-    inlineDashboard && (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare" || dashboardKind === "multi-classic");
+    inlineDashboard && (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare" || dashboardKind === "multi-classic" || dashboardKind === "multi-cfi-classic");
   if (inlineDashboard) {
     hasDashboard = true;
     body.append(inlineDashboard);
@@ -2728,7 +2728,7 @@ function renderMessageArtifacts(wrapper, artifacts) {
     }
   }
   const dashboard = createDashboardLayout(artifacts);
-  if (dashboard && dashboardKind !== "cfi-classic" && dashboardKind !== "multi-classic") {
+  if (dashboard && dashboardKind !== "cfi-classic" && dashboardKind !== "multi-classic" && dashboardKind !== "multi-cfi-classic") {
     hasDashboard = true;
     body.append(dashboard);
     if (artifacts.comparisonTable) {
@@ -2893,12 +2893,12 @@ function renderDashboardArtifact(descriptor) {
   const kind = descriptor.kind || "cfi-classic";
   const container = document.createElement("div");
   container.className = "message-dashboard";
-  if (kind === "cfi-classic" || kind === "cfi-compare" || kind === "multi-classic") {
+  if (kind === "cfi-classic" || kind === "cfi-compare" || kind === "multi-classic" || kind === "multi-cfi-classic") {
     container.classList.add("message-dashboard--cfi");
   }
   
-  // Handle multi-classic: render multiple single-company dashboards with dropdown selector
-  if (kind === "multi-classic" && descriptor.dashboards && Array.isArray(descriptor.dashboards)) {
+  // Handle multi-classic and multi-cfi-classic: render multiple single-company dashboards with company switcher
+  if ((kind === "multi-classic" || kind === "multi-cfi-classic") && descriptor.dashboards && Array.isArray(descriptor.dashboards)) {
     const multiContainer = document.createElement("div");
     multiContainer.className = "message-dashboard__multi";
     
@@ -3048,7 +3048,8 @@ function renderDashboardArtifact(descriptor) {
           const options = { 
             container: host,
             payload: dashboardItem.payload,
-            ticker: dashboardItem.ticker
+            ticker: dashboardItem.ticker,
+            isMultiTicker: true  // Flag to indicate this is part of a multi-ticker dashboard
           };
           await showCfiDashboard(options);
           
@@ -7279,7 +7280,9 @@ function resolveStaticAsset(path) {
   if (path.startsWith("/")) {
     return path;
   }
-  return `/static/${path}`;
+  // Add cache-busting for critical scripts
+  const cacheBust = path.includes("cfi_dashboard.js") ? "?v=20241027k" : "";
+  return `/static/${path}${cacheBust}`;
 }
 
 function extractBodyMarkup(html) {
@@ -7669,7 +7672,7 @@ const DEMO_CFIX_PAYLOAD = {
 
 
 async function showCfiDashboard(options = {}) {
-  const { container, payload: suppliedPayload, ...fetchOptions } = options || {};
+  const { container, payload: suppliedPayload, isMultiTicker, ...fetchOptions } = options || {};
   let host = null;
   if (container instanceof HTMLElement) {
     host = container;
@@ -7681,6 +7684,11 @@ async function showCfiDashboard(options = {}) {
   }
   if (!host) {
     throw new Error("Unable to resolve dashboard host container.");
+  }
+  
+  // Mark host as multi-ticker if applicable
+  if (isMultiTicker) {
+    host.dataset.multiTicker = "true";
   }
   // Only show loading message if we don't already have a payload (i.e., need to fetch)
   if (!suppliedPayload) {

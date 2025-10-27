@@ -242,11 +242,6 @@ body {
   display: none;
 }
 
-/* Hide Sources Section */
-.cfi-panel[data-area="sources"] {
-  display: none !important;
-}
-
 .cfi-panel[data-area="sources"] .cfi-strip {
   background: linear-gradient(135deg, #1c7ed6 0%, #2b8ce3 100%) !important;
   color: white !important;

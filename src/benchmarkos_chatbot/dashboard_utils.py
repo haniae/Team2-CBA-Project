@@ -815,6 +815,16 @@ def _sanitize_chart_data(chart_dict: Dict[str, Any]) -> Dict[str, Any]:
     if not chart_dict:
         return chart_dict
     
+    # Helper to check if a value is valid (not None, NaN, or Inf)
+    def is_valid_number(val):
+        if val is None:
+            return False
+        if not isinstance(val, (int, float)):
+            return False
+        if math.isnan(val) or math.isinf(val):
+            return False
+        return True
+    
     # Find data keys (non-'Year' keys)
     data_keys = [k for k in chart_dict.keys() if k != "Year" and k != "Case"]
     if not data_keys:
@@ -831,21 +841,11 @@ def _sanitize_chart_data(chart_dict: Dict[str, Any]) -> Dict[str, Any]:
     
     data_arrays = {k: chart_dict[k] for k in data_keys}
     
-    def _is_valid_number(val):
-        """Check if value is a valid number (not None, NaN, or Inf)."""
-        if val is None:
-            return False
-        if not isinstance(val, (int, float)):
-            return False
-        if math.isnan(val) or math.isinf(val):
-            return False
-        return True
-    
     # Filter out indices where ALL data values are invalid
     valid_indices = []
     for i in range(len(x_values)):
         has_valid_data = any(
-            _is_valid_number(data_arrays[k][i]) 
+            is_valid_number(data_arrays[k][i]) 
             for k in data_keys 
             if i < len(data_arrays[k])
         )
@@ -864,7 +864,7 @@ def _sanitize_chart_data(chart_dict: Dict[str, Any]) -> Dict[str, Any]:
             if i < len(data_arrays[k]):
                 val = data_arrays[k][i]
                 # Replace None, NaN, or Inf with 0
-                if _is_valid_number(val):
+                if is_valid_number(val):
                     clean_values.append(val)
                 else:
                     clean_values.append(0)

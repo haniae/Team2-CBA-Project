@@ -4349,10 +4349,6 @@ body::-webkit-scrollbar {
 }
 
 /* Hide sources panel at the bottom of dashboards */
-.cfi-panel[data-area="sources"] {
-  display: none !important;
-}
-
 .message-artifacts {
   display: flex;
   flex-direction: column;

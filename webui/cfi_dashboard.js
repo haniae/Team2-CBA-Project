@@ -80,6 +80,42 @@
 
   const isNumber = (value) => value !== null && value !== undefined && Number.isFinite(Number(value));
 
+  /**
+   * Aggressively sanitize data before passing to Plotly to prevent NaN errors.
+   * Replaces NaN, Infinity, null, undefined with 0 for numeric arrays.
+   */
+  function sanitizePlotlyData(data) {
+    if (!data || typeof data !== 'object') return data;
+    
+    const sanitized = Array.isArray(data) ? [] : {};
+    
+    for (const key in data) {
+      const value = data[key];
+      
+      if (Array.isArray(value)) {
+        // For arrays, filter out or replace invalid numbers
+        sanitized[key] = value.map(v => {
+          if (v === null || v === undefined) return 0;
+          if (typeof v === 'number') {
+            if (!Number.isFinite(v)) return 0; // Catches NaN and Infinity
+            return v;
+          }
+          return v; // Keep non-numeric values (like strings for labels)
+        });
+      } else if (typeof value === 'number') {
+        // For single numbers, replace invalid with 0
+        sanitized[key] = Number.isFinite(value) ? value : 0;
+      } else if (value && typeof value === 'object') {
+        // Recursively sanitize nested objects
+        sanitized[key] = sanitizePlotlyData(value);
+      } else {
+        sanitized[key] = value;
+      }
+    }
+    
+    return sanitized;
+  }
+
   function formatMoney(value) {
     if (!isNumber(value)) return "—";
     const sign = value < 0 ? "-" : "";
@@ -680,32 +716,29 @@
         })
         .filter(Boolean);
       if (cleanPoints.length) {
-        Plotly.newPlot(
-          chartNode,
-          [
-            {
-              type: "scatter",
-              mode: "lines+markers",
-              x: cleanPoints.map((pt) => pt.year),
-              y: cleanPoints.map((pt) => pt.value),
-              name: drilldown?.label || summary?.label || metricId,
-              line: { color: "#1C7ED6", width: 3 },
-              marker: { color: "#1C7ED6", size: 6 },
-              connectgaps: false,
-            },
-          ],
+        const traces = [
           {
-            ...BASE_LAYOUT,
-            title: { text: "Historical Trend", x: 0.02, font: { size: 14 } },
-            yaxis:
-              series.type === "percent"
-                ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1%", rangemode: "tozero" }
-                : series.type === "multiple"
-                ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1" }
-                : { ...BASE_LAYOUT.yaxis, separatethousands: true },
+            type: "scatter",
+            mode: "lines+markers",
+            x: cleanPoints.map((pt) => pt.year),
+            y: cleanPoints.map((pt) => pt.value),
+            name: drilldown?.label || summary?.label || metricId,
+            line: { color: "#1C7ED6", width: 3 },
+            marker: { color: "#1C7ED6", size: 6 },
+            connectgaps: false,
           },
-          { displayModeBar: false, responsive: true }
-        );
+        ];
+        const layout = {
+          ...BASE_LAYOUT,
+          title: { text: "Historical Trend", x: 0.02, font: { size: 14 } },
+          yaxis:
+            series.type === "percent"
+              ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1%", rangemode: "tozero" }
+              : series.type === "multiple"
+              ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1" }
+              : { ...BASE_LAYOUT.yaxis, separatethousands: true },
+        };
+        Plotly.newPlot(chartNode, sanitizePlotlyData(traces), sanitizePlotlyData(layout), CONFIG);
       } else {
         chartNode.innerHTML = '<div class="cfi-error">Insufficient data for trend.</div>';
       }
@@ -804,31 +837,28 @@
       chartNode.innerHTML = '<div class="cfi-error">Trend unavailable.</div>';
       return;
     }
-    Plotly.newPlot(
-      chartNode,
-      [
-        {
-          type: "scatter",
-          mode: "lines+markers",
-          x: cleanPoints.map((pt) => pt.year),
-          y: cleanPoints.map((pt) => pt.value),
-          line: { color: "#FF7F0E", width: 3 },
-          marker: { color: "#FF7F0E", size: 6 },
-          connectgaps: false,
-        },
-      ],
+    const traces = [
       {
-        ...BASE_LAYOUT,
-        title: { text: mode === "growth" ? "Growth Trend" : "Absolute Trend", x: 0.02, font: { size: 14 } },
-        yaxis:
-          type === "percent"
-            ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1%", rangemode: "tozero" }
-            : type === "multiple"
-            ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1" }
-            : { ...BASE_LAYOUT.yaxis, separatethousands: true },
+        type: "scatter",
+        mode: "lines+markers",
+        x: cleanPoints.map((pt) => pt.year),
+        y: cleanPoints.map((pt) => pt.value),
+        line: { color: "#FF7F0E", width: 3 },
+        marker: { color: "#FF7F0E", size: 6 },
+        connectgaps: false,
       },
-      { displayModeBar: false, responsive: true }
-    );
+    ];
+    const layout = {
+      ...BASE_LAYOUT,
+      title: { text: mode === "growth" ? "Growth Trend" : "Absolute Trend", x: 0.02, font: { size: 14 } },
+      yaxis:
+        type === "percent"
+          ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1%", rangemode: "tozero" }
+          : type === "multiple"
+          ? { ...BASE_LAYOUT.yaxis, tickformat: ",.1" }
+          : { ...BASE_LAYOUT.yaxis, separatethousands: true },
+    };
+    Plotly.newPlot(chartNode, sanitizePlotlyData(traces), sanitizePlotlyData(layout), CONFIG);
   }
 
   function setupTrendExplorer(payload) {
@@ -1006,7 +1036,7 @@
       bargap: 0.25,
       bargroupgap: 0.1
     };
-    Plotly.newPlot(node, traces, layout, CONFIG);
+    Plotly.newPlot(node, sanitizePlotlyData(traces), sanitizePlotlyData(layout), CONFIG);
   }
 
   function plotEbitdaChart(data) {
@@ -1086,7 +1116,7 @@
       bargap: 0.25,
       bargroupgap: 0.1
     };
-    Plotly.newPlot(node, traces, layout, CONFIG);
+    Plotly.newPlot(node, sanitizePlotlyData(traces), sanitizePlotlyData(layout), CONFIG);
   }
 
   function plotForecastChart(data) {
@@ -1153,7 +1183,7 @@
       },
       showlegend: true
     };
-    Plotly.newPlot(node, traces, layout, CONFIG);
+    Plotly.newPlot(node, sanitizePlotlyData(traces), sanitizePlotlyData(layout), CONFIG);
   }
 
   function plotValuationBar(data, meta = {}) {
@@ -1190,13 +1220,18 @@
       node.textContent = "No valuation data.";
       return;
     }
-    const xValues = entries.map((entry) => entry.x);
-    const yValues = entries.map((entry) => entry.y).filter(v => Number.isFinite(v));
     
-    if (yValues.length === 0) {
+    // Filter entries to only include those with valid finite y values
+    // Keep x and y paired together
+    const validEntries = entries.filter(entry => Number.isFinite(entry.y));
+    
+    if (validEntries.length === 0) {
       node.textContent = "No valid valuation values.";
       return;
     }
+    
+    const xValues = validEntries.map((entry) => entry.x);
+    const yValues = validEntries.map((entry) => entry.y);
     
     // Create color scheme for different valuation methods
     const colorMap = {
@@ -1269,7 +1304,12 @@
       bargap: 0.28,
       showlegend: true
     };
-    Plotly.newPlot(node, traces, layout, CONFIG);
+    
+    // Final sanitization pass to catch any remaining NaN values
+    const sanitizedTraces = sanitizePlotlyData(traces);
+    const sanitizedLayout = sanitizePlotlyData(layout);
+    
+    Plotly.newPlot(node, sanitizedTraces, sanitizedLayout, CONFIG);
   }
 
   function renderMeta(meta = {}) {
