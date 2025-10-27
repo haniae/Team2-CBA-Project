@@ -2878,8 +2878,8 @@ function renderDashboardArtifact(descriptor) {
     descriptor.dashboards.forEach((dashboardItem, index) => {
       const option = document.createElement("option");
       option.value = index;
-      // Extract company name from payload or use ticker as fallback
-      const companyName = dashboardItem.payload?.company_name || dashboardItem.ticker || `Company ${index + 1}`;
+      // Extract company name from payload.meta.company or use ticker as fallback
+      const companyName = dashboardItem.payload?.meta?.company || dashboardItem.ticker || `Company ${index + 1}`;
       option.textContent = companyName;
       dropdown.appendChild(option);
     });
@@ -2899,25 +2899,32 @@ function renderDashboardArtifact(descriptor) {
       host.style.display = index === 0 ? "block" : "none"; // Show first, hide others
       host.dataset.dashboardIndex = index;
       
-      // Render single-company dashboard
+      // Ensure payload exists before rendering
+      if (!dashboardItem.payload) {
+        host.innerHTML = `<div class="cfi-error">No data available for ${dashboardItem.ticker}.</div>`;
+        dashboardContainer.appendChild(host);
+        return host;
+      }
+      
+      // Set empty initially to avoid loading message flash
+      host.innerHTML = '';
+      
+      // Render single-company dashboard with supplied payload
       const options = { 
         container: host,
         payload: dashboardItem.payload,
         ticker: dashboardItem.ticker
       };
       
-      try {
-        const renderPromise = showCfiDashboard(options);
-        if (renderPromise && typeof renderPromise.catch === "function") {
-          renderPromise.catch((error) => {
-            console.error(`Failed to render dashboard for ${dashboardItem.ticker}:`, error);
-            host.innerHTML = `<div class="cfi-error">Unable to render dashboard for ${dashboardItem.ticker}.</div>`;
-          });
+      // Render asynchronously without blocking
+      setTimeout(async () => {
+        try {
+          await showCfiDashboard(options);
+        } catch (error) {
+          console.error(`Failed to render dashboard for ${dashboardItem.ticker}:`, error);
+          host.innerHTML = `<div class="cfi-error">Unable to render dashboard for ${dashboardItem.ticker}.</div>`;
         }
-      } catch (error) {
-        console.error(`Failed to render dashboard for ${dashboardItem.ticker}:`, error);
-        host.innerHTML = `<div class="cfi-error">Unable to render dashboard for ${dashboardItem.ticker}.</div>`;
-      }
+      }, 0);
       
       dashboardContainer.appendChild(host);
       return host;
@@ -7423,7 +7430,10 @@ async function showCfiDashboard(options = {}) {
   if (!host) {
     throw new Error("Unable to resolve dashboard host container.");
   }
-  host.innerHTML = '<div class="cfi-loading">Loading CFI dashboard...</div>';
+  // Only show loading message if we don't already have a payload (i.e., need to fetch)
+  if (!suppliedPayload) {
+    host.innerHTML = '<div class="cfi-loading">Loading CFI dashboard...</div>';
+  }
   try {
     await loadCfiDashboardMarkup(host);
     await ensureStylesheetOnce("cfi-dashboard-styles", "cfi_dashboard.css");
