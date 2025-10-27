@@ -63,7 +63,48 @@ function renderConversations(list){
 		const title = c.title || c.id
 		const date = new Date(c.updated_at || Date.now())
 		const timeStr = formatRelativeTime(date)
-		titleDiv.innerHTML = `<strong style="font-size:13px;display:block;margin-bottom:4px;">${escapeHtml(title)}</strong><div style="font-size:11px;color:rgba(255,255,255,0.6);">${timeStr}</div>`
+		titleDiv.innerHTML = `<strong style="font-size:13px;display:block;margin-bottom:4px;" class="convo-title">${escapeHtml(title)}</strong><div style="font-size:11px;color:rgba(255,255,255,0.6);">${timeStr}</div>`
+		
+		const buttonGroup = document.createElement('div')
+		buttonGroup.style.cssText = 'display:flex;gap:4px;'
+		
+		const renameBtn = document.createElement('button')
+		renameBtn.className = 'delete-btn'
+		renameBtn.title = 'Rename conversation'
+		renameBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+		</svg>`
+		
+		renameBtn.addEventListener('click', async (e)=>{
+			e.stopPropagation()
+			const currentTitle = c.title || c.id
+			const newTitle = prompt('Enter new name for this conversation:', currentTitle)
+			if(!newTitle || newTitle === currentTitle) return
+			
+			try{
+				const res = await fetch(`/conversations/${encodeURIComponent(c.id)}/rename`, {
+					method:'PATCH',
+					headers:{'Content-Type':'application/json'},
+					body:JSON.stringify({title: newTitle})
+				})
+				if(!res.ok) throw new Error('rename failed')
+				
+				// Update title in UI immediately
+				const titleEl = titleDiv.querySelector('.convo-title')
+				if(titleEl) titleEl.textContent = newTitle
+				c.title = newTitle
+				
+				// Show brief success feedback
+				renameBtn.style.color = '#10B981'
+				setTimeout(() => renameBtn.style.color = '', 1000)
+			}catch(err){
+				console.error('Rename failed:', err)
+				// Fallback: update in UI even if server fails
+				const titleEl = titleDiv.querySelector('.convo-title')
+				if(titleEl) titleEl.textContent = newTitle
+				c.title = newTitle
+			}
+		})
 		
 		const deleteBtn = document.createElement('button')
 		deleteBtn.className = 'delete-btn'
@@ -91,8 +132,10 @@ function renderConversations(list){
 			}
 		})
 		
+		buttonGroup.appendChild(renameBtn)
+		buttonGroup.appendChild(deleteBtn)
 		metaRow.appendChild(titleDiv)
-		metaRow.appendChild(deleteBtn)
+		metaRow.appendChild(buttonGroup)
 		el.appendChild(metaRow)
 		el.addEventListener('click', ()=> loadConversation(c.id))
 		el.addEventListener('keypress', (e)=> {

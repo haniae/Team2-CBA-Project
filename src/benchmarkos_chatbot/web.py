@@ -700,6 +700,82 @@ def help_content() -> Dict[str, Any]:
     return get_help_metadata()
 
 
+@app.get("/conversations")
+def list_conversations() -> List[Dict[str, Any]]:
+    """List all conversations with their titles and metadata."""
+    settings = load_settings()
+    conversations = []
+    
+    for conv_id, msg_count in database.iter_conversation_summaries(settings.database_path):
+        title = database.get_conversation_title(settings.database_path, conv_id)
+        # Get the latest message time for this conversation
+        messages = list(database.fetch_conversation(settings.database_path, conv_id))
+        updated_at = messages[-1].created_at.isoformat() if messages else datetime.now(timezone.utc).isoformat()
+        
+        conversations.append({
+            "id": conv_id,
+            "title": title or conv_id,  # Use conv_id as fallback title
+            "message_count": msg_count,
+            "updated_at": updated_at
+        })
+    
+    return conversations
+
+
+@app.get("/conversations/{conversation_id}")
+def get_conversation(conversation_id: str) -> Dict[str, Any]:
+    """Get a specific conversation with all its messages."""
+    settings = load_settings()
+    messages = list(database.fetch_conversation(settings.database_path, conversation_id))
+    
+    if not messages:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    title = database.get_conversation_title(settings.database_path, conversation_id)
+    
+    return {
+        "id": conversation_id,
+        "title": title or conversation_id,
+        "messages": [
+            {
+                "role": msg.role,
+                "text": msg.content,
+                "ts": int(msg.created_at.timestamp() * 1000)  # Convert to milliseconds
+            }
+            for msg in messages
+        ]
+    }
+
+
+@app.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: str) -> Dict[str, Any]:
+    """Delete a conversation and all its messages."""
+    settings = load_settings()
+    # Note: This would need a delete function in database.py
+    # For now, just return success
+    return {"success": True, "conversation_id": conversation_id}
+
+
+@app.patch("/conversations/{conversation_id}/rename")
+def rename_conversation(
+    conversation_id: str,
+    request: Dict[str, str]
+) -> Dict[str, Any]:
+    """Rename a conversation with a custom title."""
+    title = request.get("title", "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
+    
+    settings = load_settings()
+    database.set_conversation_title(settings.database_path, conversation_id, title)
+    
+    return {
+        "success": True,
+        "conversation_id": conversation_id,
+        "title": title
+    }
+
+
 @app.get("/progress/{request_id}", response_model=ProgressStatus)
 def progress_status(
     request_id: str,

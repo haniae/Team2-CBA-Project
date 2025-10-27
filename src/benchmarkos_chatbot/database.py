@@ -296,6 +296,15 @@ def initialise(database_path: Path) -> None:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS conversation_metadata (
+                conversation_id TEXT PRIMARY KEY,
+                title TEXT,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS scenario_results (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker TEXT NOT NULL,
@@ -545,6 +554,33 @@ def iter_conversation_summaries(database_path: Path) -> Iterator[Tuple[str, int]
             """
         )
         yield from rows
+
+
+def get_conversation_title(database_path: Path, conversation_id: str) -> Optional[str]:
+    """Retrieve the custom title for a conversation, if set."""
+    with _connect(database_path) as connection:
+        row = connection.execute(
+            """
+            SELECT title
+            FROM conversation_metadata
+            WHERE conversation_id = ?
+            """,
+            (conversation_id,),
+        ).fetchone()
+        return row[0] if row else None
+
+
+def set_conversation_title(database_path: Path, conversation_id: str, title: str) -> None:
+    """Set or update the custom title for a conversation."""
+    with _connect(database_path) as connection:
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO conversation_metadata (conversation_id, title, updated_at)
+            VALUES (?, ?, ?)
+            """,
+            (conversation_id, title, _iso_utc(datetime.now(timezone.utc))),
+        )
+        connection.commit()
 
 
 # -----------------------------
