@@ -2964,20 +2964,21 @@ function renderDashboardArtifact(descriptor) {
         return host;
       }
       
-      // Set empty initially to avoid loading message flash
-      host.innerHTML = '';
+      // Set placeholder to show we're working
+      host.innerHTML = '<div class="cfi-loading" style="padding: 40px; text-align: center; color: #6366f1;">Preparing dashboard...</div>';
       
-      // Render single-company dashboard with supplied payload
-      const options = { 
-        container: host,
-        payload: dashboardItem.payload,
-        ticker: dashboardItem.ticker
-      };
+      // Add to container FIRST before rendering
+      dashboardContainer.appendChild(host);
       
-      // Render asynchronously without blocking
-      setTimeout(async () => {
+      // Store render function for this dashboard
+      host.renderDashboard = async () => {
         try {
           console.log(`Starting render for ${dashboardItem.ticker}`);
+          const options = { 
+            container: host,
+            payload: dashboardItem.payload,
+            ticker: dashboardItem.ticker
+          };
           await showCfiDashboard(options);
           console.log(`Completed render for ${dashboardItem.ticker}`);
           
@@ -2987,22 +2988,44 @@ function renderDashboardArtifact(descriptor) {
           console.error(`Failed to render dashboard for ${dashboardItem.ticker}:`, error);
           host.innerHTML = `<div class="cfi-error">Unable to render dashboard for ${dashboardItem.ticker}.</div>`;
         }
-      }, 0);
+      };
       
-      dashboardContainer.appendChild(host);
       return host;
     });
+    
+    multiContainer.appendChild(dashboardContainer);
+    container.appendChild(multiContainer);
+    
+    // NOW render dashboards after everything is in the DOM
+    setTimeout(() => {
+      dashboardHosts.forEach((host, index) => {
+        if (host.renderDashboard) {
+          // Only render the first dashboard initially for better performance
+          if (index === 0) {
+            host.dataset.rendered = "true";
+            host.renderDashboard();
+          }
+        }
+      });
+    }, 100);
     
     // Add change event to dropdown for instant switching
     dropdown.addEventListener("change", (e) => {
       const selectedIndex = parseInt(e.target.value, 10);
       dashboardHosts.forEach((host, index) => {
-        host.style.display = index === selectedIndex ? "block" : "none";
+        if (index === selectedIndex) {
+          host.style.display = "block";
+          // Render on-demand if not already rendered
+          if (host.renderDashboard && !host.dataset.rendered) {
+            host.dataset.rendered = "true";
+            host.renderDashboard();
+          }
+        } else {
+          host.style.display = "none";
+        }
       });
     });
     
-    multiContainer.appendChild(dashboardContainer);
-    container.appendChild(multiContainer);
     return container;
   }
   
