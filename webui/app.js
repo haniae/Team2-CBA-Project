@@ -2902,36 +2902,53 @@ function renderDashboardArtifact(descriptor) {
     const multiContainer = document.createElement("div");
     multiContainer.className = "message-dashboard__multi";
     
-    // Create dropdown selector with proper accessibility attributes
+    // Create button selector for companies
     const selectorWrapper = document.createElement("div");
     selectorWrapper.className = "message-dashboard__selector";
     
-    // Generate unique ID for this dropdown
-    const dropdownId = `company-selector-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const selectorLabel = document.createElement("div");
+    selectorLabel.className = "message-dashboard__selector-label";
+    selectorLabel.textContent = "Compare Companies:";
     
-    const selectorLabel = document.createElement("label");
-    selectorLabel.textContent = "Select Company: ";
-    selectorLabel.htmlFor = dropdownId; // Associate label with dropdown
-    selectorLabel.style.cssText = "font-weight: 600; margin-right: 12px; color: var(--navy);";
+    const buttonGroup = document.createElement("div");
+    buttonGroup.className = "message-dashboard__button-group";
     
-    const dropdown = document.createElement("select");
-    dropdown.id = dropdownId; // Add unique ID
-    dropdown.name = "company-selector"; // Add name attribute
-    dropdown.className = "message-dashboard__dropdown";
-    dropdown.setAttribute("aria-label", "Select company to view dashboard");
-    
-    // Populate dropdown with company names
-    descriptor.dashboards.forEach((dashboardItem, index) => {
-      const option = document.createElement("option");
-      option.value = index;
-      // Extract company name from payload.meta.company or use ticker as fallback
+    // Create buttons for each company
+    const companyButtons = descriptor.dashboards.map((dashboardItem, index) => {
+      const button = document.createElement("button");
+      button.className = "message-dashboard__company-btn";
+      button.dataset.companyIndex = index;
+      
+      // Extract company name and ticker
       const companyName = dashboardItem.payload?.meta?.company || dashboardItem.ticker || `Company ${index + 1}`;
-      option.textContent = companyName;
-      dropdown.appendChild(option);
+      const ticker = dashboardItem.ticker || dashboardItem.payload?.meta?.ticker || '';
+      
+      // Button content
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "company-btn-name";
+      nameSpan.textContent = companyName;
+      
+      if (ticker) {
+        const tickerSpan = document.createElement("span");
+        tickerSpan.className = "company-btn-ticker";
+        tickerSpan.textContent = ticker;
+        button.appendChild(nameSpan);
+        button.appendChild(tickerSpan);
+      } else {
+        button.appendChild(nameSpan);
+      }
+      
+      // First button is active by default
+      if (index === 0) {
+        button.classList.add('active');
+      }
+      
+      buttonGroup.appendChild(button);
+      return button;
     });
     
     selectorWrapper.appendChild(selectorLabel);
-    selectorWrapper.appendChild(dropdown);
+    selectorWrapper.appendChild(buttonGroup);
     multiContainer.appendChild(selectorWrapper);
     
     // Create container for dashboard (only one visible at a time)
@@ -3004,20 +3021,28 @@ function renderDashboardArtifact(descriptor) {
       });
     }, 100);
     
-    // Add change event to dropdown for instant switching
-    dropdown.addEventListener("change", (e) => {
-      const selectedIndex = parseInt(e.target.value, 10);
-      dashboardHosts.forEach((host, index) => {
-        if (index === selectedIndex) {
-          host.style.display = "block";
-          // Render on-demand if not already rendered
-          if (host.renderDashboard && !host.dataset.rendered) {
-            host.dataset.rendered = "true";
-            host.renderDashboard();
+    // Add click event to buttons for instant switching
+    companyButtons.forEach((button, btnIndex) => {
+      button.addEventListener("click", () => {
+        const selectedIndex = parseInt(button.dataset.companyIndex, 10);
+        
+        // Update active button state
+        companyButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        
+        // Switch dashboards
+        dashboardHosts.forEach((host, index) => {
+          if (index === selectedIndex) {
+            host.style.display = "block";
+            // Render on-demand if not already rendered
+            if (host.renderDashboard && !host.dataset.rendered) {
+              host.dataset.rendered = "true";
+              host.renderDashboard();
+            }
+          } else {
+            host.style.display = "none";
           }
-        } else {
-          host.style.display = "none";
-        }
+        });
       });
     });
     
