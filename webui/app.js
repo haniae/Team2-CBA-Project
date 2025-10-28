@@ -37,6 +37,59 @@ const DEFAULT_PROMPT_SUGGESTIONS = [
   "Show revenue CAGR, ROIC, and FCF margin trends for semiconductor peers.",
   "Which tracked tickers triggered alerts in the past week and why?"
 ];
+
+/**
+ * Convert markdown text to HTML
+ * @param {string} text - Raw markdown text
+ * @returns {string} HTML string
+ */
+function renderMarkdown(text) {
+  if (!text) return '';
+  
+  let html = text;
+  
+  // Escape HTML to prevent XSS
+  html = html.replace(/&/g, '&amp;')
+             .replace(/</g, '&lt;')
+             .replace(/>/g, '&gt;');
+  
+  // Headers (### Header, ## Header, # Header)
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  
+  // Bold (**text** or __text__)
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  
+  // Italic (*text* or _text_)
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+  
+  // Links [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  
+  // Inline code `code`
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  
+  // Unordered lists (- item or * item)
+  html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+  
+  // Ordered lists (1. item)
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  
+  // Line breaks
+  html = html.replace(/\n\n/g, '</p><p>');
+  html = html.replace(/\n/g, '<br>');
+  
+  // Wrap in paragraph if not already wrapped
+  if (!html.startsWith('<')) {
+    html = `<p>${html}</p>`;
+  }
+  
+  return html;
+}
 let activePromptSuggestions = [...DEFAULT_PROMPT_SUGGESTIONS];
 const FOLLOW_UP_SUGGESTION_LIBRARY = {
   Growth: "Which peers are pacing the fastest quarter-over-quarter growth versus consensus?",
@@ -4569,7 +4622,7 @@ function buildMessageBlocks(text) {
     } else {
       const div = document.createElement("div");
       div.className = "message-content";
-      div.textContent = block.text;
+      div.innerHTML = renderMarkdown(block.text);
       fragments.push(div);
     }
   });
@@ -4577,7 +4630,7 @@ function buildMessageBlocks(text) {
   if (!blocks.length) {
     const div = document.createElement("div");
     div.className = "message-content";
-    div.textContent = text;
+    div.innerHTML = renderMarkdown(text);
     fragments.push(div);
   }
 

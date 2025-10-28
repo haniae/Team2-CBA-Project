@@ -1447,7 +1447,92 @@ body::-webkit-scrollbar {
 }
 
 .message-content {
-  white-space: pre-line;
+  white-space: normal;
+  line-height: 1.6;
+}
+
+/* Markdown styling for bot messages */
+.message-content h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 1.5rem 0 1rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.message-content h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #334155;
+  margin: 1.25rem 0 0.75rem 0;
+}
+
+.message-content h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #475569;
+  margin: 1rem 0 0.5rem 0;
+}
+
+.message-content p {
+  margin: 0.75rem 0;
+  color: #1e293b;
+}
+
+.message-content strong {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.message-content em {
+  font-style: italic;
+  color: #475569;
+}
+
+.message-content a {
+  color: #3b82f6;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.message-content a:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.message-content code {
+  background: #f1f5f9;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.875em;
+  color: #dc2626;
+}
+
+.message-content ul,
+.message-content ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.message-content li {
+  margin: 0.375rem 0;
+  color: #1e293b;
+}
+
+.message-content ul li {
+  list-style-type: disc;
+}
+
+.message-content ol li {
+  list-style-type: decimal;
+}
+
+.message-content br {
+  display: block;
+  content: "";
+  margin: 0.25rem 0;
 }
 
 .message-table {
