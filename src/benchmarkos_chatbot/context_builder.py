@@ -23,6 +23,14 @@ except ImportError:
     MULTI_SOURCE_AVAILABLE = False
     LOGGER.warning("Multi-source aggregator not available - only SEC data will be used")
 
+# Try to import macro data provider
+try:
+    from .macro_data import get_macro_provider
+    MACRO_DATA_AVAILABLE = True
+except ImportError:
+    MACRO_DATA_AVAILABLE = False
+    LOGGER.warning("Macro data provider not available - economic context will not be included")
+
 
 def format_currency(value: Optional[float]) -> str:
     """Format currency value to human-readable string."""
@@ -149,6 +157,23 @@ def build_financial_context(
             return ""
         
         context_parts = []
+        
+        # Add macro economic context at the beginning
+        if MACRO_DATA_AVAILABLE:
+            try:
+                macro_provider = get_macro_provider()
+                # Attempt to determine company sector (first ticker)
+                company_sector = None
+                if tickers:
+                    # This could be enhanced to fetch actual sector from database
+                    # For now, using generic GLOBAL benchmarks
+                    pass
+                
+                macro_context = macro_provider.build_macro_context(company_sector)
+                if macro_context:
+                    context_parts.append(f"{'='*80}\n📊 MACRO ECONOMIC CONTEXT\n{'='*80}\n{macro_context}\n\n")
+            except Exception as e:
+                LOGGER.debug(f"Could not build macro context: {e}")
         
         for ticker in tickers:
             try:
