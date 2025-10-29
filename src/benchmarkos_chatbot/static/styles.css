@@ -1448,91 +1448,151 @@ body::-webkit-scrollbar {
 
 .message-content {
   white-space: normal;
-  line-height: 1.6;
+  line-height: 1.75;
+  font-size: 15px;
+  color: var(--text-primary);
 }
 
 /* Markdown styling for bot messages */
 .message-content h1 {
-  font-size: 1.75rem;
+  font-size: 1.875rem;
   font-weight: 700;
-  color: #1e293b;
-  margin: 1.5rem 0 1rem 0;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid #e2e8f0;
+  font-family: var(--font-display);
+  color: var(--navy);
+  margin: 1.75rem 0 1.25rem 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border);
+  letter-spacing: -0.025em;
 }
 
 .message-content h2 {
-  font-size: 1.5rem;
+  font-size: 1.625rem;
   font-weight: 700;
-  color: #334155;
-  margin: 1.25rem 0 0.75rem 0;
+  font-family: var(--font-display);
+  color: var(--navy);
+  margin: 1.5rem 0 1rem 0;
+  letter-spacing: -0.020em;
 }
 
 .message-content h3 {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 600;
-  color: #475569;
-  margin: 1rem 0 0.5rem 0;
+  font-family: var(--font-display);
+  color: var(--text-primary);
+  margin: 1.25rem 0 0.75rem 0;
+  letter-spacing: -0.015em;
 }
 
 .message-content p {
-  margin: 0.75rem 0;
-  color: #1e293b;
+  margin: 1rem 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .message-content strong {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--navy);
 }
 
 .message-content em {
   font-style: italic;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .message-content a {
-  color: #3b82f6;
+  color: var(--indigo);
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: all var(--transition-fast);
+  border-bottom: 1px solid rgba(0, 102, 255, 0.25);
+  font-weight: 500;
 }
 
 .message-content a:hover {
-  color: #2563eb;
-  text-decoration: underline;
+  color: var(--navy);
+  border-bottom-color: var(--indigo);
 }
 
 .message-content code {
-  background: #f1f5f9;
-  padding: 0.125rem 0.375rem;
-  border-radius: 4px;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.875em;
-  color: #dc2626;
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--emerald);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  border: 1px solid rgba(15, 118, 110, 0.15);
+}
+
+.message-content pre {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.message-content pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--text-primary);
 }
 
 .message-content ul,
 .message-content ol {
-  margin: 0.75rem 0;
-  padding-left: 1.5rem;
+  margin: 1rem 0;
+  padding-left: 2rem;
+  line-height: 1.75;
 }
 
 .message-content li {
-  margin: 0.375rem 0;
-  color: #1e293b;
+  margin: 0.625rem 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .message-content ul li {
   list-style-type: disc;
+  padding-left: 0.5rem;
 }
 
 .message-content ol li {
   list-style-type: decimal;
+  padding-left: 0.5rem;
+}
+
+.message-content ul li::marker {
+  color: var(--indigo);
+  font-size: 0.875em;
+}
+
+.message-content ol li::marker {
+  color: var(--indigo);
+  font-weight: 600;
 }
 
 .message-content br {
   display: block;
   content: "";
-  margin: 0.25rem 0;
+  margin: 0.375rem 0;
+}
+
+.message-content blockquote {
+  border-left: 3px solid var(--indigo);
+  padding-left: 1.25rem;
+  margin: 1.25rem 0;
+  color: var(--text-secondary);
+  font-style: italic;
+  background: rgba(0, 102, 255, 0.03);
+  padding: 0.75rem 1.25rem;
+  border-radius: 0 8px 8px 0;
 }
 
 .message-table {
