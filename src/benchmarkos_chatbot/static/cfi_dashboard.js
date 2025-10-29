@@ -563,12 +563,22 @@
   async function triggerExport(button, format, payload) {
     const exporter = button;
     const exportFormat = (format || "").toLowerCase();
-    const ticker =
-      payload?.meta?.ticker_label ||
-      payload?.meta?.ticker ||
-      payload?.meta?.ticker_display ||
-      payload?.meta?.company ||
-      "";
+    
+    // Check if this is a multi-ticker export (from window metadata)
+    let ticker = "";
+    if (window.currentDashboardMeta && window.currentDashboardMeta.tickers && window.currentDashboardMeta.tickers.length > 1) {
+      // Multi-ticker: join all tickers with commas
+      ticker = window.currentDashboardMeta.tickers.join(",");
+    } else {
+      // Single ticker: use payload metadata
+      ticker =
+        payload?.meta?.ticker_label ||
+        payload?.meta?.ticker ||
+        payload?.meta?.ticker_display ||
+        payload?.meta?.company ||
+        "";
+    }
+    
     if (!exportFormat) {
       return;
     }
@@ -602,7 +612,11 @@
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       if (typeof window.showToast === "function") {
-        window.showToast(`Export ready (${filename})`, "success");
+        const isMulti = ticker.includes(",");
+        const msg = isMulti 
+          ? `Multi-company export ready (${filename})` 
+          : `Export ready (${filename})`;
+        window.showToast(msg, "success");
       }
     } catch (error) {
       console.error("Export failed:", error);
