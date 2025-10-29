@@ -1902,8 +1902,8 @@ class BenchmarkOSChatbot:
         
         # 4. Check if this is a natural language QUESTION (not a table request)
         question_patterns = [
-            r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would)\b',
-            r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would)\b',
+            r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would|about)\b',  # Added "about"
+            r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would|about)\b',  # Added "about"
             r'\bwhy\b',
             r'\bexplain\b',
             r'\btell\s+me\s+(?:about|why|how)\b',
@@ -1914,6 +1914,11 @@ class BenchmarkOSChatbot:
             r'\bshould\s+i\b',
             r'\bwhen\s+(?:is|are|was|were|did|will)\b',
             r'\bwhere\s+(?:is|are|can|do)\b',
+            # Follow-up question patterns
+            r'^\s*(?:what|how)\s+about\b',  # "What about..." "How about..."
+            r'\b(?:their|its|theirs)\b',  # Pronouns indicating context reference
+            r'\b(?:them|it)\s+(?:compare|versus|vs)\b',  # "compare them", "compare it"
+            r'\bcompare\s+(?:them|those|these)\b',  # "compare them"
         ]
         
         is_question = any(re.search(pattern, lowered) for pattern in question_patterns)
