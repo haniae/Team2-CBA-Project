@@ -5426,6 +5426,80 @@ function loadStoredConversations() {
   }
 }
 
+async function syncConversationsFromServer() {
+  try {
+    const response = await fetch(`${API_BASE}/conversations`);
+    if (!response.ok) {
+      console.warn("Could not fetch conversations from server");
+      return;
+    }
+    
+    const serverConversations = await response.json();
+    if (!Array.isArray(serverConversations)) {
+      return;
+    }
+    
+    // Merge server conversations with local ones
+    const localConvMap = new Map(conversations.map(c => [c.remoteId, c]));
+    
+    for (const serverConv of serverConversations) {
+      const localConv = localConvMap.get(serverConv.id);
+      
+      if (localConv) {
+        // Update existing conversation with server data (server is source of truth)
+        localConv.messages = serverConv.messages.map(msg => ({
+          role: msg.role,
+          text: msg.text,
+          timestamp: msg.ts || Date.now(),
+          metadata: null
+        }));
+        localConv.updatedAt = new Date(serverConv.messages[serverConv.messages.length - 1]?.ts || Date.now()).toISOString();
+      } else {
+        // Add new conversation from server
+        const firstUserMsg = serverConv.messages.find(m => m.role === "user");
+        const previewPrompt = firstUserMsg?.text || "";
+        const summary = buildSemanticSummary(previewPrompt || serverConv.title || "");
+        
+        conversations.push({
+          id: `remote-${serverConv.id}`,
+          remoteId: serverConv.id,
+          title: serverConv.title || summary.title,
+          createdAt: new Date(serverConv.messages[0]?.ts || Date.now()).toISOString(),
+          updatedAt: new Date(serverConv.messages[serverConv.messages.length - 1]?.ts || Date.now()).toISOString(),
+          messages: serverConv.messages.map(msg => ({
+            role: msg.role,
+            text: msg.text,
+            timestamp: msg.ts || Date.now(),
+            metadata: null
+          })),
+          previewPrompt,
+          intent: summary.intent,
+          tickers: summary.tickers,
+          period: summary.period,
+          metricLabel: summary.metric,
+          archived: false,
+          projectId: null,
+          projectName: "",
+          share: { isPublic: false, token: null }
+        });
+      }
+    }
+    
+    // Sort conversations by update time
+    conversations.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    
+    // Save merged conversations to localStorage
+    saveConversations();
+    
+    // Refresh the conversation list in the UI
+    renderConversationList();
+    
+    console.log(`✅ Synced ${serverConversations.length} conversations from server`);
+  } catch (error) {
+    console.warn("Failed to sync conversations from server:", error);
+  }
+}
+
 function saveConversations() {
   try {
     if (!window.localStorage) {
@@ -7042,13 +7116,24 @@ function removeToast(toast) {
   }
 }
 
+// Initial render of conversation list
 renderConversationList();
 
-if (conversations.length) {
-  loadConversation(conversations[0].id);
-} else {
-  startNewConversation({ focusInput: false });
-}
+// Sync conversations from server, then load the most recent one
+syncConversationsFromServer().then(() => {
+  if (conversations.length) {
+    loadConversation(conversations[0].id);
+  } else {
+    startNewConversation({ focusInput: false });
+  }
+}).catch(() => {
+  // If sync fails, just load from localStorage
+  if (conversations.length) {
+    loadConversation(conversations[0].id);
+  } else {
+    startNewConversation({ focusInput: false });
+  }
+});
 
 async function checkHealth() {
   try {
