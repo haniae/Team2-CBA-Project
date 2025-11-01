@@ -1,5 +1,17 @@
 const API_BASE = window.API_BASE || "";
-const STORAGE_KEY = "benchmarkos.chatHistory.v1";
+const STORAGE_KEY = "benchmarkos.chatHistory.v2";
+const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
+
+(function cleanupLegacyStorage() {
+  try {
+    if (!window || !window.localStorage) {
+      return;
+    }
+    LEGACY_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+  } catch (error) {
+    console.warn("Unable to clear legacy chat storage", error);
+  }
+})();
 
 const chatLog = document.getElementById("chat-log");
 const chatForm = document.getElementById("chat-form");
@@ -44,51 +56,235 @@ const DEFAULT_PROMPT_SUGGESTIONS = [
  * @returns {string} HTML string
  */
 function renderMarkdown(text) {
-  if (!text) return '';
-  
-  let html = text;
-  
-  // Escape HTML to prevent XSS
-  html = html.replace(/&/g, '&amp;')
-             .replace(/</g, '&lt;')
-             .replace(/>/g, '&gt;');
-  
-  // Headers (### Header, ## Header, # Header)
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-  
-  // Bold (**text** or __text__)
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
-  
-  // Italic (*text* or _text_)
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/_(.+?)_/g, '<em>$1</em>');
-  
-  // Links [text](url)
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-  
-  // Inline code `code`
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-  
-  // Unordered lists (- item or * item)
-  html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-  
-  // Ordered lists (1. item)
-  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
-  
-  // Line breaks
-  html = html.replace(/\n\n/g, '</p><p>');
-  html = html.replace(/\n/g, '<br>');
-  
-  // Wrap in paragraph if not already wrapped
-  if (!html.startsWith('<')) {
-    html = `<p>${html}</p>`;
+  if (!text) {
+    return "";
   }
-  
-  return html;
+
+  const escapeHtml = (value) =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  const escapeAttribute = (value) =>
+    value.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+  const processInline = (value) => {
+    if (!value) {
+      return "";
+    }
+
+    let working = value;
+
+    const codeTokens = [];
+    working = working.replace(/`([^`]+)`/g, (match, code) => {
+      codeTokens.push(code);
+      return `\uE000${codeTokens.length - 1}\uE000`;
+    });
+
+    working = working.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, textValue, urlValue) => {
+      const rawUrl = urlValue.trim();
+      if (!rawUrl) {
+        return textValue;
+      }
+      const safeUrl = escapeAttribute(rawUrl);
+      const href = /^([a-z][a-z\d+\-.]*:|\/\/)/i.test(safeUrl) ? safeUrl : `https://${safeUrl}`;
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${textValue}</a>`;
+    });
+
+    working = working.replace(
+      /(^|[\s>])((?:https?:\/\/|www\.)[^\s<]+)(?=$|[\s<])/gi,
+      (match, prefix, urlValue) => {
+        const safeUrl = escapeAttribute(urlValue);
+        const href = /^https?:\/\//i.test(safeUrl) ? safeUrl : `https://${safeUrl}`;
+        return `${prefix}<a href="${href}" target="_blank" rel="noopener noreferrer">${urlValue}</a>`;
+      }
+    );
+
+    working = working.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    working = working.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+    working = working.replace(/~~([^~]+)~~/g, "<del>$1</del>");
+    working = working.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    working = working.replace(/_([^_]+)_/g, "<em>$1</em>");
+
+    working = working.replace(/\uE000(\d+)\uE000/g, (match, indexValue) => {
+      const idx = Number(indexValue);
+      const codeText = codeTokens[idx] || "";
+      return `<code>${codeText}</code>`;
+    });
+
+    return working;
+  };
+
+  const lines = escapeHtml(text).split(/\r?\n/);
+
+  const html = [];
+  const listStack = [];
+
+  let inParagraph = false;
+  let paragraphHasContent = false;
+  let inBlockquote = false;
+  let inCodeBlock = false;
+  let codeLang = "";
+  const codeBuffer = [];
+
+  const closeParagraph = () => {
+    if (inParagraph) {
+      html.push("</p>");
+      inParagraph = false;
+      paragraphHasContent = false;
+    }
+  };
+
+  const closeListsToIndent = (indent) => {
+    while (listStack.length && listStack[listStack.length - 1].indent > indent) {
+      const { type } = listStack.pop();
+      html.push(`</${type}>`);
+    }
+  };
+
+  const closeAllLists = () => {
+    closeListsToIndent(-1);
+  };
+
+  const ensureList = (type, indent) => {
+    const current = listStack[listStack.length - 1];
+    if (!current || current.indent < indent) {
+      html.push(`<${type}>`);
+      listStack.push({ type, indent });
+      return;
+    }
+    if (current.indent === indent && current.type !== type) {
+      html.push(`</${current.type}>`);
+      listStack.pop();
+      html.push(`<${type}>`);
+      listStack.push({ type, indent });
+    }
+  };
+
+  const flushCodeBlock = () => {
+    const code = codeBuffer.join("\n");
+    const languageClass = codeLang ? ` class="language-${codeLang}"` : "";
+    html.push(`<pre><code${languageClass}>${code}</code></pre>`);
+    codeBuffer.length = 0;
+    codeLang = "";
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    let line = lines[index];
+
+    if (inCodeBlock) {
+      if (/^\s*```/.test(line)) {
+        flushCodeBlock();
+        inCodeBlock = false;
+      } else {
+        codeBuffer.push(line);
+      }
+      continue;
+    }
+
+    const fenceMatch = line.match(/^\s*```(\w+)?\s*$/);
+    if (fenceMatch) {
+      closeParagraph();
+      closeAllLists();
+      const language = fenceMatch[1] ? fenceMatch[1].trim().toLowerCase() : "";
+      inCodeBlock = true;
+      codeLang = language;
+      continue;
+    }
+
+    if (line.trim() === "") {
+      closeParagraph();
+      continue;
+    }
+
+    const blockquoteMatch = line.match(/^\s*> ?(.*)$/);
+    if (blockquoteMatch) {
+      if (!inBlockquote) {
+        closeParagraph();
+        closeAllLists();
+        html.push("<blockquote>");
+        inBlockquote = true;
+      }
+      line = blockquoteMatch[1];
+    } else if (inBlockquote) {
+      closeParagraph();
+      closeAllLists();
+      html.push("</blockquote>");
+      inBlockquote = false;
+      index -= 1;
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      closeParagraph();
+      closeAllLists();
+      const level = headingMatch[1].length;
+      html.push(`<h${level}>${processInline(headingMatch[2].trim())}</h${level}>`);
+      continue;
+    }
+
+    const hrMatch = line.trim().match(/^([-*_])(?:\s*\1){2,}$/);
+    if (hrMatch) {
+      closeParagraph();
+      closeAllLists();
+      html.push("<hr />");
+      continue;
+    }
+
+    const listMatch = line.match(/^(\s*)([-+*]|\d+\.)\s+(.*)$/);
+    if (listMatch) {
+      const indent = listMatch[1].replace(/\t/g, "    ").length;
+      const marker = listMatch[2];
+      const content = listMatch[3];
+
+      closeParagraph();
+      closeListsToIndent(indent);
+
+      const type = marker.endsWith(".") ? "ol" : "ul";
+      ensureList(type, indent);
+
+      html.push("<li>");
+      html.push(processInline(content.trim()));
+      html.push("</li>");
+      continue;
+    }
+
+    if (listStack.length) {
+      closeParagraph();
+      closeAllLists();
+    }
+
+    if (!inParagraph) {
+      html.push("<p>");
+      inParagraph = true;
+      paragraphHasContent = false;
+    }
+
+    const content = processInline(line.trim());
+    if (paragraphHasContent && content) {
+      html.push(" ");
+    }
+    if (content) {
+      html.push(content);
+      paragraphHasContent = true;
+    }
+  }
+
+  if (inCodeBlock) {
+    flushCodeBlock();
+  }
+
+  closeParagraph();
+  closeAllLists();
+  if (inBlockquote) {
+    closeParagraph();
+    closeAllLists();
+    html.push("</blockquote>");
+  }
+
+  return html.join("");
 }
 let activePromptSuggestions = [...DEFAULT_PROMPT_SUGGESTIONS];
 const FOLLOW_UP_SUGGESTION_LIBRARY = {
