@@ -1,17 +1,5 @@
 const API_BASE = window.API_BASE || "";
-const STORAGE_KEY = "benchmarkos.chatHistory.v2";
-const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
-
-(function cleanupLegacyStorage() {
-  try {
-    if (!window || !window.localStorage) {
-      return;
-    }
-    LEGACY_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
-  } catch (error) {
-    console.warn("Unable to clear legacy chat storage", error);
-  }
-})();
+const STORAGE_KEY = "benchmarkos.chatHistory.v1";
 
 const chatLog = document.getElementById("chat-log");
 const chatForm = document.getElementById("chat-form");
@@ -2555,6 +2543,306 @@ async function renderFilingViewerSection({ container } = {}) {
   }
 }
 
+async function renderPortfolioManagementSection({ container } = {}) {
+  console.log("renderPortfolioManagementSection called with container:", container);
+  const root = container.querySelector("[data-role='portfolio-root']");
+  console.log("Found portfolio root:", root);
+  if (!root) {
+    console.error("Portfolio root element not found!");
+    return;
+  }
+
+  root.innerHTML = `
+    <div class="portfolio-management">
+      <div class="portfolio-tabs">
+        <button class="portfolio-tab active" data-tab="upload">Upload Portfolio</button>
+        <button class="portfolio-tab" data-tab="list">My Portfolios</button>
+      </div>
+      
+      <div class="portfolio-tab-content" data-tab-content="upload">
+        <section class="portfolio-upload-section">
+          <h3>Portfolio File</h3>
+          <form class="portfolio-upload-form" data-role="portfolio-upload-form">
+            <label class="portfolio-file-upload">
+              <input type="file" accept=".csv,.xlsx,.xls,.json" data-role="portfolio-file-input" />
+              <button type="button" class="portfolio-file-button">
+                Choose File
+              </button>
+              <span class="portfolio-file-name" data-role="portfolio-file-name">No file chosen</span>
+            </label>
+            <p class="portfolio-hint">Supported formats: CSV, Excel (.xlsx, .xls), JSON</p>
+            <button type="submit" class="portfolio-upload-btn">Upload Portfolio</button>
+            <div class="portfolio-format-info">
+              <p><strong>File Format:</strong> CSV/Excel should have columns: ticker, shares (optional), weight (optional), price (optional), date (optional)</p>
+              <p><strong>Example CSV:</strong></p>
+              <pre>ticker, shares, weight, price
+AAPL, 1000, 8.5, 175.50
+MSFT, 800, 10.0, 375.20</pre>
+            </div>
+          </form>
+          <div class="portfolio-status" data-role="portfolio-upload-status"></div>
+        </section>
+      </div>
+
+      <div class="portfolio-tab-content" data-tab-content="list" style="display: none;">
+        <section class="portfolio-list-section">
+          <div class="portfolio-list-header">
+            <h3>Your Portfolios</h3>
+            <button class="portfolio-refresh-btn" data-role="portfolio-refresh" title="Refresh list">
+              Refresh
+            </button>
+          </div>
+          <div class="portfolio-list" data-role="portfolio-list">
+            <div class="portfolio-loading">Loading portfolios...</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+
+  const uploadForm = root.querySelector("[data-role='portfolio-upload-form']");
+  const fileInput = root.querySelector("[data-role='portfolio-file-input']");
+  const fileName = root.querySelector("[data-role='portfolio-file-name']");
+  const uploadStatus = root.querySelector("[data-role='portfolio-upload-status']");
+  const portfolioList = root.querySelector("[data-role='portfolio-list']");
+  const refreshBtn = root.querySelector("[data-role='portfolio-refresh']");
+  const tabs = root.querySelectorAll(".portfolio-tab");
+  const tabContents = root.querySelectorAll(".portfolio-tab-content");
+
+  // Tab switching
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const tabName = tab.dataset.tab;
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      tabContents.forEach((content) => {
+        if (content.dataset.tabContent === tabName) {
+          content.style.display = "";
+        } else {
+          content.style.display = "none";
+        }
+      });
+    });
+  });
+
+  // File input change handler
+  if (fileInput) {
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        fileName.textContent = file.name;
+      } else {
+        fileName.textContent = "No file chosen";
+      }
+    });
+  }
+
+  // File button click handler
+  const fileButton = root.querySelector(".portfolio-file-button");
+  if (fileButton && fileInput) {
+    fileButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      fileInput.click();
+    });
+  }
+
+  // Upload form handler
+  if (uploadForm) {
+    uploadForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const file = fileInput?.files[0];
+      if (!file) {
+        showPortfolioStatus("Please select a file first.", "error", uploadStatus);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        showPortfolioStatus("Uploading portfolio...", "info", uploadStatus);
+        uploadForm.querySelector("button[type='submit']").disabled = true;
+
+        const response = await fetch("/api/portfolio/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showPortfolioStatus(`Portfolio uploaded successfully: ${result.portfolio_id}`, "success", uploadStatus);
+          fileInput.value = "";
+          fileName.textContent = "No file selected";
+          await loadPortfolioList();
+        } else {
+          const errors = result.errors || [result.message || "Upload failed"];
+          showPortfolioStatus(errors.join("; "), "error", uploadStatus);
+        }
+      } catch (error) {
+        showPortfolioStatus(`Upload failed: ${error.message}`, "error", uploadStatus);
+      } finally {
+        uploadForm.querySelector("button[type='submit']").disabled = false;
+      }
+    });
+  }
+
+  // Refresh button handler
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", async () => {
+      await loadPortfolioList();
+    });
+  }
+
+  // Load portfolio list
+  async function loadPortfolioList() {
+    try {
+      portfolioList.innerHTML = '<div class="portfolio-loading">Loading portfolios...</div>';
+      const response = await fetch("/api/portfolio/list");
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const portfolios = await response.json();
+
+      if (portfolios.length === 0) {
+        portfolioList.innerHTML = '<div class="portfolio-empty">No portfolios uploaded yet. Upload your first portfolio above!</div>';
+        return;
+      }
+
+      portfolioList.innerHTML = portfolios
+        .map(
+          (portfolio) => `
+          <div class="portfolio-item">
+            <div class="portfolio-item-info">
+              <h4 class="portfolio-item-name">${escapeHtml(portfolio.name || portfolio.portfolio_id)}</h4>
+              <div class="portfolio-item-meta">
+                <span class="portfolio-meta-item">ID: ${escapeHtml(portfolio.portfolio_id)}</span>
+                ${portfolio.base_currency ? `<span class="portfolio-meta-item">Currency: ${escapeHtml(portfolio.base_currency)}</span>` : ""}
+                ${portfolio.created_at ? `<span class="portfolio-meta-item">Created: ${formatDate(portfolio.created_at)}</span>` : ""}
+              </div>
+            </div>
+            <div class="portfolio-item-actions">
+              <button class="portfolio-view-btn" data-portfolio-id="${escapeHtml(portfolio.portfolio_id)}" title="View holdings">
+                View Holdings
+              </button>
+              <button class="portfolio-use-btn" data-portfolio-id="${escapeHtml(portfolio.portfolio_id)}" title="Use in chat">
+                Use in Chat
+              </button>
+              <button class="portfolio-delete-btn" data-portfolio-id="${escapeHtml(portfolio.portfolio_id)}" title="Delete portfolio">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Delete
+              </button>
+            </div>
+          </div>
+        `
+        )
+        .join("");
+
+      // Attach delete handlers
+      portfolioList.querySelectorAll(".portfolio-delete-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const portfolioId = btn.dataset.portfolioId;
+          if (!confirm(`Are you sure you want to delete portfolio "${portfolioId}"? This action cannot be undone.`)) {
+            return;
+          }
+
+          try {
+            btn.disabled = true;
+            const response = await fetch(`/api/portfolio/${portfolioId}`, {
+              method: "DELETE",
+            });
+
+            if (response.ok) {
+              showPortfolioStatus(`Portfolio ${portfolioId} deleted successfully.`, "success", uploadStatus);
+              await loadPortfolioList();
+            } else {
+              const error = await response.json();
+              showPortfolioStatus(`Delete failed: ${error.detail || error.message || "Unknown error"}`, "error", uploadStatus);
+            }
+          } catch (error) {
+            showPortfolioStatus(`Delete failed: ${error.message}`, "error", uploadStatus);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+
+      // Attach view holdings handlers
+      portfolioList.querySelectorAll(".portfolio-view-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const portfolioId = btn.dataset.portfolioId;
+          try {
+            const response = await fetch(`/api/portfolio/${portfolioId}/holdings`);
+            if (response.ok) {
+              const data = await response.json();
+              // Show holdings in a modal or alert for now
+              const holdingsText = data.holdings?.map(h => `${h.ticker || h.symbol}: ${h.shares || h.weight || 'N/A'}`).join('\n') || 'No holdings found';
+              alert(`Holdings for ${portfolioId}:\n\n${holdingsText}`);
+            } else {
+              alert(`Failed to load holdings for ${portfolioId}`);
+            }
+          } catch (error) {
+            alert(`Error: ${error.message}`);
+          }
+        });
+      });
+
+      // Attach use handlers
+      portfolioList.querySelectorAll(".portfolio-use-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const portfolioId = btn.dataset.portfolioId;
+          if (chatInput) {
+            chatInput.value = `Show my portfolio ${portfolioId} holdings`;
+            chatInput.focus();
+            closeUtilityPanel();
+            resetNavActive();
+          }
+        });
+      });
+    } catch (error) {
+      portfolioList.innerHTML = `<div class="portfolio-error">Failed to load portfolios: ${error.message}</div>`;
+    }
+  }
+
+  function showPortfolioStatus(message, type, statusEl) {
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    statusEl.className = `portfolio-status portfolio-status--${type}`;
+    setTimeout(() => {
+      statusEl.textContent = "";
+      statusEl.className = "portfolio-status";
+    }, 5000);
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function formatDate(dateString) {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return dateString;
+    }
+  }
+
+  // Initial load
+  try {
+    await loadPortfolioList();
+  } catch (error) {
+    console.error("Error loading portfolio list:", error);
+    if (portfolioList) {
+      portfolioList.innerHTML = `<div class="portfolio-error">Error loading portfolios: ${error.message}</div>`;
+    }
+  }
+}
+
 function renderSettingsSection({ container } = {}) {
   if (!container) {
     return;
@@ -2788,6 +3076,11 @@ const UTILITY_SECTIONS = {
     html: `<div class="settings-panel" data-role="settings-root"></div>`,
     render: renderSettingsSection,
   },
+  portfolio: {
+    title: "Portfolio Management",
+    html: `<div class="portfolio-management-panel" data-role="portfolio-root"></div>`,
+    render: renderPortfolioManagementSection,
+  },
 };
 
 function normaliseArtifacts(response) {
@@ -2967,7 +3260,7 @@ function renderMessageArtifacts(wrapper, artifacts) {
   const inlineDashboard = renderDashboardArtifact(artifacts.dashboard);
   const dashboardKind = artifacts.dashboard?.kind || "";
   const isInlineClassic =
-    inlineDashboard && (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare" || dashboardKind === "multi-classic" || dashboardKind === "multi-cfi-classic");
+    inlineDashboard && (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare" || dashboardKind === "multi-classic");
   if (inlineDashboard) {
     hasDashboard = true;
     body.append(inlineDashboard);
@@ -2977,7 +3270,7 @@ function renderMessageArtifacts(wrapper, artifacts) {
     }
   }
   const dashboard = createDashboardLayout(artifacts);
-  if (dashboard && dashboardKind !== "cfi-classic" && dashboardKind !== "multi-classic" && dashboardKind !== "multi-cfi-classic") {
+  if (dashboard && dashboardKind !== "cfi-classic" && dashboardKind !== "multi-classic") {
     hasDashboard = true;
     body.append(dashboard);
     if (artifacts.comparisonTable) {
@@ -3142,12 +3435,12 @@ function renderDashboardArtifact(descriptor) {
   const kind = descriptor.kind || "cfi-classic";
   const container = document.createElement("div");
   container.className = "message-dashboard";
-  if (kind === "cfi-classic" || kind === "cfi-compare" || kind === "multi-classic" || kind === "multi-cfi-classic") {
+  if (kind === "cfi-classic" || kind === "cfi-compare" || kind === "multi-classic") {
     container.classList.add("message-dashboard--cfi");
   }
   
-  // Handle multi-classic and multi-cfi-classic: render multiple single-company dashboards with company switcher
-  if ((kind === "multi-classic" || kind === "multi-cfi-classic") && descriptor.dashboards && Array.isArray(descriptor.dashboards)) {
+  // Handle multi-classic: render multiple single-company dashboards with dropdown selector
+  if (kind === "multi-classic" && descriptor.dashboards && Array.isArray(descriptor.dashboards)) {
     const multiContainer = document.createElement("div");
     multiContainer.className = "message-dashboard__multi";
     
@@ -3297,8 +3590,7 @@ function renderDashboardArtifact(descriptor) {
           const options = { 
             container: host,
             payload: dashboardItem.payload,
-            ticker: dashboardItem.ticker,
-            isMultiTicker: true  // Flag to indicate this is part of a multi-ticker dashboard
+            ticker: dashboardItem.ticker
           };
           await showCfiDashboard(options);
           
@@ -6357,10 +6649,14 @@ function resetNavActive() {
 
 function openUtilityPanel(key) {
   if (!utilityPanel || !utilityTitle || !utilityContent) {
+    console.warn("openUtilityPanel: utility panel elements not found");
     return;
   }
+  console.log("openUtilityPanel called with key:", key);
+  console.log("Available sections:", Object.keys(UTILITY_SECTIONS));
   const section = UTILITY_SECTIONS[key];
   if (!section) {
+    console.error("openUtilityPanel: section not found for key:", key);
     return;
   }
   currentUtilityKey = key;
@@ -6381,15 +6677,24 @@ function openUtilityPanel(key) {
   }
   if (typeof section.render === "function") {
     try {
+      console.log(`Calling render function for "${key}"`);
       const maybePromise = section.render({ container: utilityContent, key });
       if (maybePromise && typeof maybePromise.then === "function") {
-        maybePromise.catch((error) =>
-          console.warn(`Utility panel "${key}" render error:`, error)
-        );
+        maybePromise.catch((error) => {
+          console.error(`Utility panel "${key}" render error:`, error);
+          if (utilityContent) {
+            utilityContent.innerHTML = `<div class="utility-error">Error loading ${section.title}: ${error.message}</div>`;
+          }
+        });
       }
     } catch (error) {
-      console.warn(`Utility panel "${key}" render error:`, error);
+      console.error(`Utility panel "${key}" render error:`, error);
+      if (utilityContent) {
+        utilityContent.innerHTML = `<div class="utility-error">Error loading ${section.title}: ${error.message}</div>`;
+      }
     }
+  } else {
+    console.log(`No render function for "${key}", using static HTML`);
   }
   setActiveNav(`open-${key}`);
   if (["help", "kpi-library", "company-universe", "filing-viewer"].includes(key)) {
@@ -6455,8 +6760,10 @@ function clearConversationSearch({ hide = false } = {}) {
 
 function handleNavAction(action) {
   if (!action) {
+    console.warn("handleNavAction called with no action");
     return;
   }
+  console.log("handleNavAction called with:", action);
   if (action === "new-analysis") {
     closeUtilityPanel();
     clearConversationSearch({ hide: true });
@@ -6495,6 +6802,7 @@ function handleNavAction(action) {
   }
   if (action.startsWith("open-")) {
     const key = action.replace("open-", "");
+    console.log("Opening utility panel with key:", key);
     if (currentUtilityKey === key) {
       closeUtilityPanel();
       resetNavActive();
@@ -7138,10 +7446,86 @@ function renderPromptChips() {
   });
 }
 
-if (navItems && navItems.length) {
-  navItems.forEach((item) => {
-    item.addEventListener("click", () => handleNavAction(item.dataset.action));
+// Initialize navigation with event delegation
+console.log("=== INITIALIZING NAVIGATION ===");
+const sidebar = document.querySelector(".sidebar-nav") || document.querySelector(".sidebar");
+if (sidebar) {
+  console.log("Found sidebar, using event delegation");
+  sidebar.addEventListener("click", (e) => {
+    const navItem = e.target.closest(".nav-item");
+    if (navItem) {
+      const action = navItem.dataset.action;
+      if (action) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("=== NAV ITEM CLICKED (via delegation) ===");
+        console.log("Action:", action);
+        console.log("Item:", navItem);
+        handleNavAction(action);
+      }
+    }
   });
+  console.log("=== NAVIGATION INITIALIZED (event delegation) ===");
+} else {
+  console.warn("Sidebar not found, trying direct attachment");
+  // Fallback: direct attachment
+  const navItemsList = document.querySelectorAll(".nav-item");
+  console.log("Nav items found:", navItemsList ? navItemsList.length : 0);
+  if (navItemsList && navItemsList.length) {
+    navItemsList.forEach((item) => {
+      const action = item.dataset.action;
+      if (action) {
+        console.log(`Attaching listener to nav item: "${item.textContent?.trim()}" with action: "${action}"`);
+        item.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log("=== NAV ITEM CLICKED (direct) ===");
+          console.log("Action:", action);
+          handleNavAction(action);
+        });
+      }
+    });
+    console.log("=== NAVIGATION INITIALIZED (direct attachment) ===");
+  } else {
+    console.error("=== ERROR: No nav items found! ===");
+  }
+}
+
+// Also add a direct handler for portfolio button as a fallback
+function attachPortfolioHandler() {
+  const portfolioButton = document.querySelector('[data-action="open-portfolio"]');
+  if (portfolioButton) {
+    console.log("Found portfolio button, adding direct handler");
+    // Remove any existing listeners
+    const newBtn = portfolioButton.cloneNode(true);
+    portfolioButton.parentNode.replaceChild(newBtn, portfolioButton);
+    newBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Portfolio button clicked directly!");
+      handleNavAction("open-portfolio");
+    });
+    // Also try on the span elements inside
+    const spans = newBtn.querySelectorAll("span");
+    spans.forEach(span => {
+      span.style.pointerEvents = "none";
+    });
+  } else {
+    console.warn("Portfolio button not found!");
+  }
+}
+
+// Try immediately and after a delay
+attachPortfolioHandler();
+setTimeout(attachPortfolioHandler, 100);
+setTimeout(attachPortfolioHandler, 500);
+
+// Log available utility sections
+console.log("=== UTILITY SECTIONS ===");
+console.log("Available sections:", Object.keys(UTILITY_SECTIONS));
+console.log("Portfolio section exists:", "portfolio" in UTILITY_SECTIONS);
+if ("portfolio" in UTILITY_SECTIONS) {
+  console.log("Portfolio section:", UTILITY_SECTIONS.portfolio);
 }
 
 if (savedSearchTrigger) {

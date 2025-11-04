@@ -1263,6 +1263,2038 @@ async function renderCompanyUniverseSection({ container } = {}) {
 
 
 const HELP_PROMPTS = [
+  "What is Apple's revenue?",
+  "Show Microsoft's EBITDA margin",
+  "Why is Tesla's margin declining?",
+  "Compare AAPL and MSFT profitability",
+  "Is Tesla overvalued?",
+  "What's my portfolio exposure?",
+  "Show me a dashboard for Apple",
+  "What are the key risks for Tesla?",
+];
+
+const HELP_SECTIONS = [
+  {
+    icon: "📊",
+    title: "Company Metrics & Analysis",
+    command: "What is [TICKER]'s [metric]?",
+    purpose: "Get single metrics, trends, or comprehensive company analysis.",
+    examples: [
+      "What is Apple's revenue?",
+      "Show Microsoft's EBITDA margin",
+      "What's Tesla's free cash flow?",
+      "What is Google's net income?",
+      "Show NVDA's gross margin",
+      "What is META's return on equity?",
+      "Tell me about Amazon's balance sheet",
+      "What's Microsoft's P/E ratio?",
+    ],
+    delivers: "Direct answers, YoY growth, 3-5 year CAGRs, business drivers, SEC sources.",
+  },
+  {
+    icon: "🔍",
+    title: "Why Questions (Deep Analysis)",
+    command: "Why is [TICKER]'s [metric] [trend]?",
+    purpose: "Get multi-factor explanations for changes in financial metrics.",
+    examples: [
+      "Why is Tesla's margin declining?",
+      "Why is Apple's revenue growing?",
+      "Why is Microsoft more profitable?",
+      "Why did NVDA's stock price increase?",
+      "Why is Amazon investing more in CapEx?",
+      "Why is Google's margin expanding?",
+    ],
+    delivers: "Multi-factor analysis (3-5 reasons), quantified impacts, business context, forward outlook.",
+  },
+  {
+    icon: "⚖️",
+    title: "Comparisons",
+    command: "Compare [TICKER1] and [TICKER2] [metric]",
+    purpose: "Side-by-side analysis of companies, metrics, or performance.",
+    examples: [
+      "Compare AAPL and MSFT profitability",
+      "Is Apple more profitable than Microsoft?",
+      "Compare Tesla and Ford margins",
+      "Which is better: Apple or Microsoft?",
+      "Compare FAANG revenue growth",
+      "Compare valuation metrics for AAPL, MSFT, GOOGL",
+    ],
+    delivers: "Side-by-side metrics, percentage differences, rankings, performance indicators.",
+  },
+  {
+    icon: "💎",
+    title: "Valuation & Multiples",
+    command: "What's [TICKER]'s [valuation metric]?",
+    purpose: "Analyze valuation multiples, P/E ratios, and relative valuation.",
+    examples: [
+      "What's Apple's P/E ratio?",
+      "Is Tesla overvalued?",
+      "What multiples is Microsoft trading at?",
+      "Compare Apple's P/E to the S&P 500",
+      "What's Amazon's PEG ratio?",
+      "How does Tesla's valuation compare to Ford?",
+      "Compare valuation metrics for FAANG stocks",
+      "Which is cheaper: Apple or Microsoft?",
+    ],
+    delivers: "Valuation metrics, peer comparison, analyst target prices, historical multiples.",
+  },
+  {
+    icon: "💪",
+    title: "Financial Health & Risk",
+    command: "What's [TICKER]'s [risk/health metric]?",
+    purpose: "Assess balance sheet strength, leverage, and risk factors.",
+    examples: [
+      "What's Tesla's debt-to-equity ratio?",
+      "How leveraged is Apple?",
+      "What's Microsoft's net debt?",
+      "What are the key risks for Tesla?",
+      "Is Amazon's balance sheet strong?",
+      "How much cash does Apple have?",
+      "What's Apple's interest coverage ratio?",
+      "What could go wrong with Apple's business?",
+    ],
+    delivers: "Balance sheet metrics, leverage ratios, credit analysis, risk factors from 10-K.",
+  },
+  {
+    icon: "📈",
+    title: "Profitability & Margins",
+    command: "What's [TICKER]'s [margin metric]?",
+    purpose: "Analyze margins, profitability trends, and operating efficiency.",
+    examples: [
+      "What's Apple's gross margin?",
+      "What's Apple's gross margin trend?",
+      "Which is more profitable: Microsoft or Google?",
+      "What's driving Tesla's margin compression?",
+      "Compare EBITDA margins across FAANG",
+      "Show me Microsoft's operating margin",
+      "What's Amazon's profit margin?",
+    ],
+    delivers: "Margin breakdown, multi-year trends, peer comparison, drivers of margin changes.",
+  },
+  {
+    icon: "🚀",
+    title: "Growth & Performance",
+    command: "What's [TICKER]'s [growth metric]?",
+    purpose: "Analyze revenue growth, earnings growth, and growth outlook.",
+    examples: [
+      "Is Apple growing faster than Microsoft?",
+      "What's Tesla's revenue CAGR?",
+      "How fast is Amazon growing?",
+      "What's Apple's earnings growth?",
+      "What's the revenue forecast for Microsoft?",
+      "Which tech stock has the best growth trajectory?",
+      "Show me NVDA's 3-year revenue CAGR",
+    ],
+    delivers: "Historical growth rates (3-5 years), segment breakdown, growth drivers, analyst forecasts.",
+  },
+  {
+    icon: "💵",
+    title: "Cash Flow & Capital Allocation",
+    command: "What's [TICKER]'s [cash flow metric]?",
+    purpose: "Analyze cash generation, capital allocation, and shareholder returns.",
+    examples: [
+      "What's Apple's free cash flow?",
+      "How much cash does Microsoft generate?",
+      "How is Amazon allocating capital?",
+      "What's Microsoft's dividend yield?",
+      "Is Apple doing share buybacks?",
+      "Compare ROI across mega-cap tech",
+      "What's Tesla's cash burn rate?",
+    ],
+    delivers: "Cash flow statements, FCF trends, capex plans, dividend history, buyback programs.",
+  },
+  {
+    icon: "🎯",
+    title: "Investment Analysis",
+    command: "Should I invest in [TICKER]?",
+    purpose: "Get investment thesis, bull/bear cases, and recommendations.",
+    examples: [
+      "Should I invest in Apple or Microsoft?",
+      "What's the bull case for Tesla?",
+      "What's the bear case for Amazon?",
+      "Should I buy Apple stock?",
+      "What's the investment thesis for NVDA?",
+      "Is Microsoft a good investment?",
+    ],
+    delivers: "Bull/bear cases, investment thesis, analyst consensus, target prices, risk factors.",
+  },
+  {
+    icon: "📦",
+    title: "Portfolio Management",
+    command: "What's my portfolio [metric]?",
+    purpose: "Analyze portfolio holdings, exposure, and optimization.",
+    examples: [
+      "What's my portfolio exposure?",
+      "Show my portfolio holdings",
+      "Optimize my portfolio to maximize Sharpe",
+      "What if the market drops 20%?",
+      "Show my portfolio performance",
+      "Analyze my portfolio risk",
+      "What's my portfolio's sector allocation?",
+    ],
+    delivers: "Portfolio analysis, holdings breakdown, risk metrics, optimization suggestions.",
+  },
+  {
+    icon: "📊",
+    title: "Dashboards",
+    command: "Show me a dashboard for [TICKER]",
+    purpose: "Get interactive visualizations and comprehensive financial tables.",
+    examples: [
+      "Show me a dashboard for Apple",
+      "Dashboard AAPL",
+      "Show dashboard for Microsoft",
+      "Create a dashboard for Tesla",
+    ],
+    delivers: "Interactive charts, multi-year comparisons, comprehensive metrics table, downloadable data.",
+  },
+  {
+    icon: "🏭",
+    title: "Market Position & Competition",
+    command: "Who are [TICKER]'s competitors?",
+    purpose: "Analyze competitive landscape and market position.",
+    examples: [
+      "Who are Apple's main competitors?",
+      "Is Apple losing market share to Samsung?",
+      "What's Microsoft's competitive advantage?",
+      "Compare Tesla to traditional automakers",
+      "What's Amazon's market share?",
+    ],
+    delivers: "Competitor analysis, market share data, competitive advantages, industry positioning.",
+  },
+  {
+    icon: "📋",
+    title: "Sector & Industry Analysis",
+    command: "Compare [TICKER] to [sector/industry]",
+    purpose: "Benchmark companies against sector averages and industry peers.",
+    examples: [
+      "How does Apple compare to the technology sector?",
+      "Compare Tesla to the automotive sector",
+      "What's Microsoft's position in cloud computing?",
+      "Show me tech sector benchmarks",
+    ],
+    delivers: "Sector benchmarks, percentile rankings, industry averages, peer comparisons.",
+  },
+  {
+    icon: "🧾",
+    title: "SEC Filing Facts",
+    command: "Fact [TICKER] [YEAR] [metric]",
+    purpose: "Retrieve exactly what was reported in 10-K/10-Q filings.",
+    example: "Fact TSLA 2022 revenue",
+    delivers: "Original value, adjustment notes, and source reference.",
+  },
+  {
+    icon: "🧮",
+    title: "Scenario Modelling",
+    command: "Scenario [TICKER] [NAME] rev=+X% margin=+Y% mult=+Z",
+    purpose: "Run what-if cases for growth, margin shifts, or valuation moves.",
+    example: "Scenario NVDA Bull rev=+8% margin=+1.5% mult=+0.5",
+    delivers: "Projected revenue, margins, EPS/FCF change, implied valuation.",
+  },
+  {
+    icon: "⚙️",
+    title: "Data Management",
+    command: ["Ingest [TICKER] [years]", "Ingest status [TICKER]", "Audit [TICKER] [year]"],
+    purpose: "Refresh data, track ingestion progress, or review the audit log.",
+    examples: [
+      "Ingest META 5 — refreshes five fiscal years of filings and quotes.",
+      "Audit META 2023 — lists the latest import activity and KPI updates.",
+    ],
+  },
+];
+
+function getHelpContent() {
+  return {
+    prompts: HELP_PROMPTS,
+    sections: HELP_SECTIONS,
+    tips: HELP_TIPS,
+  };
+}
+
+let HELP_TIPS = [
+  // Intentionally empty; tips section removed.
+];
+
+let HELP_TEXT = composeHelpText(getHelpContent());
+let HELP_GUIDE_HTML = renderHelpGuide(getHelpContent()).outerHTML;
+
+function composeHelpText(content) {
+  const lines = [];
+  lines.push("📘 BenchmarkOS Copilot — Quick Reference", "", "How to ask:");
+  content.prompts.forEach((prompt) => lines.push(`• ${prompt}`));
+  lines.push("", "──────────────────────────────────────");
+
+  content.sections.forEach((section, index) => {
+    lines.push(`${section.icon} ${section.title.toUpperCase()}`);
+    if (Array.isArray(section.command)) {
+      section.command.forEach((entry, entryIndex) => {
+        const prefix = entryIndex === 0 ? "Command:" : "         ";
+        lines.push(`${prefix} ${entry}`);
+      });
+    } else {
+      lines.push(`Command: ${section.command}`);
+    }
+    if (section.purpose) {
+      lines.push(`Purpose: ${section.purpose}`);
+    }
+    if (section.example) {
+      lines.push(`Example: ${section.example}`);
+    }
+    if (section.delivers) {
+      lines.push(`Delivers: ${section.delivers}`);
+    }
+    if (section.examples && section.examples.length) {
+      lines.push("Examples:");
+      section.examples.forEach((example) => lines.push(`• ${example}`));
+    }
+    lines.push("");
+    if (index !== content.sections.length - 1) {
+      lines.push("──────────────────────────────────────");
+    }
+  });
+
+  if (content.tips && content.tips.length) {
+    lines.push("──────────────────────────────────────", "💡 Tips");
+    content.tips.forEach((tip) => lines.push(`• ${tip}`));
+  }
+
+  return lines.join("\n");
+}
+
+function renderHelpGuide(content) {
+  const article = document.createElement("article");
+  article.className = "help-guide";
+
+  const hero = document.createElement("header");
+  hero.className = "help-guide__hero";
+
+  const badge = document.createElement("span");
+  badge.className = "help-guide__badge";
+  badge.textContent = "📘";
+
+  const heroCopy = document.createElement("div");
+  heroCopy.className = "help-guide__hero-copy";
+
+  const title = document.createElement("h2");
+  title.className = "help-guide__title";
+  title.textContent = "BenchmarkOS Copilot — Quick Reference";
+
+  const subtitle = document.createElement("p");
+  subtitle.className = "help-guide__subtitle";
+  subtitle.textContent = "Ask natural prompts and I will translate them into institutional-grade analysis.";
+
+  const promptList = document.createElement("ul");
+  promptList.className = "help-guide__prompts";
+  content.prompts.forEach((prompt) => {
+    const item = document.createElement("li");
+    item.className = "help-guide__prompt";
+    item.textContent = prompt;
+    promptList.append(item);
+  });
+
+  heroCopy.append(title, subtitle, promptList);
+  hero.append(badge, heroCopy);
+  article.append(hero);
+
+  const sectionGrid = document.createElement("div");
+  sectionGrid.className = "help-guide__grid";
+
+  content.sections.forEach((section) => {
+    const card = document.createElement("section");
+    card.className = "help-guide__card";
+
+    const cardHeader = document.createElement("div");
+    cardHeader.className = "help-guide__card-header";
+
+    const icon = document.createElement("span");
+    icon.className = "help-guide__card-icon";
+    icon.textContent = section.icon;
+
+    const heading = document.createElement("h3");
+    heading.className = "help-guide__card-title";
+    heading.textContent = section.title;
+
+    cardHeader.append(icon, heading);
+    card.append(cardHeader);
+
+    appendHelpLine(card, "Command", section.command, { tokens: true });
+    appendHelpLine(card, "Purpose", section.purpose);
+    appendHelpLine(card, "Example", section.example);
+    appendHelpLine(card, "Delivers", section.delivers);
+
+    if (section.examples && section.examples.length) {
+      const examplesLabel = document.createElement("p");
+      examplesLabel.className = "help-guide__label help-guide__label--stack";
+      examplesLabel.textContent = "Examples";
+      card.append(examplesLabel);
+
+      const exampleList = document.createElement("ul");
+      exampleList.className = "help-guide__list";
+      section.examples.forEach((example) => {
+        const li = document.createElement("li");
+        li.textContent = example;
+        exampleList.append(li);
+      });
+      card.append(exampleList);
+    }
+
+    sectionGrid.append(card);
+  });
+
+  article.append(sectionGrid);
+
+  if (content.tips && content.tips.length) {
+    const tipsSection = document.createElement("section");
+    tipsSection.className = "help-guide__tips";
+
+    const tipsHeading = document.createElement("h3");
+    tipsHeading.className = "help-guide__tips-title";
+    tipsHeading.textContent = "💡 Tips";
+
+    const tipsList = document.createElement("ul");
+    tipsList.className = "help-guide__tips-list";
+    content.tips.forEach((tip) => {
+      const li = document.createElement("li");
+      li.textContent = tip;
+      tipsList.append(li);
+    });
+
+    tipsSection.append(tipsHeading, tipsList);
+    article.append(tipsSection);
+  }
+
+  return article;
+}
+
+function appendHelpLine(container, label, value, { tokens = false } = {}) {
+  if (!value) {
+    return;
+  }
+
+  const line = document.createElement("p");
+  line.className = "help-guide__line";
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "help-guide__label";
+  labelEl.textContent = `${label}`;
+  line.append(labelEl);
+
+  if (Array.isArray(value) || tokens) {
+    const values = Array.isArray(value) ? value : [value];
+    const tokenGroup = document.createElement("div");
+    tokenGroup.className = "help-guide__tokens";
+    values.forEach((token) => {
+      const pill = document.createElement("span");
+      pill.className = "help-guide__token";
+      pill.textContent = token;
+      tokenGroup.append(pill);
+    });
+    line.append(tokenGroup);
+  } else {
+    const valueEl = document.createElement("span");
+    valueEl.className = "help-guide__value";
+    valueEl.textContent = value;
+    line.append(valueEl);
+  }
+
+  container.append(line);
+}
+
+function refreshHelpArtifacts() {
+  HELP_TEXT = composeHelpText(getHelpContent());
+  HELP_GUIDE_HTML = renderHelpGuide(getHelpContent()).outerHTML;
+  if (UTILITY_SECTIONS.help) {
+    UTILITY_SECTIONS.help.html = HELP_GUIDE_HTML;
+  }
+  if (currentUtilityKey === "help" && utilityContent) {
+    utilityContent.innerHTML = HELP_GUIDE_HTML;
+  }
+}
+
+async function loadHelpContentOverrides() {
+  try {
+    const response = await fetch(`${API_BASE}/help-content`);
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    if (Array.isArray(data?.tips) && data.tips.length) {
+      const customTips = data.tips.map((tip) => `${tip}`.trim()).filter(Boolean);
+      if (customTips.length) {
+        HELP_TIPS = customTips;
+        refreshHelpArtifacts();
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to load help tip overrides:", error);
+  }
+}
+
+
+
+function formatDisplayDate(value) {
+  if (!value) {
+    return "";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return `${value}`;
+  }
+  return parsed.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function humaniseLabel(value) {
+  if (!value) {
+    return "";
+  }
+  return `${value}`
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function createList(items, className = "kpi-library__doc-list") {
+  const list = document.createElement("ul");
+  list.className = className;
+  (items || [])
+    .map((item) => (typeof item === "string" ? item.trim() : item))
+    .filter(Boolean)
+    .forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = `${item}`;
+      list.append(li);
+    });
+  return list;
+}
+
+function formatDirectionality(value) {
+  if (!value) {
+    return "";
+  }
+  const mapping = {
+    higher_is_better: "Higher is better",
+    lower_is_better: "Lower is better",
+    depends: "Depends",
+  };
+  return mapping[value] || humaniseLabel(value);
+}
+
+function formatPeriodLabel(value) {
+  if (!value) {
+    return "";
+  }
+  return `${value}`
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatTagName(tag) {
+  if (!tag) {
+    return "";
+  }
+  return `${tag}`
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatFriendlyInput(input) {
+  if (!input || typeof input !== "object") {
+    return "";
+  }
+  const label = input.tag ? formatTagName(input.tag) : formatTagName(input.source);
+  const statement = input.statement ? humaniseLabel(input.statement) : "";
+  const derived = input.source === "derived" ? " (Derived)" : "";
+  const base = label ? `${label}${derived}` : statement;
+  if (base && statement) {
+    return `${base} (${statement})`;
+  }
+  return base || statement || "";
+}
+
+function formatTechnicalInput(input) {
+  if (!input || typeof input !== "object") {
+    return "";
+  }
+  const segments = [];
+  if (input.source) {
+    segments.push(`[${input.source}]`);
+  }
+  if (input.tag) {
+    segments.push(input.tag);
+  }
+  if (input.statement) {
+    segments.push(`(${input.statement})`);
+  }
+  if (Array.isArray(input.components) && input.components.length) {
+    segments.push(`components: ${input.components.join(", ")}`);
+  }
+  if (Array.isArray(input.fallbacks) && input.fallbacks.length) {
+    segments.push(`fallbacks: ${input.fallbacks.join(", ")}`);
+  }
+  return segments.join(" ").trim();
+}
+
+function createMetaBadge(label, value, directionality = null) {
+  if (!value) {
+    return null;
+  }
+  const badge = document.createElement("span");
+  badge.className = "kpi-library__meta-pill";
+  
+  // Add color coding for directionality
+  if (label === "Direction" && directionality) {
+    const colorClass = getDirectionalityColor(directionality);
+    badge.classList.add(colorClass);
+  }
+  
+  badge.textContent = `${label}: ${value}`;
+  return badge;
+}
+
+function getDirectionalityColor(directionality) {
+  switch (directionality) {
+    case "higher_is_better":
+      return "kpi-library__meta-pill--positive";
+    case "lower_is_better":
+      return "kpi-library__meta-pill--negative";
+    case "depends":
+      return "kpi-library__meta-pill--neutral";
+    case "neutral":
+      return "kpi-library__meta-pill--neutral";
+    default:
+      return "";
+  }
+}
+
+function createDocSection(label, content, options = {}) {
+  if (
+    content === undefined ||
+    content === null ||
+    (typeof content === "string" && !content.trim())
+  ) {
+    return null;
+  }
+  if (Array.isArray(content)) {
+    const filtered = content.map((entry) => (entry ? `${entry}`.trim() : "")).filter(Boolean);
+    if (!filtered.length) {
+      return null;
+    }
+    content = filtered;
+  }
+
+  const section = document.createElement("section");
+  section.className = "kpi-library__doc-section";
+
+  const heading = document.createElement("h6");
+  heading.className = "kpi-library__doc-label";
+  heading.textContent = label;
+  section.append(heading);
+
+  if (options.type === "code") {
+    const block = document.createElement("pre");
+    block.className = "kpi-library__formula";
+    const code = document.createElement("code");
+    code.textContent = `${content}`;
+    block.append(code);
+    section.append(block);
+    return section;
+  }
+
+  if (Array.isArray(content)) {
+    section.append(createList(content, options.listClass || "kpi-library__doc-list"));
+    return section;
+  }
+
+  if (typeof content === "object") {
+    const entries = Object.entries(content).map(
+      ([key, value]) => `${humaniseLabel(key)}: ${value}`
+    );
+    section.append(createList(entries, options.listClass || "kpi-library__doc-list"));
+    return section;
+  }
+
+  const paragraph = document.createElement("p");
+  paragraph.className = "kpi-library__doc-text";
+  paragraph.textContent = `${content}`;
+  section.append(paragraph);
+  return section;
+}
+
+function buildTechnicalDetails(kpi) {
+  const lines = [];
+  (kpi.inputs || []).forEach((input) => {
+    const descriptor = formatTechnicalInput(input);
+    if (descriptor) {
+      lines.push(`Input: ${descriptor}`);
+    }
+  });
+
+  if (kpi.parameters && Object.keys(kpi.parameters).length) {
+    lines.push(`Parameters: ${JSON.stringify(kpi.parameters)}`);
+  }
+  if (kpi.presentation && Object.keys(kpi.presentation).length) {
+    lines.push(`Presentation: ${JSON.stringify(kpi.presentation)}`);
+  }
+  if (Array.isArray(kpi.dimensions_supported) && kpi.dimensions_supported.length) {
+    lines.push(`Dimensions: ${kpi.dimensions_supported.join(", ")}`);
+  }
+  if (kpi.quality_notes) {
+    lines.push(`Quality notes: ${kpi.quality_notes}`);
+  }
+
+  const detailLines = lines.filter(Boolean);
+  if (!detailLines.length) {
+    return null;
+  }
+
+  const container = document.createElement("div");
+  container.className = "kpi-library__tech";
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "kpi-library__tech-toggle";
+  toggle.textContent = "Show technical tags ▸";
+
+  const body = document.createElement("div");
+  body.className = "kpi-library__tech-body";
+  body.hidden = true;
+  body.append(createList(detailLines, "kpi-library__tech-list"));
+
+  toggle.addEventListener("click", () => {
+    const isOpen = !body.hidden;
+    if (isOpen) {
+      body.hidden = true;
+      toggle.textContent = "Show technical tags ▸";
+      toggle.classList.remove("is-open");
+    } else {
+      body.hidden = false;
+      toggle.textContent = "Hide technical tags ▾";
+      toggle.classList.add("is-open");
+    }
+  });
+
+  container.append(toggle);
+  container.append(body);
+  return container;
+}
+
+async function loadKpiLibraryData() {
+  if (kpiLibraryCache) {
+    return kpiLibraryCache;
+  }
+  if (kpiLibraryLoadPromise) {
+    return kpiLibraryLoadPromise;
+  }
+  kpiLibraryLoadPromise = fetch(KPI_LIBRARY_PATH, { cache: "no-store" })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`KPI library fetch failed (${response.status})`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      kpiLibraryCache = data;
+      return data;
+    })
+    .finally(() => {
+      kpiLibraryLoadPromise = null;
+    });
+  return kpiLibraryLoadPromise;
+}
+
+function buildKpiLibraryHero(data) {
+  const hero = document.createElement("section");
+  hero.className = "kpi-library__hero";
+
+  const badge = document.createElement("div");
+  badge.className = "kpi-library__badge";
+  badge.textContent = "📊";
+
+  const copy = document.createElement("div");
+  copy.className = "kpi-library__hero-copy";
+
+  const title = document.createElement("h3");
+  title.className = "kpi-library__title";
+  title.textContent = data.library_name || "KPI Library";
+
+  const subtitle = document.createElement("p");
+  subtitle.className = "kpi-library__subtitle";
+  subtitle.textContent =
+    "Standardised KPI definitions, formulas, and data lineage policies.";
+
+  const metaList = document.createElement("ul");
+  metaList.className = "kpi-library__meta";
+
+const API_BASE = window.API_BASE || "";
+const STORAGE_KEY = "benchmarkos.chatHistory.v2";
+const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
+
+(function cleanupLegacyStorage() {
+  try {
+    if (!window || !window.localStorage) {
+      return;
+    }
+    LEGACY_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+  } catch (error) {
+    console.warn("Unable to clear legacy chat storage", error);
+  }
+})();
+
+const chatLog = document.getElementById("chat-log");
+const chatForm = document.getElementById("chat-form");
+const chatInput = document.getElementById("chat-input");
+const sendButton = document.getElementById("send-button");
+const scrollBtn = document.getElementById("scrollBtn");
+const statusDot = document.getElementById("api-status");
+const statusMessage = document.getElementById("status-message");
+const conversationList = document.getElementById("conversation-list");
+const navItems = document.querySelectorAll(".nav-item");
+const promptSuggestionsContainer = document.getElementById("prompt-suggestions");
+const conversationExportButtons = document.querySelectorAll(".chat-export-btn");
+const auditDrawer = document.getElementById("audit-drawer");
+const auditDrawerList = document.getElementById("audit-drawer-list");
+const auditDrawerStatus = document.getElementById("audit-drawer-status");
+const auditDrawerTitle = document.getElementById("audit-drawer-title");
+const auditDrawerDetail = document.getElementById("audit-drawer-detail");
+const chatSearchContainer = document.getElementById("chat-search");
+const chatSearchInput = document.getElementById("chat-search-input");
+const chatSearchClear = document.getElementById("chat-search-clear");
+const utilityPanel = document.getElementById("utility-panel");
+const utilityTitle = document.getElementById("utility-title");
+const utilityContent = document.getElementById("utility-content");
+const introPanel = document.getElementById("chat-intro");
+const chatPanel = document.querySelector(".chat-panel");
+const chatFormContainer = document.getElementById("chat-form");
+const savedSearchTrigger = document.querySelector("[data-action='search-saved']");
+const archivedToggleButton = document.querySelector("[data-action='toggle-archived']");
+
+const STREAM_STEP_MS = 18;
+const STREAM_MIN_SLICE = 2;
+const STREAM_MAX_SLICE = 24;
+const DEFAULT_PROMPT_SUGGESTIONS = [
+  "Summarise Q3 performance for AAPL, MSFT, and NVDA with key KPIs.",
+  "Show revenue CAGR, ROIC, and FCF margin trends for semiconductor peers.",
+  "Which tracked tickers triggered alerts in the past week and why?"
+];
+
+/**
+ * Convert markdown text to HTML
+ * @param {string} text - Raw markdown text
+ * @returns {string} HTML string
+ */
+function renderMarkdown(text) {
+  if (!text) {
+    return "";
+  }
+
+  const escapeHtml = (value) =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  const escapeAttribute = (value) =>
+    value.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+  const processInline = (value) => {
+    if (!value) {
+      return "";
+    }
+
+    let working = value;
+
+    const codeTokens = [];
+    working = working.replace(/`([^`]+)`/g, (match, code) => {
+      codeTokens.push(code);
+      return `\uE000${codeTokens.length - 1}\uE000`;
+    });
+
+    working = working.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, textValue, urlValue) => {
+      const rawUrl = urlValue.trim();
+      if (!rawUrl) {
+        return textValue;
+      }
+      const safeUrl = escapeAttribute(rawUrl);
+      const href = /^([a-z][a-z\d+\-.]*:|\/\/)/i.test(safeUrl) ? safeUrl : `https://${safeUrl}`;
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${textValue}</a>`;
+    });
+
+    working = working.replace(
+      /(^|[\s>])((?:https?:\/\/|www\.)[^\s<]+)(?=$|[\s<])/gi,
+      (match, prefix, urlValue) => {
+        const safeUrl = escapeAttribute(urlValue);
+        const href = /^https?:\/\//i.test(safeUrl) ? safeUrl : `https://${safeUrl}`;
+        return `${prefix}<a href="${href}" target="_blank" rel="noopener noreferrer">${urlValue}</a>`;
+      }
+    );
+
+    working = working.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    working = working.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+    working = working.replace(/~~([^~]+)~~/g, "<del>$1</del>");
+    working = working.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    working = working.replace(/_([^_]+)_/g, "<em>$1</em>");
+
+    working = working.replace(/\uE000(\d+)\uE000/g, (match, indexValue) => {
+      const idx = Number(indexValue);
+      const codeText = codeTokens[idx] || "";
+      return `<code>${codeText}</code>`;
+    });
+
+    return working;
+  };
+
+  const lines = escapeHtml(text).split(/\r?\n/);
+
+  const html = [];
+  const listStack = [];
+
+  let inParagraph = false;
+  let paragraphHasContent = false;
+  let inBlockquote = false;
+  let inCodeBlock = false;
+  let codeLang = "";
+  const codeBuffer = [];
+
+  const closeParagraph = () => {
+    if (inParagraph) {
+      html.push("</p>");
+      inParagraph = false;
+      paragraphHasContent = false;
+    }
+  };
+
+  const closeListsToIndent = (indent) => {
+    while (listStack.length && listStack[listStack.length - 1].indent > indent) {
+      const { type } = listStack.pop();
+      html.push(`</${type}>`);
+    }
+  };
+
+  const closeAllLists = () => {
+    closeListsToIndent(-1);
+  };
+
+  const ensureList = (type, indent) => {
+    const current = listStack[listStack.length - 1];
+    if (!current || current.indent < indent) {
+      html.push(`<${type}>`);
+      listStack.push({ type, indent });
+      return;
+    }
+    if (current.indent === indent && current.type !== type) {
+      html.push(`</${current.type}>`);
+      listStack.pop();
+      html.push(`<${type}>`);
+      listStack.push({ type, indent });
+    }
+  };
+
+  const flushCodeBlock = () => {
+    const code = codeBuffer.join("\n");
+    const languageClass = codeLang ? ` class="language-${codeLang}"` : "";
+    html.push(`<pre><code${languageClass}>${code}</code></pre>`);
+    codeBuffer.length = 0;
+    codeLang = "";
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    let line = lines[index];
+
+    if (inCodeBlock) {
+      if (/^\s*```/.test(line)) {
+        flushCodeBlock();
+        inCodeBlock = false;
+      } else {
+        codeBuffer.push(line);
+      }
+      continue;
+    }
+
+    const fenceMatch = line.match(/^\s*```(\w+)?\s*$/);
+    if (fenceMatch) {
+      closeParagraph();
+      closeAllLists();
+      const language = fenceMatch[1] ? fenceMatch[1].trim().toLowerCase() : "";
+      inCodeBlock = true;
+      codeLang = language;
+      continue;
+    }
+
+    if (line.trim() === "") {
+      closeParagraph();
+      continue;
+    }
+
+    const blockquoteMatch = line.match(/^\s*> ?(.*)$/);
+    if (blockquoteMatch) {
+      if (!inBlockquote) {
+        closeParagraph();
+        closeAllLists();
+        html.push("<blockquote>");
+        inBlockquote = true;
+      }
+      line = blockquoteMatch[1];
+    } else if (inBlockquote) {
+      closeParagraph();
+      closeAllLists();
+      html.push("</blockquote>");
+      inBlockquote = false;
+      index -= 1;
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      closeParagraph();
+      closeAllLists();
+      const level = headingMatch[1].length;
+      html.push(`<h${level}>${processInline(headingMatch[2].trim())}</h${level}>`);
+      continue;
+    }
+
+    const hrMatch = line.trim().match(/^([-*_])(?:\s*\1){2,}$/);
+    if (hrMatch) {
+      closeParagraph();
+      closeAllLists();
+      html.push("<hr />");
+      continue;
+    }
+
+    const listMatch = line.match(/^(\s*)([-+*]|\d+\.)\s+(.*)$/);
+    if (listMatch) {
+      const indent = listMatch[1].replace(/\t/g, "    ").length;
+      const marker = listMatch[2];
+      const content = listMatch[3];
+
+      closeParagraph();
+      closeListsToIndent(indent);
+
+      const type = marker.endsWith(".") ? "ol" : "ul";
+      ensureList(type, indent);
+
+      html.push("<li>");
+      html.push(processInline(content.trim()));
+      html.push("</li>");
+      continue;
+    }
+
+    if (listStack.length) {
+      closeParagraph();
+      closeAllLists();
+    }
+
+    if (!inParagraph) {
+      html.push("<p>");
+      inParagraph = true;
+      paragraphHasContent = false;
+    }
+
+    const content = processInline(line.trim());
+    if (paragraphHasContent && content) {
+      html.push(" ");
+    }
+    if (content) {
+      html.push(content);
+      paragraphHasContent = true;
+    }
+  }
+
+  if (inCodeBlock) {
+    flushCodeBlock();
+  }
+
+  closeParagraph();
+  closeAllLists();
+  if (inBlockquote) {
+    closeParagraph();
+    closeAllLists();
+    html.push("</blockquote>");
+  }
+
+  return html.join("");
+}
+let activePromptSuggestions = [...DEFAULT_PROMPT_SUGGESTIONS];
+const FOLLOW_UP_SUGGESTION_LIBRARY = {
+  Growth: "Which peers are pacing the fastest quarter-over-quarter growth versus consensus?",
+  Revenue: "Break revenue down by segment with multi-year CAGR for each tracked ticker.",
+  Margin: "Compare gross and operating margins against peers over the trailing four quarters.",
+  Earnings: "Summarise EPS surprises and guidance changes across the peer set.",
+  "Cash Flow": "Analyse free-cash-flow conversion and working capital movements this year.",
+  Valuation: "Benchmark valuation multiples versus sector medians and the three-year average.",
+  Leverage: "Show leverage ratios and interest coverage versus covenant targets.",
+  Market: "Highlight market share shifts and relative price performance over the last month.",
+  Snapshot: "Generate a KPI snapshot that I can paste into an investment memo.",
+  KPI: "List the KPI definitions and calculation lineage referenced in this analysis."
+};
+const MAX_PROMPT_SUGGESTIONS = 5;
+const ALERT_PREFS_KEY = "benchmarkos.alertPreferences";
+const DEFAULT_ALERT_PREFERENCES = {
+  digest: "immediate",
+  quietHours: {
+    enabled: false,
+    start: "22:00",
+    end: "07:00",
+  },
+  types: {
+    filings: { enabled: true, mandatory: true },
+    metricDelta: { enabled: true, threshold: 10 },
+    dataQuality: { enabled: true },
+  },
+  channels: {
+    email: { enabled: true, address: "" },
+    slack: { enabled: false, webhook: "" },
+  },
+};
+const PREFERS_REDUCED_MOTION = (() => {
+  try {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  } catch (error) {
+    return false;
+  }
+})();
+
+const TICKER_STOPWORDS = new Set([
+  "THE",
+  "AND",
+  "WITH",
+  "KPI",
+  "EPS",
+  "ROE",
+  "FCF",
+  "PE",
+  "TSR",
+  "LTM",
+  "FY",
+  "API",
+  "DATA",
+  "THIS",
+  "THAT",
+  "YOY",
+  "TTM",
+  "GROWTH",
+  "METRIC",
+  "METRICS",
+  "SUMMARY",
+  "REPORT",
+  "SCENARIO",
+  "K",
+]);
+
+let reportMenu = null;
+let projectMenu = null;
+let activeMenuConversationId = null;
+let activeMenuAnchor = null;
+let shareModalBackdrop = null;
+let shareModalElement = null;
+let shareToggleInput = null;
+let shareStatusTextEl = null;
+let shareStatusSubTextEl = null;
+let shareLinkInput = null;
+let shareCopyButton = null;
+let sharePrimaryButton = null;
+let shareCancelButton = null;
+let shareModalConversationId = null;
+let toastContainer = null;
+const toastTimeouts = new Map();
+const PROMPT_CACHE_LIMIT = 32;
+const PROMPT_CACHE_TTL_MS = 3 * 60 * 1000;
+const promptCache = new Map();
+const topBar = document.querySelector(".top-bar");
+const PROGRESS_POLL_INTERVAL_MS = 750;
+const progressTrackers = new Map();
+
+// Rotating placeholder for hero (no chips)
+const PLACEHOLDERS = [
+  "Ask anything about tickers or metrics…",
+  "Compare two companies…",
+  "Request a KPI table or explain a metric…",
+];
+let placeholderTimer = null;
+let placeholderIndex = 0;
+let hasNewSinceScroll = false;
+let lastFocusedBeforeAudit = null;
+let auditAbortController = null;
+let auditDrawerEvents = [];
+let auditActiveEventIndex = -1;
+
+function startPlaceholderRotation() {
+  stopPlaceholderRotation();
+  if (!chatInput) {
+    return;
+  }
+  chatInput.placeholder = PLACEHOLDERS[0];
+  placeholderTimer = window.setInterval(() => {
+    if (!chatInput) {
+      return;
+    }
+    if (document.activeElement === chatInput) {
+      return; // don't rotate while typing/focused
+    }
+    if (chatInput.value && chatInput.value.trim().length > 0) {
+      return; // keep when user has typed
+    }
+    placeholderIndex = (placeholderIndex + 1) % PLACEHOLDERS.length;
+    chatInput.placeholder = PLACEHOLDERS[placeholderIndex];
+  }, 5000);
+}
+
+function stopPlaceholderRotation() {
+  if (placeholderTimer) {
+    window.clearInterval(placeholderTimer);
+    placeholderTimer = null;
+  }
+}
+
+// Textarea auto-grow: up to 4 lines, cap at 6 lines then scroll
+function autoResizeTextarea() {
+  if (!chatInput) return;
+  const style = window.getComputedStyle(chatInput);
+  const lineHeight = parseFloat(style.lineHeight) || 22;
+  const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  const minHeight = 48;
+  const maxAutoLines = 4;
+  const maxLines = 6;
+  chatInput.style.height = "auto";
+  const content = chatInput.scrollHeight;
+  const maxAuto = maxAutoLines * lineHeight + paddingY;
+  const hardMax = maxLines * lineHeight + paddingY;
+  const next = Math.min(Math.max(content, minHeight), hardMax);
+  chatInput.style.height = `${next}px`;
+  chatInput.style.overflowY = next >= hardMax ? "auto" : "hidden";
+}
+const COMPLETE_STAGE_HINTS = [
+  "_complete",
+  "_ready",
+  "cache_hit",
+  "cache_miss",
+  "cache_store",
+  "cache_skip",
+  "summary_cache_hit",
+  "summary_build_complete",
+  "context_sources_ready",
+  "context_sources_empty",
+  "summary_unavailable",
+  "finalize",
+  "help_complete",
+  "complete",
+];
+const PROGRESS_BLUEPRINT = [
+  {
+    key: "intent",
+    label: "Understand request",
+    matches(stage) {
+      if (!stage) {
+        return false;
+      }
+      return (
+        stage.startsWith("intent") ||
+        stage === "help_lookup" ||
+        stage === "help_complete"
+      );
+    },
+  },
+  {
+    key: "cache",
+    label: "Check recent answers",
+    matches(stage) {
+      if (!stage) {
+        return false;
+      }
+      return stage.startsWith("cache");
+    },
+  },
+  {
+    key: "context",
+    label: "Gather context",
+    matches(stage) {
+      if (!stage) {
+        return false;
+      }
+      return (
+        stage.startsWith("context") ||
+        stage.startsWith("summary") ||
+        stage.startsWith("metrics") ||
+        stage.startsWith("ticker")
+      );
+    },
+  },
+  {
+    key: "compose",
+    label: "Compose explanation",
+    matches(stage) {
+      if (!stage) {
+        return false;
+      }
+      return (
+        stage.startsWith("llm") ||
+        stage === "fallback" ||
+        stage === "finalize" ||
+        stage === "complete"
+      );
+    },
+  },
+];
+let companyUniverseData = [];
+let filteredCompanyData = [];
+let companyUniverseMetrics = null;
+let companyUniverseTable = null;
+let companyUniverseEmpty = null;
+let companyUniverseSkeleton = null;
+let companySearchInput = null;
+let companySectorSelect = null;
+let companyCoverageSelect = null;
+let companyUniverseMetaUniverse = null;
+let companyUniverseMetaSectors = null;
+let companyUniverseMetaLatest = null;
+let companyUniverseMetaCoverage = null;
+
+const KPI_LIBRARY_PATH = "/static/data/kpi_library.json";
+const COMPANY_UNIVERSE_PATH = "/static/data/company_universe.json";
+const SETTINGS_STORAGE_KEY = "benchmarkos.userSettings.v1";
+let kpiLibraryCache = null;
+let kpiLibraryLoadPromise = null;
+let companyUniversePromise = null;
+
+const METRIC_KEYWORD_MAP = [
+  { regex: /\bgrowth|cagr|yoy\b/i, label: "Growth" },
+  { regex: /\brevenue\b/i, label: "Revenue" },
+  { regex: /\bmargin\b/i, label: "Margin" },
+  { regex: /\bearnings|\beps\b/i, label: "Earnings" },
+  { regex: /\bcash\s*flow|\bcf\b/i, label: "Cash Flow" },
+  { regex: /\bvaluation|\bp\/?e\b|\bmultiple\b/i, label: "Valuation" },
+  { regex: /\bleverage|\bdebt\b/i, label: "Leverage" },
+  { regex: /\bsummary|\bmovers|\bmarket\b/i, label: "Market" },
+  { regex: /\bfact|\bsnapshot\b/i, label: "Snapshot" },
+  { regex: /\bmetric|\bkpi\b/i, label: "KPI" },
+];
+
+const RECENT_PROJECTS = ["Benchmark Coverage", "AI Research Notes", "Sector Watchlist"];
+const INTENT_LABELS = {
+  compare: "Comparison",
+  metric: "KPI Report",
+  fact: "Fact Sheet",
+  summarize: "Market Summary",
+  scenario: "Scenario Analysis",
+  insight: "Insight",
+};
+
+const DEFAULT_USER_SETTINGS = {
+  apiKey: "",
+  dataSources: {
+    edgar: true,
+    yahoo: true,
+    bloomberg: false,
+  },
+  refreshSchedule: "daily",
+  aiModel: "gpt-4o-mini",
+  exportFormats: {
+    pdf: true,
+    excel: true,
+    markdown: false,
+  },
+  locale: "en-US",
+  timezone: "UTC",
+  currency: "USD",
+  compliance: "standard",
+};
+
+function loadUserSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return JSON.parse(JSON.stringify(DEFAULT_USER_SETTINGS));
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_USER_SETTINGS,
+      ...parsed,
+      dataSources: {
+        ...DEFAULT_USER_SETTINGS.dataSources,
+        ...(parsed?.dataSources || {}),
+      },
+      exportFormats: {
+        ...DEFAULT_USER_SETTINGS.exportFormats,
+        ...(parsed?.exportFormats || {}),
+      },
+    };
+  } catch (error) {
+    console.warn("Unable to load user settings from storage", error);
+    return JSON.parse(JSON.stringify(DEFAULT_USER_SETTINGS));
+  }
+}
+
+function saveUserSettings(settings) {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch (error) {
+    console.error("Unable to persist user settings", error);
+    throw error;
+  }
+}
+
+function cloneAlertDefaults() {
+  try {
+    // structuredClone is not available in older browsers, fall back to JSON copy.
+    return typeof structuredClone === "function"
+      ? structuredClone(DEFAULT_ALERT_PREFERENCES)
+      : JSON.parse(JSON.stringify(DEFAULT_ALERT_PREFERENCES));
+  } catch (error) {
+    return JSON.parse(JSON.stringify(DEFAULT_ALERT_PREFERENCES));
+  }
+}
+
+function loadAlertPreferences() {
+  try {
+    const raw = localStorage.getItem(ALERT_PREFS_KEY);
+    if (!raw) {
+      return cloneAlertDefaults();
+    }
+    const parsed = JSON.parse(raw);
+    const defaults = cloneAlertDefaults();
+    return {
+      ...defaults,
+      ...parsed,
+      digest: parsed?.digest || defaults.digest,
+      quietHours: {
+        ...defaults.quietHours,
+        ...(parsed?.quietHours || {}),
+      },
+      types: {
+        ...defaults.types,
+        ...(parsed?.types || {}),
+      },
+      channels: {
+        ...defaults.channels,
+        ...(parsed?.channels || {}),
+      },
+    };
+  } catch (error) {
+    console.warn("Unable to load alert preferences from storage", error);
+    return cloneAlertDefaults();
+  }
+}
+
+function saveAlertPreferences(preferences) {
+  try {
+    localStorage.setItem(ALERT_PREFS_KEY, JSON.stringify(preferences));
+  } catch (error) {
+    console.error("Unable to persist alert preferences", error);
+    throw error;
+  }
+}
+
+function renderAlertPreview(previewEl, preferences) {
+  if (!previewEl) {
+    return;
+  }
+  const prefs = preferences || cloneAlertDefaults();
+  previewEl.innerHTML = "";
+
+  const heading = document.createElement("strong");
+  heading.textContent = "What you'll receive";
+  previewEl.append(heading);
+
+  const items = document.createElement("ul");
+  const activeTypes = [];
+  if (prefs.types.filings?.enabled) {
+    activeTypes.push("New SEC filing events for tracked tickers.");
+  }
+  if (prefs.types.metricDelta?.enabled) {
+    const threshold = Number(prefs.types.metricDelta.threshold) || DEFAULT_ALERT_PREFERENCES.types.metricDelta.threshold;
+    activeTypes.push(`Metric change alerts above ${threshold}% delta.`);
+  }
+  if (prefs.types.dataQuality?.enabled) {
+    activeTypes.push("Data quality failures or ingestion retries.");
+  }
+  if (!activeTypes.length) {
+    activeTypes.push("No proactive alerts are currently enabled.");
+  }
+  activeTypes.forEach((line) => {
+    const li = document.createElement("li");
+    li.textContent = line;
+    items.append(li);
+  });
+  previewEl.append(items);
+
+  const channels = [];
+  if (prefs.channels.email?.enabled) {
+    const address = prefs.channels.email.address || "Add an email address";
+    channels.push(`Email → ${address}`);
+  }
+  if (prefs.channels.slack?.enabled) {
+    channels.push("Slack webhook");
+  }
+  if (!channels.length) {
+    channels.push("No delivery channels enabled.");
+  }
+  const channelLine = document.createElement("p");
+  channelLine.textContent = `Channels: ${channels.join(", ")}`;
+  previewEl.append(channelLine);
+
+  const digestLabel = {
+    immediate: "Deliver immediately",
+    daily: "Daily digest (8:00 AM)",
+    weekly: "Weekly digest (Monday 8:00 AM)",
+  }[prefs.digest] || "Deliver immediately";
+
+  const digestLine = document.createElement("p");
+  digestLine.textContent = `Cadence: ${digestLabel}`;
+  previewEl.append(digestLine);
+
+  const quietLine = document.createElement("p");
+  quietLine.textContent = prefs.quietHours?.enabled
+    ? `Quiet hours: ${prefs.quietHours.start || "22:00"} – ${prefs.quietHours.end || "07:00"}`
+    : "Quiet hours disabled.";
+  previewEl.append(quietLine);
+}
+
+function renderAlertSettingsSection({ container } = {}) {
+  if (!container) {
+    return;
+  }
+
+  const preferences = loadAlertPreferences();
+  container.innerHTML = `
+    <form class="alert-settings" data-role="alert-settings-form" novalidate>
+      <fieldset class="alert-settings__section">
+        <legend>Alert types</legend>
+        <p class="alert-settings__description">Choose which events raise notifications for your workspace.</p>
+        <div class="alert-settings__grid">
+          <label class="alert-settings__toggle" data-role="alert-type-filings">
+            <input type="checkbox" name="alerts.filings" disabled />
+            <span>New SEC filing ingested</span>
+            <small>Mandatory for audit coverage.</small>
+          </label>
+          <label class="alert-settings__toggle">
+            <input type="checkbox" name="alerts.metricDelta" />
+            <span>Metric change above threshold</span>
+            <small>Triggered when KPI delta exceeds your configured limit.</small>
+          </label>
+          <label class="alert-settings__toggle">
+            <input type="checkbox" name="alerts.dataQuality" />
+            <span>Data quality issue detected</span>
+            <small>Heads-up when ingestion or QA checks fail.</small>
+          </label>
+        </div>
+        <div class="alert-settings__field">
+          <span>Metric delta threshold (%)</span>
+          <input
+            type="number"
+            name="alerts.metricDeltaThreshold"
+            min="1"
+            max="100"
+            step="1"
+            inputmode="numeric"
+            aria-describedby="metric-threshold-help"
+          />
+          <small id="metric-threshold-help" class="alert-settings__description">Alerts fire when absolute change exceeds this value.</small>
+        </div>
+      </fieldset>
+      <fieldset class="alert-settings__section">
+        <legend>Delivery channels</legend>
+        <p class="alert-settings__description">Route alerts to your preferred communication channels.</p>
+        <div class="alert-settings__channels">
+          <div class="alert-settings__channel" data-channel="email">
+            <label class="alert-settings__toggle">
+              <input type="checkbox" name="channel.email.enabled" />
+              <span>Email (SES)</span>
+              <small>Distribute alerts to analysts or coverage aliases.</small>
+            </label>
+            <div class="alert-settings__field">
+              <span>Email address</span>
+              <input type="email" name="channel.email.address" placeholder="name@company.com" autocomplete="email" />
+            </div>
+          </div>
+          <div class="alert-settings__channel" data-channel="slack">
+            <label class="alert-settings__toggle">
+              <input type="checkbox" name="channel.slack.enabled" />
+              <span>Slack webhook</span>
+              <small>Post alerts into a shared #benchmarkos channel.</small>
+            </label>
+            <div class="alert-settings__field">
+              <span>Webhook URL</span>
+              <input type="url" name="channel.slack.webhook" placeholder="https://hooks.slack.com/..." inputmode="url" />
+            </div>
+          </div>
+        </div>
+      </fieldset>
+      <fieldset class="alert-settings__section">
+        <legend>Cadence & quiet hours</legend>
+        <div class="alert-settings__grid">
+          <div class="alert-settings__field">
+            <span>Digest cadence</span>
+            <select name="alerts.digest">
+              <option value="immediate">Send immediately</option>
+              <option value="daily">Daily summary</option>
+              <option value="weekly">Weekly digest</option>
+            </select>
+          </div>
+          <div class="alert-settings__field">
+            <label class="alert-settings__toggle">
+              <input type="checkbox" name="alerts.quiet.enabled" />
+              <span>Respect quiet hours</span>
+              <small>Pause notifications between the times below.</small>
+            </label>
+            <div class="alert-settings__grid">
+              <div class="alert-settings__field">
+                <span>Quiet hours start</span>
+                <input type="time" name="alerts.quiet.start" />
+              </div>
+              <div class="alert-settings__field">
+                <span>Quiet hours end</span>
+                <input type="time" name="alerts.quiet.end" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+      <div class="alert-settings__actions">
+        <button type="submit">Save preferences</button>
+        <button type="button" data-role="alert-reset">Reset to defaults</button>
+      </div>
+      <p class="alert-settings__status" data-role="alert-status" aria-live="polite"></p>
+      <div class="alert-settings__preview" data-role="alert-preview"></div>
+    </form>
+  `;
+
+  const form = container.querySelector("[data-role='alert-settings-form']");
+  if (!form) {
+    return;
+  }
+
+  const statusEl = form.querySelector("[data-role='alert-status']");
+  const resetButton = form.querySelector("[data-role='alert-reset']");
+  const previewEl = form.querySelector("[data-role='alert-preview']");
+  const channelContainers = {
+    email: form.querySelector("[data-channel='email']"),
+    slack: form.querySelector("[data-channel='slack']"),
+  };
+
+  const controls = {
+    filings: form.querySelector("[name='alerts.filings']"),
+    metricDelta: form.querySelector("[name='alerts.metricDelta']"),
+    metricDeltaThreshold: form.querySelector("[name='alerts.metricDeltaThreshold']"),
+    dataQuality: form.querySelector("[name='alerts.dataQuality']"),
+    digest: form.querySelector("[name='alerts.digest']"),
+    quietEnabled: form.querySelector("[name='alerts.quiet.enabled']"),
+    quietStart: form.querySelector("[name='alerts.quiet.start']"),
+    quietEnd: form.querySelector("[name='alerts.quiet.end']"),
+    emailEnabled: form.querySelector("[name='channel.email.enabled']"),
+    emailAddress: form.querySelector("[name='channel.email.address']"),
+    slackEnabled: form.querySelector("[name='channel.slack.enabled']"),
+    slackWebhook: form.querySelector("[name='channel.slack.webhook']"),
+  };
+
+  const applyPreferences = (prefs) => {
+    controls.filings.checked = true;
+    controls.metricDelta.checked = Boolean(prefs.types.metricDelta?.enabled);
+    controls.metricDeltaThreshold.value = Number(prefs.types.metricDelta?.threshold ?? DEFAULT_ALERT_PREFERENCES.types.metricDelta.threshold);
+    controls.dataQuality.checked = Boolean(prefs.types.dataQuality?.enabled);
+    controls.digest.value = prefs.digest || DEFAULT_ALERT_PREFERENCES.digest;
+    controls.quietEnabled.checked = Boolean(prefs.quietHours?.enabled);
+    controls.quietStart.value = prefs.quietHours?.start || DEFAULT_ALERT_PREFERENCES.quietHours.start;
+    controls.quietEnd.value = prefs.quietHours?.end || DEFAULT_ALERT_PREFERENCES.quietHours.end;
+    controls.emailEnabled.checked = Boolean(prefs.channels.email?.enabled);
+    controls.emailAddress.value = prefs.channels.email?.address || "";
+    controls.slackEnabled.checked = Boolean(prefs.channels.slack?.enabled);
+    controls.slackWebhook.value = prefs.channels.slack?.webhook || "";
+    syncQuietHours();
+    syncChannelState();
+    syncMetricThresholdState();
+    renderAlertPreview(previewEl, prefs);
+  };
+
+  const clampThreshold = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return DEFAULT_ALERT_PREFERENCES.types.metricDelta.threshold;
+    }
+    return Math.min(100, Math.max(1, Math.round(numeric)));
+  };
+
+  const collectPreferences = () => {
+    const next = cloneAlertDefaults();
+    next.types.metricDelta.enabled = Boolean(controls.metricDelta.checked);
+    next.types.metricDelta.threshold = clampThreshold(controls.metricDeltaThreshold.value);
+    next.types.dataQuality.enabled = Boolean(controls.dataQuality.checked);
+    next.digest = controls.digest.value || DEFAULT_ALERT_PREFERENCES.digest;
+    next.quietHours.enabled = Boolean(controls.quietEnabled.checked);
+    next.quietHours.start = controls.quietStart.value || DEFAULT_ALERT_PREFERENCES.quietHours.start;
+    next.quietHours.end = controls.quietEnd.value || DEFAULT_ALERT_PREFERENCES.quietHours.end;
+    next.channels.email.enabled = Boolean(controls.emailEnabled.checked);
+    next.channels.email.address = controls.emailAddress.value.trim();
+    next.channels.slack.enabled = Boolean(controls.slackEnabled.checked);
+    next.channels.slack.webhook = controls.slackWebhook.value.trim();
+    controls.metricDeltaThreshold.value = next.types.metricDelta.threshold;
+    return next;
+  };
+
+  const showStatus = (message, tone = "info") => {
+    if (!statusEl) {
+      return;
+    }
+    statusEl.textContent = message;
+    statusEl.dataset.tone = tone;
+  };
+
+  const syncChannelState = () => {
+    const emailEnabled = Boolean(controls.emailEnabled?.checked);
+    const slackEnabled = Boolean(controls.slackEnabled?.checked);
+    if (controls.emailAddress) {
+      controls.emailAddress.disabled = !emailEnabled;
+    }
+    if (controls.slackWebhook) {
+      controls.slackWebhook.disabled = !slackEnabled;
+    }
+    if (channelContainers.email) {
+      channelContainers.email.classList.toggle("alert-settings__channel-disabled", !emailEnabled);
+    }
+    if (channelContainers.slack) {
+      channelContainers.slack.classList.toggle("alert-settings__channel-disabled", !slackEnabled);
+    }
+  };
+
+  const syncQuietHours = () => {
+    const enabled = Boolean(controls.quietEnabled?.checked);
+    if (controls.quietStart) {
+      controls.quietStart.disabled = !enabled;
+    }
+    if (controls.quietEnd) {
+      controls.quietEnd.disabled = !enabled;
+    }
+  };
+
+  const syncMetricThresholdState = () => {
+    if (!controls.metricDeltaThreshold) {
+      return;
+    }
+    const enabled = Boolean(controls.metricDelta?.checked);
+    controls.metricDeltaThreshold.disabled = !enabled;
+  };
+
+  applyPreferences(preferences);
+
+  controls.emailEnabled?.addEventListener("change", () => {
+    syncChannelState();
+    renderAlertPreview(previewEl, collectPreferences());
+  });
+  controls.slackEnabled?.addEventListener("change", () => {
+    syncChannelState();
+    renderAlertPreview(previewEl, collectPreferences());
+  });
+  controls.quietEnabled?.addEventListener("change", () => {
+    syncQuietHours();
+    renderAlertPreview(previewEl, collectPreferences());
+  });
+  controls.metricDelta?.addEventListener("change", () => {
+    syncMetricThresholdState();
+    renderAlertPreview(previewEl, collectPreferences());
+  });
+
+  form.addEventListener("input", (event) => {
+    if (event.target === controls.metricDeltaThreshold) {
+      controls.metricDeltaThreshold.value = controls.metricDeltaThreshold.value.slice(0, 3);
+    }
+    if (statusEl) {
+      statusEl.textContent = "";
+      delete statusEl.dataset.tone;
+    }
+    renderAlertPreview(previewEl, collectPreferences());
+  });
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const next = collectPreferences();
+    try {
+      saveAlertPreferences(next);
+      showStatus("Alert preferences saved.", "success");
+      renderAlertPreview(previewEl, next);
+    } catch (error) {
+      showStatus("Unable to save alert preferences. Try again.", "error");
+    }
+  });
+
+  resetButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    const defaults = cloneAlertDefaults();
+    applyPreferences(defaults);
+    try {
+      saveAlertPreferences(defaults);
+      showStatus("Alert preferences reset to defaults.", "success");
+    } catch (error) {
+      showStatus("Unable to reset alert preferences.", "error");
+    }
+    renderAlertPreview(previewEl, defaults);
+  });
+}
+
+function generateRequestId() {
+  if (window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  return `req_${Date.now().toString(16)}_${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function formatElapsed(milliseconds) {
+  if (typeof milliseconds !== "number" || Number.isNaN(milliseconds)) {
+    return null;
+  }
+  if (milliseconds < 1000) {
+    return `${Math.max(0, milliseconds).toFixed(0)} ms`;
+  }
+  if (milliseconds < 10000) {
+    return `${(milliseconds / 1000).toFixed(1)} s`;
+  }
+  return `${Math.round(milliseconds / 1000)} s`;
+}
+
+function createProgressSteps() {
+  return PROGRESS_BLUEPRINT.map(({ key, label }) => ({
+    key,
+    label,
+    status: "pending",
+    detail: "",
+    messages: [],
+  }));
+}
+
+function stepStatusFromStage(stage) {
+  if (!stage) {
+    return "pending";
+  }
+  if (stage === "error") {
+    return "error";
+  }
+  if (stage === "complete" || COMPLETE_STAGE_HINTS.some((hint) => stage.includes(hint))) {
+    return "complete";
+  }
+  return "active";
+}
+
+function findStepKeyForStage(stage) {
+  if (!stage) {
+    return null;
+  }
+  const match = PROGRESS_BLUEPRINT.find((entry) => entry.matches(stage));
+  return match ? match.key : null;
+}
+
+async function renderCompanyUniverseSection({ container } = {}) {
+  if (!container) {
+    return;
+  }
+
+  companyUniverseMetrics = null;
+  companyUniverseTable = null;
+  companyUniverseEmpty = null;
+  companySearchInput = null;
+  companySectorSelect = null;
+  companyCoverageSelect = null;
+  companyUniverseMetaUniverse = null;
+  companyUniverseMetaSectors = null;
+  companyUniverseMetaLatest = null;
+  companyUniverseMetaCoverage = null;
+
+  container.innerHTML = `
+    <div class="company-universe" role="region" aria-live="polite">
+      <section class="company-universe__hero">
+        <div class="company-universe__badge" aria-hidden="true">CU</div>
+        <div class="company-universe__hero-copy">
+          <h3 class="company-universe__title">Company Universe</h3>
+          <p class="company-universe__subtitle">
+            Explore coverage across every tracked company, segment results, and monitor ingestion progress inside this financial dataset view.
+          </p>
+          <p class="company-universe__context">Coverage includes all S&amp;P 500 firms and major tech leaders, refreshed weekly.</p>
+          <div class="company-universe__status">
+            <div class="company-universe__status-card" role="status">
+              <span class="company-universe__status-icon" aria-hidden="true">📈</span>
+              <div class="company-universe__status-text">
+                <span class="company-universe__status-label">Universe</span>
+                <span class="company-universe__status-value" data-role="company-universe-meta-universe">Loading...</span>
+              </div>
+            </div>
+            <div class="company-universe__status-card" role="status">
+              <span class="company-universe__status-icon" aria-hidden="true">🏭</span>
+              <div class="company-universe__status-text">
+                <span class="company-universe__status-label">Sectors</span>
+                <span class="company-universe__status-value" data-role="company-universe-meta-sectors">Loading...</span>
+              </div>
+            </div>
+            <div class="company-universe__status-card" role="status">
+              <span class="company-universe__status-icon" aria-hidden="true">🗓</span>
+              <div class="company-universe__status-text">
+                <span class="company-universe__status-label">Latest filing</span>
+                <span class="company-universe__status-value" data-role="company-universe-meta-latest">Loading...</span>
+              </div>
+            </div>
+            <div class="company-universe__status-card" role="status">
+              <span class="company-universe__status-icon" aria-hidden="true">✅</span>
+              <div class="company-universe__status-text">
+                <span class="company-universe__status-label">Coverage mix</span>
+                <span class="company-universe__status-value" data-role="company-universe-meta-coverage">Loading...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <div class="company-universe__controls">
+        <label class="sr-only" for="company-universe-search-input">Search companies</label>
+        <input
+          type="search"
+          id="company-universe-search-input"
+          data-role="company-universe-search"
+          placeholder="Search by company, ticker, or sector"
+          autocomplete="off"
+        />
+        <label class="sr-only" for="company-universe-sector-filter">Filter by sector</label>
+        <select id="company-universe-sector-filter" data-role="company-universe-sector">
+          <option value="">All sectors</option>
+        </select>
+        <label class="sr-only" for="company-universe-coverage-filter">Filter by coverage</label>
+        <select id="company-universe-coverage-filter" data-role="company-universe-coverage">
+          <option value="">All coverage</option>
+          <option value="complete">Complete coverage</option>
+          <option value="partial">Partial coverage</option>
+          <option value="missing">Missing coverage</option>
+        </select>
+      </div>
+      <div class="company-universe__legend" role="note" aria-label="Dataset cues">
+        <span class="company-universe__legend-title">Data cues</span>
+        <span class="company-universe__legend-item" title="Market cap benchmark"> 
+          <span class="company-universe__legend-dot company-universe__legend-dot--mega" aria-hidden="true"></span>
+          Market cap ≥ $1T
+        </span>
+        <span class="company-universe__legend-item" title="Filing recency benchmark">
+          <span class="company-universe__legend-dot company-universe__legend-dot--stale" aria-hidden="true"></span>
+          Filing > 180 days
+        </span>
+      </div>
+      <div class="company-universe__metrics" data-role="company-universe-metrics">
+        <div class="utility-loading">Loading coverage snapshot...</div>
+      </div>
+      <div class="company-universe__table-wrapper">
+        <table class="company-universe__table hidden" data-role="company-universe-table">
+          <thead>
+            <tr>
+              <th scope="col">Company</th>
+              <th scope="col">Ticker</th>
+              <th scope="col">Sector</th>
+              <th scope="col">Market cap</th>
+              <th scope="col">Latest filing</th>
+              <th scope="col">Coverage</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div class="company-universe__skeleton" data-role="company-universe-skeleton">
+          ${Array.from({ length: 6 })
+            .map(
+              () => `
+                <div class=\"company-universe__skeleton-row\">
+                  <span class=\"company-universe__skeleton-col\"></span>
+                  <span class=\"company-universe__skeleton-col\"></span>
+                  <span class=\"company-universe__skeleton-col\"></span>
+                  <span class=\"company-universe__skeleton-col\"></span>
+                  <span class=\"company-universe__skeleton-col\"></span>
+                  <span class=\"company-universe__skeleton-col\"></span>
+                </div>`
+            )
+            .join("")}
+        </div>
+        <p class="company-universe__empty hidden" data-role="company-universe-empty">
+          <span class="company-universe__empty-icon" aria-hidden="true">📊</span>
+          <span>No companies match your search. Adjust filters and try again.</span>
+        </p>
+      </div>
+    </div>
+  `;
+
+  companySearchInput = container.querySelector("[data-role='company-universe-search']");
+  companySectorSelect = container.querySelector("[data-role='company-universe-sector']");
+  companyCoverageSelect = container.querySelector("[data-role='company-universe-coverage']");
+  companyUniverseMetrics = container.querySelector("[data-role='company-universe-metrics']");
+  companyUniverseTable = container.querySelector("[data-role='company-universe-table']");
+  companyUniverseEmpty = container.querySelector("[data-role='company-universe-empty']");
+  companyUniverseSkeleton = container.querySelector("[data-role='company-universe-skeleton']");
+  companyUniverseMetaUniverse = container.querySelector("[data-role='company-universe-meta-universe']");
+  companyUniverseMetaSectors = container.querySelector("[data-role='company-universe-meta-sectors']");
+  companyUniverseMetaLatest = container.querySelector("[data-role='company-universe-meta-latest']");
+  companyUniverseMetaCoverage = container.querySelector("[data-role='company-universe-meta-coverage']");
+
+  if (companySearchInput) {
+    companySearchInput.value = "";
+    companySearchInput.addEventListener("input", applyCompanyUniverseFilters);
+  }
+  if (companySectorSelect) {
+    companySectorSelect.value = "";
+    companySectorSelect.addEventListener("change", applyCompanyUniverseFilters);
+  }
+  if (companyCoverageSelect) {
+    companyCoverageSelect.value = "";
+    companyCoverageSelect.addEventListener("change", applyCompanyUniverseFilters);
+  }
+  if (companyUniverseMetrics) {
+    companyUniverseMetrics.innerHTML = `<div class="utility-loading">Loading coverage snapshot...</div>`;
+  }
+  if (companyUniverseSkeleton) {
+    companyUniverseSkeleton.classList.remove("hidden");
+  }
+  if (companyUniverseEmpty) {
+    companyUniverseEmpty.classList.add("hidden");
+  }
+  if (companyUniverseTable) {
+    companyUniverseTable.classList.add("hidden");
+  }
+  if (companyUniverseEmpty) {
+    companyUniverseEmpty.classList.add("hidden");
+  }
+
+  try {
+    await loadCompanyUniverseData();
+    if (!container.isConnected) {
+      return;
+    }
+    applyCompanyUniverseFilters();
+    if (companySearchInput) {
+      companySearchInput.focus();
+      companySearchInput.select();
+    }
+  } catch (error) {
+    companyUniverseMetrics = null;
+    companyUniverseTable = null;
+    companyUniverseEmpty = null;
+    companySearchInput = null;
+    companySectorSelect = null;
+    companyCoverageSelect = null;
+    companyUniverseMetaUniverse = null;
+    companyUniverseMetaSectors = null;
+    companyUniverseMetaLatest = null;
+    companyUniverseMetaCoverage = null;
+    if (!container.isConnected) {
+      return;
+    }
+    container.innerHTML = `
+      <div class="utility-error">
+        <p>Unable to load the company universe right now. Please try again.</p>
+        <button type="button" class="utility-error__retry" data-action="retry-company-universe">Retry</button>
+      </div>
+    `;
+    const retryButton = container.querySelector("[data-action='retry-company-universe']");
+    if (retryButton) {
+      retryButton.addEventListener("click", () => {
+        renderCompanyUniverseSection({ container });
+      });
+    }
+  }
+}
+
+
+const HELP_PROMPTS = [
   "Show Apple KPIs for 2022–2024",
   "Compare Microsoft and Amazon in FY2023",
   "What was Tesla’s 2022 revenue?",

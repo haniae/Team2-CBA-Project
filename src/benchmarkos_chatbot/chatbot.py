@@ -40,6 +40,20 @@ from .dashboard_utils import (
 from .routing import enhance_structured_parse, should_build_dashboard, EnhancedIntent
 from .context_builder import build_financial_context
 
+# Portfolio module imports (combined portfolio.py)
+from .portfolio import (
+    validate_holdings,
+    enrich_holdings_with_fundamentals,
+    calculate_portfolio_statistics,
+    analyze_exposure,
+    brinson_attribution,
+    run_equity_drawdown_scenario,
+    run_sector_rotation_scenario,
+    run_custom_scenario,
+    generate_committee_brief,
+    EnrichedHolding,
+)
+
 LOGGER = logging.getLogger(__name__)
 
 # Enhanced Error Handling

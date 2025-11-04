@@ -96,9 +96,9 @@ def _format_billions(value: Optional[float]) -> Optional[float]:
     scaled = value / 1_000_000_000
     magnitude = abs(scaled)
     if magnitude >= 100:
-        return round(scaled)
+        return round(scaled, 2)
     if magnitude >= 10:
-        return round(scaled, 1)
+        return round(scaled, 2)
     return round(scaled, 2)
 
 
@@ -106,10 +106,10 @@ def _format_percent(value: Optional[float]) -> Optional[float]:
     """Convert fractional metrics into percentage values."""
     if value is None:
         return None
-    return round(value * 100, 1)
+    return round(value * 100, 2)
 
 
-def _format_number(value: Optional[float], decimals: int = 1) -> Optional[str]:
+def _format_number(value: Optional[float], decimals: int = 2) -> Optional[str]:
     """Format a float with trimmed trailing zeroes."""
     if value is None:
         return None
@@ -178,20 +178,20 @@ def _format_kpi_value(value: Optional[float], value_type: str) -> str:
         return "N/A"
     
     if value_type == "percent":
-        # Convert decimal to percentage (e.g., 0.12 -> 12.0%)
-        return f"{value * 100:.1f}%"
+        # Convert decimal to percentage (e.g., 0.12 -> 12.00%)
+        return f"{value * 100:.2f}%"
     elif value_type == "multiple":
-        # Format multiples with 2 decimal places (e.g., 1.5x)
+        # Format multiples with 2 decimal places (e.g., 1.50x)
         return f"{value:.2f}x"
     else:
         # Format large numbers with suffixes
         abs_value = abs(value)
         if abs_value >= 1_000_000_000:
-            return f"${value/1_000_000_000:.1f}B"
+            return f"${value/1_000_000_000:.2f}B"
         elif abs_value >= 1_000_000:
-            return f"${value/1_000_000:.1f}M"
+            return f"${value/1_000_000:.2f}M"
         elif abs_value >= 1_000:
-            return f"${value/1_000:.1f}K"
+            return f"${value/1_000:.2f}K"
         else:
             return f"${value:.2f}"
 
@@ -1287,14 +1287,14 @@ def build_cfi_compare_payload(
                 label = f"Revenue (FY{str(year)[-2:]} $B)"
             else:
                 label = "Revenue ($B)"
-            card[label] = _format_number(revenue_billions, 1)
+            card[label] = _format_number(revenue_billions, 2)
 
         net_margin_pct = _format_percent(_latest_metric_value(latest, "net_margin"))
         if net_margin_pct is not None:
-            card["Net margin"] = f"{_format_number(net_margin_pct, 1)}%"
+            card["Net margin"] = f"{_format_number(net_margin_pct, 2)}%"
         roe_pct = _format_percent(_latest_metric_value(latest, "return_on_equity", "roe"))
         if roe_pct is not None:
-            card["ROE"] = f"{_format_number(roe_pct, 1)}%"
+            card["ROE"] = f"{_format_number(roe_pct, 2)}%"
         pe_ratio = _latest_metric_value(latest, "pe_ratio")
         if pe_ratio is not None:
             card["P/E (ttm)"] = f"{_format_number(pe_ratio, 2)}×"
@@ -1304,13 +1304,13 @@ def build_cfi_compare_payload(
     bench_revenue = benchmark_metrics.get("revenue")
     bench_revenue_b = _format_billions(bench_revenue.value if bench_revenue and bench_revenue.value is not None else None)
     if bench_revenue_b is not None:
-        benchmark_card["Revenue (Avg $B)"] = _format_number(bench_revenue_b, 1)
+        benchmark_card["Revenue (Avg $B)"] = _format_number(bench_revenue_b, 2)
     bench_net_margin = _format_percent(_latest_metric_value(benchmark_metrics, "net_margin"))
     if bench_net_margin is not None:
-        benchmark_card["Net margin"] = f"{_format_number(bench_net_margin, 1)}%"
+        benchmark_card["Net margin"] = f"{_format_number(bench_net_margin, 2)}%"
     bench_roe = _format_percent(_latest_metric_value(benchmark_metrics, "return_on_equity"))
     if bench_roe is not None:
-        benchmark_card["ROE"] = f"{_format_number(bench_roe, 1)}%"
+        benchmark_card["ROE"] = f"{_format_number(bench_roe, 2)}%"
     bench_pe = _latest_metric_value(benchmark_metrics, "pe_ratio")
     if bench_pe is not None:
         benchmark_card["P/E (ttm)"] = f"{_format_number(bench_pe, 2)}×"

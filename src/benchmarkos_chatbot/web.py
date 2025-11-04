@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 import time
@@ -13,13 +14,16 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response
+LOGGER = logging.getLogger(__name__)
+
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import AnalyticsEngine, BenchmarkOSChatbot, database, load_settings
+from .document_processor import extract_text_from_file
 from .help_content import HELP_TEXT, get_help_metadata
 from .dashboard_utils import (
     _collect_series as _collect_series_util,
@@ -37,6 +41,126 @@ from .dashboard_utils import (
     build_cfi_compare_payload,
 )
 from .export_pipeline import generate_dashboard_export
+from .portfolio_ppt_builder import build_portfolio_powerpoint
+from .portfolio_export import build_portfolio_pdf, build_portfolio_excel
+from .portfolio_risk_metrics import (
+    calculate_cvar,
+    optimize_portfolio_cvar_constrained,
+    CVaRResult,
+    CVaROptimizationResult,
+)
+# TODO: These functions don't exist yet - need to implement or import from correct module
+# from .portfolio_scenarios_enhanced import (
+#     create_custom_scenario,
+#     run_geopolitical_scenario,
+#     run_sector_specific_shock,
+#     run_rate_term_structure_scenario,
+#     run_fx_exposure_stress_test,
+# )
+# TODO: These functions don't exist yet - need to implement or import from correct module
+# from .portfolio_optimizer_alternative import (
+#     optimize_portfolio_esg_constrained,
+#     analyze_esg_exposure,
+#     optimize_portfolio_tax_aware,
+#     calculate_tax_adjusted_returns,
+#     optimize_portfolio_tracking_error,
+#     optimize_portfolio_diversification,
+#     ESGExposureResult,
+#     ESGOptimizationResult,
+#     TaxOptimizationResult,
+# )
+from .portfolio_trades import (
+    generate_trade_list,
+    export_trade_list,
+    estimate_trade_costs,
+    analyze_trade_impact,
+    simulate_trade_execution,
+    TradeList,
+    TradeImpactResult,
+    PortfolioState,
+)
+# TODO: portfolio_report_builder doesn't exist - using portfolio_reporting instead
+# from .portfolio_report_builder import (
+#     create_custom_report,
+#     save_report_template,
+#     load_report_template,
+#     list_report_templates,
+#     export_interactive_charts,
+#     configure_report_branding,
+#     apply_branding_to_report,
+#     ReportConfig,
+#     ReportTemplate,
+#     BrandingConfig,
+# )
+# TODO: portfolio_data_enrichment doesn't exist yet
+# from .portfolio_data_enrichment import (
+#     enrich_with_alternative_data,
+#     get_sentiment_score,
+#     sync_brokerage_holdings,
+#     execute_trades_via_brokerage,
+#     EnrichedPortfolio,
+#     SyncResult,
+# )
+# TODO: portfolio_dashboard_custom doesn't exist yet
+# from .portfolio_dashboard_custom import (
+#     save_dashboard_layout,
+#     load_dashboard_layout,
+#     list_dashboard_layouts,
+#     save_user_preferences,
+#     load_user_preferences,
+#     DashboardLayout,
+#     UserPreferences,
+# )
+from .portfolio_enhancements import (
+    monte_carlo_portfolio_simulation,
+    MonteCarloResult,
+    # TODO: These functions don't exist yet - need to implement
+    # optimize_portfolio_multi_period,
+    # optimize_portfolio_risk_parity,
+    # run_comprehensive_stress_test,
+    # analyze_factor_attribution,
+    # backtest_portfolio_strategy,
+    # MultiPeriodOptimizationResult,
+    # RiskParityResult,
+    # StressTestResult,
+    # FactorAttributionResult,
+    # BacktestResult,
+)
+
+# Portfolio module imports (combined portfolio.py)
+from .portfolio import (
+    ingest_holdings_csv,
+    ingest_holdings_excel,
+    ingest_holdings_json,
+    parse_ips_json,
+    parse_ips_pdf,
+    save_portfolio_to_database,
+    save_policy_to_database,
+    validate_holdings,
+    enrich_holdings_with_fundamentals,
+    calculate_portfolio_statistics,
+    optimize_portfolio_sharpe,
+    PolicyConstraint,
+    OptimizationResult,
+    analyze_exposure,
+    brinson_attribution,
+    run_equity_drawdown_scenario,
+    run_sector_rotation_scenario,
+    run_custom_scenario,
+    generate_committee_brief,
+    calculate_covariance_matrix,
+    calculate_betas_batch,
+    calculate_expected_returns,
+    load_sp500_benchmark_weights,
+    EnrichedHolding,
+    # Error handling
+    PortfolioError,
+    InvalidHoldingsError,
+    OptimizationFailedError,
+    PolicyConstraintError,
+    PortfolioNotFoundError,
+    format_portfolio_error,
+)
 
 
 # ----- CORS / Static ----------------------------------------------------------
@@ -82,9 +206,11 @@ async def serve_index():
         content=content,
         media_type="text/html",
         headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
             "Pragma": "no-cache",
-            "Expires": "0"
+            "Expires": "0",
+            "ETag": f'"html-{int(time.time())}"',
+            "Last-Modified": "Thu, 01 Jan 1970 00:00:00 GMT"
         }
     )
 
@@ -123,6 +249,52 @@ async def serve_styles_css():
     return Response(
         content=content,
         media_type="text/css",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "ETag": f'"css-{int(time.time())}"',
+            "Last-Modified": "Thu, 01 Jan 1970 00:00:00 GMT"
+        }
+    )
+
+
+@app.get("/portfolio")
+async def serve_portfolio_dashboard():
+    """Serve portfolio_dashboard.html with no-cache headers."""
+    dashboard_path = PACKAGE_STATIC / "portfolio_dashboard.html" if PACKAGE_STATIC.exists() else FRONTEND_DIR / "portfolio_dashboard.html"
+    if not dashboard_path.exists():
+        raise HTTPException(status_code=404, detail="portfolio_dashboard.html not found")
+    
+    with open(dashboard_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    return Response(
+        content=content,
+        media_type="text/html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "ETag": f'"portfolio-{int(time.time())}"',
+            "Last-Modified": "Thu, 01 Jan 1970 00:00:00 GMT"
+        }
+    )
+
+
+@app.get("/static/portfolio_dashboard.js")
+async def serve_portfolio_dashboard_js():
+    """Serve portfolio_dashboard.js with no-cache headers."""
+    js_path = PACKAGE_STATIC / "portfolio_dashboard.js" if PACKAGE_STATIC.exists() else FRONTEND_DIR / "portfolio_dashboard.js"
+    if not js_path.exists():
+        raise HTTPException(status_code=404, detail="portfolio_dashboard.js not found")
+    
+    with open(js_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    return Response(
+        content=content,
+        media_type="application/javascript",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
@@ -294,6 +466,163 @@ class FilingFactsResponse(BaseModel):
     items: List[FilingFact]
     summary: FilingFactsSummary
 
+
+# ----- Portfolio API Models -----------------------------------------------------
+
+class PortfolioMetadata(BaseModel):
+    """Portfolio metadata response."""
+    portfolio_id: str
+    name: str
+    base_currency: str
+    benchmark_index: Optional[str] = None
+    strategy_type: Optional[str] = None
+    created_at: str
+
+
+class PortfolioHolding(BaseModel):
+    """Single portfolio holding with enrichment."""
+    ticker: str
+    weight: Optional[float] = None
+    shares: Optional[float] = None
+    price: Optional[float] = None
+    market_value: Optional[float] = None
+    sector: Optional[str] = None
+    pe_ratio: Optional[float] = None
+    dividend_yield: Optional[float] = None
+    roe: Optional[float] = None
+    roic: Optional[float] = None
+
+
+class PortfolioHoldingsResponse(BaseModel):
+    """Response with portfolio holdings."""
+    portfolio_id: str
+    name: str
+    holdings: List[PortfolioHolding]
+
+
+class PolicyConstraintResponse(BaseModel):
+    """Policy constraint response."""
+    constraint_id: str
+    type: str
+    dimension: Optional[str] = None
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+    target_value: Optional[float] = None
+    unit: str
+    active: bool
+
+
+class PortfolioConstraintsResponse(BaseModel):
+    """Response with portfolio constraints."""
+    portfolio_id: str
+    constraints: List[PolicyConstraintResponse]
+
+
+class ExposureResponse(BaseModel):
+    """Portfolio exposure response."""
+    portfolio_id: str
+    snapshot_date: str
+    sector_exposure: Dict[str, float]
+    factor_exposure: Dict[str, float]
+    concentration_metrics: Dict[str, float]
+
+
+class PortfolioSummaryResponse(BaseModel):
+    """Portfolio summary statistics."""
+    portfolio_id: str
+    name: str
+    num_holdings: int
+    total_market_value: Optional[float] = None
+    weighted_avg_pe: Optional[float] = None
+    weighted_avg_dividend_yield: Optional[float] = None
+    top_10_concentration: Optional[float] = None
+    num_sectors: int
+    sector_breakdown: Dict[str, float]
+
+
+class OptimizationRequest(BaseModel):
+    """Request body for portfolio optimization."""
+    objective: str = "maximize_sharpe"  # maximize_sharpe, minimize_tracking_error, maximize_return
+    turnover_limit: Optional[float] = None
+    constraints_override: Optional[List[Dict[str, Any]]] = None
+
+
+class Trade(BaseModel):
+    """Proposed trade."""
+    ticker: str
+    action: str  # buy, sell, hold
+    from_weight: Optional[float] = None
+    to_weight: Optional[float] = None
+    shares: Optional[float] = None
+
+
+class OptimizationResponse(BaseModel):
+    """Portfolio optimization response."""
+    portfolio_id: str
+    status: str
+    proposed_trades: List[Trade]
+    objective_value: Optional[float] = None
+    metrics_before: Dict[str, float]
+    metrics_after: Dict[str, float]
+    policy_flags: List[str] = []
+
+
+class AttributionRequest(BaseModel):
+    """Request for attribution analysis."""
+    start_date: str
+    end_date: str
+
+
+class AttributionResponse(BaseModel):
+    """Portfolio attribution response."""
+    portfolio_id: str
+    start_date: str
+    end_date: str
+    total_active_return: float
+    allocation_effect: Dict[str, float]
+    selection_effect: Dict[str, float]
+    interaction_effect: Dict[str, float]
+    top_contributors: List[Dict[str, Any]]
+    top_detractors: List[Dict[str, Any]]
+
+
+class ScenarioRequest(BaseModel):
+    """Request for scenario analysis."""
+    scenario_type: str  # equity_drawdown, sector_rotation, custom
+    parameters: Dict[str, Any]
+
+
+class ScenarioResponse(BaseModel):
+    """Scenario analysis response."""
+    portfolio_id: str
+    scenario_type: str
+    portfolio_return: float
+    portfolio_value_change: float
+    pnl_attribution: Dict[str, float]
+    top_gainers: List[Dict[str, Any]]
+    top_losers: List[Dict[str, Any]]
+    risk_metrics: Dict[str, float]
+
+
+class UploadResponse(BaseModel):
+    """Response for portfolio upload."""
+    success: bool
+    portfolio_id: Optional[str] = None
+    portfolio_name: Optional[str] = None
+    num_holdings: Optional[int] = None
+    errors: List[str] = []
+    warnings: List[str] = []
+
+
+class DocumentUploadResponse(BaseModel):
+    """Response for document upload."""
+    success: bool
+    document_id: Optional[str] = None
+    filename: Optional[str] = None
+    file_type: Optional[str] = None
+    content_preview: Optional[str] = None
+    errors: List[str] = []
+
 # ----- Dependencies / Singletons ---------------------------------------------
 
 @lru_cache
@@ -308,6 +637,12 @@ def get_engine() -> AnalyticsEngine:
     engine = AnalyticsEngine(get_settings())
     engine.refresh_metrics()
     return engine
+
+
+@lru_cache
+def get_database() -> Path:
+    """Get database path from settings."""
+    return get_settings().database_path
 
 
 def build_bot(conversation_id: Optional[str] = None) -> BenchmarkOSChatbot:
@@ -1299,4 +1634,2407 @@ def audit(
     ]
     display_symbol = requested or _display_ticker_symbol(canonical or _normalise_ticker_symbol(ticker))
     return AuditEventResponse(ticker=display_symbol, events=payload)
+
+
+# ----- Portfolio API Endpoints --------------------------------------------------
+
+@app.post("/api/portfolio/upload", response_model=UploadResponse)
+async def portfolio_upload(file: UploadFile = File(...)) -> UploadResponse:
+    """Upload portfolio holdings from CSV, Excel, or JSON file."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Create temporary file
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
+        content = await file.read()
+        tmp_file.write(content)
+        tmp_path = Path(tmp_file.name)
+    
+    try:
+        # Determine file type and parse
+        file_ext = Path(file.filename).suffix.lower()
+        if file_ext == ".csv":
+            holdings = ingest_holdings_csv(tmp_path)
+        elif file_ext in [".xlsx", ".xls"]:
+            holdings = ingest_holdings_excel(tmp_path)
+        elif file_ext == ".json":
+            holdings = ingest_holdings_json(tmp_path)
+        else:
+            return UploadResponse(
+                success=False,
+                errors=[f"Unsupported file type: {file_ext}. Supported: .csv, .xlsx, .xls, .json"]
+            )
+        
+        # Validate holdings
+        portfolio_id = f"port_{uuid.uuid4().hex[:8]}"
+        portfolio_name = Path(file.filename).stem
+        
+        if not holdings:
+            return UploadResponse(
+                success=False,
+                errors=["No holdings found in file. Please check the file format."]
+            )
+        
+        validation = validate_holdings(holdings, portfolio_id=portfolio_id, base_currency="USD")
+        
+        if not validation.is_valid:
+            # Use PortfolioError for better error messages
+            error_response = format_portfolio_error(
+                InvalidHoldingsError(
+                    "Holdings validation failed. Please check the file format and data.",
+                    errors=validation.errors,
+                    warnings=validation.warnings
+                ),
+                include_technical=False
+            )
+            return UploadResponse(
+                success=False,
+                errors=[error_response["message"]] + validation.errors,
+                warnings=validation.warnings
+            )
+        
+        if not validation.normalized_holdings:
+            error_response = format_portfolio_error(
+                InvalidHoldingsError(
+                    "No valid holdings found after validation. All holdings were filtered out."
+                )
+            )
+            return UploadResponse(
+                success=False,
+                errors=[error_response["message"]],
+                warnings=validation.warnings
+            )
+        
+        # Save to database
+        try:
+            save_portfolio_to_database(
+                db_path,
+                portfolio_id,
+                portfolio_name,
+                "USD",
+                validation.normalized_holdings,
+            )
+        except Exception as save_error:
+            error_msg = str(save_error)
+            LOGGER.error(f"Failed to save portfolio {portfolio_id}: {error_msg}", exc_info=True)
+            
+            # Provide more helpful error messages
+            if "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
+                error_detail = f"Portfolio with this name already exists. Please use a different name or delete the existing portfolio first."
+            elif "database" in error_msg.lower() or "connection" in error_msg.lower():
+                error_detail = f"Database connection issue. Please try again in a moment. Error: {error_msg}"
+            elif "validation" in error_msg.lower():
+                error_detail = f"Data validation failed: {error_msg}. Please check your file format and try again."
+            else:
+                error_detail = f"Failed to save portfolio to database: {error_msg}. Please check the file format and try again."
+            
+            return UploadResponse(
+                success=False,
+                errors=[error_detail]
+            )
+        
+        return UploadResponse(
+            success=True,
+            portfolio_id=portfolio_id,
+            portfolio_name=portfolio_name,
+            num_holdings=len(validation.normalized_holdings),
+            warnings=validation.warnings
+        )
+    except InvalidHoldingsError as e:
+        LOGGER.error(f"Invalid holdings error: {e.message}", exc_info=True)
+        error_response = format_portfolio_error(e)
+        return UploadResponse(
+            success=False,
+            errors=[error_response["message"]] + error_response.get("validation_errors", []),
+            warnings=error_response.get("validation_warnings", [])
+        )
+    except PortfolioError as e:
+        LOGGER.error(f"Portfolio error: {e.message}", exc_info=True)
+        error_response = format_portfolio_error(e)
+        return UploadResponse(
+            success=False,
+            errors=[error_response["message"]]
+        )
+    except Exception as e:
+        error_msg = str(e)
+        LOGGER.error(f"Portfolio upload error: {error_msg}", exc_info=True)
+        
+        # Provide more helpful error messages based on error type
+        if "parsing" in error_msg.lower() or "parse" in error_msg.lower():
+            error_detail = f"Unable to parse file. Please check that the file is a valid CSV, Excel, or JSON format. Error: {error_msg}"
+        elif "columns" in error_msg.lower() or "required" in error_msg.lower():
+            error_detail = f"File is missing required columns. Please ensure your file has at least a 'ticker' column. Error: {error_msg}"
+        elif "empty" in error_msg.lower():
+            error_detail = "File appears to be empty or contains no valid holdings data."
+        elif "permission" in error_msg.lower() or "access" in error_msg.lower():
+            error_detail = "File access denied. Please check file permissions and try again."
+        elif "size" in error_msg.lower() or "too large" in error_msg.lower():
+            error_detail = "File is too large. Please ensure the file is under 10MB."
+        else:
+            error_detail = f"Error processing file: {error_msg}. Please verify the file format and try again."
+        
+        return UploadResponse(
+            success=False,
+            errors=[error_detail]
+        )
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+@app.post("/api/documents/upload", response_model=DocumentUploadResponse)
+async def document_upload(
+    file: UploadFile = File(...),
+    conversation_id: Optional[str] = Form(None)
+) -> DocumentUploadResponse:
+    """
+    Upload any document type and extract text for chatbot to use.
+    Accepts all file types: PDF, Word, TXT, CSV, Excel, JSON, code files, etc.
+    """
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Create temporary file
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
+        content = await file.read()
+        tmp_file.write(content)
+        tmp_path = Path(tmp_file.name)
+        file_size = len(content)
+    
+    try:
+        # Log file info for debugging
+        LOGGER.info(f"Processing uploaded file: {file.filename}, size: {file_size} bytes")
+        
+        # Extract text from file
+        try:
+            extracted_text, file_type = extract_text_from_file(tmp_path, file.filename)
+            LOGGER.info(f"File type detected: {file_type}, extracted text length: {len(extracted_text) if extracted_text else 0}")
+        except Exception as extract_error:
+            LOGGER.error(f"Error during text extraction: {extract_error}", exc_info=True)
+            extracted_text = None
+            file_type = None
+        
+        if not extracted_text:
+            if file_type == 'image':
+                return DocumentUploadResponse(
+                    success=False,
+                    errors=["Image files are not yet supported. Please upload text-based documents (PDF, Word, TXT, etc.)"]
+                )
+            elif file_type == 'unknown' or not file_type:
+                # Try to extract as binary/text anyway
+                LOGGER.info(f"Attempting fallback text extraction for {file.filename}")
+                try:
+                    with open(tmp_path, 'rb') as f:
+                        content = f.read()
+                    # Try to decode as text
+                    try:
+                        text_content = content.decode('utf-8', errors='replace')
+                        if text_content.strip() and len(text_content.strip()) > 10:
+                            extracted_text = text_content
+                            file_type = 'text'
+                            LOGGER.info(f"Successfully extracted text from unknown file type as plain text ({len(text_content)} chars)")
+                    except Exception as e:
+                        LOGGER.debug(f"UTF-8 decode failed: {e}")
+                        # Try other encodings
+                        for encoding in ['latin-1', 'cp1252', 'iso-8859-1']:
+                            try:
+                                text_content = content.decode(encoding, errors='replace')
+                                if text_content.strip() and len(text_content.strip()) > 10:
+                                    extracted_text = text_content
+                                    file_type = 'text'
+                                    LOGGER.info(f"Successfully extracted text using {encoding} encoding")
+                                    break
+                            except:
+                                continue
+                except Exception as e:
+                    LOGGER.error(f"Fallback extraction failed: {e}")
+                
+                if not extracted_text:
+                    return DocumentUploadResponse(
+                        success=False,
+                        errors=[f"Unable to extract text from {file.filename}. Supported formats: PDF, Word (.docx), TXT, CSV, Excel (.xlsx/.xls), JSON, and code files. Error: Could not read file content. Make sure the file is not corrupted or password-protected."]
+                    )
+            else:
+                # Try one more fallback - read as text
+                LOGGER.info(f"Attempting text fallback for {file_type} file: {file.filename}")
+                try:
+                    from .document_processor import extract_text_from_txt
+                    fallback_text = extract_text_from_txt(tmp_path)
+                    if fallback_text and fallback_text.strip() and len(fallback_text.strip()) > 10:
+                        extracted_text = fallback_text
+                        file_type = 'text'
+                        LOGGER.info(f"Successfully extracted text using fallback method")
+                except Exception as e:
+                    LOGGER.debug(f"Fallback extraction failed: {e}")
+                
+                if not extracted_text:
+                    # Provide more helpful error message
+                    error_msg = f"Unable to extract text from {file.filename}"
+                    if file_type == 'pdf':
+                        error_msg += ". PDF might be password-protected, image-based, or corrupted. Try a different PDF or convert it to text."
+                    elif file_type == 'docx':
+                        error_msg += ". Word document might be corrupted or password-protected. Try saving as .txt or .pdf first."
+                    else:
+                        error_msg += f" (type: {file_type}). The file may be empty, corrupted, or password-protected."
+                    
+                    return DocumentUploadResponse(
+                        success=False,
+                        errors=[error_msg]
+                    )
+        
+        # Generate document ID
+        document_id = f"doc_{uuid.uuid4().hex[:8]}"
+        
+        # Truncate content if too long (keep first 500k chars for preview, full content stored)
+        content_preview = extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text
+        
+        # Save to database
+        import sqlite3
+        from datetime import datetime, timezone
+        
+        created_at = datetime.now(timezone.utc).isoformat()
+        metadata = json.dumps({
+            "original_filename": file.filename,
+            "file_size": file_size,
+            "file_type": file_type,
+            "content_length": len(extracted_text)
+        })
+        
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO uploaded_documents 
+                (document_id, conversation_id, filename, file_type, file_size, content, metadata, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    document_id,
+                    conversation_id,
+                    file.filename,
+                    file_type,
+                    file_size,
+                    extracted_text,
+                    metadata,
+                    created_at,
+                    created_at
+                )
+            )
+            conn.commit()
+        
+        LOGGER.info(f"Document uploaded: {document_id} ({file.filename}, {file_type}, {len(extracted_text)} chars)")
+        
+        return DocumentUploadResponse(
+            success=True,
+            document_id=document_id,
+            filename=file.filename,
+            file_type=file_type,
+            content_preview=content_preview
+        )
+        
+    except Exception as e:
+        error_msg = str(e)
+        LOGGER.error(f"Document upload error: {error_msg}", exc_info=True)
+        
+        if "size" in error_msg.lower() or "too large" in error_msg.lower():
+            error_detail = "File is too large. Please ensure the file is under 50MB."
+        elif "permission" in error_msg.lower() or "access" in error_msg.lower():
+            error_detail = "File access denied. Please check file permissions and try again."
+        else:
+            error_detail = f"Error processing file: {error_msg}. Please verify the file format and try again."
+        
+        return DocumentUploadResponse(
+            success=False,
+            errors=[error_detail]
+        )
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+@app.post("/api/portfolio/policy/upload")
+async def policy_upload(
+    portfolio_id: str = Form(...),
+    file: UploadFile = File(...)
+) -> Dict[str, Any]:
+    """Upload Investment Policy Statement (IPS) document."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Create temporary file
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
+        content = await file.read()
+        tmp_file.write(content)
+        tmp_path = Path(tmp_file.name)
+    
+    try:
+        # Parse IPS document
+        file_ext = Path(file.filename).suffix.lower()
+        if file_ext == ".json":
+            ips_data = parse_ips_json(tmp_path)
+        elif file_ext == ".pdf":
+            ips_data = parse_ips_pdf(tmp_path)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_ext}")
+        
+        # Save policy constraints
+        constraints = ips_data.get("constraints", [])
+        save_policy_to_database(
+            db_path,
+            portfolio_id,
+            constraints,
+            document_type="IPS",
+            file_path=str(tmp_path)
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "num_constraints": len(constraints)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing IPS: {str(e)}")
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+@app.get("/api/portfolio/list", response_model=List[PortfolioMetadata])
+def portfolio_list() -> List[PortfolioMetadata]:
+    """List all portfolios in the database."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Query database directly
+    import sqlite3
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT portfolio_id, name, base_currency, benchmark_index, strategy_type, created_at "
+            "FROM portfolio_metadata ORDER BY created_at DESC"
+        ).fetchall()
+    
+    return [
+        PortfolioMetadata(
+            portfolio_id=row["portfolio_id"],
+            name=row["name"],
+            base_currency=row["base_currency"],
+            benchmark_index=row["benchmark_index"],
+            strategy_type=row["strategy_type"],
+            created_at=row["created_at"]
+        )
+        for row in rows
+    ]
+
+
+@app.get("/api/portfolio/{portfolio_id}/holdings", response_model=PortfolioHoldingsResponse)
+def portfolio_holdings(portfolio_id: str) -> PortfolioHoldingsResponse:
+    """Get portfolio holdings with enriched fundamentals."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Fetch portfolio metadata
+    import sqlite3
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        meta_row = conn.execute(
+            "SELECT portfolio_id, name FROM portfolio_metadata WHERE portfolio_id = ?",
+            (portfolio_id,)
+        ).fetchone()
+        
+        if not meta_row:
+            error_response = format_portfolio_error(PortfolioNotFoundError(portfolio_id))
+            raise HTTPException(
+                status_code=404,
+                detail=error_response["message"]
+            )
+        
+        # Fetch holdings
+        holding_rows = conn.execute(
+            "SELECT ticker, shares, weight, market_value, currency, position_date "
+            "FROM portfolio_holdings WHERE portfolio_id = ? ORDER BY weight DESC",
+            (portfolio_id,)
+        ).fetchall()
+    
+    # Convert to dict format for enrichment
+    holdings_dict = [
+        {
+            "ticker": row["ticker"],
+            "shares": row["shares"],
+            "weight": row["weight"],
+            "market_value": row["market_value"],
+            "currency": row["currency"],
+            "position_date": row["position_date"]
+        }
+        for row in holding_rows
+    ]
+    
+    # Enrich with fundamentals
+    enriched = enrich_holdings_with_fundamentals(db_path, holdings_dict)
+    
+    # Convert to response format
+    holdings = [
+        PortfolioHolding(
+            ticker=h.ticker,
+            weight=h.weight,
+            shares=h.shares,
+            price=h.price,
+            market_value=h.market_value,
+            sector=h.sector,
+            pe_ratio=h.pe_ratio,
+            dividend_yield=h.dividend_yield,
+            roe=h.roe,
+            roic=h.roic
+        )
+        for h in enriched
+    ]
+    
+    return PortfolioHoldingsResponse(
+        portfolio_id=portfolio_id,
+        name=meta_row["name"],
+        holdings=holdings
+    )
+
+
+@app.get("/api/portfolio/{portfolio_id}/constraints", response_model=PortfolioConstraintsResponse)
+def portfolio_constraints(portfolio_id: str, active_only: bool = Query(True)) -> PortfolioConstraintsResponse:
+    """Get policy constraints for a portfolio."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Check portfolio exists
+    import sqlite3
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        meta_row = conn.execute(
+            "SELECT portfolio_id FROM portfolio_metadata WHERE portfolio_id = ?",
+            (portfolio_id,)
+        ).fetchone()
+        
+        if not meta_row:
+            error_response = format_portfolio_error(PortfolioNotFoundError(portfolio_id))
+            raise HTTPException(
+                status_code=404,
+                detail=error_response["message"]
+            )
+        
+        query = "SELECT * FROM policy_constraints WHERE portfolio_id = ?"
+        params = [portfolio_id]
+        if active_only:
+            query += " AND active = 1"
+        query += " ORDER BY type, dimension"
+        
+        rows = conn.execute(query, params).fetchall()
+    
+    constraints = [
+        PolicyConstraintResponse(
+            constraint_id=row["constraint_id"],
+            type=row["constraint_type"],
+            dimension=row["dimension"],
+            min_value=row["min_value"],
+            max_value=row["max_value"],
+            target_value=row["target_value"],
+            unit=row["unit"] or "percent",
+            active=bool(row["active"])
+        )
+        for row in rows
+    ]
+    
+    return PortfolioConstraintsResponse(
+        portfolio_id=portfolio_id,
+        constraints=constraints
+    )
+
+
+@app.get("/api/portfolio/{portfolio_id}/exposure", response_model=ExposureResponse)
+def portfolio_exposure(portfolio_id: str) -> ExposureResponse:
+    """Calculate multi-dimensional portfolio exposures."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Fetch holdings
+    holdings_response = portfolio_holdings(portfolio_id)
+    
+    # Convert to dict format for enrichment
+    holdings_dict = [
+        {
+            "ticker": h.ticker,
+            "weight": h.weight,
+            "sector": h.sector
+        }
+        for h in holdings_response.holdings
+    ]
+    
+    # Convert to EnrichedHolding format
+    from .portfolio import EnrichedHolding
+    enriched_holdings = [
+        EnrichedHolding(
+            ticker=h["ticker"],
+            weight=h["weight"],
+            sector=h.get("sector")
+        )
+        for h in holdings_dict
+    ]
+    
+    # Calculate exposures (pass database path for beta calculation)
+    exposure = analyze_exposure(enriched_holdings, database_path=db_path)
+    
+    return ExposureResponse(
+        portfolio_id=portfolio_id,
+        snapshot_date=datetime.now(timezone.utc).isoformat(),
+        sector_exposure=exposure.sector_exposure,
+        factor_exposure=exposure.factor_exposure,
+        concentration_metrics=exposure.concentration_metrics
+    )
+
+
+@app.get("/api/portfolio/{portfolio_id}/summary", response_model=PortfolioSummaryResponse)
+def portfolio_summary(portfolio_id: str) -> PortfolioSummaryResponse:
+    """Get portfolio summary statistics."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Fetch holdings
+    holdings_response = portfolio_holdings(portfolio_id)
+    holdings_dict = [
+        {
+            "ticker": h.ticker,
+            "shares": h.shares,
+            "weight": h.weight,
+            "sector": h.sector,
+            "pe_ratio": h.pe_ratio,
+            "dividend_yield": h.dividend_yield,
+            "market_value": h.market_value
+        }
+        for h in holdings_response.holdings
+    ]
+    
+    # Calculate statistics
+    stats = calculate_portfolio_statistics(
+        enrich_holdings_with_fundamentals(db_path, holdings_dict)
+    )
+    
+    return PortfolioSummaryResponse(
+        portfolio_id=portfolio_id,
+        name=holdings_response.name,
+        num_holdings=stats.num_holdings,
+        total_market_value=stats.total_market_value,
+        weighted_avg_pe=stats.weighted_avg_pe,
+        weighted_avg_dividend_yield=stats.weighted_avg_dividend_yield,
+        top_10_concentration=stats.top_10_weight,
+        num_sectors=stats.num_sectors,
+        sector_breakdown=stats.sector_concentration
+    )
+
+
+@app.post("/api/portfolio/{portfolio_id}/optimize", response_model=OptimizationResponse)
+def portfolio_optimize(portfolio_id: str, request: OptimizationRequest) -> OptimizationResponse:
+    """Run portfolio optimization with policy constraints."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Fetch holdings
+    holdings_response = portfolio_holdings(portfolio_id)
+    current_holdings = {h.ticker: h.weight or 0.0 for h in holdings_response.holdings if h.weight is not None}
+    
+    # Fetch constraints
+    constraints_response = portfolio_constraints(portfolio_id, active_only=True)
+    policy_constraints = [
+        PolicyConstraint(
+            constraint_type=c.type,
+            dimension=c.dimension or "*",
+            min_value=c.min_value,
+            max_value=c.max_value
+        )
+        for c in constraints_response.constraints
+    ]
+    
+    # Build expected returns and covariance matrix from historical data
+    ticker_list = list(current_holdings.keys())
+    
+    # Calculate expected returns using historical method
+    expected_returns = calculate_expected_returns(
+        db_path,
+        ticker_list,
+        method="historical",
+        lookback_days=252,
+    )
+    
+    # Fallback to placeholder if no historical data available
+    if not expected_returns:
+        expected_returns = {ticker: 0.08 for ticker in ticker_list}  # Default: 8% return
+    
+    # Ensure all tickers have expected returns
+    for ticker in ticker_list:
+        if ticker not in expected_returns:
+            expected_returns[ticker] = 0.08  # Default: 8% return
+    
+    # Calculate covariance matrix from historical prices
+    import numpy as np
+    try:
+        covariance_matrix, valid_tickers = calculate_covariance_matrix(
+            db_path,
+            ticker_list,
+            lookback_days=252,
+        )
+        
+        # If some tickers were excluded, need to align
+        if len(valid_tickers) != len(ticker_list):
+            if len(valid_tickers) < 2:
+                raise OptimizationFailedError(
+                    f"Optimization requires at least 2 holdings with sufficient historical data. Only {len(valid_tickers)} ticker(s) have enough data."
+                )
+            # Reorder ticker_list to match valid_tickers
+            ticker_list = valid_tickers
+            # Filter current_holdings and expected_returns
+            current_holdings = {t: current_holdings.get(t, 0.0) for t in ticker_list}
+            expected_returns = {t: expected_returns.get(t, 0.08) for t in ticker_list}
+            
+            # Renormalize weights after filtering
+            total_weight = sum(current_holdings.values())
+            if total_weight > 0:
+                current_holdings = {t: w / total_weight for t, w in current_holdings.items()}
+            elif len(current_holdings) > 0:
+                # If all weights were zero, assign equal weights
+                equal_weight = 1.0 / len(current_holdings)
+                current_holdings = {t: equal_weight for t in ticker_list}
+    except Exception as e:
+        # Fallback to placeholder if calculation fails
+        LOGGER.warning(f"Failed to calculate covariance matrix: {e}, using placeholder")
+        n = len(ticker_list)
+        if n < 2:
+            raise OptimizationFailedError(
+                f"Optimization requires at least 2 holdings. Current portfolio has {n}."
+            )
+        # Create a reasonable placeholder covariance matrix
+        # Use correlation of 0.3 between assets as default
+        base_var = 0.04  # 4% variance per asset
+        covariance_matrix = np.eye(n) * base_var
+        correlation = 0.3
+        for i in range(n):
+            for j in range(i + 1, n):
+                cov_value = correlation * base_var
+                covariance_matrix[i, j] = cov_value
+                covariance_matrix[j, i] = cov_value
+    
+    # Validate inputs before optimization
+    if len(ticker_list) < 2:
+        raise OptimizationFailedError(
+            f"Optimization requires at least 2 holdings. Current portfolio has {len(ticker_list)}."
+        )
+    
+    # Ensure weights are normalized
+    total_weight = sum(current_holdings.values())
+    if total_weight > 1.01 or (total_weight > 0 and total_weight < 0.99):
+        # Normalize weights if they don't sum to 1.0
+        if total_weight > 0:
+            current_holdings = {t: w / total_weight for t, w in current_holdings.items()}
+        else:
+            # If all weights are zero, assign equal weights
+            equal_weight = 1.0 / len(ticker_list)
+            current_holdings = {t: equal_weight for t in ticker_list}
+    
+    # Run optimization
+    try:
+        result = optimize_portfolio_sharpe(
+            current_holdings=current_holdings,
+            expected_returns=expected_returns,
+            covariance_matrix=covariance_matrix,
+            ticker_list=ticker_list,
+            constraints=policy_constraints,
+            turnover_limit=request.turnover_limit,
+            objective=request.objective
+        )
+        
+        # Convert trades to response format
+        trades = [
+            Trade(
+                ticker=trade.get("ticker", ""),
+                action=trade.get("action", "hold"),
+                from_weight=trade.get("from_weight"),
+                to_weight=trade.get("to_weight"),
+                shares=trade.get("shares")
+            )
+            for trade in result.proposed_trades
+        ]
+        
+        return OptimizationResponse(
+            portfolio_id=portfolio_id,
+            status=result.status,
+            proposed_trades=trades,
+            objective_value=result.objective_value,
+            metrics_before=result.metrics_before,
+            metrics_after=result.metrics_after,
+            policy_flags=result.policy_flags or []
+        )
+    except (OptimizationFailedError, ValueError, Exception) as e:
+        error_msg = str(e) if isinstance(e, Exception) else getattr(e, 'message', str(e))
+        LOGGER.error(f"Optimization failed for portfolio {portfolio_id}: {error_msg}", exc_info=True)
+        
+        if isinstance(e, OptimizationFailedError):
+            error_response = format_portfolio_error(e, include_technical=False)
+        else:
+            # Convert other exceptions to OptimizationFailedError for consistent response
+            error_response = format_portfolio_error(
+                OptimizationFailedError(f"Optimization solver failed: {error_msg}"),
+                include_technical=False
+            )
+        
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "success": False,
+                "title": error_response.get("title", "Optimization Failed"),
+                "message": error_response["message"],
+                "error_code": error_response["error_code"],
+                "common_causes": error_response.get("common_causes", []),
+                "solutions": error_response.get("solutions", error_response.get("suggestions", [])),
+                "status": getattr(e, 'status', 'error')
+            }
+        )
+    except Exception as e:
+        error_msg = str(e)
+        LOGGER.error(f"Optimization failed for portfolio {portfolio_id}: {error_msg}", exc_info=True)
+        
+        # Create OptimizationFailedError for consistent handling
+        opt_error = OptimizationFailedError(
+            f"Optimization failed: {error_msg}. Please check portfolio holdings and try again.",
+            status="unknown_error"
+        )
+        error_response = format_portfolio_error(opt_error, include_technical=False)
+        
+        # Provide more helpful error messages
+        if "infeasible" in error_msg.lower() or "constraint" in error_msg.lower():
+            detail_msg = error_response.get("solutions", [])[0] if error_response.get("solutions") else "Try relaxing policy constraints or increasing turnover limit."
+        elif "covariance" in error_msg.lower() or "matrix" in error_msg.lower():
+            detail_msg = "Unable to calculate portfolio risk metrics. Some holdings may lack sufficient historical data."
+        elif "solver" in error_msg.lower():
+            detail_msg = f"Optimization solver failed. This may indicate an invalid problem formulation. Error: {error_msg}"
+        else:
+            detail_msg = error_response["message"]
+        
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": detail_msg,
+                "error_code": error_response["error_code"],
+                "suggestions": error_response["suggestions"]
+            }
+        )
+
+
+@app.post("/api/portfolio/{portfolio_id}/attribution", response_model=AttributionResponse)
+def portfolio_attribution(portfolio_id: str, request: AttributionRequest) -> AttributionResponse:
+    """Run performance attribution analysis."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Fetch holdings
+    holdings_response = portfolio_holdings(portfolio_id)
+    portfolio_weights = {h.ticker: h.weight or 0.0 for h in holdings_response.holdings if h.weight is not None}
+    
+    # Get sectors
+    sectors = {h.ticker: h.sector or "Unknown" for h in holdings_response.holdings}
+    
+    # Placeholder returns (would need historical data integration)
+    portfolio_returns = {ticker: 0.05 for ticker in portfolio_weights.keys()}
+    benchmark_weights = {ticker: 1.0 / len(portfolio_weights) for ticker in portfolio_weights.keys()}
+    benchmark_returns = {ticker: 0.04 for ticker in portfolio_weights.keys()}
+    
+    # Run attribution
+    try:
+        attribution = brinson_attribution(
+            portfolio_weights=portfolio_weights,
+            portfolio_returns=portfolio_returns,
+            benchmark_weights=benchmark_weights,
+            benchmark_returns=benchmark_returns,
+            sectors=sectors
+        )
+        
+        return AttributionResponse(
+            portfolio_id=portfolio_id,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            total_active_return=attribution.total_active_return,
+            allocation_effect=attribution.allocation_effect,
+            selection_effect=attribution.selection_effect,
+            interaction_effect=attribution.interaction_effect,
+            top_contributors=attribution.top_contributors,
+            top_detractors=attribution.top_detractors
+        )
+    except Exception as e:
+        error_msg = str(e)
+        LOGGER.error(f"Attribution failed for portfolio {portfolio_id}: {error_msg}", exc_info=True)
+        
+        # Provide more helpful error messages
+        if "returns" in error_msg.lower() or "data" in error_msg.lower():
+            detail = f"Unable to calculate attribution: insufficient return data for the specified period. Please check date range and ensure portfolio has holdings during this period."
+        elif "weights" in error_msg.lower():
+            detail = f"Invalid portfolio or benchmark weights. Please ensure weights sum to approximately 1.0. Error: {error_msg}"
+        else:
+            detail = f"Attribution calculation failed: {error_msg}. Please verify portfolio holdings and try again."
+        
+        raise HTTPException(status_code=500, detail=detail)
+
+
+@app.post("/api/portfolio/{portfolio_id}/scenario", response_model=ScenarioResponse)
+def portfolio_scenario(portfolio_id: str, request: ScenarioRequest) -> ScenarioResponse:
+    """Run stress test scenario."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Fetch holdings
+    holdings_response = portfolio_holdings(portfolio_id)
+    holdings = {h.ticker: h.weight or 0.0 for h in holdings_response.holdings if h.weight is not None}
+    
+    # Calculate real betas from historical data
+    try:
+        betas = calculate_betas_batch(
+            db_path,
+            list(holdings.keys()),
+            benchmark="SPY",
+            lookback_days=252,
+        )
+        # Fallback to default beta = 1.0 for tickers without historical data
+        for ticker in holdings.keys():
+            if ticker not in betas:
+                betas[ticker] = 1.0
+    except Exception as e:
+        # Fallback to placeholder if calculation fails
+        LOGGER.warning(f"Failed to calculate betas: {e}, using placeholder")
+        betas = {ticker: 1.0 for ticker in holdings.keys()}
+
+
+@app.delete("/api/portfolio/{portfolio_id}")
+def delete_portfolio(portfolio_id: str) -> Dict[str, Any]:
+    """Delete a portfolio and all its holdings."""
+    settings = get_settings()
+    db_path = settings.database_path  # Can be str or Path
+    
+    # Import delete function
+    from .database import delete_portfolio as db_delete_portfolio
+    
+    try:
+        deleted = db_delete_portfolio(db_path, portfolio_id)
+        if deleted:
+            LOGGER.info(f"Successfully deleted portfolio {portfolio_id}")
+            return {"success": True, "message": f"Portfolio {portfolio_id} deleted successfully"}
+        else:
+            LOGGER.warning(f"Portfolio {portfolio_id} not found for deletion")
+            error_response = format_portfolio_error(PortfolioNotFoundError(portfolio_id))
+            raise HTTPException(
+                status_code=404,
+                detail=error_response["message"]
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e) if str(e) else "Unknown error"
+        LOGGER.error(f"Failed to delete portfolio {portfolio_id}: {error_msg}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to delete portfolio: {error_msg}")
+
+
+@app.get("/api/portfolio/{portfolio_id}/export/pptx")
+def portfolio_export_pptx(portfolio_id: str) -> StreamingResponse:
+    """Export portfolio as PowerPoint presentation."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Fetch all portfolio data
+    holdings_response = portfolio_holdings(portfolio_id)
+    summary_response = portfolio_summary(portfolio_id)
+    exposure_response = portfolio_exposure(portfolio_id)
+    
+    # Convert to format expected by PowerPoint builder
+    holdings = [
+        {
+            "ticker": h.ticker,
+            "weight": h.weight or 0.0,
+            "sector": h.sector,
+            "pe_ratio": h.pe_ratio,
+            "market_value": h.market_value,
+        }
+        for h in holdings_response.holdings
+    ]
+    
+    summary = {
+        "num_holdings": summary_response.num_holdings,
+        "total_market_value": summary_response.total_market_value,
+        "weighted_avg_pe": summary_response.weighted_avg_pe,
+        "weighted_avg_dividend_yield": summary_response.weighted_avg_dividend_yield,
+        "top_10_concentration": summary_response.top_10_concentration,
+        "num_sectors": summary_response.num_sectors,
+        "sector_breakdown": summary_response.sector_breakdown,
+    }
+    
+    exposure = {
+        "sector_exposure": exposure_response.sector_exposure,
+        "factor_exposure": exposure_response.factor_exposure,
+        "concentration_metrics": exposure_response.concentration_metrics,
+    }
+    
+    # Build PowerPoint
+    ppt_bytes = build_portfolio_powerpoint(
+        database_path=Path(db_path),
+        portfolio_id=portfolio_id,
+        optimization_result=None,  # Optional - can be fetched if needed
+        attribution_result=None,  # Optional - can be fetched if needed
+        exposure_result=None,  # Optional - can be fetched if needed
+        scenario_results=None,  # Optional - can be fetched if needed
+    )
+    
+    # Return as streaming response
+    buffer = BytesIO(ppt_bytes)
+    buffer.seek(0)
+    filename = f"portfolio_{portfolio_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.pptx"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Export-Format": "pptx",
+    }
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers=headers
+    )
+
+
+@app.get("/api/portfolio/{portfolio_id}/export/pdf")
+def portfolio_export_pdf(portfolio_id: str) -> StreamingResponse:
+    """Export portfolio as PDF executive summary."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Fetch all portfolio data
+    holdings_response = portfolio_holdings(portfolio_id)
+    summary_response = portfolio_summary(portfolio_id)
+    exposure_response = portfolio_exposure(portfolio_id)
+    
+    # Convert to format expected by PDF builder
+    holdings = [
+        {
+            "ticker": h.ticker,
+            "weight": h.weight or 0.0,
+            "shares": h.shares,
+            "price": h.price,
+            "roe": h.roe,
+            "roic": h.roic,
+            "sector": h.sector,
+            "pe_ratio": h.pe_ratio,
+            "dividend_yield": h.dividend_yield,
+            "market_value": h.market_value,
+            "roe": h.roe,
+            "roic": h.roic,
+        }
+        for h in holdings_response.holdings
+    ]
+    
+    summary = {
+        "num_holdings": summary_response.num_holdings,
+        "total_market_value": summary_response.total_market_value,
+        "weighted_avg_pe": summary_response.weighted_avg_pe,
+        "weighted_avg_dividend_yield": summary_response.weighted_avg_dividend_yield,
+        "top_10_concentration": summary_response.top_10_concentration,
+        "num_sectors": summary_response.num_sectors,
+        "sector_breakdown": summary_response.sector_breakdown,
+    }
+    
+    exposure = {
+        "sector_exposure": exposure_response.sector_exposure,
+        "factor_exposure": exposure_response.factor_exposure,
+        "concentration_metrics": exposure_response.concentration_metrics,
+    }
+    
+    # Build PDF
+    pdf_bytes = build_portfolio_pdf(
+        portfolio_id=portfolio_id,
+        portfolio_name=holdings_response.name,
+        holdings=holdings,
+        summary=summary,
+        exposure=exposure,
+        attribution=None,  # Optional - can be fetched if needed
+        optimization=None,  # Optional - can be fetched if needed
+    )
+    
+    # Return as streaming response
+    buffer = BytesIO(pdf_bytes)
+    buffer.seek(0)
+    filename = f"portfolio_{portfolio_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Export-Format": "pdf",
+    }
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers=headers
+    )
+
+
+@app.get("/api/portfolio/{portfolio_id}/export/xlsx")
+def portfolio_export_xlsx(portfolio_id: str) -> StreamingResponse:
+    """Export portfolio as Excel workbook."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    # Fetch all portfolio data
+    holdings_response = portfolio_holdings(portfolio_id)
+    summary_response = portfolio_summary(portfolio_id)
+    exposure_response = portfolio_exposure(portfolio_id)
+    
+    # Convert to format expected by Excel builder
+    holdings = [
+        {
+            "ticker": h.ticker,
+            "weight": h.weight or 0.0,
+            "shares": h.shares,
+            "price": h.price,
+            "sector": h.sector,
+            "pe_ratio": h.pe_ratio,
+            "dividend_yield": h.dividend_yield,
+            "market_value": h.market_value,
+            "roe": h.roe,
+            "roic": h.roic,
+        }
+        for h in holdings_response.holdings
+    ]
+    
+    summary = {
+        "num_holdings": summary_response.num_holdings,
+        "total_market_value": summary_response.total_market_value,
+        "weighted_avg_pe": summary_response.weighted_avg_pe,
+        "weighted_avg_dividend_yield": summary_response.weighted_avg_dividend_yield,
+        "top_10_concentration": summary_response.top_10_concentration,
+        "num_sectors": summary_response.num_sectors,
+        "sector_breakdown": summary_response.sector_breakdown,
+    }
+    
+    exposure = {
+        "sector_exposure": exposure_response.sector_exposure,
+        "factor_exposure": exposure_response.factor_exposure,
+        "concentration_metrics": exposure_response.concentration_metrics,
+    }
+    
+    # Build Excel
+    excel_bytes = build_portfolio_excel(
+        portfolio_id=portfolio_id,
+        portfolio_name=holdings_response.name,
+        holdings=holdings,
+        summary=summary,
+        exposure=exposure,
+        attribution=None,  # Optional - can be fetched if needed
+        optimization=None,  # Optional - can be fetched if needed
+        scenarios=None,  # Optional - can be fetched if needed
+    )
+    
+    # Return as streaming response
+    buffer = BytesIO(excel_bytes)
+    buffer.seek(0)
+    filename = f"portfolio_{portfolio_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.xlsx"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Export-Format": "xlsx",
+    }
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers
+    )
+
+
+# ============================================================================
+# Advanced Portfolio Features API Endpoints
+# ============================================================================
+
+@app.post("/api/portfolio/{portfolio_id}/optimize/multi-period", response_model=Dict[str, Any])
+def optimize_portfolio_multi_period_endpoint(
+    portfolio_id: str,
+    periods: int = Query(4, ge=1, le=12, description="Number of periods to optimize"),
+    rebalance_frequency: str = Query("quarterly", regex="^(quarterly|monthly|weekly)$", description="Rebalance frequency"),
+    objective: str = Query("sharpe", regex="^(sharpe|tracking_error|return)$", description="Optimization objective"),
+) -> Dict[str, Any]:
+    """Optimize portfolio over multiple periods with rebalancing."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = optimize_portfolio_multi_period(
+            db_path,
+            portfolio_id,
+            periods=periods,
+            rebalance_frequency=rebalance_frequency,
+            objective=objective
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "periods": result.periods,
+            "total_return": result.total_return,
+            "average_sharpe": result.average_sharpe,
+            "rebalance_count": result.rebalance_count
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except OptimizationFailedError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=422, detail=error_response)
+    except Exception as e:
+        LOGGER.error(f"Multi-period optimization failed: {e}", exc_info=True)
+        error_response = format_portfolio_error(
+            OptimizationFailedError(f"Multi-period optimization failed: {str(e)}"),
+            include_technical=False
+        )
+        raise HTTPException(status_code=500, detail=error_response)
+
+
+@app.post("/api/portfolio/{portfolio_id}/optimize/risk-parity", response_model=Dict[str, Any])
+def optimize_portfolio_risk_parity_endpoint(
+    portfolio_id: str,
+    target_risk_contribution: Optional[float] = Query(None, ge=0.0, le=1.0, description="Target risk contribution per asset"),
+) -> Dict[str, Any]:
+    """Optimize portfolio using risk parity approach."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = optimize_portfolio_risk_parity(
+            db_path,
+            portfolio_id,
+            target_risk_contribution=target_risk_contribution
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "holdings": result.holdings,
+            "risk_contributions": result.risk_contributions,
+            "portfolio_variance": result.portfolio_variance,
+            "expected_return": result.expected_return
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except OptimizationFailedError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=422, detail=error_response)
+    except Exception as e:
+        LOGGER.error(f"Risk parity optimization failed: {e}", exc_info=True)
+        error_response = format_portfolio_error(
+            OptimizationFailedError(f"Risk parity optimization failed: {str(e)}"),
+            include_technical=False
+        )
+        raise HTTPException(status_code=500, detail=error_response)
+
+
+@app.post("/api/portfolio/{portfolio_id}/stress-test", response_model=Dict[str, Any])
+def comprehensive_stress_test_endpoint(
+    portfolio_id: str,
+    scenarios: List[Dict[str, Any]] = Body(..., description="List of scenario definitions"),
+) -> Dict[str, Any]:
+    """Run comprehensive stress test with multiple scenarios."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = run_comprehensive_stress_test(
+            db_path,
+            portfolio_id,
+            scenarios=scenarios
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "scenarios": result.scenarios,
+            "worst_case": result.worst_case,
+            "best_case": result.best_case,
+            "comparison": result.comparison
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except Exception as e:
+        LOGGER.error(f"Stress test failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Stress test failed: {str(e)}"})
+
+
+@app.get("/api/portfolio/{portfolio_id}/factor-attribution", response_model=Dict[str, Any])
+def factor_attribution_endpoint(
+    portfolio_id: str,
+    benchmark_id: str = Query("sp500", description="Benchmark identifier"),
+    factors: Optional[List[str]] = Query(None, description="List of factors to analyze"),
+) -> Dict[str, Any]:
+    """Decompose portfolio returns into factor exposures."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = analyze_factor_attribution(
+            db_path,
+            portfolio_id,
+            benchmark_id=benchmark_id,
+            factors=factors
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "benchmark_id": benchmark_id,
+            "active_return": result.active_return,
+            "factor_loadings": result.factor_loadings,
+            "factor_contributions": result.factor_contributions,
+            "residual": result.residual
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except Exception as e:
+        LOGGER.error(f"Factor attribution failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Factor attribution failed: {str(e)}"})
+
+
+@app.get("/api/portfolio/{portfolio_id}/monte-carlo", response_model=Dict[str, Any])
+def monte_carlo_simulation_endpoint(
+    portfolio_id: str,
+    num_simulations: int = Query(10000, ge=1000, le=100000, description="Number of simulations"),
+    time_horizon: int = Query(252, ge=10, le=1000, description="Time horizon in trading days"),
+) -> Dict[str, Any]:
+    """Run Monte Carlo simulation for portfolio returns."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = monte_carlo_portfolio_simulation(
+            db_path,
+            portfolio_id,
+            num_simulations=num_simulations,
+            time_horizon=time_horizon
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "mean_return": result.mean_return,
+            "std_return": result.std_return,
+            "percentile_5": result.percentile_5,
+            "percentile_95": result.percentile_95,
+            "var_95": result.var_95,
+            "cvar_95": result.cvar_95,
+            "simulations_count": len(result.simulations)
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Monte Carlo simulation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Monte Carlo simulation failed: {str(e)}"})
+
+
+@app.get("/api/portfolio/{portfolio_id}/backtest", response_model=Dict[str, Any])
+def backtest_portfolio_endpoint(
+    portfolio_id: str,
+    start_date: str = Query(..., description="Start date (ISO format: YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (ISO format: YYYY-MM-DD)"),
+    rebalance_frequency: str = Query("quarterly", regex="^(quarterly|monthly|weekly)$", description="Rebalance frequency"),
+) -> Dict[str, Any]:
+    """Backtest portfolio strategy over historical period."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = backtest_portfolio_strategy(
+            db_path,
+            portfolio_id,
+            start_date=start_date,
+            end_date=end_date,
+            rebalance_frequency=rebalance_frequency
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "start_date": start_date,
+            "end_date": end_date,
+            "total_return": result.total_return,
+            "annualized_return": result.annualized_return,
+            "sharpe_ratio": result.sharpe_ratio,
+            "max_drawdown": result.max_drawdown,
+            "alpha": result.alpha,
+            "beta": result.beta,
+            "portfolio_values": result.portfolio_values,
+            "benchmark_values": result.benchmark_values
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Backtest failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Backtest failed: {str(e)}"})
+
+
+# ============================================================================
+# Priority 1: Advanced Risk Management Endpoints
+# ============================================================================
+
+@app.get("/api/portfolio/{portfolio_id}/risk/cvar", response_model=Dict[str, Any])
+def portfolio_cvar_endpoint(
+    portfolio_id: str,
+    confidence_level: float = Query(0.95, ge=0.90, le=0.99, description="Confidence level (e.g., 0.95 for 95%)"),
+    lookback_days: int = Query(252, ge=20, le=1000, description="Lookback period in days"),
+) -> Dict[str, Any]:
+    """Calculate Conditional Value at Risk (CVaR) for portfolio."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = calculate_cvar(
+            db_path,
+            portfolio_id,
+            confidence_level=confidence_level,
+            lookback_days=lookback_days
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "cvar": result.cvar,
+            "var": result.var,
+            "confidence_level": result.confidence_level,
+            "portfolio_value": result.portfolio_value,
+            "expected_loss": result.expected_loss,
+            "position_cvar": result.position_cvar
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"CVaR calculation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"CVaR calculation failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/optimize/cvar-constrained", response_model=Dict[str, Any])
+def optimize_portfolio_cvar_constrained_endpoint(
+    portfolio_id: str,
+    max_cvar: float = Body(..., description="Maximum allowed CVaR (as decimal, e.g., -0.05 for -5%)"),
+    confidence_level: float = Body(0.95, description="Confidence level for CVaR"),
+    objective: str = Body("sharpe", regex="^(sharpe|return|minimize_variance)$", description="Optimization objective"),
+) -> Dict[str, Any]:
+    """Optimize portfolio with CVaR constraint."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = optimize_portfolio_cvar_constrained(
+            db_path,
+            portfolio_id,
+            max_cvar=max_cvar,
+            confidence_level=confidence_level,
+            objective=objective,
+            constraints=None  # Can be extended to accept constraints
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "holdings": result.holdings,
+            "expected_return": result.expected_return,
+            "portfolio_variance": result.portfolio_variance,
+            "sharpe_ratio": result.sharpe_ratio,
+            "cvar": result.cvar,
+            "var": result.var,
+            "optimization_status": result.optimization_status
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except OptimizationFailedError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=400, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"CVaR-constrained optimization failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Optimization failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/scenario/custom", response_model=Dict[str, Any])
+def custom_scenario_endpoint(
+    portfolio_id: str,
+    shocks: Dict[str, Any] = Body(..., description="Custom scenario shocks definition"),
+) -> Dict[str, Any]:
+    """Create custom stress test scenario with user-defined shocks."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = create_custom_scenario(
+            db_path,
+            portfolio_id,
+            shocks=shocks
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "portfolio_value_change": result.portfolio_value_change,
+            "portfolio_return": result.portfolio_return,
+            "pnl_attribution": result.pnl_attribution,
+            "affected_holdings": result.affected_holdings,
+            "risk_metrics": result.risk_metrics,
+            "scenario_type": result.scenario_type,
+            "severity": result.severity
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Custom scenario failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Scenario failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/scenario/geopolitical", response_model=Dict[str, Any])
+def geopolitical_scenario_endpoint(
+    portfolio_id: str,
+    event_type: str = Body(..., regex="^(trade_war|sanctions|conflict|pandemic)$", description="Type of geopolitical event"),
+    severity: float = Body(0.5, ge=0.0, le=1.0, description="Severity level (0.0 to 1.0)"),
+) -> Dict[str, Any]:
+    """Run geopolitical stress test scenario."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = run_geopolitical_scenario(
+            db_path,
+            portfolio_id,
+            event_type=event_type,
+            severity=severity
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "event_type": event_type,
+            "severity": severity,
+            "portfolio_value_change": result.portfolio_value_change,
+            "portfolio_return": result.portfolio_return,
+            "pnl_attribution": result.pnl_attribution,
+            "affected_holdings": result.affected_holdings,
+            "risk_metrics": result.risk_metrics,
+            "scenario_type": result.scenario_type
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Geopolitical scenario failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Scenario failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/scenario/sector-shock", response_model=Dict[str, Any])
+def sector_shock_scenario_endpoint(
+    portfolio_id: str,
+    sector: str = Body(..., description="Sector name (e.g., 'Technology', 'Financials')"),
+    shock_pct: float = Body(..., description="Shock percentage (e.g., -0.15 for 15% decline)"),
+) -> Dict[str, Any]:
+    """Run sector-specific shock scenario."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = run_sector_specific_shock(
+            db_path,
+            portfolio_id,
+            sector=sector,
+            shock_pct=shock_pct
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "sector": sector,
+            "shock_pct": shock_pct,
+            "portfolio_value_change": result.portfolio_value_change,
+            "portfolio_return": result.portfolio_return,
+            "pnl_attribution": result.pnl_attribution,
+            "affected_holdings": result.affected_holdings,
+            "risk_metrics": result.risk_metrics
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Sector shock scenario failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Scenario failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/scenario/rate-structure", response_model=Dict[str, Any])
+def rate_structure_scenario_endpoint(
+    portfolio_id: str,
+    short_rate_change: float = Body(..., description="Short-term rate change in basis points"),
+    long_rate_change: float = Body(..., description="Long-term rate change in basis points"),
+    curve_steepening: bool = Body(False, description="Whether yield curve steepens"),
+) -> Dict[str, Any]:
+    """Run interest rate term structure scenario."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = run_rate_term_structure_scenario(
+            db_path,
+            portfolio_id,
+            short_rate_change=short_rate_change,
+            long_rate_change=long_rate_change,
+            curve_steepening=curve_steepening
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "short_rate_change": short_rate_change,
+            "long_rate_change": long_rate_change,
+            "portfolio_value_change": result.portfolio_value_change,
+            "portfolio_return": result.portfolio_return,
+            "pnl_attribution": result.pnl_attribution,
+            "affected_holdings": result.affected_holdings,
+            "risk_metrics": result.risk_metrics
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Rate structure scenario failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Scenario failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/scenario/fx-exposure", response_model=Dict[str, Any])
+def fx_exposure_scenario_endpoint(
+    portfolio_id: str,
+    currency_shocks: Dict[str, float] = Body(..., description="Currency shocks (e.g., {'EUR': -0.10, 'GBP': -0.15})"),
+) -> Dict[str, Any]:
+    """Run FX exposure stress test."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = run_fx_exposure_stress_test(
+            db_path,
+            portfolio_id,
+            currency_shocks=currency_shocks
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "currency_shocks": currency_shocks,
+            "portfolio_value_change": result.portfolio_value_change,
+            "portfolio_return": result.portfolio_return,
+            "pnl_attribution": result.pnl_attribution,
+            "affected_holdings": result.affected_holdings,
+            "risk_metrics": result.risk_metrics
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"FX exposure scenario failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Scenario failed: {str(e)}"})
+
+
+# ============================================================================
+# Priority 2: Alternative Optimization Objectives Endpoints
+# ============================================================================
+
+@app.get("/api/portfolio/{portfolio_id}/exposure/esg", response_model=Dict[str, Any])
+def portfolio_esg_exposure_endpoint(
+    portfolio_id: str,
+) -> Dict[str, Any]:
+    """Analyze portfolio ESG exposure."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = analyze_esg_exposure(
+            db_path,
+            portfolio_id
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "portfolio_esg_score": result.portfolio_esg_score,
+            "position_esg_scores": result.position_esg_scores,
+            "environmental_score": result.environmental_score,
+            "social_score": result.social_score,
+            "governance_score": result.governance_score,
+            "controversy_level": result.controversy_level,
+            "improvement_suggestions": result.improvement_suggestions
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except Exception as e:
+        LOGGER.error(f"ESG exposure analysis failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Analysis failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/optimize/esg-constrained", response_model=Dict[str, Any])
+def optimize_portfolio_esg_constrained_endpoint(
+    portfolio_id: str,
+    min_esg_score: float = Body(6.0, ge=0.0, le=10.0, description="Minimum portfolio ESG score"),
+    objective: str = Body("sharpe", regex="^(sharpe|return|minimize_variance)$", description="Optimization objective"),
+) -> Dict[str, Any]:
+    """Optimize portfolio with ESG constraints."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = optimize_portfolio_esg_constrained(
+            db_path,
+            portfolio_id,
+            min_esg_score=min_esg_score,
+            objective=objective,
+            constraints=None  # Can be extended to accept constraints
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "holdings": result.holdings,
+            "expected_return": result.expected_return,
+            "portfolio_variance": result.portfolio_variance,
+            "sharpe_ratio": result.sharpe_ratio,
+            "portfolio_esg_score": result.portfolio_esg_score,
+            "optimization_status": result.optimization_status
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except OptimizationFailedError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=400, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"ESG-constrained optimization failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Optimization failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/optimize/tax-aware", response_model=Dict[str, Any])
+def optimize_portfolio_tax_aware_endpoint(
+    portfolio_id: str,
+    tax_rate_short: float = Body(0.37, ge=0.0, le=1.0, description="Short-term capital gains tax rate"),
+    tax_rate_long: float = Body(0.20, ge=0.0, le=1.0, description="Long-term capital gains tax rate"),
+    harvest_losses: bool = Body(True, description="Identify tax-loss harvesting opportunities"),
+    objective: str = Body("sharpe", regex="^(sharpe|return|minimize_variance)$", description="Optimization objective"),
+) -> Dict[str, Any]:
+    """Optimize portfolio with tax considerations."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = optimize_portfolio_tax_aware(
+            db_path,
+            portfolio_id,
+            tax_rate_short=tax_rate_short,
+            tax_rate_long=tax_rate_long,
+            harvest_losses=harvest_losses,
+            objective=objective,
+            constraints=None
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "holdings": result.holdings,
+            "expected_return": result.expected_return,
+            "after_tax_return": result.after_tax_return,
+            "tax_adjusted_sharpe": result.tax_adjusted_sharpe,
+            "portfolio_variance": result.portfolio_variance,
+            "tax_loss_harvesting_opportunities": result.tax_loss_harvesting_opportunities,
+            "optimization_status": result.optimization_status
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except OptimizationFailedError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=400, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Tax-aware optimization failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Optimization failed: {str(e)}"})
+
+
+@app.get("/api/portfolio/{portfolio_id}/tax-analysis", response_model=Dict[str, Any])
+def portfolio_tax_analysis_endpoint(
+    portfolio_id: str,
+    tax_rate_short: float = Query(0.37, ge=0.0, le=1.0, description="Short-term capital gains tax rate"),
+    tax_rate_long: float = Query(0.20, ge=0.0, le=1.0, description="Long-term capital gains tax rate"),
+) -> Dict[str, Any]:
+    """Calculate tax-adjusted returns for portfolio holdings."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        # Get holdings with estimated holding periods
+        holdings = portfolio.get_portfolio_holdings(db_path, portfolio_id)
+        holding_periods = {h['ticker']: 180 for h in holdings}  # Assume 6 months average
+        
+        tax_adjusted = calculate_tax_adjusted_returns(
+            db_path,
+            portfolio_id,
+            holding_periods,
+            tax_rate_short,
+            tax_rate_long
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "tax_adjusted_returns": tax_adjusted,
+            "tax_rate_short": tax_rate_short,
+            "tax_rate_long": tax_rate_long
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except Exception as e:
+        LOGGER.error(f"Tax analysis failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Analysis failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/optimize/tracking-error", response_model=Dict[str, Any])
+def optimize_portfolio_tracking_error_endpoint(
+    portfolio_id: str,
+    benchmark_id: str = Body("sp500", description="Benchmark identifier"),
+    max_tracking_error: float = Body(0.025, ge=0.0, le=0.5, description="Maximum allowed tracking error"),
+    objective: str = Body("minimize_tracking_error", regex="^(minimize_tracking_error|sharpe|return)$", description="Optimization objective"),
+) -> Dict[str, Any]:
+    """Optimize portfolio to minimize tracking error."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = optimize_portfolio_tracking_error(
+            db_path,
+            portfolio_id,
+            benchmark_id=benchmark_id,
+            max_tracking_error=max_tracking_error,
+            objective=objective,
+            constraints=None
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "benchmark_id": benchmark_id,
+            "holdings": result.holdings,
+            "expected_return": result.expected_return,
+            "portfolio_variance": result.portfolio_variance,
+            "sharpe_ratio": result.sharpe_ratio,
+            "tracking_error": result.tracking_error if hasattr(result, 'tracking_error') else None,
+            "optimization_status": result.optimization_status
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except OptimizationFailedError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=400, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Tracking error optimization failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Optimization failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/optimize/diversification", response_model=Dict[str, Any])
+def optimize_portfolio_diversification_endpoint(
+    portfolio_id: str,
+) -> Dict[str, Any]:
+    """Optimize portfolio to maximize diversification ratio."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        result = optimize_portfolio_diversification(
+            db_path,
+            portfolio_id,
+            constraints=None
+        )
+        
+        # Calculate diversification ratio
+        holdings = portfolio.get_portfolio_holdings(db_path, portfolio_id)
+        ticker_list = [h['ticker'] for h in holdings]
+        covariance_matrix, ticker_list_ordered = portfolio.calculate_covariance_matrix(
+            db_path,
+            ticker_list
+        )
+        
+        from .portfolio_optimizer_alternative import calculate_diversification_ratio
+        div_ratio = calculate_diversification_ratio(
+            result.holdings,
+            covariance_matrix,
+            ticker_list_ordered
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "holdings": result.holdings,
+            "expected_return": result.expected_return,
+            "portfolio_variance": result.portfolio_variance,
+            "sharpe_ratio": result.sharpe_ratio,
+            "diversification_ratio": div_ratio,
+            "optimization_status": result.optimization_status
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except OptimizationFailedError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=400, detail=error_response)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Diversification optimization failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Optimization failed: {str(e)}"})
+
+
+# ============================================================================
+# Priority 4: Order Management Integration Endpoints
+# ============================================================================
+
+@app.post("/api/portfolio/{portfolio_id}/trades/generate", response_model=Dict[str, Any])
+def generate_trade_list_endpoint(
+    portfolio_id: str,
+    optimization_result: Dict[str, Any] = Body(..., description="Optimization result from previous optimization"),
+) -> Dict[str, Any]:
+    """Generate trade list from optimization results."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        # Convert optimization result to OptimizationResult object
+        from .portfolio import OptimizationResult
+        opt_result = OptimizationResult(
+            holdings=optimization_result.get('holdings', {}),
+            expected_return=optimization_result.get('expected_return', 0.0),
+            portfolio_variance=optimization_result.get('portfolio_variance', 0.0),
+            sharpe_ratio=optimization_result.get('sharpe_ratio', 0.0),
+            optimization_status=optimization_result.get('optimization_status', 'optimal')
+        )
+        
+        trade_list = generate_trade_list(
+            db_path,
+            portfolio_id,
+            opt_result
+        )
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "trades": [
+                {
+                    "ticker": t.ticker,
+                    "action": t.action,
+                    "quantity": t.quantity,
+                    "current_weight": t.current_weight,
+                    "target_weight": t.target_weight,
+                    "price": t.price,
+                    "trade_value": t.trade_value,
+                    "estimated_cost": t.estimated_cost
+                }
+                for t in trade_list.trades
+            ],
+            "total_trade_value": trade_list.total_trade_value,
+            "total_estimated_cost": trade_list.total_estimated_cost,
+            "generated_at": trade_list.generated_at.isoformat()
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except Exception as e:
+        LOGGER.error(f"Trade list generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Trade list generation failed: {str(e)}"})
+
+
+@app.get("/api/portfolio/{portfolio_id}/trades/export/{format}")
+def export_trade_list_endpoint(
+    portfolio_id: str,
+    format: str,
+    optimization_result: Dict[str, Any] = Body(..., description="Optimization result"),
+) -> StreamingResponse:
+    """Export trade list in specified format."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        from .portfolio import OptimizationResult
+        opt_result = OptimizationResult(
+            holdings=optimization_result.get('holdings', {}),
+            expected_return=optimization_result.get('expected_return', 0.0),
+            portfolio_variance=optimization_result.get('portfolio_variance', 0.0),
+            sharpe_ratio=optimization_result.get('sharpe_ratio', 0.0),
+            optimization_status=optimization_result.get('optimization_status', 'optimal')
+        )
+        
+        trade_list = generate_trade_list(db_path, portfolio_id, opt_result)
+        trade_bytes = export_trade_list(trade_list, format=format)
+        
+        content_type_map = {
+            "csv": "text/csv",
+            "fix": "text/plain",
+            "json": "application/json"
+        }
+        
+        return StreamingResponse(
+            io.BytesIO(trade_bytes),
+            media_type=content_type_map.get(format, "application/octet-stream"),
+            headers={
+                "Content-Disposition": f'attachment; filename="trades_{portfolio_id}.{format}"'
+            }
+        )
+    except Exception as e:
+        LOGGER.error(f"Trade list export failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Export failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/trades/analyze", response_model=Dict[str, Any])
+def analyze_trade_impact_endpoint(
+    portfolio_id: str,
+    proposed_trades: List[Dict[str, Any]] = Body(..., description="List of proposed trades"),
+) -> Dict[str, Any]:
+    """Analyze impact of proposed trades on portfolio."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        from .portfolio_trades import Trade
+        trades = [
+            Trade(
+                ticker=t['ticker'],
+                action=t['action'],
+                quantity=t.get('quantity', 0),
+                current_weight=t.get('current_weight', 0),
+                target_weight=t.get('target_weight', 0),
+                current_shares=t.get('current_shares', 0),
+                target_shares=t.get('target_shares', 0),
+                price=t.get('price'),
+            )
+            for t in proposed_trades
+        ]
+        
+        result = analyze_trade_impact(db_path, portfolio_id, trades)
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "before_metrics": result.before_metrics,
+            "after_metrics": result.after_metrics,
+            "impact_analysis": result.impact_analysis,
+            "policy_violations": result.policy_violations,
+            "risk_changes": result.risk_changes
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except Exception as e:
+        LOGGER.error(f"Trade impact analysis failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Analysis failed: {str(e)}"})
+
+
+@app.post("/api/portfolio/{portfolio_id}/trades/simulate", response_model=Dict[str, Any])
+def simulate_trade_execution_endpoint(
+    portfolio_id: str,
+    trades: List[Dict[str, Any]] = Body(..., description="List of trades to simulate"),
+) -> Dict[str, Any]:
+    """Simulate portfolio state after trade execution."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        from .portfolio_trades import Trade
+        trade_objects = [
+            Trade(
+                ticker=t['ticker'],
+                action=t['action'],
+                quantity=t.get('quantity', 0),
+                current_weight=t.get('current_weight', 0),
+                target_weight=t.get('target_weight', 0),
+                current_shares=t.get('current_shares', 0),
+                target_shares=t.get('target_shares', 0),
+            )
+            for t in trades
+        ]
+        
+        result = simulate_trade_execution(db_path, portfolio_id, trade_objects)
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "holdings": result.holdings,
+            "metrics": result.metrics,
+            "timestamp": result.timestamp.isoformat()
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except Exception as e:
+        LOGGER.error(f"Trade simulation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Simulation failed: {str(e)}"})
+
+
+# ============================================================================
+# Priority 5: Enhanced Reporting & Customization Endpoints
+# ============================================================================
+
+@app.post("/api/portfolio/{portfolio_id}/reports/custom")
+def create_custom_report_endpoint(
+    portfolio_id: str,
+    report_config: Dict[str, Any] = Body(..., description="Report configuration"),
+) -> StreamingResponse:
+    """Generate custom report from configuration."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        from .portfolio_report_builder import ReportConfig, ReportSection
+        sections = [
+            ReportSection(**s) for s in report_config.get('sections', [])
+        ]
+        config = ReportConfig(
+            portfolio_id=portfolio_id,
+            report_name=report_config.get('report_name', 'Custom Report'),
+            sections=sections,
+            format=report_config.get('format', 'pdf'),
+            branding=report_config.get('branding'),
+            include_charts=report_config.get('include_charts', True),
+            chart_types=report_config.get('chart_types')
+        )
+        
+        report_bytes = create_custom_report(db_path, portfolio_id, config)
+        
+        content_type_map = {
+            "pdf": "application/pdf",
+            "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+        
+        return StreamingResponse(
+            io.BytesIO(report_bytes),
+            media_type=content_type_map.get(config.format, "application/octet-stream"),
+            headers={
+                "Content-Disposition": f'attachment; filename="{config.report_name}.{config.format}"'
+            }
+        )
+    except Exception as e:
+        LOGGER.error(f"Custom report generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Report generation failed: {str(e)}"})
+
+
+@app.get("/api/portfolio/{portfolio_id}/charts/export")
+def export_interactive_charts_endpoint(
+    portfolio_id: str,
+    chart_types: Optional[List[str]] = Query(None, description="List of chart types to export"),
+) -> Response:
+    """Export portfolio charts as interactive HTML."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        html_content = export_interactive_charts(db_path, portfolio_id, chart_types)
+        
+        return Response(
+            content=html_content,
+            media_type="text/html",
+            headers={
+                "Content-Disposition": f'inline; filename="charts_{portfolio_id}.html"'
+            }
+        )
+    except Exception as e:
+        LOGGER.error(f"Chart export failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Chart export failed: {str(e)}"})
+
+
+@app.post("/api/reports/templates")
+def save_report_template_endpoint(
+    template_data: Dict[str, Any] = Body(..., description="Template data"),
+) -> Dict[str, Any]:
+    """Save report template."""
+    try:
+        from .portfolio_report_builder import ReportConfig, ReportSection
+        sections = [
+            ReportSection(**s) for s in template_data['config'].get('sections', [])
+        ]
+        config = ReportConfig(
+            portfolio_id=template_data['config']['portfolio_id'],
+            report_name=template_data['config']['report_name'],
+            sections=sections,
+            format=template_data['config'].get('format', 'pdf'),
+            branding=template_data['config'].get('branding'),
+            include_charts=template_data['config'].get('include_charts', True),
+            chart_types=template_data['config'].get('chart_types')
+        )
+        
+        template_id = save_report_template(
+            template_data['template_name'],
+            template_data.get('description', ''),
+            config,
+            template_data.get('template_id')
+        )
+        
+        return {
+            "success": True,
+            "template_id": template_id,
+            "template_name": template_data['template_name']
+        }
+    except Exception as e:
+        LOGGER.error(f"Template save failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template save failed: {str(e)}"})
+
+
+@app.get("/api/reports/templates")
+def list_report_templates_endpoint() -> List[Dict[str, Any]]:
+    """List all available report templates."""
+    try:
+        templates = list_report_templates()
+        
+        return [
+            {
+                "template_id": t.template_id,
+                "template_name": t.template_name,
+                "description": t.description,
+                "created_at": t.created_at.isoformat(),
+                "updated_at": t.updated_at.isoformat()
+            }
+            for t in templates
+        ]
+    except Exception as e:
+        LOGGER.error(f"Template list failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template list failed: {str(e)}"})
+
+
+# ============================================================================
+# Priority 6: Data Integration & External Services Endpoints
+# ============================================================================
+
+@app.get("/api/portfolio/{portfolio_id}/enrichment")
+def enrich_portfolio_endpoint(
+    portfolio_id: str,
+    data_sources: Optional[List[str]] = Query(None, description="List of data sources to use"),
+) -> Dict[str, Any]:
+    """Enrich portfolio with alternative data sources."""
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        enriched = enrich_with_alternative_data(db_path, portfolio_id, data_sources)
+        
+        return {
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "sentiment_scores": {
+                k: {
+                    "ticker": v.ticker,
+                    "score": v.score,
+                    "source": v.source,
+                    "confidence": v.confidence
+                }
+                for k, v in enriched.sentiment_scores.items()
+            },
+            "economic_indicators": enriched.economic_indicators,
+            "enriched_at": enriched.enriched_at.isoformat()
+        }
+    except PortfolioNotFoundError as e:
+        error_response = format_portfolio_error(e, include_technical=False)
+        raise HTTPException(status_code=404, detail=error_response)
+    except Exception as e:
+        LOGGER.error(f"Portfolio enrichment failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Enrichment failed: {str(e)}"})
+
+
+@app.get("/api/portfolio/{portfolio_id}/sentiment/{ticker}")
+def get_sentiment_score_endpoint(
+    portfolio_id: str,
+    ticker: str,
+    source: str = Query("news", regex="^(news|analyst|social)$", description="Sentiment source"),
+) -> Dict[str, Any]:
+    """Get sentiment score for ticker."""
+    try:
+        score = get_sentiment_score(ticker, source=source)
+        
+        return {
+            "success": True,
+            "ticker": ticker,
+            "source": source,
+            "score": score,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        LOGGER.error(f"Sentiment score fetch failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Sentiment fetch failed: {str(e)}"})
+
+
+# ============================================================================
+# Priority 7: User Experience & Accessibility Endpoints
+# ============================================================================
+
+@app.post("/api/dashboard/layouts")
+def save_dashboard_layout_endpoint(
+    layout_data: Dict[str, Any] = Body(..., description="Dashboard layout data"),
+) -> Dict[str, Any]:
+    """Save dashboard layout."""
+    try:
+        from .portfolio_dashboard_custom import DashboardLayout, DashboardWidget
+        widgets = [
+            DashboardWidget(**w) for w in layout_data.get('widgets', [])
+        ]
+        layout = DashboardLayout(
+            layout_id=layout_data.get('layout_id', f"layout_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"),
+            layout_name=layout_data['layout_name'],
+            user_id=layout_data.get('user_id'),
+            portfolio_id=layout_data.get('portfolio_id'),
+            widgets=widgets
+        )
+        
+        layout_id = save_dashboard_layout(layout)
+        
+        return {
+            "success": True,
+            "layout_id": layout_id,
+            "layout_name": layout.layout_name
+        }
+    except Exception as e:
+        LOGGER.error(f"Layout save failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Layout save failed: {str(e)}"})
+
+
+@app.get("/api/dashboard/layouts/{layout_id}")
+def load_dashboard_layout_endpoint(
+    layout_id: str,
+) -> Dict[str, Any]:
+    """Load dashboard layout by ID."""
+    try:
+        layout = load_dashboard_layout(layout_id)
+        
+        return {
+            "success": True,
+            "layout_id": layout.layout_id,
+            "layout_name": layout.layout_name,
+            "user_id": layout.user_id,
+            "portfolio_id": layout.portfolio_id,
+            "widgets": [
+                {
+                    "widget_id": w.widget_id,
+                    "widget_type": w.widget_type,
+                    "title": w.title,
+                    "enabled": w.enabled,
+                    "position": w.position,
+                    "config": w.config
+                }
+                for w in layout.widgets
+            ],
+            "created_at": layout.created_at.isoformat(),
+            "updated_at": layout.updated_at.isoformat()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Layout load failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Layout load failed: {str(e)}"})
+
+
+@app.get("/api/dashboard/layouts")
+def list_dashboard_layouts_endpoint(
+    user_id: Optional[str] = Query(None, description="Filter by user ID"),
+    portfolio_id: Optional[str] = Query(None, description="Filter by portfolio ID"),
+) -> List[Dict[str, Any]]:
+    """List available dashboard layouts."""
+    try:
+        layouts = list_dashboard_layouts(user_id=user_id, portfolio_id=portfolio_id)
+        
+        return [
+            {
+                "layout_id": l.layout_id,
+                "layout_name": l.layout_name,
+                "user_id": l.user_id,
+                "portfolio_id": l.portfolio_id,
+                "created_at": l.created_at.isoformat(),
+                "updated_at": l.updated_at.isoformat()
+            }
+            for l in layouts
+        ]
+    except Exception as e:
+        LOGGER.error(f"Layout list failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Layout list failed: {str(e)}"})
+
+
+@app.post("/api/user/preferences")
+def save_user_preferences_endpoint(
+    preferences_data: Dict[str, Any] = Body(..., description="User preferences data"),
+) -> Dict[str, Any]:
+    """Save user preferences."""
+    try:
+        from .portfolio_dashboard_custom import UserPreferences
+        preferences = UserPreferences(
+            user_id=preferences_data['user_id'],
+            theme=preferences_data.get('theme', 'light'),
+            font_size=preferences_data.get('font_size', 'medium'),
+            color_scheme=preferences_data.get('color_scheme'),
+            accessibility_options=preferences_data.get('accessibility_options'),
+            dashboard_layout_id=preferences_data.get('dashboard_layout_id')
+        )
+        
+        user_id = save_user_preferences(preferences)
+        
+        return {
+            "success": True,
+            "user_id": user_id
+        }
+    except Exception as e:
+        LOGGER.error(f"Preferences save failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Preferences save failed: {str(e)}"})
+
+
+@app.get("/api/user/{user_id}/preferences")
+def load_user_preferences_endpoint(
+    user_id: str,
+) -> Dict[str, Any]:
+    """Load user preferences by user ID."""
+    try:
+        preferences = load_user_preferences(user_id)
+        
+        return {
+            "success": True,
+            "user_id": preferences.user_id,
+            "theme": preferences.theme,
+            "font_size": preferences.font_size,
+            "color_scheme": preferences.color_scheme,
+            "accessibility_options": preferences.accessibility_options,
+            "dashboard_layout_id": preferences.dashboard_layout_id
+        }
+    except Exception as e:
+        LOGGER.error(f"Preferences load failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Preferences load failed: {str(e)}"})
 

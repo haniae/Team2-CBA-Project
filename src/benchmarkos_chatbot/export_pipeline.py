@@ -41,7 +41,7 @@ def _format_percent(value: Any) -> str:
         number = float(value)
     except (TypeError, ValueError):
         return "N/A"
-    return f"{number * 100:.2f}%"
+    return f"{number * 100:.1f}%"
 
 
 def _format_multiple(value: Any) -> str:
@@ -50,11 +50,10 @@ def _format_multiple(value: Any) -> str:
         number = float(value)
     except (TypeError, ValueError):
         return "N/A"
-    return f"{number:.2f}x"
+    return f"{number:.1f}x"
 
 
-def _format_number(value: Any, is_currency: bool = False) -> str:
-    """Format large numbers with 2 decimal places and B/M suffixes for readability."""
+def _format_currency(value: Any) -> str:
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -64,21 +63,12 @@ def _format_number(value: Any, is_currency: bool = False) -> str:
     prefix = "$" if is_currency else ""
     
     if magnitude >= 1_000_000_000:
-        return f"{prefix}{number / 1_000_000_000:.2f}B"
+        return f"${number / 1_000_000_000:.1f}B"
     if magnitude >= 1_000_000:
-        return f"{prefix}{number / 1_000_000:.2f}M"
+        return f"${number / 1_000_000:.1f}M"
     if magnitude >= 1_000:
-        # For thousands, only show suffix if currency or very large
-        if is_currency or magnitude >= 10_000:
-            return f"{prefix}{number / 1_000:.2f}K"
-    
-    # Small numbers: 2 decimal places
-    return f"{prefix}{number:,.2f}"
-
-
-def _format_currency(value: Any) -> str:
-    """Format currency with 2 decimal places and B/M/K suffixes for large numbers."""
-    return _format_number(value, is_currency=True)
+        return f"${number / 1_000:.1f}K"
+    return f"${number:,.2f}"
 
 
 def _format_value(entry: Dict[str, Any]) -> str:
@@ -228,21 +218,7 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     
     # Initialize PDF with professional settings
     pdf = FPDF(orientation="P", unit="mm", format="A4")
-    pdf.set_auto_page_break(auto=True, margin=20)
-    pdf.set_margins(left=20, top=20, right=20)
-    
-    # Color scheme (professional blues and grays)
-    COLOR_PRIMARY = (30, 90, 180)      # Deep blue
-    COLOR_SECONDARY = (100, 130, 200)  # Light blue
-    COLOR_ACCENT = (50, 50, 50)        # Dark gray
-    COLOR_LIGHT_GRAY = (240, 240, 240) # Light gray background
-    COLOR_TEXT = (40, 40, 40)          # Dark text
-    
-    company = _sanitize_text_for_pdf(meta.get("company") or meta.get("ticker") or "BenchmarkOS Dashboard")
-    ticker = _sanitize_text_for_pdf(meta.get("ticker") or "")
-    report_date = meta.get("date") or datetime.utcnow().strftime("%B %d, %Y")
-    
-    # ========== COVER PAGE ==========
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
     # Header bar with primary color
@@ -259,45 +235,10 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     if ticker:
         pdf.set_font("Helvetica", "", 16)
         pdf.set_text_color(220, 220, 255)
-        pdf.cell(0, 8, f"({ticker})", align="C", ln=1)
-    
-    # Report title
-    pdf.set_y(60)
-    pdf.set_font("Helvetica", "B", 20)
-    pdf.set_text_color(*COLOR_ACCENT)
-    pdf.cell(0, 10, "Financial Analysis Report", align="C", ln=1)
-    
-    # Decorative line
-    pdf.set_y(75)
-    pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.5)
-    pdf.line(70, 75, 140, 75)
-    
-    # Executive Summary Box
-    pdf.set_y(90)
-    pdf.set_fill_color(*COLOR_LIGHT_GRAY)
-    pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.3)
-    pdf.rect(30, 90, 150, 50, 'FD')
-    
-    pdf.set_y(95)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(*COLOR_PRIMARY)
-    pdf.cell(0, 8, "Executive Summary", align="C", ln=1)
-
-    pdf.set_font("Helvetica", "", 11)
-    pdf.set_text_color(*COLOR_TEXT)
-    
-    rec = _sanitize_text_for_pdf(meta.get("recommendation") or "N/A")
-    target_price = _format_currency(meta.get("target_price"))
-    scenario = _sanitize_text_for_pdf(meta.get("scenario") or meta.get("live_scenario") or "Consensus")
-    
-    pdf.set_x(40)
-    pdf.cell(60, 8, "Recommendation:", align="L")
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 8, rec, align="L", ln=1)
-    
-    pdf.set_font("Helvetica", "", 11)
+    company = meta.get("company") or meta.get("ticker") or "BenchmarkOS Dashboard"
+    ticker = meta.get("ticker") or ""
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, f"{company} {f'({ticker})' if ticker else ''}".strip(), ln=1)
     pdf.set_x(40)
     pdf.cell(60, 8, "Target Price:", align="L")
     pdf.set_font("Helvetica", "B", 11)
@@ -306,69 +247,19 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     
     pdf.set_text_color(*COLOR_TEXT)
     pdf.set_font("Helvetica", "", 11)
-    pdf.set_x(40)
-    pdf.cell(60, 8, "Scenario:", align="L")
-    pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 8, scenario, align="L", ln=1)
-    
-    # Footer on cover page
-    pdf.set_y(260)
-    pdf.set_font("Helvetica", "I", 10)
-    pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 6, f"Report Date: {report_date}", align="C", ln=1)
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.set_text_color(*COLOR_PRIMARY)
-    pdf.cell(0, 6, "Generated by BenchmarkOS", align="C", ln=1)
-    
-    # ========== EXECUTIVE SUMMARY PAGE (NEW) ==========
-    pdf.add_page()
-    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
-    
-    pdf.set_y(40)
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.set_text_color(*COLOR_PRIMARY)
-    pdf.cell(0, 10, "Executive Summary", ln=1)
-    
-    pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.5)
-    pdf.line(20, 52, 190, 52)
-    
-    pdf.ln(5)
-    
-    # Investment Thesis section
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(*COLOR_ACCENT)
-    pdf.cell(0, 7, "Investment Thesis", ln=1)
-    
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(*COLOR_TEXT)
-    
-    # More factual investment thesis
-    thesis_text = (
-        f"This investment analysis of {company} ({ticker}) examines the company's financial performance, "
-        f"valuation metrics, and operational results. The report provides a comprehensive overview of "
-        f"key financial indicators based on the most recent available data."
-    )
-    pdf.multi_cell(0, 5, _sanitize_text_for_pdf(thesis_text))
-    
+    rec = meta.get("recommendation") or "N/A"
+    target_price = _format_currency(meta.get("target_price"))
+    scenario = meta.get("scenario") or meta.get("live_scenario") or "Consensus"
+    pdf.multi_cell(0, 6, f"Recommendation: {rec} | Target Price: {target_price} | Scenario: {scenario}")
+    if meta.get("date"):
+        pdf.multi_cell(0, 6, f"Report Date: {meta['date']}")
+
     pdf.ln(4)
-    
-    # Key Highlights section
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(*COLOR_ACCENT)
-    pdf.cell(0, 7, "Key Highlights", ln=1)
-    
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(*COLOR_TEXT)
-    
-    # Extract top 5 KPIs for highlights
-    highlight_count = 0
-    for kpi in kpis[:5]:
-        label = kpi.get("label", "")
-        value = _format_value(kpi)
-        period = kpi.get("period", "")
-        
-        highlight_text = f"- {label}: {value}"
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 8, "KPI Scorecard", ln=1)
+    pdf.set_font("Helvetica", "", 11)
+    for label, value_text, period, source in _collect_kpi_rows(kpis):
+        line = f"- {label}: {value_text}"
         if period:
             highlight_text += f" ({period})"
         
