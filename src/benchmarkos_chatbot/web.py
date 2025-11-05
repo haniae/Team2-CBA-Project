@@ -660,6 +660,18 @@ def build_bot(conversation_id: Optional[str] = None) -> BenchmarkOSChatbot:
             bot.conversation.messages = [
                 {"role": msg.role, "content": msg.content} for msg in history
             ]
+    
+    # CRITICAL: Ensure fresh bot starts with no dashboard AND no cached summaries
+    # This prevents stale dashboards and wrong company summaries from persisting
+    if hasattr(bot, 'last_structured_response'):
+        bot.last_structured_response["dashboard"] = None
+        bot.last_structured_response["comparison_table"] = None
+    
+    # CRITICAL: Clear summary cache to prevent wrong company summaries
+    # The summary cache can contain snapshots of wrong companies from fuzzy ticker matching
+    if hasattr(bot, '_summary_cache'):
+        bot._summary_cache.clear()
+    
     return bot
 
 
@@ -1026,6 +1038,14 @@ def chat(request: ChatRequest) -> ChatResponse:
 
     progress_snapshot = _progress_snapshot(request_id)
     structured = getattr(bot, "last_structured_response", {}) or {}
+    
+    # CRITICAL: Filter out None/empty dashboards - if dashboard is None, don't send it
+    dashboard_data = structured.get("dashboard")
+    if dashboard_data is None:
+        dashboard_data = None  # Explicitly set to None (don't send)
+    elif isinstance(dashboard_data, dict) and not dashboard_data:
+        dashboard_data = None  # Empty dict, don't send
+    
     trends = [
         TrendSeries(**series) for series in structured.get("trends") or []
     ]
@@ -1049,7 +1069,7 @@ def chat(request: ChatRequest) -> ChatResponse:
         comparison_table=comparison_table,
         citations=citations,
         exports=exports,
-        dashboard=structured.get("dashboard"),
+        dashboard=dashboard_data,  # Use filtered dashboard (None if cleared)
         progress_events=progress_snapshot.events,
     )
 

@@ -522,6 +522,84 @@ def build_financial_context(
         return ""
 
 
+def build_company_universe_context(database_path: str) -> str:
+    """
+    Build company universe context for filter queries.
+    
+    Returns:
+        Formatted company universe context with sector breakdowns
+    """
+    try:
+        import json
+        from pathlib import Path
+        
+        # Load company universe data
+        universe_path = Path(__file__).resolve().parents[2] / "webui" / "data" / "company_universe.json"
+        if not universe_path.exists():
+            return ""
+        
+        with open(universe_path, 'r', encoding='utf-8') as f:
+            companies = json.load(f)
+        
+        if not companies:
+            return ""
+        
+        # Group by sector
+        sectors: Dict[str, List[Dict[str, Any]]] = {}
+        for company in companies:
+            sector = company.get('sector', 'Uncategorised')
+            if sector not in sectors:
+                sectors[sector] = []
+            sectors[sector].append(company)
+        
+        # Build context
+        context_parts = [
+            "╔═══════════════════════════════════════════════════════════════════════════════╗\n"
+            "║                     COMPANY UNIVERSE FILTER CONTEXT                          ║\n"
+            "╚═══════════════════════════════════════════════════════════════════════════════╝\n\n"
+            "📊 **INSTRUCTIONS FOR FILTER QUERIES**:\n"
+            "The user is asking to filter or list companies by specific criteria (sector, revenue, growth, etc.).\n"
+            "Use the company universe data below to:\n"
+            "1. Filter companies by the requested criteria\n"
+            "2. Present results as a formatted list or table\n"
+            "3. Include key metrics: ticker, company name, sector, revenue, market cap\n"
+            "4. Sort by relevance (e.g., by revenue if revenue filter is specified)\n"
+            "5. Limit to top 10-20 most relevant results\n"
+            "6. Explain the filtering criteria used\n\n"
+            f"📈 **DATABASE OVERVIEW**: {len(companies)} companies across {len(sectors)} sectors\n\n"
+            "═══════════════════════════════════════════════════════════════════════════════\n\n"
+        ]
+        
+        # Add sector breakdowns
+        for sector, sector_companies in sorted(sectors.items(), key=lambda x: len(x[1]), reverse=True):
+            context_parts.append(f"**{sector}** ({len(sector_companies)} companies):\n")
+            
+            # Sort by market cap (if available) and show top companies
+            sorted_companies = sorted(
+                sector_companies,
+                key=lambda c: c.get('market_cap', 0) if c.get('market_cap') else 0,
+                reverse=True
+            )[:15]  # Top 15 companies per sector
+            
+            for company in sorted_companies:
+                ticker = company.get('ticker', 'N/A')
+                name = company.get('company', 'Unknown')
+                market_cap_display = company.get('market_cap_display', 'N/A')
+                
+                context_parts.append(f"  • {ticker}: {name} (Market Cap: {market_cap_display})\n")
+            
+            if len(sector_companies) > 15:
+                context_parts.append(f"  ... and {len(sector_companies) - 15} more\n")
+            
+            context_parts.append("\n")
+        
+        return "".join(context_parts)
+        
+    except Exception as e:
+        LOGGER.debug(f"Could not build company universe context: {e}")
+        return ""
+
+
 def format_metrics_naturally(ticker: str, metrics: Dict[str, Any]) -> str:
     """Format metrics as natural language text."""
     if not metrics:
