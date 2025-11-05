@@ -581,7 +581,16 @@ SYSTEM_PROMPT = (
     "8. **If data is missing** - If the portfolio data doesn't include a metric you need, explicitly state 'This metric is not available in the portfolio data' BUT still try to provide estimates based on available data\n"
     "9. **DO NOT provide generic advice** - If portfolio data is provided, you MUST analyze THAT SPECIFIC portfolio, not a hypothetical one\n"
     "10. **Verify against data** - Before mentioning any ticker, weight, or metric, verify it exists in the provided portfolio data\n"
-    "11. **Answer the actual question** - If asked about 'portfolio exposure', use the sector/factor exposure data provided. If asked to 'analyze portfolio', analyze the actual holdings shown. If asked about 'CVaR' or risk, CALCULATE it using the portfolio data provided\n\n"
+    "11. **Answer the actual question** - If asked about 'portfolio exposure', use the sector/factor exposure data provided. If asked to 'analyze portfolio', analyze the actual holdings shown. If asked about 'CVaR' or risk, use the pre-calculated metrics from the portfolio context\n"
+    "12. **MANDATORY: Include comprehensive sources** - ALWAYS end portfolio responses with a '📊 Sources:' section containing:\n"
+    "    - SEC filing links for top holdings (10-K, 10-Q) from the portfolio context\n"
+    "    - Yahoo Finance links for all holdings\n"
+    "    - Benchmark ETF sources (SPY, QQQ, DIA, IWM) for risk calculations\n"
+    "    - Portfolio metadata (portfolio ID, holdings count)\n"
+    "    - Risk calculation methodology references\n"
+    "    - Minimum 5-10 source links per portfolio response\n"
+    "    - Format all sources as markdown links: [Name](URL)\n"
+    "    - Use the source links provided in the 'PORTFOLIO DATA SOURCES' section of the context\n\n"
     
     "## Response Structure\n\n"
     "**Direct Answer (1-2 sentences)**\n"
@@ -594,16 +603,28 @@ SYSTEM_PROMPT = (
     "- ### Business Drivers (what's causing the numbers)\n"
     "- ### Future Outlook (implications, catalysts, risks)\n\n"
     
-    "**Multiple Sources (5-10 minimum)**\n"
-    "End with:\n"
-    "📊 **Sources:**\n"
-    "- [10-K FY2024](url)\n"
-    "- [10-K FY2023](url)\n"
-    "- [10-Q Q4 FY2024](url)\n"
-    "- [Yahoo Finance - Ticker](url)\n"
-    "- [Analyst Ratings](url)\n"
-    "- [Recent News Article](url)\n"
-    "- [FRED Economic Data](url) (if relevant)\n\n"
+    "🚨 **MANDATORY SOURCES REQUIREMENT - EVERY RESPONSE MUST INCLUDE:**\n\n"
+    "**CRITICAL: You MUST include a '📊 Sources:' section at the END of EVERY response with clickable links.**\n\n"
+    "**Requirements:**\n"
+    "- **Minimum 5-10 source links** per response\n"
+    "- **ALL sources must be clickable markdown links**: [Name](URL)\n"
+    "- **Use ACTUAL URLs from the context provided** - never use placeholder URLs\n"
+    "- **Include SEC filing links** when available (10-K, 10-Q, 8-K, etc.)\n"
+    "- **Include Yahoo Finance links** for ticker data\n"
+    "- **Include FRED economic data links** when macro context is relevant\n"
+    "- **Include news/article links** when referenced\n"
+    "- **Format example:**\n"
+    "  📊 **Sources:**\n"
+    "  - [10-K FY2024](https://www.sec.gov/...)\n"
+    "  - [10-K FY2023](https://www.sec.gov/...)\n"
+    "  - [10-Q Q4 FY2024](https://www.sec.gov/...)\n"
+    "  - [Yahoo Finance - AAPL](https://finance.yahoo.com/quote/AAPL)\n"
+    "  - [FRED Economic Data - GDP](https://fred.stlouisfed.org/series/GDP)\n\n"
+    "**❌ NEVER send a response without:**\n"
+    "- A '📊 Sources:' section at the very end\n"
+    "- At least 5-10 clickable source links\n"
+    "- Real URLs (not placeholders like 'url' or 'https://example.com')\n"
+    "- If context provides source URLs, you MUST use them - no excuses\n\n"
     
     "## Data Integration - Use Everything\n\n"
     "Your context includes multiple data sources. **USE THEM ALL:**\n\n"
@@ -831,7 +852,8 @@ SYSTEM_PROMPT = (
     "- [Yahoo Finance - AAPL](https://finance.yahoo.com/quote/AAPL)\n"
     "- [FRED GDP Data](https://fred.stlouisfed.org/series/GDP)\n"
     "- [FRED Unemployment](https://fred.stlouisfed.org/series/UNRATE)\n"
-    "- [FRED Consumer Sentiment](https://fred.stlouisfed.org/series/UMCSENT)\"\n\n"
+    "- [FRED Consumer Sentiment](https://fred.stlouisfed.org/series/UMCSENT)\n\n"
+    "**REMEMBER: This sources section is MANDATORY for every response, not optional.**\n\n"
     
     "## Formatting Rules\n\n"
     "- Use **bold** for all key numbers and metrics\n"
@@ -847,6 +869,7 @@ SYSTEM_PROMPT = (
     "- Then provide comprehensive depth (400-1000 words)\n"
     "- Use 10-15+ specific data points\n"
     "- Include multiple sections with headers\n"
+    "- **ALWAYS include a '📊 Sources:' section with 5-10+ clickable links at the end**\n"
     "- Reference all available sources (5-10 minimum)\n"
     "- Show historical trends (3-5 years)\n"
     "- Include analyst views and institutional ownership\n"
@@ -855,10 +878,27 @@ SYSTEM_PROMPT = (
     
     "❌ **DON'T:**\n"
     "- Write short 200-word responses (too brief)\n"
+    "- **EVER send a response without a '📊 Sources:' section**\n"
     "- Use only 1-2 sources (need 5-10)\n"
+    "- Use placeholder URLs (like 'url' or 'https://example.com')\n"
     "- Skip historical context\n"
     "- Omit analyst/market perspective\n"
-    "- Use placeholder links like '[URL]'\n"
+    "- **NEVER omit the sources section** - it's mandatory, not optional\n\n"
+    
+    "## Pre-Send Checklist (VERIFY BEFORE RESPONDING):\n\n"
+    "Before sending your response, verify:\n"
+    "1. ✅ Response includes comprehensive analysis (400-1000 words)\n"
+    "2. ✅ Response includes at least 10-15 specific data points\n"
+    "3. ✅ Response includes multiple sections with headers\n"
+    "4. ✅ **Response ends with a '📊 Sources:' section**\n"
+    "5. ✅ **Sources section contains at least 5-10 clickable markdown links**\n"
+    "6. ✅ **All source links are real URLs (not placeholders)**\n"
+    "7. ✅ **All URLs from context are included in sources**\n"
+    "8. ✅ Response references historical trends (3-5 years)\n"
+    "9. ✅ Response includes analyst/market perspective\n"
+    "10. ✅ Response provides forward outlook\n\n"
+    "**If any item is missing, especially the sources section, DO NOT send the response until it's complete.**\n\n"
+    "- Never use placeholder links like '[URL]' or 'url' - always use real URLs from context\n"
 )
 
 
@@ -3789,6 +3829,84 @@ class BenchmarkOSChatbot:
             context_parts.append("")
             
             context_parts.append("=" * 80)
+            context_parts.append("PORTFOLIO DATA SOURCES - MANDATORY TO INCLUDE IN RESPONSE")
+            context_parts.append("=" * 80)
+            context_parts.append("")
+            context_parts.append("📊 **CRITICAL: You MUST include a '📊 Sources:' section at the end of your response with:**")
+            context_parts.append("")
+            
+            # Portfolio metadata source
+            context_parts.append("### Portfolio Data Sources")
+            context_parts.append(f"- Portfolio ID: {portfolio_id}")
+            context_parts.append(f"- Portfolio Holdings: {len(enriched_holdings)} positions")
+            context_parts.append(f"- Total Market Value: ${stats.total_market_value:,.2f}" if stats and stats.total_market_value else "- Total Market Value: Calculated from holdings")
+            context_parts.append("")
+            
+            # Top holdings SEC filing sources
+            context_parts.append("### SEC Filing Sources for Top Holdings")
+            top_holdings = sorted(enriched_holdings, key=lambda h: h.weight or 0, reverse=True)[:10]
+            from .context_builder import _get_filing_sources
+            
+            for holding in top_holdings:
+                if not holding.ticker:
+                    continue
+                filing_sources = _get_filing_sources(holding.ticker, self.settings.database_path)
+                if filing_sources:
+                    # Get most recent filing
+                    recent_filing = filing_sources[0]
+                    form_type = recent_filing.get("form_type", "SEC filing")
+                    fiscal_year = recent_filing.get("fiscal_year")
+                    sec_url = recent_filing.get("sec_url")
+                    
+                    if sec_url and fiscal_year:
+                        context_parts.append(f"- **{holding.ticker}** ({holding.weight:.1%}): [{form_type} FY{fiscal_year}]({sec_url})")
+                    elif sec_url:
+                        context_parts.append(f"- **{holding.ticker}** ({holding.weight:.1%}): [{form_type}]({sec_url})")
+                    else:
+                        # Fallback to Yahoo Finance if no SEC URL available
+                        context_parts.append(f"- **{holding.ticker}** ({holding.weight:.1%}): [Yahoo Finance - {holding.ticker}](https://finance.yahoo.com/quote/{holding.ticker})")
+                else:
+                    # Fallback to Yahoo Finance when no filing sources found
+                    context_parts.append(f"- **{holding.ticker}** ({holding.weight:.1%}): [Yahoo Finance - {holding.ticker}](https://finance.yahoo.com/quote/{holding.ticker})")
+            
+            context_parts.append("")
+            
+            # Yahoo Finance sources for all holdings
+            context_parts.append("### Yahoo Finance Sources for Holdings")
+            unique_tickers = list(set([h.ticker for h in enriched_holdings if h.ticker]))[:15]
+            for ticker in unique_tickers:
+                context_parts.append(f"- [{ticker}](https://finance.yahoo.com/quote/{ticker})")
+            context_parts.append("")
+            
+            # Benchmark data sources
+            context_parts.append("### Benchmark Data Sources")
+            context_parts.append("- **SPY (S&P 500 ETF)**: [Yahoo Finance - SPY](https://finance.yahoo.com/quote/SPY) | [SPDR S&P 500 ETF Trust](https://www.ssga.com/us/en/institutional/etfs/funds/spdr-sp-500-etf-trust-spy)")
+            context_parts.append("- **QQQ (Nasdaq 100 ETF)**: [Yahoo Finance - QQQ](https://finance.yahoo.com/quote/QQQ) | [Invesco QQQ Trust](https://www.invesco.com/us/financial-products/etfs/product-detail?productId=QQQ)")
+            context_parts.append("- **DIA (Dow Jones ETF)**: [Yahoo Finance - DIA](https://finance.yahoo.com/quote/DIA) | [SPDR Dow Jones Industrial Average ETF](https://www.ssga.com/us/en/institutional/etfs/funds/spdr-dow-jones-industrial-average-etf-trust-dia)")
+            context_parts.append("- **IWM (Russell 2000 ETF)**: [Yahoo Finance - IWM](https://finance.yahoo.com/quote/IWM) | [iShares Russell 2000 ETF](https://www.ishares.com/us/products/239710/ishares-russell-2000-etf)")
+            context_parts.append("")
+            
+            # Risk calculation methodology
+            context_parts.append("### Risk & Performance Calculation Methodology")
+            context_parts.append("- **CVaR & VaR**: Calculated using historical portfolio returns (252 trading days) with 95% confidence level")
+            context_parts.append("- **Volatility**: Annualized standard deviation of portfolio returns (√252 × daily std)")
+            context_parts.append("- **Sharpe Ratio**: (Portfolio Return - Risk-Free Rate) / Portfolio Volatility (annualized)")
+            context_parts.append("- **Sortino Ratio**: (Portfolio Return - Risk-Free Rate) / Downside Deviation (annualized)")
+            context_parts.append("- **Beta**: Covariance(Portfolio, Benchmark) / Variance(Benchmark) - calculated vs SPY or alternative benchmark")
+            context_parts.append("- **Alpha**: Portfolio Return - (Risk-Free Rate + Beta × (Benchmark Return - Risk-Free Rate)) (annualized)")
+            context_parts.append("- **Tracking Error**: Annualized standard deviation of excess returns (Portfolio - Benchmark)")
+            context_parts.append("- **Historical Price Data**: Sourced from database and Yahoo Finance API")
+            context_parts.append("")
+            
+            # Portfolio statistics source
+            context_parts.append("### Portfolio Statistics Sources")
+            context_parts.append("- **Holdings Data**: Portfolio holdings database")
+            context_parts.append("- **Fundamental Data**: SEC filings (10-K, 10-Q) and Yahoo Finance")
+            context_parts.append("- **Sector Classifications**: GICS sector classifications from holdings data")
+            context_parts.append("- **Market Values**: Calculated from current share prices and holdings quantities")
+            context_parts.append("")
+            
+            context_parts.append("=" * 80)
             context_parts.append("END OF PORTFOLIO DATA")
             context_parts.append("=" * 80)
             context_parts.append("")
@@ -3801,10 +3919,14 @@ class BenchmarkOSChatbot:
             context_parts.append("6. Quote the ACTUAL numbers (weights, values, metrics) from above")
             context_parts.append("7. If data is missing, explicitly state it - do not make up numbers")
             context_parts.append("8. DO NOT provide generic portfolio advice - analyze THIS SPECIFIC portfolio")
+            context_parts.append("9. **MANDATORY: Include a '📊 Sources:' section at the end with clickable links from the sources above**")
+            context_parts.append("10. **Include at least 5-10 source links**: SEC filings for top holdings, Yahoo Finance links, benchmark sources")
             context_parts.append("")
             context_parts.append("USER QUESTION: " + user_input)
             context_parts.append("")
             context_parts.append("Now answer the user's question using ONLY the portfolio data shown above.")
+            context_parts.append("")
+            context_parts.append("**REMEMBER: End your response with a '📊 Sources:' section listing all relevant sources from the sections above.**")
             
             context_str = "\n".join(context_parts)
             LOGGER.info(f"Built portfolio context for {portfolio_id}: {len(context_str)} characters, {len(enriched_holdings)} holdings")
