@@ -56,6 +56,15 @@ class EnhancedIntent(Enum):
     PORTFOLIO_SCHEDULE = "portfolio_schedule"
     PORTFOLIO_ENRICHMENT = "portfolio_enrichment"
     PORTFOLIO_SUMMARY = "portfolio_summary"
+    # ML Forecasting intents
+    ML_FORECAST_ARIMA = "ml_forecast_arima"
+    ML_FORECAST_PROPHET = "ml_forecast_prophet"
+    ML_FORECAST_ETS = "ml_forecast_ets"
+    ML_FORECAST_LSTM = "ml_forecast_lstm"
+    ML_FORECAST_GRU = "ml_forecast_gru"
+    ML_FORECAST_TRANSFORMER = "ml_forecast_transformer"
+    ML_FORECAST_ENSEMBLE = "ml_forecast_ensemble"
+    ML_FORECAST_AUTO = "ml_forecast_auto"
 
 
 @dataclass
@@ -253,6 +262,30 @@ def enhance_structured_parse(
                 intent=intent,
                 confidence=0.95,  # Increased confidence for portfolio intents
                 force_text_only=True  # Prevent dashboard rendering for portfolio queries
+            )
+    
+    # ========================================
+    # 1. ML FORECASTING INTENTS
+    # ========================================
+    # ML Forecasting patterns
+    ml_forecast_patterns = [
+        (r"\b(?:forecast|predict|estimate|project)\s+(?:.+?)\s+(?:using|with)\s+arima", EnhancedIntent.ML_FORECAST_ARIMA),
+        (r"\b(?:forecast|predict|estimate|project)\s+(?:.+?)\s+(?:using|with)\s+prophet", EnhancedIntent.ML_FORECAST_PROPHET),
+        (r"\b(?:forecast|predict|estimate|project)\s+(?:.+?)\s+(?:using|with)\s+ets", EnhancedIntent.ML_FORECAST_ETS),
+        (r"\b(?:forecast|predict|estimate|project)\s+(?:.+?)\s+(?:using|with)\s+lstm", EnhancedIntent.ML_FORECAST_LSTM),
+        (r"\b(?:forecast|predict|estimate|project)\s+(?:.+?)\s+(?:using|with)\s+gru", EnhancedIntent.ML_FORECAST_GRU),
+        (r"\b(?:forecast|predict|estimate|project)\s+(?:.+?)\s+(?:using|with)\s+transformer", EnhancedIntent.ML_FORECAST_TRANSFORMER),
+        (r"\b(?:forecast|predict|estimate|project)\s+(?:.+?)\s+(?:using|with)\s+ensemble", EnhancedIntent.ML_FORECAST_ENSEMBLE),
+        (r"\b(?:forecast|predict|estimate|project)\s+(?:.+?)\s+(?:using|with)\s+(?:best|auto|automatic|ml)\s+model", EnhancedIntent.ML_FORECAST_AUTO),
+        (r"\b(?:forecast|predict|estimate|project)\s+(?:.+?)", EnhancedIntent.ML_FORECAST_AUTO),  # General forecast
+    ]
+    
+    for pattern, intent in ml_forecast_patterns:
+        if re.search(pattern, lowered):
+            return EnhancedRouting(
+                intent=intent,
+                confidence=0.90,
+                force_text_only=True  # Prevent dashboard for forecasts
             )
     
     # Also check if query contains portfolio ID + keywords

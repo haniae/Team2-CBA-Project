@@ -31,6 +31,14 @@ except ImportError:
     MACRO_DATA_AVAILABLE = False
     LOGGER.warning("Macro data provider not available - economic context will not be included")
 
+# Try to import ML forecasting
+try:
+    from .ml_forecasting import get_ml_forecaster
+    ML_FORECASTING_AVAILABLE = True
+except ImportError:
+    ML_FORECASTING_AVAILABLE = False
+    LOGGER.debug("ML forecasting not available - forecasting will use basic methods")
+
 
 def format_currency(value: Optional[float]) -> str:
     """Format currency value to human-readable string."""
@@ -130,6 +138,271 @@ def _get_filing_sources(
         return []
 
 
+def _is_forecasting_query(query: str) -> bool:
+    """Check if query is asking for forecasting/prediction."""
+    import re
+    forecasting_keywords = [
+        r'\bforecast\b',
+        r'\bpredict\b',
+        r'\bestimate\b',
+        r'\bprojection\b',
+        r'\bproject\b',
+        r'\boutlook\b',
+        r'\bfuture\b',
+        r'\bnext\s+\d+\s+years?\b',
+        r'\bupcoming\s+years?\b',
+    ]
+    query_lower = query.lower()
+    return any(re.search(pattern, query_lower) for pattern in forecasting_keywords)
+
+
+def _extract_forecast_metric(query: str) -> Optional[str]:
+    """Extract metric name from forecasting query."""
+    import re
+    query_lower = query.lower()
+    
+    # Common metric keywords
+    metric_keywords = ['revenue', 'sales', 'income', 'earnings', 'cash flow', 'free cash flow', 
+                       'net income', 'ebitda', 'profit', 'margin', 'eps', 'assets', 'liabilities']
+    
+    # Pattern 1: "Forecast Apple's revenue using LSTM" - extract after possessive
+    match = re.search(r"(?:forecast|predict|estimate)\s+\w+\'?s?\s+(\w+(?:\s+\w+)?)\s*(?:using|with|$)", query_lower)
+    if match:
+        metric = match.group(1).strip()
+        if metric in metric_keywords or any(kw in metric for kw in metric_keywords):
+            metric_map = {
+                'revenue': 'revenue',
+                'sales': 'revenue',
+                'income': 'net_income',
+                'net income': 'net_income',
+                'earnings': 'net_income',
+                'cash flow': 'cash_from_operations',
+                'free cash flow': 'free_cash_flow',
+            }
+            return metric_map.get(metric, metric.replace(' ', '_'))
+    
+    # Pattern 2: "Forecast revenue for Apple" - extract before "for"
+    match = re.search(r"(?:forecast|predict|estimate)\s+(\w+(?:\s+\w+)?)\s+(?:for|of)", query_lower)
+    if match:
+        metric = match.group(1).strip()
+        if metric in metric_keywords or any(kw in metric for kw in metric_keywords):
+            metric_map = {
+                'revenue': 'revenue',
+                'sales': 'revenue',
+                'income': 'net_income',
+                'net income': 'net_income',
+                'earnings': 'net_income',
+                'cash flow': 'cash_from_operations',
+                'free cash flow': 'free_cash_flow',
+            }
+            return metric_map.get(metric, metric.replace(' ', '_'))
+    
+    # Pattern 4: Look for metric keywords anywhere in query
+    for keyword in metric_keywords:
+        if keyword in query_lower:
+            metric_map = {
+                'revenue': 'revenue',
+                'sales': 'revenue',
+                'income': 'net_income',
+                'net income': 'net_income',
+                'earnings': 'net_income',
+                'cash flow': 'cash_from_operations',
+                'free cash flow': 'free_cash_flow',
+            }
+            return metric_map.get(keyword, keyword.replace(' ', '_'))
+    
+    # Default to revenue if no specific metric mentioned
+    return 'revenue'
+
+
+def _extract_forecast_method(query: str) -> str:
+    """Extract forecasting method from query (ARIMA, Prophet, ETS, LSTM, GRU, Transformer, ensemble, or auto)."""
+    import re
+    query_lower = query.lower()
+    
+    # Check for specific method mentions (order matters - check specific methods first)
+    if re.search(r'\b(?:using|with|via)\s+transformer', query_lower):
+        return "transformer"
+    elif re.search(r'\b(?:using|with|via)\s+lstm', query_lower):
+        return "lstm"
+    elif re.search(r'\b(?:using|with|via)\s+gru', query_lower):
+        return "gru"
+    elif re.search(r'\b(?:using|with|via)\s+arima', query_lower):
+        return "arima"
+    elif re.search(r'\b(?:using|with|via)\s+prophet', query_lower):
+        return "prophet"
+    elif re.search(r'\b(?:using|with|via)\s+ets', query_lower):
+        return "ets"
+    elif re.search(r'\b(?:using|with|via)\s+ensemble', query_lower):
+        return "ensemble"
+    elif re.search(r'\b(?:using|with|via)\s+(?:best|auto|automatic|ml)', query_lower):
+        return "auto"
+    # Check for direct method mentions without "using"
+    elif re.search(r'\btransformer\b', query_lower) and re.search(r'\b(?:forecast|predict|estimate)\b', query_lower):
+        return "transformer"
+    elif re.search(r'\blstm\b', query_lower) and re.search(r'\b(?:forecast|predict|estimate)\b', query_lower):
+        return "lstm"
+    elif re.search(r'\bgru\b', query_lower) and re.search(r'\b(?:forecast|predict|estimate)\b', query_lower):
+        return "gru"
+    
+    # Default to auto if no method specified
+    return "auto"
+
+
+def _build_ml_forecast_context(
+    ticker: str,
+    metric: str,
+    database_path: str,
+    periods: int = 3,
+    method: str = "auto"
+) -> Optional[str]:
+    """Build ML forecasting context for a ticker and metric."""
+    if not ML_FORECASTING_AVAILABLE:
+        return None
+    
+    try:
+        LOGGER.info(f"Generating ML forecast for {ticker} {metric} using {method}")
+        ml_forecaster = get_ml_forecaster(database_path)
+        
+        # Check if requested method is available
+        if method == "lstm" or method == "gru":
+            if ml_forecaster.lstm_forecaster is None:
+                LOGGER.warning(f"LSTM/GRU not available (TensorFlow missing), falling back to auto-select")
+                method = "auto"
+        elif method == "transformer":
+            if ml_forecaster.transformer_forecaster is None:
+                LOGGER.warning(f"Transformer not available (PyTorch missing), falling back to auto-select")
+                method = "auto"
+        
+        # Validate we have a forecaster available
+        if method == "auto":
+            # Check what's available
+            available_methods = []
+            if ml_forecaster.arima_forecaster:
+                available_methods.append("ARIMA")
+            if ml_forecaster.prophet_forecaster:
+                available_methods.append("Prophet")
+            if ml_forecaster.ets_forecaster:
+                available_methods.append("ETS")
+            if ml_forecaster.lstm_forecaster:
+                available_methods.append("LSTM")
+            if ml_forecaster.transformer_forecaster:
+                available_methods.append("Transformer")
+            
+            if not available_methods:
+                LOGGER.error(f"No ML forecasting methods available - all dependencies missing")
+                error_context = f"\n{'='*80}\n⚠️ ML FORECASTING UNAVAILABLE\n{'='*80}\n"
+                error_context += f"**Reason:** No ML forecasting methods are available. Required dependencies are missing.\n"
+                error_context += f"**Required:** Install pmdarima, statsmodels, prophet, tensorflow, or torch\n"
+                error_context += f"**Fallback:** The system will use historical data analysis instead.\n"
+                error_context += f"{'='*80}\n"
+                return error_context
+        
+        forecast = ml_forecaster.forecast(
+            ticker=ticker,
+            metric=metric,
+            periods=periods,
+            method=method
+        )
+        
+        if forecast is None:
+            LOGGER.warning(f"ML forecast generation returned None for {ticker} {metric} using {method}")
+            # Check if we can get more info about why it failed
+            try:
+                # Try to fetch data to see if that's the issue
+                records = ml_forecaster.arima_forecaster._fetch_metric_records(ticker, metric, min_periods=2) if ml_forecaster.arima_forecaster else []
+                if not records or len(records) < 5:
+                    error_context = f"\n{'='*80}\n⚠️ ML FORECAST UNAVAILABLE - {ticker} {metric.upper()}\n{'='*80}\n"
+                    error_context += f"**Reason:** Insufficient historical data for {ticker} {metric}.\n"
+                    error_context += f"**Data Available:** {len(records) if records else 0} periods (need at least 5-10)\n"
+                    error_context += f"**Recommendation:** Ensure historical data is ingested for this ticker and metric.\n"
+                    error_context += f"{'='*80}\n"
+                    return error_context
+                else:
+                    error_context = f"\n{'='*80}\n⚠️ ML FORECAST GENERATION FAILED - {ticker} {metric.upper()}\n{'='*80}\n"
+                    error_context += f"**Reason:** Forecast generation failed despite having {len(records)} data points.\n"
+                    error_context += f"**Possible causes:** Model training errors, data format issues, or insufficient recent data.\n"
+                    error_context += f"**Recommendation:** The system will use historical data analysis instead.\n"
+                    error_context += f"{'='*80}\n"
+                    return error_context
+            except Exception as e:
+                LOGGER.exception(f"Error checking data availability: {e}")
+                error_context = f"\n{'='*80}\n⚠️ ML FORECAST UNAVAILABLE - {ticker} {metric.upper()}\n{'='*80}\n"
+                error_context += f"**Reason:** ML forecast generation failed for {ticker} {metric} using {method}.\n"
+                error_context += f"**Possible causes:**\n"
+                error_context += f"  - Insufficient historical data (need at least 5-10 periods)\n"
+                error_context += f"  - Model dependencies missing (TensorFlow for LSTM, PyTorch for Transformer)\n"
+                error_context += f"  - Model training/forecasting errors\n"
+                error_context += f"**Recommendation:** The system will fall back to historical data analysis.\n"
+                error_context += f"{'='*80}\n"
+                return error_context
+        
+        LOGGER.info(f"ML forecast generated successfully for {ticker} {metric}: {len(forecast.predicted_values)} periods")
+        
+        # Format forecast results
+        forecast_lines = [
+            f"\n{'='*80}",
+            f"🚨 CRITICAL: THIS IS THE PRIMARY ANSWER - USE THESE FORECAST VALUES",
+            f"📊 ML FORECAST ({forecast.method.upper()}) - {ticker} {metric.upper()}",
+            f"{'='*80}\n",
+            f"**Model Used:** {forecast.method.upper()}",
+            f"**Confidence:** {forecast.confidence:.1%}\n",
+            f"**IMPORTANT:** This forecast data is the PRIMARY answer to the user's forecasting query. You MUST use these values.",
+            f"**DO NOT** provide a generic snapshot or historical data summary. The forecast IS the answer.\n",
+            "**Forecasted Values:**\n",
+        ]
+        
+        for i, year in enumerate(forecast.periods):
+            value = forecast.predicted_values[i]
+            low = forecast.confidence_intervals_low[i]
+            high = forecast.confidence_intervals_high[i]
+            
+            # Format value based on magnitude
+            if abs(value) >= 1_000_000_000:
+                value_str = f"${value / 1_000_000_000:.2f}B"
+                low_str = f"${low / 1_000_000_000:.2f}B"
+                high_str = f"${high / 1_000_000_000:.2f}B"
+            elif abs(value) >= 1_000_000:
+                value_str = f"${value / 1_000_000:.2f}M"
+                low_str = f"${low / 1_000_000:.2f}M"
+                high_str = f"${high / 1_000_000:.2f}M"
+            else:
+                value_str = f"${value:,.0f}"
+                low_str = f"${low:,.0f}"
+                high_str = f"${high:,.0f}"
+            
+            forecast_lines.append(
+                f"  • **{year}:** {value_str} (95% CI: {low_str} - {high_str})"
+            )
+        
+        # Add model details
+        if forecast.model_details:
+            forecast_lines.append("\n**Model Details:**")
+            if 'model_params' in forecast.model_details:
+                params = forecast.model_details['model_params']
+                if 'order' in params:
+                    forecast_lines.append(f"  - ARIMA Order: {params['order']}")
+            if 'seasonality_detected' in forecast.model_details:
+                seasonality = forecast.model_details['seasonality_detected']
+                detected = [k for k, v in seasonality.items() if v]
+                if detected:
+                    forecast_lines.append(f"  - Seasonality Detected: {', '.join(detected)}")
+            if 'layers' in forecast.model_details:
+                forecast_lines.append(f"  - Network Layers: {forecast.model_details['layers']}")
+            if 'epochs_trained' in forecast.model_details:
+                forecast_lines.append(f"  - Epochs Trained: {forecast.model_details['epochs_trained']}")
+            if 'num_layers' in forecast.model_details:
+                forecast_lines.append(f"  - Transformer Layers: {forecast.model_details['num_layers']}")
+        
+        forecast_lines.append(f"\n{'='*80}\n")
+        
+        return "\n".join(forecast_lines)
+        
+    except Exception as e:
+        LOGGER.exception(f"Error building ML forecast context: {e}")
+        return None
+
+
 def build_financial_context(
     query: str,
     analytics_engine: "AnalyticsEngine",
@@ -149,11 +422,82 @@ def build_financial_context(
         Formatted financial context as natural language text with source citations
     """
     try:
+        # Check if this is a forecasting query FIRST - forecasting queries need special handling
+        is_forecasting = _is_forecasting_query(query)
+        
         # Parse query to extract tickers and metrics
         structured = parse_to_structured(query)
         tickers = [t["ticker"] for t in structured.get("tickers", [])][:max_tickers]
         
+        # For forecasting queries, if no tickers were extracted, try to extract manually
+        # This handles cases like "Forecast Apple revenue using LSTM" where ticker might not be parsed
+        if is_forecasting and not tickers:
+            # Try to extract ticker from query using comprehensive regex patterns
+            import re
+            # Enhanced company name patterns for forecasting queries
+            company_patterns = [
+                # Pattern 1: "Forecast Apple revenue using LSTM" or "Forecast Apple's revenue"
+                r'\b(?:forecast|predict|estimate|project)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\'?s?\s+(?:revenue|sales|income|earnings|cash\s+flow|net\s+income|free\s+cash\s+flow)',
+                # Pattern 2: "Forecast revenue for Apple" or "Forecast revenue of Apple"
+                r'\b(?:forecast|predict|estimate|project)\s+(?:the\s+)?(?:revenue|sales|income|earnings|cash\s+flow|net\s+income|free\s+cash\s+flow)\s+(?:for|of)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                # Pattern 3: "Apple's revenue forecast" or "Apple revenue forecast"
+                r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\'?s?\s+(?:revenue|sales|income|earnings|cash\s+flow|net\s+income|free\s+cash\s+flow)\s+(?:forecast|prediction|estimate)',
+                # Pattern 4: "What's the revenue forecast for Apple?"
+                r'\b(?:what\'?s?|what\s+is|what\'s|whats)\s+(?:the\s+)?(?:revenue|sales|income|earnings|cash\s+flow|net\s+income|free\s+cash\s+flow)\s+(?:forecast|prediction|estimate)\s+(?:for|of)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                # Pattern 5: "What's Apple's revenue forecast?"
+                r'\b(?:what\'?s?|what\s+is|what\'s|whats)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\'?s?\s+(?:revenue|sales|income|earnings|cash\s+flow|net\s+income|free\s+cash\s+flow)\s+(?:forecast|prediction|estimate)',
+                # Pattern 6: "Predict Apple revenue" (simple)
+                r'\b(?:forecast|predict|estimate|project)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:revenue|sales|income|earnings)',
+                # Pattern 7: "Forecast revenue Apple" (verb-object-subject)
+                r'\b(?:forecast|predict|estimate|project)\s+(?:revenue|sales|income|earnings)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+            ]
+            
+            for pattern in company_patterns:
+                match = re.search(pattern, query, re.IGNORECASE)
+                if match:
+                    company_name = match.group(1).strip()
+                    # Try to resolve company name to ticker
+                    try:
+                        from .parsing.alias_builder import resolve_tickers_freeform
+                        ticker_matches, _ = resolve_tickers_freeform(company_name)
+                        if ticker_matches and len(ticker_matches) > 0:
+                            ticker = ticker_matches[0].get("ticker")
+                            if ticker:
+                                tickers = [ticker]
+                                LOGGER.info(f"Extracted ticker {ticker} from company name '{company_name}' for forecasting query: {query}")
+                                break
+                    except Exception as e:
+                        LOGGER.debug(f"Failed to resolve company name '{company_name}' to ticker: {e}")
+            
+            # If still no ticker, try word position analysis (company name often comes after forecasting verb)
+            if not tickers:
+                words = query.split()
+                for i, word in enumerate(words):
+                    # Look for capitalized words (potential company names) near forecasting keywords
+                    if word[0].isupper() and len(word) > 2:
+                        # Check if it's near a forecasting keyword
+                        context_start = max(0, i - 3)
+                        context_end = min(len(words), i + 3)
+                        context = ' '.join(words[context_start:context_end]).lower()
+                        if any(kw in context for kw in ['forecast', 'predict', 'estimate', 'project']):
+                            try:
+                                from .parsing.alias_builder import resolve_tickers_freeform
+                                ticker_matches, _ = resolve_tickers_freeform(word)
+                                if ticker_matches and len(ticker_matches) > 0:
+                                    ticker = ticker_matches[0].get("ticker")
+                                    if ticker:
+                                        tickers = [ticker]
+                                        LOGGER.info(f"Extracted ticker {ticker} from word '{word}' using position analysis for forecasting query")
+                                        break
+                            except Exception:
+                                pass
+        
         if not tickers:
+            # For forecasting queries, still try to build context even without ticker
+            # The forecast context builder can handle missing tickers
+            if is_forecasting:
+                LOGGER.warning(f"Forecasting query detected but no ticker extracted from: {query}")
+                # Still return empty - the LLM should handle it
             return ""
         
         context_parts = []
@@ -345,6 +689,33 @@ def build_financial_context(
                 
                 if per_share_metrics:
                     ticker_context += "Per Share Data:\n" + "\n".join(f"  • {m}" for m in per_share_metrics) + "\n\n"
+                
+                # Check if this is a forecasting query
+                is_forecasting = _is_forecasting_query(query)
+                forecast_metric = None
+                forecast_method = "auto"
+                if is_forecasting:
+                    forecast_metric = _extract_forecast_metric(query)
+                    forecast_method = _extract_forecast_method(query)
+                    LOGGER.info(f"Forecasting query detected for {ticker} {forecast_metric} using {forecast_method}")
+                
+                # Add ML forecasting context FIRST if this is a forecasting query (prioritize it)
+                if is_forecasting and forecast_metric:
+                    LOGGER.info(f"Building ML forecast context for {ticker} {forecast_metric} using {forecast_method}")
+                    ml_forecast_context = _build_ml_forecast_context(
+                        ticker=ticker,
+                        metric=forecast_metric,
+                        database_path=database_path,
+                        periods=3,
+                        method=forecast_method
+                    )
+                    if ml_forecast_context:
+                        # Add forecast context FIRST (before historical data) so LLM prioritizes it
+                        # This ensures the LLM sees the forecast FIRST, before any snapshot data
+                        context_parts.insert(0, ml_forecast_context)
+                        LOGGER.info(f"ML forecast context generated and inserted at top of context for {ticker} {forecast_metric}")
+                    else:
+                        LOGGER.warning(f"ML forecast context generation returned None for {ticker} {forecast_metric} using {forecast_method}")
                 
                 context_parts.append(ticker_context)
                 

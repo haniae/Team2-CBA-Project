@@ -592,6 +592,37 @@ SYSTEM_PROMPT = (
     "    - Format all sources as markdown links: [Name](URL)\n"
     "    - Use the source links provided in the 'PORTFOLIO DATA SOURCES' section of the context\n\n"
     
+    "## ML Forecasting - CRITICAL RULES\n\n"
+    "🚨 **MANDATORY: When ML forecast data is provided in the context (marked with '📊 ML FORECAST' or '🚨 CRITICAL: THIS IS THE PRIMARY ANSWER'):**\n\n"
+    "**YOU MUST FOLLOW THESE RULES EXACTLY - NO EXCEPTIONS:**\n\n"
+    "1. **THE FORECAST IS THE ONLY ANSWER** - When a forecast is provided, you MUST use ONLY the ML forecast values. DO NOT provide historical snapshots, KPIs, or generic company data.\n"
+    "2. **DO NOT PROVIDE GENERIC SNAPSHOTS** - If a forecast is provided, DO NOT return a standard company snapshot or historical data summary. The forecast REPLACES the snapshot.\n"
+    "3. **START WITH THE FORECAST** - Begin your response IMMEDIATELY with the forecast values (e.g., 'Based on LSTM forecasting, Apple's revenue is forecasted to reach $410.50B in 2025')\n"
+    "4. **Quote actual forecast values** - Reference the EXACT forecasted values, confidence intervals, and model used from the context. Use the exact numbers shown.\n"
+    "5. **Include ALL forecast years** - List ALL forecasted values for each year shown in the context (e.g., 2025, 2026, 2027)\n"
+    "6. **Include model details** - Mention the model used (ARIMA, Prophet, ETS, LSTM, GRU, Transformer) and its confidence level from the context\n"
+    "7. **Explain forecast interpretation** - Explain what the forecast means, including confidence intervals (e.g., 'The 95% confidence interval suggests revenue could range from $395.20B to $425.80B')\n"
+    "8. **Compare with historical data** - If historical data is provided, briefly compare the forecast to historical trends (1-2 sentences), but the FORECAST is the PRIMARY answer\n"
+    "9. **Mention model performance** - If model details are provided (training loss, validation loss, epochs), briefly mention model quality\n"
+    "10. **DO NOT estimate manually** - Use the pre-calculated forecast values from the context, don't try to calculate your own forecasts\n"
+    "11. **Forecast is the answer** - When asked to 'forecast' or 'predict', the ML forecast IS the answer - present it prominently, NOT a snapshot\n"
+    "12. **NEVER ignore forecast context** - If you see '🚨 CRITICAL: THIS IS THE PRIMARY ANSWER' in the context, the forecast MUST be your primary response. Ignoring this is a CRITICAL ERROR.\n"
+    "13. **Response structure for forecasts:**\n"
+    "    - First paragraph: Forecast summary with actual values\n"
+    "    - Second paragraph: Model details and confidence\n"
+    "    - Third paragraph: Brief historical context (optional)\n"
+    "    - Sources section (mandatory)\n"
+    "    - DO NOT include KPI snapshots or Phase 1/Phase 2 KPIs\n\n"
+    
+    "**Example for forecasting queries:**\n"
+    "If asked 'Forecast Apple's revenue using LSTM', your response should:\n"
+    "- Start with: 'Based on LSTM forecasting, Apple's revenue is projected to be...'\n"
+    "- Include all forecasted values for each year (2025, 2026, 2027)\n"
+    "- Show confidence intervals for each forecast\n"
+    "- Explain the model used and its confidence level\n"
+    "- Compare forecast to historical growth trends\n"
+    "- Include sources section with links\n\n"
+    
     "## Response Structure\n\n"
     "**Direct Answer (1-2 sentences)**\n"
     "- State the answer immediately\n\n"
@@ -974,6 +1005,16 @@ class BenchmarkOSChatbot:
         lowered = prompt.strip().lower()
         if not lowered:
             return False
+        
+        # CRITICAL: Don't cache forecasting queries - they need fresh ML forecast context
+        # Forecasting queries should always generate fresh forecasts, not return cached snapshots
+        try:
+            from .context_builder import _is_forecasting_query
+            if _is_forecasting_query(prompt):
+                return False  # Never cache forecasting queries
+        except ImportError:
+            pass  # If context_builder not available, continue with normal caching logic
+        
         allowed_prefixes = (
             "compare",
             "fact",
@@ -1071,11 +1112,36 @@ class BenchmarkOSChatbot:
             self._metrics_cache.popitem(last=False)
         return records
 
-    def _get_ticker_summary(self, ticker: str) -> str:
+    def _get_ticker_summary(self, ticker: str, user_input: Optional[str] = None) -> str:
         """Return a narrative summary for ``ticker`` with caching."""
+        # CRITICAL: Don't generate summaries for forecasting queries
+        # This is a final safeguard to prevent snapshot generation for forecasting queries
+        # MUST check BEFORE cache lookup to prevent returning cached summaries for forecasting queries
+        if user_input:
+            try:
+                from .context_builder import _is_forecasting_query
+                if _is_forecasting_query(user_input):
+                    LOGGER.warning(f"Attempted to generate summary for forecasting query: {user_input}")
+                    return None  # Return None to prevent summary generation
+            except ImportError:
+                pass  # If context_builder not available, continue with normal summary generation
+        
         normalized = ticker.upper()
         entry = self._summary_cache.get(normalized)
         if entry:
+            # CRITICAL: Also check if user_input is a forecasting query before returning cached summary
+            # This prevents returning cached snapshots for forecasting queries
+            if user_input:
+                try:
+                    from .context_builder import _is_forecasting_query
+                    if _is_forecasting_query(user_input):
+                        LOGGER.warning(f"Attempted to return cached summary for forecasting query: {user_input}")
+                        # Don't return cached summary for forecasting queries - clear it and return None
+                        self._summary_cache.pop(normalized, None)
+                        return None
+                except ImportError:
+                    pass
+            
             summary, created_at = entry
             if self._current_time() - created_at <= self._SUMMARY_CACHE_TTL_SECONDS:
                 self._summary_cache.move_to_end(normalized)
@@ -1179,7 +1245,7 @@ class BenchmarkOSChatbot:
         for ticker in POPULAR_TICKERS:
             try:
                 self._fetch_metrics_cached(ticker)
-                self._get_ticker_summary(ticker)
+                self._get_ticker_summary(ticker, None)
             except Exception:  # pragma: no cover - defensive caching preload
                 LOGGER.debug("Preload for %s failed", ticker, exc_info=True)
 
@@ -1334,6 +1400,17 @@ class BenchmarkOSChatbot:
     def _normalize_nl_to_command(self, text: str) -> Optional[str]:
         """Turn flexible NL prompts into the strict CLI-style commands this class handles."""
         t = text.strip()
+        
+        # CRITICAL: Skip normalization for forecasting queries
+        # Normalization might break forecasting intent (e.g., "Forecast Apple revenue" -> "metrics AAPL")
+        # Forecasting queries should be handled by LLM with forecast context, not normalized commands
+        try:
+            from .context_builder import _is_forecasting_query
+            if _is_forecasting_query(text):
+                LOGGER.debug(f"Skipping normalization for forecasting query: {text}")
+                return None  # Return None to skip normalization, let LLM handle it
+        except ImportError:
+            pass  # If context_builder not available, continue with normalization
 
         def _canon_year_span(txt: str) -> Optional[str]:
             if not txt:
@@ -1800,9 +1877,23 @@ class BenchmarkOSChatbot:
                 emit("cache_lookup", "Checking recent answers")
                 cached_entry = self._get_cached_reply(canonical_prompt)
                 if cached_entry:
-                    emit("cache_hit", "Reusing earlier answer from cache")
-                    reply = cached_entry.reply
-                    self.last_structured_response = copy.deepcopy(cached_entry.structured)
+                    # CRITICAL: Don't use cached replies for forecasting queries
+                    # Forecasting queries need fresh ML forecast context, not cached snapshots
+                    try:
+                        from .context_builder import _is_forecasting_query
+                        if _is_forecasting_query(user_input):
+                            # Skip cache for forecasting queries - they need fresh forecast context
+                            emit("cache_skip", "Skipping cache for forecasting query - need fresh ML forecast context")
+                            cached_entry = None
+                        else:
+                            emit("cache_hit", "Reusing earlier answer from cache")
+                            reply = cached_entry.reply
+                            self.last_structured_response = copy.deepcopy(cached_entry.structured)
+                    except ImportError:
+                        # If context_builder not available, use cache as normal
+                        emit("cache_hit", "Reusing earlier answer from cache")
+                        reply = cached_entry.reply
+                        self.last_structured_response = copy.deepcopy(cached_entry.structured)
                 else:
                     emit("cache_miss", "No reusable answer found")
             else:
@@ -1815,23 +1906,64 @@ class BenchmarkOSChatbot:
                     emit("help_complete", "Help guide ready")
                 else:
                     attempted_intent = False
-                    # Try structured parsing first (Priority 1)
-                    emit("intent_routed_structured", "Trying structured parsing first")
-                    try:
-                        reply = self._handle_financial_intent(user_input)
-                        attempted_intent = True
-                    except Exception as e:
-                        LOGGER.exception(f"Error in _handle_financial_intent: {e}")
-                        emit("intent_error", f"Structured parsing error: {str(e)}")
-                        attempted_intent = True
-                        reply = None
                     
-                    # Fallback to normalized command if structured parsing fails
-                    if reply is None and normalized_command and normalized_command.strip().lower() != lowered_input:
-                        emit("intent_normalised", "Falling back to normalized command")
-                        emit("intent_routed_structured", f"Executing structured command: {normalized_command}")
-                        reply = self._handle_financial_intent(normalized_command)
+                    # CRITICAL: Check for forecasting queries BEFORE structured parsing
+                    # Forecasting queries should always route to LLM with forecast context
+                    is_forecasting = False
+                    try:
+                        from .context_builder import _is_forecasting_query
+                        is_forecasting = _is_forecasting_query(user_input)
+                    except ImportError:
+                        pass
+                    
+                    if is_forecasting:
+                        # Skip structured parsing for forecasting queries - always use LLM
+                        emit("intent_forecasting", "Forecasting query detected - skipping structured parsing, routing to LLM")
+                        reply = None
                         attempted_intent = True
+                    else:
+                        # Try structured parsing first (Priority 1)
+                        emit("intent_routed_structured", "Trying structured parsing first")
+                        try:
+                            reply = self._handle_financial_intent(user_input)
+                            attempted_intent = True
+                            
+                            # CRITICAL: Even if structured parsing returned a reply, check if it's a forecasting query
+                            # If so, ignore the structured reply and route to LLM
+                            if reply is not None:
+                                try:
+                                    from .context_builder import _is_forecasting_query
+                                    if _is_forecasting_query(user_input):
+                                        LOGGER.warning(f"Structured parsing returned reply for forecasting query, ignoring and routing to LLM: {reply[:100]}")
+                                        reply = None  # Override structured reply for forecasting queries
+                                        emit("intent_forecasting", "Forecasting query detected in structured reply - overriding to route to LLM")
+                                except ImportError:
+                                    pass
+                        except Exception as e:
+                            LOGGER.exception(f"Error in _handle_financial_intent: {e}")
+                            emit("intent_error", f"Structured parsing error: {str(e)}")
+                            attempted_intent = True
+                            reply = None
+                        
+                        # Fallback to normalized command if structured parsing fails
+                        # BUT: Skip if it's a forecasting query (normalization might break forecasting intent)
+                        if reply is None and not is_forecasting and normalized_command and normalized_command.strip().lower() != lowered_input:
+                            emit("intent_normalised", "Falling back to normalized command")
+                            emit("intent_routed_structured", f"Executing structured command: {normalized_command}")
+                            reply = self._handle_financial_intent(normalized_command)
+                            attempted_intent = True
+                            
+                            # Check again if normalized command is actually a forecasting query
+                            if reply is not None:
+                                try:
+                                    from .context_builder import _is_forecasting_query
+                                    if _is_forecasting_query(normalized_command) or _is_forecasting_query(user_input):
+                                        LOGGER.warning(f"Normalized command returned reply for forecasting query, ignoring: {reply[:100]}")
+                                        reply = None
+                                        emit("intent_forecasting", "Forecasting query detected in normalized reply - overriding to route to LLM")
+                                except ImportError:
+                                    pass
+                    
                     if attempted_intent:
                         if reply is not None:
                             emit("intent_complete", "Analytics intent resolved")
@@ -1841,6 +1973,19 @@ class BenchmarkOSChatbot:
             if reply is None:
                 # Check if this is a question - if so, skip summary and let LLM handle it
                 lowered_input = user_input.lower()
+                
+                # CRITICAL: Check for forecasting queries FIRST (before question check)
+                try:
+                    from .context_builder import _is_forecasting_query
+                    if _is_forecasting_query(user_input):
+                        # Forecasting query - ALWAYS use LLM with forecasting context
+                        # Don't process through dashboard or structured parsing
+                        emit("intent_forecasting", "Forecasting query detected - using LLM with ML forecast context")
+                        # Skip to LLM path
+                        pass  # Continue to LLM path below
+                except ImportError:
+                    pass
+                
                 question_patterns = [
                     # CRITICAL: Contractions MUST come first
                     r'\bwhat\'s\b',  # "what's" contraction - CRITICAL
@@ -1858,10 +2003,12 @@ class BenchmarkOSChatbot:
                     r'\bshould\s+i\b',
                     r'\bwhen\s+(?:is|are|was|were|did|will)\b',
                     r'\bwhere\s+(?:is|are|can|do)\b',
+                    # Forecasting patterns (also questions)
+                    r'\b(?:forecast|predict|estimate|project)\b',
                 ]
                 is_question = any(re.search(pattern, lowered_input) for pattern in question_patterns)
                 
-                # Only do ticker summary for bare ticker mentions, NOT questions
+                # Only do ticker summary for bare ticker mentions, NOT questions or forecasting queries
                 if not is_question:
                     # Check for dashboard keyword first
                     dashboard_keywords = ["dashboard", "full dashboard", "comprehensive dashboard", 
@@ -1925,20 +2072,40 @@ class BenchmarkOSChatbot:
                         # If no tickers detected, fall through to other handlers
                     else:
                         # Not a dashboard request - check for regular summary
-                        summary_target = self._detect_summary_target(user_input, normalized_command)
-                        if summary_target:
-                            # Use text summary for regular ticker queries (bare mentions only)
-                            emit("summary_attempt", f"Compiling text summary for {summary_target}")
-                            reply = self._get_ticker_summary(summary_target)
-                            if reply:
-                                emit("summary_complete", f"Text snapshot prepared for {summary_target}")
-                            else:
-                                emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
+                        # CRITICAL: Skip summary for forecasting queries - they should use LLM with forecast context
+                        is_forecasting = False
+                        try:
+                            from .context_builder import _is_forecasting_query
+                            is_forecasting = _is_forecasting_query(user_input)
+                        except ImportError:
+                            pass
+                        
+                        if not is_forecasting:
+                            summary_target = self._detect_summary_target(user_input, normalized_command)
+                            if summary_target:
+                                # Use text summary for regular ticker queries (bare mentions only)
+                                emit("summary_attempt", f"Compiling text summary for {summary_target}")
+                                reply = self._get_ticker_summary(summary_target, user_input)
+                                if reply:
+                                    emit("summary_complete", f"Text snapshot prepared for {summary_target}")
+                                else:
+                                    emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
+                        else:
+                            # Forecasting query - skip summary generation, use LLM with forecast context
+                            emit("intent_forecasting", "Forecasting query detected - skipping snapshot, using LLM with ML forecast context")
 
             if reply is None:
                 emit("context_build_start", "Gathering enhanced financial context")
                 
-                # Check if this is a portfolio query FIRST - portfolio queries get special handling
+                # Check if this is a forecasting query FIRST - forecasting queries need special handling
+                is_forecasting = False
+                try:
+                    from .context_builder import _is_forecasting_query
+                    is_forecasting = _is_forecasting_query(user_input)
+                except ImportError:
+                    pass
+                
+                # Check if this is a portfolio query - portfolio queries get special handling
                 portfolio_context = self._build_portfolio_context(user_input)
                 
                 if portfolio_context:
@@ -1950,6 +2117,17 @@ class BenchmarkOSChatbot:
                 else:
                     # For non-portfolio queries, use regular financial context
                     context = self._build_enhanced_rag_context(user_input)
+                    
+                    # For forecasting queries, even if context is empty, ensure we still call LLM
+                    # The LLM can handle forecasting queries even without full context
+                    if is_forecasting and not context:
+                        LOGGER.warning(f"Forecasting query detected but context is empty - will still call LLM")
+                        # Add a minimal context indicating this is a forecasting query
+                        context = f"\n{'='*80}\n📊 FORECASTING QUERY DETECTED\n{'='*80}\n"
+                        context += f"**Query:** {user_input}\n"
+                        context += f"**Note:** This is a forecasting query. Please provide a forecast based on available data.\n"
+                        context += f"{'='*80}\n"
+                    
                     emit(
                         "context_build_ready",
                         "Context compiled" if context else "Context not required",
@@ -1963,8 +2141,21 @@ class BenchmarkOSChatbot:
                 LOGGER.info(f"Generated reply length: {len(reply) if reply else 0} characters")
 
             if reply is None:
-                emit("fallback", "Using enhanced fallback reply")
-                reply = self._handle_enhanced_error(ErrorCategory.UNKNOWN_ERROR)
+                # CRITICAL: Final check before fallback - ensure forecasting queries never get fallback snapshots
+                try:
+                    from .context_builder import _is_forecasting_query
+                    if _is_forecasting_query(user_input):
+                        # Forecasting query should have already been handled by LLM with forecast context
+                        # If we're here, something went wrong - log it but don't generate a snapshot
+                        LOGGER.warning(f"Forecasting query reached fallback handler - this should not happen: {user_input}")
+                        reply = "I apologize, but I encountered an issue generating the forecast. Please try rephrasing your query or specifying the company name more clearly."
+                        emit("forecasting_fallback", "Forecasting query reached fallback - using error message instead of snapshot")
+                    else:
+                        emit("fallback", "Using enhanced fallback reply")
+                        reply = self._handle_enhanced_error(ErrorCategory.UNKNOWN_ERROR)
+                except ImportError:
+                    emit("fallback", "Using enhanced fallback reply")
+                    reply = self._handle_enhanced_error(ErrorCategory.UNKNOWN_ERROR)
 
             emit("finalize", "Finalising response")
             database.log_message(
@@ -1976,9 +2167,34 @@ class BenchmarkOSChatbot:
             )
             self.conversation.messages.append({"role": "assistant", "content": reply})
 
-            if cacheable and not cached_entry and reply:
+            # CRITICAL: Don't cache forecasting queries - they need fresh ML forecast context
+            # Check if this was a forecasting query before caching
+            is_forecasting_for_cache = False
+            try:
+                from .context_builder import _is_forecasting_query
+                is_forecasting_for_cache = _is_forecasting_query(user_input)
+            except ImportError:
+                pass
+            
+            if cacheable and not cached_entry and reply and not is_forecasting_for_cache:
                 emit("cache_store", "Caching response for future reuse")
                 self._store_cached_reply(canonical_prompt, reply)
+            elif is_forecasting_for_cache:
+                emit("cache_skip", "Skipping cache for forecasting query - need fresh ML forecast context")
+
+            # FINAL SAFEGUARD: Check if reply contains snapshot text for forecasting queries
+            # This prevents returning snapshots even if they somehow got generated
+            try:
+                from .context_builder import _is_forecasting_query
+                if _is_forecasting_query(user_input):
+                    # Check if reply contains snapshot markers (Phase1 KPIs, Phase 2 KPIs, etc.)
+                    if reply and ("Phase1 KPIs" in reply or "Phase 1 KPIs" in reply or "Phase 2 KPIs" in reply or ("snapshot" in reply.lower() and "forecast" not in reply.lower())):
+                        LOGGER.error(f"CRITICAL: Forecasting query returned a snapshot instead of forecast! Query: {user_input}, Reply preview: {reply[:200]}")
+                        # Replace snapshot with error message
+                        reply = "I apologize, but I encountered an issue generating the forecast. The system attempted to return a snapshot instead of a forecast. Please try rephrasing your query or specifying the company name and metric more clearly (e.g., 'Forecast Apple revenue using Prophet')."
+                        emit("forecasting_snapshot_error", "Forecasting query returned snapshot - replaced with error message")
+            except ImportError:
+                pass
 
             emit("complete", "Response ready")
             return reply
@@ -2003,6 +2219,17 @@ class BenchmarkOSChatbot:
         """Route based on query type - prefer natural language for questions."""
         
         lowered = text.strip().lower()
+        
+        # 0. CRITICAL: Check for forecasting queries FIRST (before anything else)
+        try:
+            from .context_builder import _is_forecasting_query
+            if _is_forecasting_query(text):
+                # Forecasting query - ALWAYS use LLM with forecasting context
+                # Don't process through any other path
+                self._progress("intent_forecasting", "Forecasting query detected - using LLM with ML forecast context")
+                return None  # Will trigger LLM with enhanced context including ML forecast
+        except ImportError:
+            pass  # If context_builder not available, continue to normal flow
         
         # 1. Help command
         if lowered == "help":
@@ -2030,6 +2257,17 @@ class BenchmarkOSChatbot:
             tokens = text.split()[1:]
             return self._handle_metrics_comparison(tokens)
         
+        # 3.5. Check if this is a forecasting query (CRITICAL - must be before question check)
+        # Import forecasting detection functions
+        try:
+            from .context_builder import _is_forecasting_query
+            if _is_forecasting_query(text):
+                # Forecasting query - always use LLM with forecasting context
+                self._progress("intent_forecasting", "Forecasting query detected - using LLM with ML forecast context")
+                return None  # Will trigger LLM with enhanced context including ML forecast
+        except ImportError:
+            pass  # If context_builder not available, continue to normal flow
+        
         # 4. Check if this is a natural language QUESTION (not a table request)
         question_patterns = [
             # CRITICAL: Contractions MUST come first to catch "What's", "How's" etc.
@@ -2048,6 +2286,8 @@ class BenchmarkOSChatbot:
             r'\bshould\s+i\b',
             r'\bwhen\s+(?:is|are|was|were|did|will)\b',
             r'\bwhere\s+(?:is|are|can|do)\b',
+            # Forecasting patterns (also questions)
+            r'\b(?:forecast|predict|estimate|project)\b',
             # Follow-up question patterns
             r'^\s*(?:what|how)\s+about\b',  # "What about..." "How about..."
             r'\b(?:their|its|theirs)\b',  # Pronouns indicating context reference
@@ -2064,6 +2304,15 @@ class BenchmarkOSChatbot:
         
         # 5. Check for explicit "show X kpis/metrics/table" pattern (table request)
         if re.search(r'\bshow\s+.*\s+(?:kpis?|metrics?|table)', lowered):
+            # Check for forecasting queries FIRST - don't process as table request
+            try:
+                from .context_builder import _is_forecasting_query
+                if _is_forecasting_query(text):
+                    # Forecasting query - always use LLM with forecasting context
+                    return None
+            except ImportError:
+                pass
+            
             structured = parse_to_structured(text)
             self.last_structured_response["parser"] = structured
 
@@ -2073,6 +2322,10 @@ class BenchmarkOSChatbot:
                 # Check for portfolio intents early
                 if enhanced_routing and enhanced_routing.intent.value.startswith("portfolio_"):
                     # Portfolio intents should be handled by LLM with portfolio context
+                    return None
+                # Check for ML forecasting intents early
+                if enhanced_routing and enhanced_routing.intent.value.startswith("ml_forecast_"):
+                    # ML forecasting intents should be handled by LLM with forecast context
                     return None
                 self.last_structured_response["enhanced_routing"] = {
                     "intent": enhanced_routing.intent.value,
@@ -2092,6 +2345,16 @@ class BenchmarkOSChatbot:
             return None
         
         # 7. Try structured parsing as fallback (but with lower priority)
+        # IMPORTANT: Check for forecasting queries BEFORE structured parsing
+        try:
+            from .context_builder import _is_forecasting_query
+            if _is_forecasting_query(text):
+                # Forecasting query - always use LLM with forecasting context
+                # Don't even try structured parsing
+                return None
+        except ImportError:
+            pass
+        
         try:
             structured = parse_to_structured(text)
         except Exception as e:
@@ -2127,6 +2390,12 @@ class BenchmarkOSChatbot:
                 # Check for portfolio intents first (before other checks)
                 if enhanced_routing.intent.value.startswith("portfolio_"):
                     # Portfolio intents should be handled by LLM with portfolio context
+                    # Don't try to process them as structured metrics
+                    return None
+                
+                # Check for ML forecasting intents (must be handled by LLM with forecast context)
+                if enhanced_routing.intent.value.startswith("ml_forecast_"):
+                    # ML forecasting intents should be handled by LLM with ML forecast context
                     # Don't try to process them as structured metrics
                     return None
         
@@ -2342,6 +2611,17 @@ class BenchmarkOSChatbot:
         """Handle parsed structured intents without relying on legacy commands."""
         if not structured:
             return None
+        
+        # Early check for ML forecasting intents - bypass structured metrics processing
+        try:
+            if hasattr(self, 'last_structured_response') and self.last_structured_response.get("enhanced_routing"):
+                enhanced_routing = self.last_structured_response.get("enhanced_routing", {})
+                intent = enhanced_routing.get("intent", "")
+                if intent and intent.startswith("ml_forecast_"):
+                    # ML forecasting intent - don't process as structured metrics, use LLM instead
+                    return None
+        except Exception as e:
+            LOGGER.debug(f"Failed to check for ML forecasting intent: {e}")
         tickers = structured.get("tickers")
         if tickers is None:
             tickers = []

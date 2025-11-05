@@ -95,3 +95,14 @@ dash-core-components>=2.0.0
 dash-html-components>=2.0.0
 dash-table>=5.0.0
 dash-bootstrap-components>=1.5.0
+
+# ML Forecasting (Phase 1: Time Series Models)
+pmdarima>=2.0.0
+statsmodels>=0.14.0
+prophet>=1.1.0
+
+# ML Forecasting (Phase 2: Deep Learning - Optional)
+tensorflow>=2.13.0
+keras>=2.13.0
+# torch>=2.1.0  # Already in requirements.txt
+# transformers>=4.35.0  # Already in requirements.txt

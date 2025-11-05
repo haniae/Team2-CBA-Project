@@ -308,6 +308,52 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
     alias_map, lookup, ticker_set = _ensure_lookup_loaded()
     lowered_text = text or ""
     
+    # Forecasting keyword detection - extract company names from forecasting query structures
+    # Patterns like "Forecast Apple revenue", "Predict Microsoft revenue using LSTM"
+    forecasting_keywords = [
+        r'\bforecast\b', r'\bpredict\b', r'\bestimate\b', r'\bprojection\b',
+        r'\bproject\b', r'\boutlook\b', r'\bfuture\b',
+    ]
+    is_forecasting_query = any(re.search(pattern, lowered_text, re.IGNORECASE) for pattern in forecasting_keywords)
+    
+    # If forecasting query, try to extract company name from forecasting patterns
+    if is_forecasting_query:
+        # Patterns for forecasting queries: "Forecast [Company] revenue", "[Company]'s revenue forecast"
+        forecasting_patterns = [
+            r'\b(?:forecast|predict|estimate|project)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\'?s?\s+(?:revenue|sales|income|earnings|cash\s+flow|net\s+income)',
+            r'\b(?:forecast|predict|estimate|project)\s+(?:the\s+)?(?:revenue|sales|income|earnings|cash\s+flow|net\s+income)\s+(?:for|of)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+            r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\'?s?\s+(?:revenue|sales|income|earnings|cash\s+flow|net\s+income)\s+(?:forecast|prediction|estimate)',
+            r'\b(?:what\'?s?|what\s+is|what\'s|whats)\s+(?:the\s+)?(?:revenue|sales|income|earnings|cash\s+flow|net\s+income)\s+(?:forecast|prediction|estimate)\s+(?:for|of)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+            r'\b(?:what\'?s?|what\s+is|what\'s|whats)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\'?s?\s+(?:revenue|sales|income|earnings|cash\s+flow|net\s+income)\s+(?:forecast|prediction|estimate)',
+        ]
+        
+        for pattern in forecasting_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                company_name = match.group(1).strip()
+                # Try to resolve the extracted company name using alias lookup directly
+                # Avoid recursion by using internal lookup functions
+                try:
+                    alias_map, lookup, ticker_set = _ensure_lookup_loaded()
+                    # Try direct lookup first
+                    company_lower = company_name.lower()
+                    if company_lower in lookup:
+                        for ticker in lookup[company_lower]:
+                            return [{"input": company_name, "ticker": ticker}], []
+                    # Try fuzzy matching
+                    normalized_company = normalize_alias(company_lower)
+                    if normalized_company in lookup:
+                        for ticker in lookup[normalized_company]:
+                            return [{"input": company_name, "ticker": ticker}], []
+                    # Try partial matching
+                    for alias, tickers in lookup.items():
+                        if company_lower in alias or alias in company_lower:
+                            for ticker in tickers:
+                                return [{"input": company_name, "ticker": ticker}], []
+                except Exception:
+                    # If resolution fails, continue to normal flow below
+                    pass
+    
     # Portfolio keyword blacklist - skip ticker resolution if portfolio keywords detected
     # This prevents false positives like "portfolio risk" -> VRSK, "portfolio CVaR" -> CPB
     # "What's my portfolio" -> CPB, "risk?" -> VRSK

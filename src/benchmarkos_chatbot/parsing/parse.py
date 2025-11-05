@@ -43,6 +43,15 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
     norm = normalize(text)
     lowered_full = unicodedata.normalize("NFKC", text).lower()
 
+    # Check for forecasting keywords BEFORE ticker resolution to prevent false positives
+    # Forecasting queries need special handling - don't use default ticker fallback
+    forecasting_keywords = [
+        r'\bforecast\b', r'\bpredict\b', r'\bestimate\b', r'\bprojection\b',
+        r'\bproject\b', r'\boutlook\b', r'\bfuture\b',
+        r'\bnext\s+\d+\s+years?\b', r'\bupcoming\s+years?\b',
+    ]
+    is_forecasting_query = any(re.search(pattern, lowered_full, re.IGNORECASE) for pattern in forecasting_keywords)
+    
     # Check for portfolio keywords BEFORE ticker resolution to prevent false positives
     # Portfolio keywords take priority over ticker resolution
     # This prevents false positives like "What's my portfolio risk?" -> CPB, VRSK
@@ -86,6 +95,13 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
     else:
         ticker_matches, ticker_warnings = resolve_tickers_freeform(text)
     
+    # For forecasting queries, don't use default ticker fallback (AAPL)
+    # Let specialized extraction in context_builder handle forecasting queries
+    if is_forecasting_query and not ticker_matches:
+        # Don't add default ticker - let forecasting context builder handle extraction
+        # This prevents false matches and allows specialized forecasting extraction
+        pass
+    
     metric_matches = resolve_metrics(text, lowered_full)
     periods = parse_periods(norm, prefer_fiscal=False)
 
@@ -108,8 +124,11 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
     warnings = list(periods.get("warnings", [])) + ticker_warnings
     if not ticker_matches:
         warnings.append("missing_ticker")
-        ticker_matches = [{"input": "AAPL", "ticker": "AAPL"}]
-        warnings.append("default_ticker:AAPL")
+        # For forecasting queries, don't use default ticker fallback
+        # Let specialized extraction in context_builder handle it
+        if not is_forecasting_query:
+            ticker_matches = [{"input": "AAPL", "ticker": "AAPL"}]
+            warnings.append("default_ticker:AAPL")
     if not metric_matches:
         warnings.append("missing_metric")
 
