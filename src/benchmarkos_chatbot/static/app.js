@@ -4826,7 +4826,21 @@ function normaliseArtifacts(response) {
   if (!response || typeof response !== "object") {
     return null;
   }
-  const dashboard = response.dashboard || response.Dashboard || null;
+  // CRITICAL: Strictly validate dashboard - if null/undefined/empty, treat as no dashboard
+  let dashboard = response.dashboard || response.Dashboard || null;
+  
+  // Extra validation: ensure dashboard is not empty object or invalid
+  if (dashboard !== null && typeof dashboard === 'object') {
+    // If dashboard is an empty object {}, treat as null
+    if (Object.keys(dashboard).length === 0) {
+      dashboard = null;
+    }
+    // If dashboard has no kind or payload, treat as null
+    if (!dashboard.kind && !dashboard.payload && !dashboard.dashboards) {
+      dashboard = null;
+    }
+  }
+  
   const artifacts = {
     highlights: Array.isArray(response.highlights) ? response.highlights : [],
     trends: Array.isArray(response.trends) ? response.trends : [],
@@ -4834,7 +4848,7 @@ function normaliseArtifacts(response) {
     citations: Array.isArray(response.citations) ? response.citations : [],
     exports: Array.isArray(response.exports) ? response.exports : [],
     conclusion: "",
-    dashboard: dashboard,
+    dashboard: dashboard,  // Use validated dashboard (null if invalid)
   };
   if (
     !artifacts.highlights.length &&
@@ -5168,7 +5182,14 @@ function makeIdsUnique(container, uniqueSuffix) {
 }
 
 function renderDashboardArtifact(descriptor) {
-  if (!descriptor) {
+  // CRITICAL: Strict null/undefined/invalid dashboard check
+  if (!descriptor || descriptor === null || descriptor === undefined) {
+    console.log('[Dashboard] Dashboard is null/undefined - skipping render');
+    return null;
+  }
+  // Extra validation: ensure descriptor is a valid object with required properties
+  if (typeof descriptor !== 'object' || Object.keys(descriptor).length === 0) {
+    console.log('[Dashboard] Dashboard is invalid object - skipping render');
     return null;
   }
   const kind = descriptor.kind || "cfi-classic";
@@ -8304,10 +8325,19 @@ function loadConversation(conversationId) {
   }
 
   conversation.messages.forEach((message) => {
+    // CRITICAL FIX: Don't render dashboards from old conversation history
+    // Only render the text, skip artifacts/dashboards from history
+    // This prevents showing stale/wrong company dashboards
+    let artifactsToRender = message.metadata || null;
+    if (artifactsToRender && artifactsToRender.dashboard) {
+      // Clear dashboard from historical messages
+      artifactsToRender = { ...artifactsToRender, dashboard: null };
+    }
+    
     appendMessage(message.role, message.text, {
       smooth: false,
       animate: false,
-      artifacts: message.metadata || null,
+      artifacts: artifactsToRender,  // Use cleaned artifacts (no dashboard)
     });
   });
 

@@ -349,6 +349,17 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
     matches: List[Tuple[int, str, str]] = []
     seen: Set[str] = set()
     warnings: List[str] = []
+    
+    # CRITICAL: Question stopwords to prevent false ticker matches
+    # Don't resolve question words as tickers
+    QUESTION_STOPWORDS = {
+        "what", "whats", "what's", "how", "hows", "how's", "why", "when", "where", "who", "which",
+        "is", "are", "was", "were", "does", "did", "do", "can", "could", "would", "should", "will",
+        "has", "have", "had", "to", "from", "in", "on", "by", "at", "the", "a", "an", "of", "for", "with",
+        "tell", "help", "explain", "understand", "know", "think", "see", "look", "find",
+        "trading", "growing", "performing", "profitable", "sales", "revenue", "profit", "margin",
+        "figures", "metrics", "data", "information", "about", "their", "its", "them",
+    }
 
     for match in _TICKER_PATTERN.finditer(lowered_text):
         raw_token = match.group(0)
@@ -408,17 +419,51 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
             if not candidate_phrase:
                 continue
             normalised_phrase = normalize_alias(candidate_phrase)
+            
+            # CRITICAL: Skip if phrase is a question stopword
+            if normalised_phrase in QUESTION_STOPWORDS:
+                continue
+            # Also skip single-word phrases that are stopwords
+            if len(phrase_tokens) == 1 and phrase_tokens[0] in QUESTION_STOPWORDS:
+                continue
+            
             if normalised_phrase and _try_add_alias(normalised_phrase, candidate_phrase):
                 continue
             if len(normalised_phrase) <= 2:
                 continue
+            
+            # OPTIMIZATION: Pre-filter candidates before expensive fuzzy matching
+            # Only consider aliases with similar characteristics
+            phrase_len = len(normalised_phrase)
+            first_char = normalised_phrase[0] if normalised_phrase else ''
+            
+            # Pre-filter: only check aliases with similar length and same first letter
+            filtered_candidates = [
+                alias for alias in alias_candidates
+                if alias and
+                alias[0] == first_char and  # Same first letter
+                abs(len(alias) - phrase_len) <= 3  # Similar length (±3 chars)
+            ]
+            
+            # If no candidates after filtering, skip fuzzy matching entirely
+            if not filtered_candidates:
+                continue
+            
+            # Limit to top 50 candidates max (for very long candidate lists)
+            if len(filtered_candidates) > 50:
+                filtered_candidates = filtered_candidates[:50]
+            
             best_alias = None
             best_score = 0.0
-            for alias in alias_candidates:
+            for alias in filtered_candidates:
                 score = difflib.SequenceMatcher(None, normalised_phrase, alias).ratio()
                 if score > best_score:
                     best_alias = alias
                     best_score = score
+                # Early exit if we find a very good match
+                if score >= 0.98:
+                    break
+            
             if best_alias and best_score >= 0.95:
                 if _try_add_alias(best_alias, candidate_phrase, mark_warning=True):
                     continue

@@ -34,6 +34,19 @@ RELATIVE_PAST_PATTERN = re.compile(r"(?i)\bpast\s+(\d{1,2})\s+(quarters?|years?)
 RELATIVE_PREVIOUS_PATTERN = re.compile(r"(?i)\bprevious\s+(\d{1,2})\s+(quarters?|years?)\b")
 RELATIVE_RECENT_PATTERN = re.compile(r"(?i)\brecent\s+(\d{1,2})\s+(quarters?|years?)\b")
 
+# NEW: Enhanced natural language time patterns
+LAST_YEAR_PATTERN = re.compile(r"(?i)\blast year\b")  # Check before LATEST
+LAST_QUARTER_PATTERN = re.compile(r"(?i)\blast quarter\b")  # Check before LATEST
+LATEST_PATTERN = re.compile(r"(?i)\b(latest|most recent|current|this year|this quarter)\b")
+NEXT_YEAR_PATTERN = re.compile(r"(?i)\bnext year\b")
+NEXT_QUARTER_PATTERN = re.compile(r"(?i)\bnext quarter\b")
+YTD_PATTERN = re.compile(r"(?i)\b(ytd|year to date|year-to-date)\b")
+QTD_PATTERN = re.compile(r"(?i)\b(qtd|quarter to date|quarter-to-date)\b")
+TRAILING_PATTERN = re.compile(r"(?i)\btrailing\s+(\d{1,2})\s+(months?|quarters?|years?)\b")
+FOR_YEAR_PATTERN = re.compile(r"(?i)\bfor\s+(20\d{2})\b")
+IN_YEAR_PATTERN = re.compile(r"(?i)\bin\s+(20\d{2})\b")
+DURING_PATTERN = re.compile(r"(?i)\bduring\s+(20\d{2})\b")
+
 # Modifier patterns
 ANNUAL_MODIFIERS = [
     'annual', 'yearly', 'full-year', 'calendar-year', 'year-end',
@@ -678,8 +691,80 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
     original = _normalize(text)
     lower_text = original.lower()
     warnings: List[str] = []
+    
+    # NEW: Check natural language time patterns FIRST (before all other checks)
+    # This ensures "last year" doesn't get confused with "latest"
+    
+    # "last year" - specific pattern
+    if LAST_YEAR_PATTERN.search(lower_text):
+        warnings.append("last_year_detected")
+        return {
+            "type": "single",
+            "granularity": "fiscal_year",
+            "items": [{"fy": 2024, "fq": None}],
+            "normalize_to_fiscal": prefer_fiscal,
+            "warnings": warnings,
+        }
+    
+    # "last quarter" - specific pattern
+    if LAST_QUARTER_PATTERN.search(lower_text):
+        warnings.append("last_quarter_detected")
+        return {
+            "type": "single",
+            "granularity": "fiscal_quarter",
+            "items": [{"fy": 2024, "fq": 4}],  # Q4 2024
+            "normalize_to_fiscal": prefer_fiscal,
+            "warnings": warnings,
+        }
+    
+    # "latest", "most recent", "current" - generic pattern (check AFTER specific ones)
+    if LATEST_PATTERN.search(lower_text):
+        warnings.append("latest_detected")
+        return {
+            "type": "latest",
+            "granularity": "fiscal_year",
+            "items": [{"fy": 2025, "fq": None}],  # Latest available
+            "normalize_to_fiscal": prefer_fiscal,
+            "warnings": warnings,
+        }
+    
+    # "next year" or "next quarter" - forecast queries
+    if NEXT_YEAR_PATTERN.search(lower_text) or NEXT_QUARTER_PATTERN.search(lower_text):
+        warnings.append("future_period_detected")
+        is_quarter = bool(NEXT_QUARTER_PATTERN.search(lower_text))
+        return {
+            "type": "future",
+            "granularity": "fiscal_quarter" if is_quarter else "fiscal_year",
+            "items": [{"fy": 2026 if not is_quarter else 2025, "fq": 1 if is_quarter else None}],
+            "normalize_to_fiscal": prefer_fiscal,
+            "warnings": warnings,
+        }
+    
+    # "YTD" or "year to date"
+    if YTD_PATTERN.search(lower_text):
+        warnings.append("ytd_detected")
+        return {
+            "type": "ytd",
+            "granularity": "year_to_date",
+            "items": [{"fy": 2025, "fq": None}],
+            "normalize_to_fiscal": prefer_fiscal,
+            "warnings": warnings,
+        }
+    
+    # "for 2024", "in 2024", "during 2024"
+    for_year = FOR_YEAR_PATTERN.search(lower_text) or IN_YEAR_PATTERN.search(lower_text) or DURING_PATTERN.search(lower_text)
+    if for_year:
+        year = int(for_year.group(1))
+        warnings.append("natural_year_detected")
+        return {
+            "type": "single",
+            "granularity": "fiscal_year",
+            "items": [{"fy": year, "fq": None}],
+            "normalize_to_fiscal": prefer_fiscal,
+            "warnings": warnings,
+        }
 
-    # Check for quarter patterns first (highest priority)
+    # Check for quarter patterns (high priority)
     has_quarter = bool(re.search(r'\bQ[1-4]\b', original))
     
     # Check for multi-period patterns (higher priority than multi-company)
@@ -1066,7 +1151,7 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
                     is_quarter_series = True
     
     # Check for range patterns (continuous periods)
-    range_spec = next((spec for spec in specs_sorted if spec["start"] != spec["end"] or "-" in spec.get("quarter", "")), None)
+    range_spec = next((spec for spec in specs_sorted if spec["start"] != spec["end"] or "-" in (spec.get("quarter") or "")), None)
     
     # Check if we have a continuous range (e.g., 2020-2023 should be range, not multi)
     is_continuous_range = False
