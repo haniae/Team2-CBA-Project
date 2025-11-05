@@ -1863,16 +1863,29 @@ class BenchmarkOSChatbot:
                 
                 # CRITICAL: Check for filter queries FIRST - these should NEVER generate dashboards
                 filter_query_patterns = [
+                    # "Show/List/Find" patterns
                     r'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:companies|stocks|firms)',
+                    
+                    # "Which" patterns - CRITICAL for "Which tech company..."
+                    r'\bwhich\s+(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:company|stock|firm)',
+                    r'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial)',
+                    
+                    # Sector/Industry patterns
                     r'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:sector|industry)',
                     r'\b(?:tech|technology|financial|healthcare|energy|consumer|industrial)\s+(?:sector|industry)\s+(?:companies|stocks)',
+                    
+                    # Attribute filters
                     r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below|between)',
                     r'\b(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)\s+\$?\d+',
                     r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
                     r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
                     r'\b(?:companies|stocks|firms)\s+(?:that are|that have|with)\s+(?:growing|increasing)',
+                    
+                    # Market cap filters
                     r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
                     r'\b(?:companies|stocks|firms)\s+with\s+market\s+cap\s+(?:over|under|above|below)',
+                    
+                    # Combined filters
                     r'\b(?:companies|stocks|firms)\s+(?:in|from)\s+.*\s+with\s+',
                 ]
                 is_filter_query = any(re.search(pattern, lowered_input) for pattern in filter_query_patterns)
@@ -2073,9 +2086,30 @@ class BenchmarkOSChatbot:
         
         is_question = any(re.search(pattern, lowered) for pattern in question_patterns)
         
-        if is_question:
-            # Natural language question - let LLM handle with context
-            self._progress("intent_question", "Natural language question detected")
+        # CRITICAL: Also check for filter queries in this method
+        filter_query_patterns = [
+            r'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:companies|stocks|firms)',
+            r'\bwhich\s+(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:company|stock|firm)',
+            r'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial)',
+            r'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:sector|industry)',
+            r'\b(?:tech|technology|financial|healthcare|energy|consumer|industrial)\s+(?:sector|industry)\s+(?:companies|stocks)',
+            r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below|between)',
+            r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
+            r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+            r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+        ]
+        is_filter_query = any(re.search(pattern, lowered) for pattern in filter_query_patterns)
+        
+        if is_question or is_filter_query:
+            # Natural language question or filter query - let LLM handle with context
+            # Clear dashboard to prevent showing wrong company
+            if "dashboard" in self.last_structured_response:
+                self.last_structured_response["dashboard"] = None
+            
+            if is_filter_query:
+                self._progress("intent_filter", "Company filter/category query detected")
+            else:
+                self._progress("intent_question", "Natural language question detected")
             return None  # Will trigger LLM with enhanced context
         
         # 5. Check for explicit "show X kpis/metrics/table" pattern (table request)
@@ -3957,6 +3991,31 @@ class BenchmarkOSChatbot:
         portfolio_id_pattern = r"\bport_[\w]{4,12}\b"
         if re.search(portfolio_id_pattern, user_input, re.IGNORECASE):
             return None
+        
+        # CRITICAL: Check if this is a filter/category query
+        lowered = user_input.strip().lower()
+        filter_patterns = [
+            r'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:companies|stocks|firms)',
+            r'\bwhich\s+(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:company|stock|firm)',
+            r'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial)',
+            r'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:sector|industry)',
+            r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
+            r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
+            r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+            r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+        ]
+        
+        is_filter_query = any(re.search(pattern, lowered) for pattern in filter_patterns)
+        
+        if is_filter_query:
+            # This is a filter query - provide company universe context
+            try:
+                from .context_builder import build_company_universe_context
+                universe_context = build_company_universe_context(self.settings.database_path)
+                if universe_context:
+                    return universe_context
+            except Exception as e:
+                LOGGER.debug(f"Company universe context builder failed: {e}")
         
         # First, try the smart context builder for natural language formatting
         try:
