@@ -1773,13 +1773,17 @@ class BenchmarkOSChatbot:
                 # Check if this is a question - if so, skip summary and let LLM handle it
                 lowered_input = user_input.lower()
                 question_patterns = [
-                    r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would)\b',
-                    r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would)\b',
+                    # CRITICAL: Contractions MUST come first
+                    r'\bwhat\'s\b',  # "what's" contraction - CRITICAL
+                    r'\bhow\'s\b',   # "how's" contraction
+                    r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would|about|does|did)\b',
+                    r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would|about|to|do|profitable|fast|good|bad|strong|weak)\b',
                     r'\bwhy\b',
                     r'\bexplain\b',
                     r'\btell\s+me\s+(?:about|why|how)\b',
                     r'\bis\s+\w+\s+(?:more|less|better|worse|higher|lower)',
-                    r'\bwhich\s+(?:company|stock|one|is)\b',
+                    r'\bis\s+\w+\s+(?:overvalued|undervalued|expensive|cheap|good|bad|risky|safe|strong|weak|profitable|worth)',
+                    r'\bwhich\s+(?:company|stock|one|is|has|have)\b',
                     r'\bcan\s+you\b',
                     r'\bdoes\s+\w+\s+have\b',
                     r'\bshould\s+i\b',
@@ -1959,13 +1963,17 @@ class BenchmarkOSChatbot:
         
         # 4. Check if this is a natural language QUESTION (not a table request)
         question_patterns = [
-            r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would|about)\b',  # Added "about"
-            r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would|about)\b',  # Added "about"
+            # CRITICAL: Contractions MUST come first to catch "What's", "How's" etc.
+            r'\bwhat\'s\b',  # "what's" contraction - CRITICAL for "What's Apple revenue?"
+            r'\bhow\'s\b',   # "how's" contraction
+            r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would|about|does|did)\b',
+            r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would|about|to|do|profitable|fast|good|bad|strong|weak)\b',
             r'\bwhy\b',
             r'\bexplain\b',
             r'\btell\s+me\s+(?:about|why|how)\b',
             r'\bis\s+\w+\s+(?:more|less|better|worse|higher|lower)',
-            r'\bwhich\s+(?:company|stock|one|is)\b',
+            r'\bis\s+\w+\s+(?:overvalued|undervalued|expensive|cheap|good|bad|risky|safe|strong|weak|profitable|worth)',  # "Is X overvalued?"
+            r'\bwhich\s+(?:company|stock|one|is|has|have)\b',
             r'\bcan\s+you\b',
             r'\bdoes\s+\w+\s+have\b',
             r'\bshould\s+i\b',
