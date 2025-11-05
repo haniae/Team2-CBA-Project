@@ -2,6 +2,18 @@ const API_BASE = window.API_BASE || "";
 const STORAGE_KEY = "benchmarkos.chatHistory.v2";
 const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
 
+// Initialize theme from localStorage
+(function initializeTheme() {
+  try {
+    const savedTheme = localStorage.getItem('benchmarkos.theme');
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  } catch (error) {
+    console.warn("Unable to load theme from storage", error);
+  }
+})();
+
 (function cleanupLegacyStorage() {
   try {
     if (!window || !window.localStorage) {
@@ -1696,19 +1708,266 @@ GOOGL,25,8.7</code></pre>
 
 
 const HELP_PROMPTS = [
-  "Show Apple KPIs for 2022–2024",
-  "Compare Microsoft and Amazon in FY2023",
-  "What was Tesla's 2022 revenue?",
+  "What is Apple's revenue?",
+  "Show Microsoft's EBITDA margin",
+  "Is Tesla overvalued?",
+  "Compare AAPL and MSFT profitability",
+  "Why is Tesla's margin declining?",
+  "Analyze portfolio port_xxxxx",
+  "What's my portfolio risk?",
+  "What's my portfolio CVaR?",
+  "What's my portfolio exposure?",
+  "Optimize my portfolio to maximize Sharpe",
+  "What if the market drops 20%?",
 ];
 
 const HELP_SECTIONS = [
   {
     icon: "📊",
-    title: "KPI & Comparisons",
-    command: "Metrics TICKER [YEAR | YEAR–YEAR] [+ peers]",
-    purpose: "Summarise a company's finance snapshot or line up peers on one table.",
-    example: "Metrics AAPL 2023 vs MSFT",
-    delivers: "Revenue, profitability, free cash flow, ROE, valuation ratios.",
+    title: "Company Metrics & Analysis",
+    command: "What is [TICKER]'s [metric]?",
+    purpose: "Get single metrics, trends, or comprehensive company analysis.",
+    examples: [
+      "What is Apple's revenue?",
+      "Show Microsoft's EBITDA margin",
+      "What's Tesla's free cash flow?",
+      "What is Google's net income?",
+      "Show NVDA's gross margin",
+      "What is META's return on equity?",
+      "Analyze Apple",
+      "Show me Tesla's financials",
+      "What's Microsoft's P/E ratio?",
+      "How is NVIDIA performing?",
+      "Compare Apple and Microsoft",
+    ],
+    delivers: "Direct answers, YoY growth, 3-5 year CAGRs, business drivers, SEC sources, comprehensive sources with clickable links.",
+  },
+  {
+    icon: "🔍",
+    title: "Why Questions (Deep Analysis)",
+    command: "Why is [TICKER]'s [metric] [trend]?",
+    purpose: "Get multi-factor explanations for changes in financial metrics.",
+    examples: [
+      "Why is Tesla's margin declining?",
+      "Why is Apple's revenue growing?",
+      "Why is Microsoft more profitable?",
+      "Why did NVDA's stock price increase?",
+    ],
+    delivers: "3-5 key drivers, quantified impacts, business context, forward outlook.",
+  },
+  {
+    icon: "🆚",
+    title: "Comparisons",
+    command: "Compare [TICKER1] vs [TICKER2] [metric]",
+    purpose: "Compare companies, metrics, or multi-company analysis.",
+    examples: [
+      "Is Microsoft more profitable than Apple?",
+      "Compare Apple vs Microsoft margins",
+      "Which is better: Tesla or Ford profitability?",
+      "Compare AAPL, MSFT, and GOOGL revenue growth",
+      "Compare FAANG stocks",
+      "Compare Apple and Microsoft",
+      "Show me revenue growth for Tesla vs Ford",
+    ],
+    delivers: "Side-by-side metrics, relative strengths, structural differences, investment implications, comprehensive sources with clickable links.",
+  },
+  {
+    icon: "💰",
+    title: "Valuation & Multiples",
+    command: "What's [TICKER]'s [valuation metric]?",
+    purpose: "Get valuation metrics, multiples, and fair value analysis.",
+    examples: [
+      "What's Apple's P/E ratio?",
+      "Is Tesla overvalued?",
+      "What's Microsoft's EV/EBITDA?",
+      "Compare Apple's P/E to the S&P 500 average",
+      "What's Amazon's PEG ratio?",
+    ],
+    delivers: "Valuation metrics (P/E, EV/EBITDA, P/B, PEG), peer comparison, historical ranges.",
+  },
+  {
+    icon: "💪",
+    title: "Financial Health & Risk",
+    command: "What's [TICKER]'s [risk metric]?",
+    purpose: "Assess balance sheet strength, leverage, and risk factors.",
+    examples: [
+      "What's Tesla's debt-to-equity ratio?",
+      "How leveraged is Apple?",
+      "What's Microsoft's net debt?",
+      "What are the key risks for Tesla?",
+      "What's Apple's interest coverage ratio?",
+    ],
+    delivers: "Balance sheet metrics, leverage ratios, credit analysis, risk factors from 10-K.",
+  },
+  {
+    icon: "📈",
+    title: "Profitability & Margins",
+    command: "What's [TICKER]'s [margin metric]?",
+    purpose: "Analyze margins, profitability trends, and operating efficiency.",
+    examples: [
+      "What's Apple's gross margin?",
+      "What's Apple's gross margin trend?",
+      "Which is more profitable: Microsoft or Google?",
+      "What's driving Tesla's margin compression?",
+      "Compare EBITDA margins across FAANG",
+    ],
+    delivers: "Margin breakdown, multi-year trends, peer comparison, drivers of margin changes.",
+  },
+  {
+    icon: "🚀",
+    title: "Growth & Performance",
+    command: "What's [TICKER]'s [growth metric]?",
+    purpose: "Analyze revenue growth, earnings growth, and growth outlook.",
+    examples: [
+      "Is Apple growing faster than Microsoft?",
+      "What's Tesla's revenue CAGR?",
+      "How fast is Amazon growing?",
+      "What's Apple's earnings growth?",
+      "What's the revenue forecast for Microsoft?",
+    ],
+    delivers: "Historical growth rates (3-5 years), segment breakdown, growth drivers, analyst forecasts.",
+  },
+  {
+    icon: "💵",
+    title: "Cash Flow & Capital Allocation",
+    command: "What's [TICKER]'s [cash flow metric]?",
+    purpose: "Analyze cash generation, capital allocation, and shareholder returns.",
+    examples: [
+      "What's Apple's free cash flow?",
+      "How much cash does Microsoft generate?",
+      "How is Amazon allocating capital?",
+      "What's Microsoft's dividend yield?",
+      "Is Apple doing share buybacks?",
+    ],
+    delivers: "Cash flow statements, FCF trends, capex plans, dividend history, buyback programs.",
+  },
+  {
+    icon: "🎯",
+    title: "Investment Analysis",
+    command: "Should I invest in [TICKER]?",
+    purpose: "Get investment thesis, bull/bear cases, and recommendations.",
+    examples: [
+      "Should I invest in Apple or Microsoft?",
+      "What's the bull case for Tesla?",
+      "What's the bear case for Apple?",
+      "What are the catalysts for Amazon?",
+      "Why is Netflix stock down?",
+    ],
+    delivers: "Investment thesis, bull/bear arguments, catalysts, valuation vs fundamentals, risk/reward.",
+  },
+  {
+    icon: "🏆",
+    title: "Market Position & Competition",
+    command: "Who are [TICKER]'s competitors?",
+    purpose: "Analyze competitive landscape, market share, and competitive advantages.",
+    examples: [
+      "Who are Apple's main competitors?",
+      "What's Tesla's market share?",
+      "What's Apple's moat?",
+      "Is Apple losing share to Samsung?",
+      "How competitive is the smartphone market?",
+    ],
+    delivers: "Competitor analysis, market share data, competitive advantages, industry structure.",
+  },
+  {
+    icon: "👔",
+    title: "Management & Strategy",
+    command: "How is [TICKER]'s management performing?",
+    purpose: "Assess management performance, corporate strategy, and governance.",
+    examples: [
+      "How is Apple's management performing?",
+      "What's Tesla's strategy for growth?",
+      "How is Microsoft allocating capital?",
+      "What's Apple's board composition?",
+      "Is Apple's capital allocation shareholder-friendly?",
+    ],
+    delivers: "Management track record, strategic initiatives, capital allocation, governance structure.",
+  },
+  {
+    icon: "🏭",
+    title: "Sector & Industry Analysis",
+    command: "How is the [sector] performing?",
+    purpose: "Analyze sector trends, industry dynamics, and macro factors.",
+    examples: [
+      "How is the tech sector performing?",
+      "What's the outlook for semiconductors?",
+      "Compare retail vs e-commerce stocks",
+      "What are the trends in the auto industry?",
+      "How is AI affecting tech stocks?",
+    ],
+    delivers: "Sector metrics, industry trends, competitive dynamics, regulatory changes, macro factors.",
+  },
+  {
+    icon: "📊",
+    title: "Analyst & Institutional Views",
+    command: "What do analysts think of [TICKER]?",
+    purpose: "Get analyst ratings, price targets, and institutional ownership data.",
+    examples: [
+      "What do analysts think of Apple?",
+      "What's the price target for Microsoft?",
+      "What's the institutional ownership of Apple?",
+      "Have there been recent upgrades on Tesla?",
+      "Who are the largest holders of Microsoft?",
+      "What's the consensus rating on Tesla?",
+      "Are institutions buying or selling Amazon?",
+      "Have there been recent insider purchases at Apple?",
+    ],
+    delivers: "Analyst ratings (Buy/Hold/Sell), price targets, institutional holdings, insider transactions, comprehensive sources with clickable links.",
+  },
+  {
+    icon: "🌍",
+    title: "Macroeconomic Context",
+    command: "How do [economic factors] affect [TICKER]?",
+    purpose: "Analyze economic sensitivity, interest rate impact, and inflation effects.",
+    examples: [
+      "How do interest rates affect tech stocks?",
+      "What's the impact of inflation on Apple?",
+      "How is Apple affected by recession?",
+      "How do currency fluctuations impact Microsoft's earnings?",
+      "What's the recession risk for tech?",
+    ],
+    delivers: "Economic sensitivity analysis, historical correlations, geographic revenue breakdown, hedging strategies.",
+  },
+  {
+    icon: "🌱",
+    title: "ESG & Sustainability",
+    command: "What's [TICKER]'s ESG score?",
+    purpose: "Get ESG scores, environmental initiatives, and governance ratings.",
+    examples: [
+      "What's Apple's ESG score?",
+      "How sustainable is Tesla's business?",
+      "What's Microsoft's carbon footprint?",
+      "Does Microsoft have good governance?",
+      "What are Amazon's environmental initiatives?",
+    ],
+    delivers: "ESG scores, environmental initiatives, social policies, governance structure, controversies.",
+  },
+  {
+    icon: "📈",
+    title: "Dashboard & Visualizations",
+    command: "Show dashboard for [TICKER]",
+    purpose: "Get comprehensive interactive dashboards with charts and metrics.",
+    examples: [
+      "Dashboard AAPL",
+      "Show dashboard for Apple",
+      "Full dashboard for Microsoft",
+      "Comprehensive dashboard Tesla",
+    ],
+    delivers: "Interactive charts, KPI cards, trend visualizations, comparison views, export options.",
+  },
+  {
+    icon: "🌐",
+    title: "Segment & Geographic Analysis",
+    command: "What's [TICKER]'s [segment/region] revenue?",
+    purpose: "Analyze business segments, geographic revenue, and product mix.",
+    examples: [
+      "What's Apple's exposure to China?",
+      "Where does Microsoft's revenue come from?",
+      "How important is iPhone to Apple?",
+      "What's the outlook for Tesla's Cybertruck?",
+      "Is AWS Amazon's most profitable business?",
+    ],
+    delivers: "Segment breakdown, geographic revenue, product mix, customer demographics, growth by segment.",
   },
   {
     icon: "🧾",
@@ -1725,6 +1984,55 @@ const HELP_SECTIONS = [
     purpose: "Run what-if cases for growth, margin shifts, or valuation moves.",
     example: "Scenario NVDA Bull rev=+8% margin=+1.5% mult=+0.5",
     delivers: "Projected revenue, margins, EPS/FCF change, implied valuation.",
+  },
+  {
+    icon: "📊",
+    title: "Portfolio Management",
+    command: [
+      "Analyze portfolio port_xxxxx",
+      "What's my portfolio risk?",
+      "Show my portfolio exposure",
+      "Optimize my portfolio",
+    ],
+    purpose: "Manage portfolios, analyze exposures, calculate risk metrics, optimize, and run scenarios.",
+    examples: [
+      "Analyze portfolio port_xxxxx",
+      "Analyze my portfolio",
+      "What are my holdings?",
+      "Show my portfolio",
+      "List my portfolio",
+      "What's my portfolio risk?",
+      "What is my portfolio risk?",
+      "What's my portfolio CVaR?",
+      "What is the CVAR for this portfolio",
+      "What's my portfolio VaR?",
+      "What's my portfolio volatility?",
+      "Calculate my portfolio volatility",
+      "What's my portfolio Sharpe ratio?",
+      "What's my portfolio Sortino ratio?",
+      "What's my portfolio beta?",
+      "What's my portfolio alpha?",
+      "What's my portfolio tracking error?",
+      "What's my portfolio exposure?",
+      "Show my portfolio exposure",
+      "What's my portfolio sector exposure?",
+      "Show my portfolio sector exposure",
+      "What's my portfolio diversification?",
+      "Show my portfolio allocation",
+      "What's my portfolio allocation?",
+      "What's my portfolio factor exposure?",
+      "What's my portfolio performance?",
+      "How is my portfolio performing?",
+      "Calculate my portfolio returns",
+      "Optimize my portfolio",
+      "Rebalance my portfolio",
+      "Suggest portfolio improvements",
+      "What are my holdings?",
+      "Show my holdings",
+      "List my portfolio holdings",
+      "What stocks are in my portfolio?",
+    ],
+    delivers: "Holdings, exposures, risk metrics (CVaR, VaR, volatility, Sharpe, Sortino, alpha, beta, tracking error), optimization results, scenario analysis, performance attribution, comprehensive sources with clickable links.",
   },
   {
     icon: "⚙️",
@@ -1953,15 +2261,33 @@ async function loadHelpContentOverrides() {
       return;
     }
     const data = await response.json();
+    
+    // Load tips
     if (Array.isArray(data?.tips) && data.tips.length) {
       const customTips = data.tips.map((tip) => `${tip}`.trim()).filter(Boolean);
       if (customTips.length) {
         HELP_TIPS = customTips;
-        refreshHelpArtifacts();
       }
     }
+    
+    // Load prompts if provided
+    if (Array.isArray(data?.prompts) && data.prompts.length) {
+      HELP_PROMPTS.length = 0;
+      HELP_PROMPTS.push(...data.prompts);
+    }
+    
+    // Load sections if provided
+    if (Array.isArray(data?.sections) && data.sections.length) {
+      HELP_SECTIONS.length = 0;
+      HELP_SECTIONS.push(...data.sections);
+    }
+    
+    // Refresh help artifacts if any changes were made
+    if (data?.tips || data?.prompts || data?.sections) {
+      refreshHelpArtifacts();
+    }
   } catch (error) {
-    console.warn("Failed to load help tip overrides:", error);
+    console.warn("Failed to load help content overrides:", error);
   }
 }
 
@@ -2996,13 +3322,32 @@ function renderSettingsSection({ container } = {}) {
   const root = container.querySelector("[data-role='settings-root']") || container;
   const settings = loadUserSettings();
 
+  const savedTheme = localStorage.getItem('benchmarkos.theme');
+  const isDarkMode = savedTheme === 'dark' || (!savedTheme && document.documentElement.getAttribute('data-theme') === 'dark');
+  
   root.innerHTML = `
     <form class="settings-form" data-role="settings-form">
       <section class="settings-section">
-        <h3>AI preferences</h3>
+        <h3 class="settings-section-title">
+          <span class="settings-section-icon">🎨</span>
+          <span>Appearance</span>
+        </h3>
+        <label class="settings-toggle-switch">
+          <span class="settings-toggle-label">
+            <span class="settings-toggle-icon">🌙</span>
+            <span>Dark mode</span>
+          </span>
+          <input type="checkbox" class="settings-switch-input" data-role="dark-mode-toggle" ${isDarkMode ? 'checked' : ''} />
+          <span class="settings-switch"></span>
+        </label>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">
+          <span class="settings-section-icon">🤖</span>
+          <span>AI Preferences</span>
+        </h3>
         <p class="settings-hint">
-          The values below are stored locally in your browser so you can experiment without touching
-          the backend configuration.
+          The values below are stored locally in your browser so you can experiment without touching the backend configuration.
         </p>
         <label class="settings-field">
           <span class="settings-label">Preferred model</span>
@@ -3022,53 +3367,14 @@ function renderSettingsSection({ container } = {}) {
         </label>
       </section>
       <section class="settings-section">
-        <h3>Data sources</h3>
+        <h3 class="settings-section-title">
+          <span class="settings-section-icon">📊</span>
+          <span>Data Sources</span>
+        </h3>
         <label class="settings-toggle">
           <input type="checkbox" name="dataSources.edgar" />
           <span>SEC EDGAR filings</span>
         </label>
-        <label class="settings-toggle">
-          <input type="checkbox" name="dataSources.yahoo" />
-          <span>Yahoo Finance market data</span>
-        </label>
-        <label class="settings-toggle">
-          <input type="checkbox" name="dataSources.bloomberg" />
-          <span>Bloomberg real-time quotes</span>
-        </label>
-      </section>
-      <section class="settings-section">
-        <h3>Output preferences</h3>
-        <label class="settings-field">
-          <span class="settings-label">Timezone</span>
-          <input name="timezone" type="text" autocomplete="off" placeholder="e.g. UTC" />
-        </label>
-        <label class="settings-field">
-          <span class="settings-label">Primary currency</span>
-          <input name="currency" type="text" autocomplete="off" placeholder="e.g. USD" />
-        </label>
-        <label class="settings-field">
-          <span class="settings-label">Compliance mode</span>
-          <select name="compliance">
-            <option value="standard">Standard</option>
-            <option value="restricted">Restricted</option>
-            <option value="audit">Audit</option>
-          </select>
-        </label>
-        <fieldset class="settings-checkbox-group">
-          <legend>Enable exports</legend>
-          <label class="settings-toggle">
-            <input type="checkbox" name="exportFormats.pdf" />
-            <span>PDF</span>
-          </label>
-          <label class="settings-toggle">
-            <input type="checkbox" name="exportFormats.excel" />
-            <span>Excel</span>
-          </label>
-          <label class="settings-toggle">
-            <input type="checkbox" name="exportFormats.markdown" />
-            <span>Markdown</span>
-          </label>
-        </fieldset>
       </section>
       <div class="settings-actions">
         <button type="submit">Save settings</button>
@@ -3084,38 +3390,32 @@ function renderSettingsSection({ container } = {}) {
   }
   const statusEl = root.querySelector("[data-role='settings-status']");
   const resetButton = root.querySelector("[data-role='settings-reset']");
+  const darkModeToggle = root.querySelector("[data-role='dark-mode-toggle']");
 
   const fields = {
     aiModel: form.elements.aiModel,
     apiKey: form.elements.apiKey,
     refreshSchedule: form.elements.refreshSchedule,
-    timezone: form.elements.timezone,
-    currency: form.elements.currency,
-    compliance: form.elements.compliance,
     edgar: form.querySelector("[name='dataSources.edgar']"),
-    yahoo: form.querySelector("[name='dataSources.yahoo']"),
-    bloomberg: form.querySelector("[name='dataSources.bloomberg']"),
-    exportPdf: form.querySelector("[name='exportFormats.pdf']"),
-    exportExcel: form.querySelector("[name='exportFormats.excel']"),
-    exportMarkdown: form.querySelector("[name='exportFormats.markdown']"),
   };
+
+  // Dark mode toggle functionality
+  if (darkModeToggle) {
+    darkModeToggle.addEventListener('change', (e) => {
+      const isDark = e.target.checked;
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      localStorage.setItem('benchmarkos.theme', isDark ? 'dark' : 'light');
+    });
+  }
 
   const applySettings = (values) => {
     if (!values) {
       return;
     }
-    fields.aiModel.value = values.aiModel || "";
-    fields.apiKey.value = values.apiKey || "";
-    fields.refreshSchedule.value = values.refreshSchedule || "daily";
-    fields.timezone.value = values.timezone || "UTC";
-    fields.currency.value = values.currency || "USD";
-    fields.compliance.value = values.compliance || "standard";
-    fields.edgar.checked = Boolean(values?.dataSources?.edgar);
-    fields.yahoo.checked = Boolean(values?.dataSources?.yahoo);
-    fields.bloomberg.checked = Boolean(values?.dataSources?.bloomberg);
-    fields.exportPdf.checked = Boolean(values?.exportFormats?.pdf);
-    fields.exportExcel.checked = Boolean(values?.exportFormats?.excel);
-    fields.exportMarkdown.checked = Boolean(values?.exportFormats?.markdown);
+    if (fields.aiModel) fields.aiModel.value = values.aiModel || "";
+    if (fields.apiKey) fields.apiKey.value = values.apiKey || "";
+    if (fields.refreshSchedule) fields.refreshSchedule.value = values.refreshSchedule || "daily";
+    if (fields.edgar) fields.edgar.checked = Boolean(values?.dataSources?.edgar);
   };
 
   const showStatus = (message, type = "info") => {
@@ -3140,23 +3440,12 @@ function renderSettingsSection({ container } = {}) {
     event.preventDefault();
     const nextSettings = {
       ...settings,
-      apiKey: fields.apiKey.value.trim(),
-      aiModel: fields.aiModel.value.trim() || DEFAULT_USER_SETTINGS.aiModel,
-      refreshSchedule: fields.refreshSchedule.value || DEFAULT_USER_SETTINGS.refreshSchedule,
-      timezone: fields.timezone.value.trim() || DEFAULT_USER_SETTINGS.timezone,
-      currency: fields.currency.value.trim() || DEFAULT_USER_SETTINGS.currency,
-      compliance: fields.compliance.value || DEFAULT_USER_SETTINGS.compliance,
+      apiKey: fields.apiKey?.value.trim() || "",
+      aiModel: fields.aiModel?.value.trim() || DEFAULT_USER_SETTINGS.aiModel,
+      refreshSchedule: fields.refreshSchedule?.value || DEFAULT_USER_SETTINGS.refreshSchedule,
       dataSources: {
         ...settings.dataSources,
-        edgar: fields.edgar.checked,
-        yahoo: fields.yahoo.checked,
-        bloomberg: fields.bloomberg.checked,
-      },
-      exportFormats: {
-        ...settings.exportFormats,
-        pdf: fields.exportPdf.checked,
-        excel: fields.exportExcel.checked,
-        markdown: fields.exportMarkdown.checked,
+        edgar: fields.edgar?.checked ?? true,
       },
     };
     saveUserSettings(nextSettings);

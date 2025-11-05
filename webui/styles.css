@@ -6600,6 +6600,7 @@ img {
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 [data-theme="dark"] .settings-section {
@@ -6708,6 +6709,7 @@ img {
   font-size: 14px;
   color: #374151;
   font-weight: 500;
+  cursor: pointer;
 }
 
 [data-theme="dark"] .settings-toggle-label {
@@ -6732,6 +6734,7 @@ img {
   width: 44px;
   height: 24px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .settings-switch::before {
@@ -6785,26 +6788,33 @@ img {
 }
 
 /* Checkbox toggle */
-.settings-toggle-checkbox {
+.settings-toggle {
   display: flex;
   align-items: center;
   gap: 10px;
   cursor: pointer;
+  margin-bottom: 12px;
 }
 
-.settings-toggle-checkbox input[type="checkbox"] {
+.settings-toggle:last-child {
+  margin-bottom: 0;
+}
+
+.settings-toggle input[type="checkbox"] {
   width: 18px;
   height: 18px;
   cursor: pointer;
   accent-color: #3b82f6;
+  flex-shrink: 0;
 }
 
-.settings-toggle-checkbox span {
+.settings-toggle span {
   font-size: 14px;
   color: #374151;
+  font-weight: 500;
 }
 
-[data-theme="dark"] .settings-toggle-checkbox span {
+[data-theme="dark"] .settings-toggle span {
   color: #e5e7eb;
 }
 
