@@ -340,30 +340,30 @@ const PREFERS_REDUCED_MOTION = (() => {
 })();
 
 const TICKER_STOPWORDS = new Set([
-  "THE",
-  "AND",
-  "WITH",
-  "KPI",
-  "EPS",
-  "ROE",
-  "FCF",
-  "PE",
-  "TSR",
-  "LTM",
-  "FY",
-  "API",
-  "DATA",
-  "THIS",
-  "THAT",
-  "YOY",
-  "TTM",
-  "GROWTH",
-  "METRIC",
-  "METRICS",
-  "SUMMARY",
-  "REPORT",
-  "SCENARIO",
-  "K",
+  // Common words
+  "THE", "AND", "WITH", "FOR", "FROM", "ABOUT", "HAVE", "SHOW", "TELL",
+  "THIS", "THAT", "THEM", "THEIR", "THOSE", "THESE",
+  
+  // Question words
+  "WHAT", "WHICH", "WHERE", "WHEN", "WHY", "HOW", "WHO",
+  
+  // Sector/industry words (prevent "TECH" being treated as ticker)
+  "TECH", "TECHNOLOGY", "FINANCIAL", "HEALTHCARE", "ENERGY", "CONSUMER",
+  "INDUSTRIAL", "UTILITY", "SECTOR", "INDUSTRY",
+  
+  // Company descriptors
+  "COMPANY", "COMPANIES", "STOCK", "STOCKS", "FIRM", "FIRMS",
+  "BEST", "TOP", "GOOD", "BETTER", "HIGHEST", "LOWEST",
+  
+  // Metrics (existing)
+  "KPI", "EPS", "ROE", "FCF", "PE", "TSR", "LTM", "FY",
+  "YOY", "TTM", "GROWTH", "METRIC", "METRICS",
+  
+  // Report types
+  "SUMMARY", "REPORT", "SCENARIO", "ANALYSIS", "INSIGHT",
+  
+  // Other
+  "API", "DATA", "K",
 ]);
 
 let reportMenu = null;
@@ -542,6 +542,7 @@ let companyUniversePromise = null;
 const METRIC_KEYWORD_MAP = [
   { regex: /\bgrowth|cagr|yoy\b/i, label: "Growth" },
   { regex: /\brevenue\b/i, label: "Revenue" },
+  { regex: /\bprofit\s*margin|profitability\b/i, label: "Profitability" },
   { regex: /\bmargin\b/i, label: "Margin" },
   { regex: /\bearnings|\beps\b/i, label: "Earnings" },
   { regex: /\bcash\s*flow|\bcf\b/i, label: "Cash Flow" },
@@ -6521,7 +6522,12 @@ function composeTitleComponents({ tickers, period, metricLabel, intentInfo }) {
     });
   };
 
-  if (tickers.length >= 2) {
+  // If no valid tickers, use metric as the main subject
+  if (tickers.length === 0) {
+    if (metricLabel) {
+      pushWord(metricLabel);
+    }
+  } else if (tickers.length >= 2) {
     pushWord(tickers[0]);
     pushWord("vs");
     pushWord(tickers[1]);
@@ -6573,7 +6579,7 @@ function composeTitleComponents({ tickers, period, metricLabel, intentInfo }) {
 
   const fallbackWords = ["Insight", "Report", "Overview", "Brief"];
   let fallbackIndex = 0;
-  while (words.length < 4 && fallbackIndex < fallbackWords.length) {
+  while (words.length < 2 && fallbackIndex < fallbackWords.length) {
     pushWord(fallbackWords[fallbackIndex]);
     fallbackIndex += 1;
   }
