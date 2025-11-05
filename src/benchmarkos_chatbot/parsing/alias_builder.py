@@ -307,6 +307,43 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
     """Resolve tickers from free-form text using aliases and fuzzy fallback."""
     alias_map, lookup, ticker_set = _ensure_lookup_loaded()
     lowered_text = text or ""
+    
+    # Portfolio keyword blacklist - skip ticker resolution if portfolio keywords detected
+    # This prevents false positives like "portfolio risk" -> VRSK, "portfolio CVaR" -> CPB
+    # "What's my portfolio" -> CPB, "risk?" -> VRSK
+    portfolio_keywords = [
+        # Basic portfolio keywords
+        r'\bportfolio\b', r'\bmy portfolio\b', r'\bthe portfolio\b', r'\bthis portfolio\b',
+        r'\bholdings\b', r'\bexposure\b', r'\bport_\w+\b',
+        # Portfolio + attribute combinations (catch these even if words are separated)
+        r'\bportfolio\s+\w+\s+risk\b', r'\bportfolio\s+risk\b', r'\bmy\s+portfolio\s+risk\b',
+        r'\bportfolio\s+\w+\s+cvar\b', r'\bportfolio\s+cvar\b', r'\bmy\s+portfolio\s+cvar\b',
+        r'\bportfolio\s+\w+\s+volatility\b', r'\bportfolio\s+volatility\b',
+        r'\bportfolio\s+\w+\s+diversification\b', r'\bportfolio\s+diversification\b',
+        r'\bportfolio\s+\w+\s+exposure\b', r'\bportfolio\s+exposure\b',
+        r'\bportfolio\s+\w+\s+performance\b', r'\bportfolio\s+performance\b',
+        r'\bportfolio\s+\w+\s+allocation\b', r'\bportfolio\s+allocation\b',
+        r'\bportfolio\s+\w+\s+optimization\b', r'\bportfolio\s+optimization\b',
+        r'\bportfolio\s+\w+\s+attribution\b', r'\bportfolio\s+attribution\b',
+        r'\bportfolio\s+rebalancing\b', r'\bportfolio\s+rebalance\b',
+        r'\bportfolio\s+scenario\b', r'\bportfolio\s+stress\b', r'\bportfolio\s+esg\b',
+        r'\bportfolio\s+tax\b', r'\bportfolio\s+tracking\b', r'\bportfolio\s+sentiment\b',
+        # Question patterns with portfolio (catch "what's my portfolio", "show my portfolio", etc.)
+        r'\b(?:what\'?s?|what\s+is|show|analyze|calculate|get|display|tell\s+me)\s+(?:my\s+)?portfolio\b',
+        r'\b(?:what\'?s?|what\s+is|show|analyze|calculate|get|display)\s+(?:my\s+)?(?:portfolio\s+)?(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification)\b',
+        # Risk/other attributes with portfolio context (catch "CVAR for this portfolio", "CVaR of portfolio", etc.)
+        r'\b(?:my\s+)?portfolio\s+(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification|optimization|attribution)\b',
+        r'\b(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification)\s+(?:of|for|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
+        # Catch "CVAR" or "CVaR" when portfolio context is present (prevents false match to AES)
+        r'\b(?:what\s+is|calculate|show|get)\s+(?:the\s+)?(?:cvar|cva?r)\s+(?:for|of|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
+        r'\b(?:cvar|cva?r)\s+(?:for|of|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
+    ]
+    
+    # Check if this is a portfolio query - if so, skip ticker resolution
+    is_portfolio_query = any(re.search(pattern, lowered_text, re.IGNORECASE) for pattern in portfolio_keywords)
+    if is_portfolio_query:
+        return [], []
+    
     normalized_text = normalize_alias(lowered_text)
     padded_text = f" {normalized_text} "
     matches: List[Tuple[int, str, str]] = []

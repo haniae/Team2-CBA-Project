@@ -6110,6 +6110,25 @@ img {
   font-weight: 500;
   font-size: 14px;
   color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.portfolio-upload-form__field input[type="text"] {
+  padding: 12px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: #ffffff;
+  transition: all 200ms ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.portfolio-upload-form__field input[type="text"]:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .portfolio-upload-form__file-input {
@@ -6270,6 +6289,7 @@ img {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 200px;
 }
 
 .portfolio-list__loading,
@@ -6469,6 +6489,47 @@ img {
   padding: 24px;
   overflow-y: auto;
   flex: 1;
+  max-height: calc(90vh - 80px);
+}
+
+.portfolio-holdings-modal__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.portfolio-holdings-modal__table thead {
+  background: #f9fafb;
+  border-bottom: 2px solid rgba(148, 163, 184, 0.2);
+}
+
+.portfolio-holdings-modal__table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.portfolio-holdings-modal__table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  color: var(--text-secondary);
+}
+
+.portfolio-holdings-modal__table tbody tr:hover {
+  background: rgba(37, 99, 235, 0.03);
+}
+
+.portfolio-holdings-modal__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.portfolio-holdings-modal__table td strong {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 /* Holdings Table */

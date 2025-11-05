@@ -1262,6 +1262,438 @@ async function renderCompanyUniverseSection({ container } = {}) {
   }
 }
 
+async function renderPortfolioManagementSection({ container } = {}) {
+  if (!container) {
+    return;
+  }
+
+  // Remove any dashboards from the page
+  const removeDashboards = () => {
+    document.querySelectorAll('.financial-dashboard, .message-dashboard, .cfi-dashboard, [class*="dashboard"], [class*="chart"], [class*="Chart"], [id*="dashboard"], [id*="chart"]').forEach(el => {
+      if (el.closest('[data-role="portfolio-management-root"]') || !el.closest('.message')) {
+        el.remove();
+      }
+    });
+    document.querySelectorAll('.message').forEach(msg => {
+      msg.classList.remove('message--has-dashboard');
+    });
+  };
+
+  removeDashboards();
+
+  // Monitor for dashboards for 30 seconds
+  const dashboardObserver = new MutationObserver(() => {
+    removeDashboards();
+  });
+
+  const root = container.querySelector('[data-role="portfolio-management-root"]') || container;
+  dashboardObserver.observe(root, { childList: true, subtree: true });
+  
+  setTimeout(() => {
+    dashboardObserver.disconnect();
+  }, 30000);
+
+  container.innerHTML = `
+    <div class="portfolio-management" data-role="portfolio-management-root">
+      <section class="portfolio-management__hero">
+        <div class="portfolio-management__badge" aria-hidden="true">💼</div>
+        <div class="portfolio-management__hero-copy">
+          <h3 class="portfolio-management__title">Portfolio Management</h3>
+          <p class="portfolio-management__subtitle">
+            Upload, manage, and analyze your investment portfolios. Upload CSV, Excel, or JSON files to get started with portfolio analysis.
+          </p>
+        </div>
+      </section>
+
+      <div class="portfolio-management__tabs">
+        <button class="portfolio-management__tab is-active" data-tab="upload">
+          <span class="portfolio-management__tab-icon">📤</span>
+          <span>Upload Portfolio</span>
+        </button>
+        <button class="portfolio-management__tab" data-tab="list">
+          <span class="portfolio-management__tab-icon">📋</span>
+          <span>My Portfolios</span>
+        </button>
+      </div>
+
+      <div class="portfolio-management__content">
+        <div class="portfolio-management__tab-panel is-active" data-panel="upload">
+          <form class="portfolio-upload-form" data-role="portfolio-upload-form">
+            <div class="portfolio-upload-form__field">
+              <label>Portfolio Name</label>
+              <input type="text" name="name" placeholder="e.g., Tech Growth Portfolio" required />
+            </div>
+
+            <div class="portfolio-upload-form__field">
+              <label>Upload Portfolio File</label>
+              <div class="portfolio-upload-form__file-input">
+                <input type="file" id="portfolio-file-input" name="file" accept=".csv,.xlsx,.xls,.json" required />
+                <label for="portfolio-file-input" class="portfolio-upload-form__file-label">
+                  <span class="portfolio-upload-form__file-button">Choose File</span>
+                  <span class="portfolio-upload-form__file-name" data-role="file-name">No file chosen</span>
+                </label>
+              </div>
+              <p class="portfolio-upload-form__hint">
+                Supported formats: CSV, Excel (.xlsx, .xls), JSON
+              </p>
+            </div>
+
+            <button type="submit" class="portfolio-upload-form__submit">Upload Portfolio</button>
+
+            <div class="portfolio-upload-form__status" data-role="upload-status" style="display: none;"></div>
+
+            <div class="portfolio-upload-form__instructions">
+              <h4>File Format Requirements</h4>
+              <p>Your portfolio file should include the following columns:</p>
+              <ul>
+                <li><code>ticker</code> - Stock ticker symbol (required)</li>
+                <li><code>shares</code> or <code>quantity</code> - Number of shares (required)</li>
+                <li><code>weight</code> - Portfolio weight as percentage (optional)</li>
+                <li><code>price</code> - Purchase price per share (optional)</li>
+              </ul>
+              <p><strong>Example CSV:</strong></p>
+              <pre><code>ticker,shares,weight
+AAPL,100,15.5
+MSFT,50,12.3
+GOOGL,25,8.7</code></pre>
+            </div>
+          </form>
+        </div>
+
+        <div class="portfolio-management__tab-panel" data-panel="list">
+          <div class="portfolio-list" data-role="portfolio-list">
+            <div class="portfolio-list__loading">Loading portfolios...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Tab switching
+  const tabs = container.querySelectorAll('.portfolio-management__tab');
+  const panels = container.querySelectorAll('.portfolio-management__tab-panel');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.dataset.tab;
+      
+      tabs.forEach(t => t.classList.remove('is-active'));
+      panels.forEach(p => p.classList.remove('is-active'));
+      
+      tab.classList.add('is-active');
+      const panel = container.querySelector(`[data-panel="${tabName}"]`);
+      if (panel) {
+        panel.classList.add('is-active');
+      }
+
+      if (tabName === 'list') {
+        loadPortfolioList();
+      }
+    });
+  });
+
+  // File input handler
+  const fileInput = container.querySelector('#portfolio-file-input');
+  const fileName = container.querySelector('[data-role="file-name"]');
+  
+  if (fileInput && fileName) {
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        fileName.textContent = file.name;
+      } else {
+        fileName.textContent = 'No file chosen';
+      }
+    });
+  }
+
+  // Upload form handler
+  const uploadForm = container.querySelector('[data-role="portfolio-upload-form"]');
+  const uploadStatus = container.querySelector('[data-role="upload-status"]');
+
+  if (uploadForm) {
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      removeDashboards();
+
+      const formData = new FormData(uploadForm);
+      const name = formData.get('name');
+      const file = formData.get('file');
+
+      if (!file || !name) {
+        showUploadStatus('Please provide both portfolio name and file.', 'error');
+        return;
+      }
+
+      const submitButton = uploadForm.querySelector('button[type="submit"]');
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Uploading...';
+      }
+
+      try {
+        const uploadData = new FormData();
+        uploadData.append('name', name);
+        uploadData.append('file', file);
+
+        const response = await fetch(`${API_BASE}/api/portfolio/upload`, {
+          method: 'POST',
+          body: uploadData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+          throw new Error(error.message || 'Upload failed');
+        }
+
+        const result = await response.json();
+        showUploadStatus(`Portfolio "${result.name || name}" uploaded successfully! Portfolio ID: ${result.portfolio_id}`, 'success');
+        
+        // Reset form
+        uploadForm.reset();
+        if (fileName) {
+          fileName.textContent = 'No file chosen';
+        }
+
+        // Switch to list tab and refresh
+        const listTab = container.querySelector('[data-tab="list"]');
+        if (listTab) {
+          listTab.click();
+        }
+      } catch (error) {
+        showUploadStatus(error.message || 'Failed to upload portfolio. Please try again.', 'error');
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = 'Upload Portfolio';
+        }
+      }
+    });
+  }
+
+  function showUploadStatus(message, tone) {
+    if (!uploadStatus) return;
+    uploadStatus.textContent = message;
+    uploadStatus.dataset.tone = tone;
+    uploadStatus.style.display = 'block';
+    setTimeout(() => {
+      uploadStatus.style.display = 'none';
+    }, 5000);
+  }
+
+  // Load portfolio list
+  async function loadPortfolioList() {
+    const listContainer = container.querySelector('[data-role="portfolio-list"]');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '<div class="portfolio-list__loading">Loading portfolios...</div>';
+
+    try {
+      const response = await fetch(`${API_BASE}/api/portfolio/list`);
+      if (!response.ok) {
+        throw new Error('Failed to load portfolios');
+      }
+
+      const portfolios = await response.json();
+
+      if (portfolios.length === 0) {
+        listContainer.innerHTML = `
+          <div class="portfolio-list__empty">
+            <p>No portfolios found. Upload your first portfolio to get started!</p>
+          </div>
+        `;
+        return;
+      }
+
+      listContainer.innerHTML = portfolios.map(portfolio => `
+        <div class="portfolio-list__item" data-portfolio-id="${portfolio.portfolio_id}">
+          <div class="portfolio-list__item-header">
+            <h4 class="portfolio-list__item-name">${portfolio.name || 'Unnamed Portfolio'}</h4>
+            <span class="portfolio-list__item-id">${portfolio.portfolio_id}</span>
+          </div>
+          <div class="portfolio-list__item-meta">
+            <span>Created: ${new Date(portfolio.created_at).toLocaleDateString()}</span>
+            ${portfolio.strategy_type ? `<span>Strategy: ${portfolio.strategy_type}</span>` : ''}
+            ${portfolio.benchmark_index ? `<span>Benchmark: ${portfolio.benchmark_index}</span>` : ''}
+          </div>
+          <div class="portfolio-list__item-actions">
+            <button class="portfolio-list__action-button" data-action="view" data-portfolio-id="${portfolio.portfolio_id}">
+              👁️ View Holdings
+            </button>
+            <button class="portfolio-list__action-button" data-action="use-in-chat" data-portfolio-id="${portfolio.portfolio_id}">
+              💬 Use in Chat
+            </button>
+            <button class="portfolio-list__action-button portfolio-list__action-button--danger" data-action="delete" data-portfolio-id="${portfolio.portfolio_id}">
+              🗑️ Delete
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      // Attach event listeners
+      listContainer.querySelectorAll('[data-action]').forEach(button => {
+        button.addEventListener('click', async (e) => {
+          const action = button.dataset.action;
+          const portfolioId = button.dataset.portfolioId;
+          
+          if (action === 'view') {
+            await showHoldingsModal(portfolioId);
+          } else if (action === 'use-in-chat') {
+            usePortfolioInChat(portfolioId);
+          } else if (action === 'delete') {
+            if (confirm(`Are you sure you want to delete portfolio "${portfolioId}"?`)) {
+              await deletePortfolio(portfolioId);
+            }
+          }
+        });
+      });
+    } catch (error) {
+      listContainer.innerHTML = `
+        <div class="portfolio-list__error">
+          Failed to load portfolios: ${error.message}
+        </div>
+      `;
+    }
+  }
+
+  // Show holdings modal
+  async function showHoldingsModal(portfolioId) {
+    removeDashboards();
+
+    try {
+      const response = await fetch(`${API_BASE}/api/portfolio/${portfolioId}/holdings`);
+      if (!response.ok) {
+        throw new Error('Failed to load holdings');
+      }
+
+      const data = await response.json();
+
+      // Create modal
+      const modal = document.createElement('div');
+      modal.className = 'portfolio-holdings-modal';
+      modal.innerHTML = `
+        <div class="portfolio-holdings-modal__backdrop"></div>
+        <div class="portfolio-holdings-modal__content">
+          <div class="portfolio-holdings-modal__header">
+            <h3 class="portfolio-holdings-modal__title">${data.name || portfolioId} - Holdings</h3>
+            <button class="portfolio-holdings-modal__close" aria-label="Close">×</button>
+          </div>
+          <div class="portfolio-holdings-modal__body">
+            <table class="portfolio-holdings-modal__table">
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Weight</th>
+                  <th>Shares</th>
+                  <th>Market Value</th>
+                  <th>Sector</th>
+                  <th>P/E</th>
+                  <th>Dividend Yield</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.holdings.map(h => `
+                  <tr>
+                    <td><strong>${h.ticker}</strong></td>
+                    <td>${h.weight ? (h.weight * 100).toFixed(2) + '%' : 'N/A'}</td>
+                    <td>${h.shares ? h.shares.toLocaleString() : 'N/A'}</td>
+                    <td>${h.market_value ? '$' + h.market_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 'N/A'}</td>
+                    <td>${h.sector || 'N/A'}</td>
+                    <td>${h.pe_ratio ? h.pe_ratio.toFixed(2) : 'N/A'}</td>
+                    <td>${h.dividend_yield ? (h.dividend_yield * 100).toFixed(2) + '%' : 'N/A'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Close handlers
+      const closeBtn = modal.querySelector('.portfolio-holdings-modal__close');
+      const backdrop = modal.querySelector('.portfolio-holdings-modal__backdrop');
+      
+      const closeModal = () => {
+        modal.remove();
+        removeDashboards();
+      };
+
+      closeBtn?.addEventListener('click', closeModal);
+      backdrop?.addEventListener('click', closeModal);
+    } catch (error) {
+      alert(`Failed to load holdings: ${error.message}`);
+    }
+  }
+
+  // Use portfolio in chat
+  function usePortfolioInChat(portfolioId) {
+    removeDashboards();
+
+    if (!chatInput) return;
+
+    // Remove collapsed classes
+    if (chatPanel) {
+      chatPanel.classList.remove('chat-panel--collapsed');
+    }
+    if (chatLog) {
+      chatLog.classList.remove('hidden');
+    }
+    if (chatFormContainer) {
+      chatFormContainer.classList.remove('chat-form--collapsed');
+    }
+
+    // Close utility panel
+    closeUtilityPanel();
+
+    // Set prompt
+    chatInput.value = `Analyze portfolio ${portfolioId}`;
+    
+    // Trigger input event to enable send button
+    const inputEvent = new Event('input', { bubbles: true });
+    chatInput.dispatchEvent(inputEvent);
+    
+    // Manually update send button state
+    if (sendButton) {
+      sendButton.disabled = !chatInput.value.trim();
+    }
+    
+    // Auto-resize textarea
+    if (typeof autoResizeTextarea === 'function') {
+      autoResizeTextarea();
+    }
+    
+    // Focus input
+    chatInput.focus();
+    chatInput.setSelectionRange(chatInput.value.length, chatInput.value.length);
+  }
+
+  // Delete portfolio
+  async function deletePortfolio(portfolioId) {
+    try {
+      const response = await fetch(`${API_BASE}/api/portfolio/${portfolioId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete portfolio');
+      }
+
+      // Reload list
+      await loadPortfolioList();
+    } catch (error) {
+      alert(`Failed to delete portfolio: ${error.message}`);
+    }
+  }
+
+  // Load initial list if on list tab
+  const activeTab = container.querySelector('.portfolio-management__tab.is-active');
+  if (activeTab && activeTab.dataset.tab === 'list') {
+    loadPortfolioList();
+  }
+}
+
 
 const HELP_PROMPTS = [
   "Show Apple KPIs for 2022–2024",
@@ -2788,6 +3220,13 @@ const UTILITY_SECTIONS = {
     title: "Settings",
     html: `<div class="settings-panel" data-role="settings-root"></div>`,
     render: renderSettingsSection,
+  },
+  portfolio: {
+    title: "Portfolio Management",
+    html: `<div class="portfolio-management-panel" data-role="portfolio-management-root">
+      <div class="utility-loading">Loading portfolio management...</div>
+    </div>`,
+    render: renderPortfolioManagementSection,
   },
 };
 
@@ -6396,7 +6835,7 @@ function openUtilityPanel(key) {
     }
   }
   setActiveNav(`open-${key}`);
-  if (["help", "kpi-library", "company-universe", "filing-viewer"].includes(key)) {
+  if (["help", "kpi-library", "company-universe", "filing-viewer", "portfolio"].includes(key)) {
     if (chatPanel) {
       chatPanel.classList.add("chat-panel--collapsed");
     }

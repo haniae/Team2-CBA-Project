@@ -570,10 +570,17 @@ SYSTEM_PROMPT = (
     "4. **Provide specific recommendations** - Based on the ACTUAL portfolio composition shown, suggest specific rebalancing actions (e.g., 'Reduce AAPL from 15.2% to 10%')\n"
     "5. **Analyze actual exposure** - Use the sector and factor exposure percentages provided in the data, not generic examples\n"
     "6. **Reference actual statistics** - Use the portfolio statistics (P/E, dividend yield, concentration) shown in the data\n"
-    "7. **If data is missing** - If the portfolio data doesn't include a metric you need, explicitly state 'This metric is not available in the portfolio data'\n"
-    "8. **DO NOT provide generic advice** - If portfolio data is provided, you MUST analyze THAT SPECIFIC portfolio, not a hypothetical one\n"
-    "9. **Verify against data** - Before mentioning any ticker, weight, or metric, verify it exists in the provided portfolio data\n"
-    "10. **Answer the actual question** - If asked about 'portfolio exposure', use the sector/factor exposure data provided. If asked to 'analyze portfolio', analyze the actual holdings shown\n\n"
+    "7. **CALCULATE RISK METRICS** - When asked about risk metrics (CVaR, VaR, volatility, beta):\n"
+    "   - Use the actual holdings and weights provided to calculate or estimate these metrics\n"
+    "   - For CVaR/VaR: Calculate based on portfolio composition and weights, using sector exposure and concentration metrics\n"
+    "   - For volatility: Estimate based on sector diversification and concentration (higher concentration = higher volatility)\n"
+    "   - For beta: Use weighted average of holdings if available, or estimate from sector exposure\n"
+    "   - Provide specific numbers based on the portfolio composition shown\n"
+    "   - If you cannot calculate exact values, provide estimates based on the portfolio structure (e.g., 'Based on 15 holdings with 32% in Technology, estimated volatility is...')\n"
+    "8. **If data is missing** - If the portfolio data doesn't include a metric you need, explicitly state 'This metric is not available in the portfolio data' BUT still try to provide estimates based on available data\n"
+    "9. **DO NOT provide generic advice** - If portfolio data is provided, you MUST analyze THAT SPECIFIC portfolio, not a hypothetical one\n"
+    "10. **Verify against data** - Before mentioning any ticker, weight, or metric, verify it exists in the provided portfolio data\n"
+    "11. **Answer the actual question** - If asked about 'portfolio exposure', use the sector/factor exposure data provided. If asked to 'analyze portfolio', analyze the actual holdings shown. If asked about 'CVaR' or risk, CALCULATE it using the portfolio data provided\n\n"
     
     "## Response Structure\n\n"
     "**Direct Answer (1-2 sentences)**\n"
@@ -730,6 +737,27 @@ SYSTEM_PROMPT = (
     "- \"What are Amazon's environmental initiatives?\"\n"
     "- \"Does Microsoft have good governance?\"\n"
     "- \"What are the social impact risks for tech companies?\"\n\n"
+    
+    "**Portfolio Analysis - EXAMPLES:**\n"
+    "- \"What's my portfolio risk?\" → Use portfolio data to calculate risk metrics (volatility, beta, CVaR)\n"
+    "- \"Analyze my portfolio exposure\" → Use sector/factor exposure data from portfolio context\n"
+    "- \"What are my holdings?\" → List actual holdings with weights from portfolio data\n"
+    "- \"What's my portfolio diversification?\" → Use HHI and concentration metrics from portfolio data\n"
+    "- \"Optimize my portfolio\" → Analyze current holdings and suggest specific rebalancing based on actual weights\n"
+    "- \"What's my portfolio performance?\" → Calculate returns using actual holdings and their weights\n"
+    "- \"Show me my portfolio exposure by sector\" → Use sector exposure percentages from portfolio data\n"
+    "- \"What's my portfolio CVaR?\" → Calculate conditional value at risk using actual holdings\n"
+    "- \"Analyze port_xxxxx\" → Use portfolio ID to fetch and analyze that specific portfolio\n"
+    "- \"What's my portfolio allocation?\" → Show actual allocation by ticker/sector from portfolio data\n\n"
+    
+    "**Portfolio Query Interpretation:**\n"
+    "- When user asks \"What's my portfolio risk?\" → They want risk metrics for THEIR portfolio, not a generic portfolio\n"
+    "- When user asks \"What's my portfolio exposure?\" → They want sector/factor exposure for THEIR holdings\n"
+    "- When user asks \"What are my holdings?\" → They want the ACTUAL holdings from the portfolio data\n"
+    "- When user asks \"Optimize my portfolio\" → They want recommendations based on THEIR current holdings\n"
+    "- When portfolio data is provided, ALWAYS analyze THAT SPECIFIC portfolio, not a hypothetical one\n"
+    "- NEVER say \"Here's a sample portfolio\" when actual portfolio data is provided\n"
+    "- ALWAYS reference specific tickers, weights, and metrics from the portfolio data\n\n"
     
     "## Example Response Template\n\n"
     "**Q:** \"What is Apple's revenue?\"\n\n"
@@ -3477,22 +3505,29 @@ class BenchmarkOSChatbot:
         ]
         is_portfolio_query = any(kw in lowered for kw in portfolio_keywords)
         
-        # Extract portfolio ID from query - try both explicit ID and "my portfolio"
-        portfolio_id_pattern = r"\bport_[\w]{4,12}\b"
-        match = re.search(portfolio_id_pattern, user_input, re.IGNORECASE)
+        # Extract portfolio ID from query - try multiple patterns
+        portfolio_id_patterns = [
+            r"\bport_[\w]{4,12}\b",  # Standard format: port_xxxxx
+            r"\bportfolio\s+([a-z0-9_]{4,12})\b",  # "portfolio xxxxx"
+            r"\bportfolio\s+id[:\s]+([a-z0-9_]{4,12})\b",  # "portfolio id: xxxxx"
+        ]
         
         portfolio_id = None
-        if match:
-            portfolio_id = match.group(0)
-            LOGGER.info(f"Found explicit portfolio ID: {portfolio_id}")
-        elif is_portfolio_query:
+        for pattern in portfolio_id_patterns:
+            match = re.search(pattern, user_input, re.IGNORECASE)
+            if match:
+                portfolio_id = match.group(0) if len(match.groups()) == 0 else match.group(1)
+                LOGGER.info(f"Found explicit portfolio ID: {portfolio_id}")
+                break
+        
+        if not portfolio_id and is_portfolio_query:
             # If it's a portfolio query but no explicit ID, try to get the most recent portfolio
             try:
                 # Try to get list of portfolios from database
                 import sqlite3
                 with sqlite3.connect(self.settings.database_path) as conn:
                     cursor = conn.execute(
-                        "SELECT portfolio_id FROM portfolios ORDER BY created_at DESC LIMIT 1"
+                        "SELECT portfolio_id FROM portfolio_metadata ORDER BY created_at DESC LIMIT 1"
                     )
                     row = cursor.fetchone()
                     if row:
@@ -3504,6 +3539,19 @@ class BenchmarkOSChatbot:
         if not portfolio_id:
             if is_portfolio_query:
                 LOGGER.warning(f"Portfolio query detected but no portfolio ID found: {user_input}")
+                # Return helpful error message for user
+                return (
+                    "PORTFOLIO QUERY DETECTED BUT NO PORTFOLIO FOUND\n\n"
+                    "I detected that you're asking about a portfolio, but I couldn't find a portfolio in the database.\n\n"
+                    "To analyze your portfolio:\n"
+                    "1. Go to the Portfolio Management section\n"
+                    "2. Upload your portfolio (CSV, Excel, or JSON format)\n"
+                    "3. Once uploaded, you can ask questions like:\n"
+                    "   - 'What's my portfolio risk?'\n"
+                    "   - 'Analyze my portfolio exposure'\n"
+                    "   - 'What are my holdings?'\n\n"
+                    "If you have a portfolio ID (e.g., port_xxxxx), include it in your question."
+                )
             return None
         
         try:
@@ -3546,7 +3594,12 @@ class BenchmarkOSChatbot:
             context_parts.append("CRITICAL INSTRUCTIONS:")
             context_parts.append("- You MUST use ONLY the data provided below")
             context_parts.append("- DO NOT make up or hallucinate portfolio data")
-            context_parts.append("- If data is missing, say so - do not invent numbers")
+            context_parts.append("- CALCULATE RISK METRICS: When asked about CVaR, VaR, volatility, or other risk metrics:")
+            context_parts.append("  * Use the holdings, weights, sector exposure, and concentration metrics below to calculate estimates")
+            context_parts.append("  * For CVaR: Calculate based on portfolio concentration and sector exposure (higher concentration = higher CVaR)")
+            context_parts.append("  * Provide specific numbers based on the portfolio composition shown")
+            context_parts.append("  * If exact calculation requires historical returns, provide estimates based on portfolio structure")
+            context_parts.append("- If data is missing, say so - but still try to provide estimates based on available portfolio data")
             context_parts.append("- Reference specific tickers, weights, and metrics from below")
             context_parts.append("- Quote the actual numbers from the data provided")
             context_parts.append("")

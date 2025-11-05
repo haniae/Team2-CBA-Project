@@ -97,7 +97,13 @@ def enhance_structured_parse(
     portfolio_id_pattern = r"\bport_[\w]+"
     
     # Portfolio-specific patterns (with ID detection)
+    # Priority: Catch portfolio queries BEFORE ticker resolution to prevent false positives
     portfolio_patterns = [
+        # Generic portfolio queries (highest priority to prevent false positives)
+        (r"\b(?:what'?s?|what\s+is)\s+(?:my\s+)?portfolio\s+(?:risk|cvar|volatility|diversification|exposure|performance|allocation|attribution|beta|alpha|sharpe|sortino)", EnhancedIntent.PORTFOLIO_SUMMARY),
+        (r"\b(?:show|analyze|calculate|get)\s+(?:my\s+)?portfolio\s+(?:risk|cvar|volatility|diversification|exposure|performance|allocation|attribution|beta|alpha|sharpe|sortino)", EnhancedIntent.PORTFOLIO_SUMMARY),
+        (r"\b(?:what'?s?|what\s+is)\s+(?:my\s+)?portfolio\s+(?:sector|factor|geographic|style)\s+exposure", EnhancedIntent.PORTFOLIO_EXPOSURE),
+        (r"\b(?:show|analyze|get)\s+(?:my\s+)?portfolio\s+(?:sector|factor|geographic|style)\s+exposure", EnhancedIntent.PORTFOLIO_EXPOSURE),
         (r"\b(?:use|switch|set|select)\s+portfolio\s+port_[\w]+", EnhancedIntent.PORTFOLIO_HOLDINGS),  # "use portfolio port_xxx"
         (r"\b(?:use|switch|set|select)\s+portfolio", EnhancedIntent.PORTFOLIO_HOLDINGS),  # "use portfolio" (will extract ID)
         (r"\b(?:upload|load|import)\s+(?:my\s+)?portfolio", EnhancedIntent.PORTFOLIO_UPLOAD),
@@ -245,7 +251,8 @@ def enhance_structured_parse(
         if re.search(pattern, lowered):
             return EnhancedRouting(
                 intent=intent,
-                confidence=0.9
+                confidence=0.95,  # Increased confidence for portfolio intents
+                force_text_only=True  # Prevent dashboard rendering for portfolio queries
             )
     
     # Also check if query contains portfolio ID + keywords

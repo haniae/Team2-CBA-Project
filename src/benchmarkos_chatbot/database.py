@@ -118,6 +118,103 @@ class TickerAliasRecord:
     updated_at: datetime
 
 
+@dataclass(frozen=True)
+class PortfolioMetadataRecord:
+    """Portfolio metadata including name, benchmark, and strategy."""
+
+    portfolio_id: str
+    name: str
+    base_currency: str
+    benchmark_index: Optional[str]
+    inception_date: datetime
+    strategy_type: Optional[str]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class PortfolioHoldingRecord:
+    """Individual holding in a portfolio."""
+
+    ticker: str
+    portfolio_id: str
+    position_date: datetime
+    shares: Optional[float]
+    weight: Optional[float]
+    cost_basis: Optional[float]
+    market_value: Optional[float]
+    currency: str
+    account_id: Optional[str]
+
+
+@dataclass(frozen=True)
+class PolicyConstraintRecord:
+    """Policy constraint definition for a portfolio."""
+
+    constraint_id: str
+    portfolio_id: str
+    constraint_type: str
+    target_value: Optional[float]
+    min_value: Optional[float]
+    max_value: Optional[float]
+    unit: Optional[str]
+    active: bool
+    dimension: Optional[str]  # e.g., "Technology" for sector_limit, ticker for allocation_cap
+
+
+@dataclass(frozen=True)
+class PolicyDocumentRecord:
+    """Policy document metadata and parsed content."""
+
+    document_id: str
+    portfolio_id: str
+    document_type: str  # IPS, guidelines, mandate
+    file_path: Optional[str]
+    parsed_constraints: Dict[str, Any]
+    uploaded_at: datetime
+
+
+@dataclass(frozen=True)
+class PortfolioTransactionRecord:
+    """Portfolio transaction (buy, sell, rebalance)."""
+
+    transaction_id: str
+    portfolio_id: str
+    ticker: str
+    trade_date: datetime
+    action: str  # buy, sell, rebalance
+    shares: Optional[float]
+    price: Optional[float]
+    commission: Optional[float]
+    notes: Optional[str]
+
+
+@dataclass(frozen=True)
+class ExposureSnapshotRecord:
+    """Exposure snapshot by dimension (sector, factor, issuer, geography)."""
+
+    snapshot_id: str
+    portfolio_id: str
+    snapshot_date: datetime
+    exposure_type: str
+    dimension: str
+    value: Optional[float]
+    weight: Optional[float]
+
+
+@dataclass(frozen=True)
+class AttributionResultRecord:
+    """Performance attribution result."""
+
+    attribution_id: str
+    portfolio_id: str
+    start_date: datetime
+    end_date: datetime
+    attribution_type: str  # allocation, selection, interaction
+    dimension: str
+    contribution: Optional[float]
+    created_at: datetime
+
+
 # -----------------------------
 # Helpers
 # -----------------------------
@@ -429,6 +526,104 @@ def initialise(database_path: Path) -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_metadata (
+                portfolio_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                base_currency TEXT NOT NULL,
+                benchmark_index TEXT,
+                inception_date TEXT NOT NULL,
+                strategy_type TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_holdings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                portfolio_id TEXT NOT NULL,
+                position_date TEXT NOT NULL,
+                shares REAL,
+                weight REAL,
+                cost_basis REAL,
+                market_value REAL,
+                currency TEXT NOT NULL,
+                account_id TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS policy_constraints (
+                constraint_id TEXT PRIMARY KEY,
+                portfolio_id TEXT NOT NULL,
+                constraint_type TEXT NOT NULL,
+                target_value REAL,
+                min_value REAL,
+                max_value REAL,
+                unit TEXT,
+                active INTEGER NOT NULL DEFAULT 1,
+                dimension TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS policy_documents (
+                document_id TEXT PRIMARY KEY,
+                portfolio_id TEXT NOT NULL,
+                document_type TEXT NOT NULL,
+                file_path TEXT,
+                parsed_constraints TEXT NOT NULL DEFAULT '{}',
+                uploaded_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_transactions (
+                transaction_id TEXT PRIMARY KEY,
+                portfolio_id TEXT NOT NULL,
+                ticker TEXT NOT NULL,
+                trade_date TEXT NOT NULL,
+                action TEXT NOT NULL,
+                shares REAL,
+                price REAL,
+                commission REAL,
+                notes TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS exposure_snapshots (
+                snapshot_id TEXT PRIMARY KEY,
+                portfolio_id TEXT NOT NULL,
+                snapshot_date TEXT NOT NULL,
+                exposure_type TEXT NOT NULL,
+                dimension TEXT NOT NULL,
+                value REAL,
+                weight REAL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attribution_results (
+                attribution_id TEXT PRIMARY KEY,
+                portfolio_id TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                attribution_type TEXT NOT NULL,
+                dimension TEXT NOT NULL,
+                contribution REAL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
 
         _apply_migrations(connection)
 
@@ -466,6 +661,36 @@ def initialise(database_path: Path) -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_ticker_aliases_name
             ON ticker_aliases (company_name)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_portfolio_holdings_portfolio_date
+            ON portfolio_holdings (portfolio_id, position_date DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_policy_constraints_portfolio
+            ON policy_constraints (portfolio_id, active)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_portfolio_date
+            ON portfolio_transactions (portfolio_id, trade_date DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_exposure_snapshots_portfolio_date
+            ON exposure_snapshots (portfolio_id, snapshot_date DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_attribution_results_portfolio
+            ON attribution_results (portfolio_id, start_date DESC, end_date DESC)
             """
         )
         connection.commit()
@@ -1596,3 +1821,502 @@ def fetch_scenario_results(
             )
         )
     return results
+
+
+# -----------------------------
+# Portfolio Management
+# -----------------------------
+
+
+def upsert_portfolio_metadata(database_path: Path, record: PortfolioMetadataRecord) -> None:
+    """Insert or update portfolio metadata."""
+    with _connect(database_path) as connection:
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO portfolio_metadata
+            (portfolio_id, name, base_currency, benchmark_index, inception_date, strategy_type, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.portfolio_id,
+                record.name,
+                record.base_currency,
+                record.benchmark_index,
+                _iso_utc(record.inception_date),
+                record.strategy_type,
+                _iso_utc(record.created_at),
+            ),
+        )
+        connection.commit()
+
+
+def fetch_portfolio_metadata(database_path: Path, portfolio_id: str) -> Optional[PortfolioMetadataRecord]:
+    """Fetch portfolio metadata by ID."""
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            """
+            SELECT portfolio_id, name, base_currency, benchmark_index, inception_date, strategy_type, created_at
+            FROM portfolio_metadata
+            WHERE portfolio_id = ?
+            """,
+            (portfolio_id,),
+        ).fetchone()
+        
+        if not row:
+            return None
+        
+        return PortfolioMetadataRecord(
+            portfolio_id=row["portfolio_id"],
+            name=row["name"],
+            base_currency=row["base_currency"],
+            benchmark_index=row["benchmark_index"],
+            inception_date=_parse_dt(row["inception_date"]) or datetime.now(timezone.utc),
+            strategy_type=row["strategy_type"],
+            created_at=_parse_dt(row["created_at"]) or datetime.now(timezone.utc),
+        )
+
+
+def list_portfolios(database_path: Path) -> List[PortfolioMetadataRecord]:
+    """List all portfolios in the database."""
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """
+            SELECT portfolio_id, name, base_currency, benchmark_index, inception_date, strategy_type, created_at
+            FROM portfolio_metadata
+            ORDER BY created_at DESC
+            """
+        ).fetchall()
+        
+        return [
+            PortfolioMetadataRecord(
+                portfolio_id=row["portfolio_id"],
+                name=row["name"],
+                base_currency=row["base_currency"],
+                benchmark_index=row["benchmark_index"],
+                inception_date=_parse_dt(row["inception_date"]) or datetime.now(timezone.utc),
+                strategy_type=row["strategy_type"],
+                created_at=_parse_dt(row["created_at"]) or datetime.now(timezone.utc),
+            )
+            for row in rows
+        ]
+
+
+def bulk_insert_portfolio_holdings(
+    database_path: Path, holdings: Sequence[PortfolioHoldingRecord], *, connection: Optional[sqlite3.Connection] = None
+) -> int:
+    """Insert portfolio holdings in bulk."""
+    if not holdings:
+        return 0
+
+    payload = [
+        (
+            _normalize_ticker(holding.ticker),
+            holding.portfolio_id,
+            _iso_utc(holding.position_date),
+            holding.shares,
+            holding.weight,
+            holding.cost_basis,
+            holding.market_value,
+            holding.currency,
+            holding.account_id,
+        )
+        for holding in holdings
+    ]
+
+    own_connection = False
+    if connection is None:
+        connection = _connect(database_path)
+        own_connection = True
+    try:
+        cursor = connection.executemany(
+            """
+            INSERT INTO portfolio_holdings (ticker, portfolio_id, position_date, shares, weight, cost_basis, market_value, currency, account_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            payload,
+        )
+        if own_connection:
+            connection.commit()
+        return cursor.rowcount
+    finally:
+        if own_connection:
+            connection.close()
+
+
+def fetch_portfolio_holdings(
+    database_path: Path, portfolio_id: str, *, as_of_date: Optional[datetime] = None
+) -> List[PortfolioHoldingRecord]:
+    """Fetch holdings for a portfolio, optionally filtered by date."""
+    query = [
+        "SELECT ticker, portfolio_id, position_date, shares, weight, cost_basis, market_value, currency, account_id",
+        "FROM portfolio_holdings",
+        "WHERE portfolio_id = ?",
+    ]
+    params: List[Any] = [portfolio_id]
+    
+    if as_of_date:
+        query.append("AND position_date <= ?")
+        params.append(_iso_utc(as_of_date))
+    
+    query.append("ORDER BY position_date DESC, weight DESC")
+    
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute("\n".join(query), params).fetchall()
+    
+    return [
+        PortfolioHoldingRecord(
+            ticker=_normalize_ticker(row["ticker"]),
+            portfolio_id=row["portfolio_id"],
+            position_date=_parse_dt(row["position_date"]) or datetime.now(timezone.utc),
+            shares=row["shares"],
+            weight=row["weight"],
+            cost_basis=row["cost_basis"],
+            market_value=row["market_value"],
+            currency=row["currency"],
+            account_id=row["account_id"],
+        )
+        for row in rows
+    ]
+
+
+def upsert_policy_constraint(database_path: Path, record: PolicyConstraintRecord) -> None:
+    """Insert or update a policy constraint."""
+    with _connect(database_path) as connection:
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO policy_constraints
+            (constraint_id, portfolio_id, constraint_type, target_value, min_value, max_value, unit, active, dimension)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.constraint_id,
+                record.portfolio_id,
+                record.constraint_type,
+                record.target_value,
+                record.min_value,
+                record.max_value,
+                record.unit,
+                1 if record.active else 0,
+                record.dimension,
+            ),
+        )
+        connection.commit()
+
+
+def fetch_policy_constraints(database_path: Path, portfolio_id: str, *, active_only: bool = True) -> List[PolicyConstraintRecord]:
+    """Fetch policy constraints for a portfolio."""
+    query = [
+        "SELECT constraint_id, portfolio_id, constraint_type, target_value, min_value, max_value, unit, active, dimension",
+        "FROM policy_constraints",
+        "WHERE portfolio_id = ?",
+    ]
+    params: List[Any] = [portfolio_id]
+    
+    if active_only:
+        query.append("AND active = 1")
+    
+    query.append("ORDER BY constraint_type, dimension")
+    
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute("\n".join(query), params).fetchall()
+    
+    return [
+        PolicyConstraintRecord(
+            constraint_id=row["constraint_id"],
+            portfolio_id=row["portfolio_id"],
+            constraint_type=row["constraint_type"],
+            target_value=row["target_value"],
+            min_value=row["min_value"],
+            max_value=row["max_value"],
+            unit=row["unit"],
+            active=bool(row["active"]),
+            dimension=row["dimension"],
+        )
+        for row in rows
+    ]
+
+
+def upsert_policy_document(database_path: Path, record: PolicyDocumentRecord) -> None:
+    """Insert or update a policy document."""
+    with _connect(database_path) as connection:
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO policy_documents
+            (document_id, portfolio_id, document_type, file_path, parsed_constraints, uploaded_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.document_id,
+                record.portfolio_id,
+                record.document_type,
+                record.file_path,
+                _json_dumps(record.parsed_constraints),
+                _iso_utc(record.uploaded_at),
+            ),
+        )
+        connection.commit()
+
+
+def fetch_policy_documents(database_path: Path, portfolio_id: str) -> List[PolicyDocumentRecord]:
+    """Fetch policy documents for a portfolio."""
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """
+            SELECT document_id, portfolio_id, document_type, file_path, parsed_constraints, uploaded_at
+            FROM policy_documents
+            WHERE portfolio_id = ?
+            ORDER BY uploaded_at DESC
+            """,
+            (portfolio_id,),
+        ).fetchall()
+    
+    return [
+        PolicyDocumentRecord(
+            document_id=row["document_id"],
+            portfolio_id=row["portfolio_id"],
+            document_type=row["document_type"],
+            file_path=row["file_path"],
+            parsed_constraints=json.loads(row["parsed_constraints"] or "{}"),
+            uploaded_at=_parse_dt(row["uploaded_at"]) or datetime.now(timezone.utc),
+        )
+        for row in rows
+    ]
+
+
+def insert_portfolio_transaction(database_path: Path, record: PortfolioTransactionRecord) -> None:
+    """Insert a portfolio transaction."""
+    with _connect(database_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO portfolio_transactions
+            (transaction_id, portfolio_id, ticker, trade_date, action, shares, price, commission, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.transaction_id,
+                record.portfolio_id,
+                _normalize_ticker(record.ticker),
+                _iso_utc(record.trade_date),
+                record.action,
+                record.shares,
+                record.price,
+                record.commission,
+                record.notes,
+            ),
+        )
+        connection.commit()
+
+
+def fetch_portfolio_transactions(
+    database_path: Path, portfolio_id: str, *, ticker: Optional[str] = None, limit: Optional[int] = None
+) -> List[PortfolioTransactionRecord]:
+    """Fetch portfolio transactions, optionally filtered by ticker."""
+    query = [
+        "SELECT transaction_id, portfolio_id, ticker, trade_date, action, shares, price, commission, notes",
+        "FROM portfolio_transactions",
+        "WHERE portfolio_id = ?",
+    ]
+    params: List[Any] = [portfolio_id]
+    
+    if ticker:
+        query.append("AND ticker = ?")
+        params.append(_normalize_ticker(ticker))
+    
+    query.append("ORDER BY trade_date DESC")
+    
+    if limit:
+        query.append("LIMIT ?")
+        params.append(limit)
+    
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute("\n".join(query), params).fetchall()
+    
+    return [
+        PortfolioTransactionRecord(
+            transaction_id=row["transaction_id"],
+            portfolio_id=row["portfolio_id"],
+            ticker=_normalize_ticker(row["ticker"]),
+            trade_date=_parse_dt(row["trade_date"]) or datetime.now(timezone.utc),
+            action=row["action"],
+            shares=row["shares"],
+            price=row["price"],
+            commission=row["commission"],
+            notes=row["notes"],
+        )
+        for row in rows
+    ]
+
+
+def bulk_insert_exposure_snapshots(
+    database_path: Path, snapshots: Sequence[ExposureSnapshotRecord], *, connection: Optional[sqlite3.Connection] = None
+) -> int:
+    """Insert exposure snapshots in bulk."""
+    if not snapshots:
+        return 0
+
+    payload = [
+        (
+            snapshot.snapshot_id,
+            snapshot.portfolio_id,
+            _iso_utc(snapshot.snapshot_date),
+            snapshot.exposure_type,
+            snapshot.dimension,
+            snapshot.value,
+            snapshot.weight,
+        )
+        for snapshot in snapshots
+    ]
+
+    own_connection = False
+    if connection is None:
+        connection = _connect(database_path)
+        own_connection = True
+    try:
+        cursor = connection.executemany(
+            """
+            INSERT INTO exposure_snapshots (snapshot_id, portfolio_id, snapshot_date, exposure_type, dimension, value, weight)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            payload,
+        )
+        if own_connection:
+            connection.commit()
+        return cursor.rowcount
+    finally:
+        if own_connection:
+            connection.close()
+
+
+def fetch_exposure_snapshots(
+    database_path: Path, portfolio_id: str, *, exposure_type: Optional[str] = None, as_of_date: Optional[datetime] = None
+) -> List[ExposureSnapshotRecord]:
+    """Fetch exposure snapshots for a portfolio."""
+    query = [
+        "SELECT snapshot_id, portfolio_id, snapshot_date, exposure_type, dimension, value, weight",
+        "FROM exposure_snapshots",
+        "WHERE portfolio_id = ?",
+    ]
+    params: List[Any] = [portfolio_id]
+    
+    if exposure_type:
+        query.append("AND exposure_type = ?")
+        params.append(exposure_type)
+    
+    if as_of_date:
+        query.append("AND snapshot_date <= ?")
+        params.append(_iso_utc(as_of_date))
+    
+    query.append("ORDER BY snapshot_date DESC, exposure_type, dimension")
+    
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute("\n".join(query), params).fetchall()
+    
+    return [
+        ExposureSnapshotRecord(
+            snapshot_id=row["snapshot_id"],
+            portfolio_id=row["portfolio_id"],
+            snapshot_date=_parse_dt(row["snapshot_date"]) or datetime.now(timezone.utc),
+            exposure_type=row["exposure_type"],
+            dimension=row["dimension"],
+            value=row["value"],
+            weight=row["weight"],
+        )
+        for row in rows
+    ]
+
+
+def bulk_insert_attribution_results(
+    database_path: Path, results: Sequence[AttributionResultRecord], *, connection: Optional[sqlite3.Connection] = None
+) -> int:
+    """Insert attribution results in bulk."""
+    if not results:
+        return 0
+
+    payload = [
+        (
+            result.attribution_id,
+            result.portfolio_id,
+            _iso_utc(result.start_date),
+            _iso_utc(result.end_date),
+            result.attribution_type,
+            result.dimension,
+            result.contribution,
+            _iso_utc(result.created_at),
+        )
+        for result in results
+    ]
+
+    own_connection = False
+    if connection is None:
+        connection = _connect(database_path)
+        own_connection = True
+    try:
+        cursor = connection.executemany(
+            """
+            INSERT INTO attribution_results (attribution_id, portfolio_id, start_date, end_date, attribution_type, dimension, contribution, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            payload,
+        )
+        if own_connection:
+            connection.commit()
+        return cursor.rowcount
+    finally:
+        if own_connection:
+            connection.close()
+
+
+def fetch_attribution_results(
+    database_path: Path,
+    portfolio_id: str,
+    *,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    attribution_type: Optional[str] = None,
+) -> List[AttributionResultRecord]:
+    """Fetch attribution results for a portfolio."""
+    query = [
+        "SELECT attribution_id, portfolio_id, start_date, end_date, attribution_type, dimension, contribution, created_at",
+        "FROM attribution_results",
+        "WHERE portfolio_id = ?",
+    ]
+    params: List[Any] = [portfolio_id]
+    
+    if start_date:
+        query.append("AND start_date >= ?")
+        params.append(_iso_utc(start_date))
+    
+    if end_date:
+        query.append("AND end_date <= ?")
+        params.append(_iso_utc(end_date))
+    
+    if attribution_type:
+        query.append("AND attribution_type = ?")
+        params.append(attribution_type)
+    
+    query.append("ORDER BY created_at DESC, attribution_type, dimension")
+    
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute("\n".join(query), params).fetchall()
+    
+    return [
+        AttributionResultRecord(
+            attribution_id=row["attribution_id"],
+            portfolio_id=row["portfolio_id"],
+            start_date=_parse_dt(row["start_date"]) or datetime.now(timezone.utc),
+            end_date=_parse_dt(row["end_date"]) or datetime.now(timezone.utc),
+            attribution_type=row["attribution_type"],
+            dimension=row["dimension"],
+            contribution=row["contribution"],
+            created_at=_parse_dt(row["created_at"]) or datetime.now(timezone.utc),
+        )
+        for row in rows
+    ]
