@@ -2021,8 +2021,16 @@ class BenchmarkOSChatbot:
                 ]
                 is_filter_query = any(re.search(pattern, lowered_input) for pattern in filter_query_patterns)
                 
-                # Only do ticker summary for bare ticker mentions, NOT questions, forecasting, or filter queries
-                if not is_question and not is_filter_query:
+                # CRITICAL: Check for specific metric queries - route to LLM for focused response
+                # Pattern: "show [company]'s [specific metric]" or "what's [company]'s [metric]"
+                specific_metric_patterns = [
+                    r'\b(?:show|tell|give)\s+(?:me\s+)?[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt)',
+                    r'\bwhat\'s\s+[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt)',
+                ]
+                is_specific_metric = any(re.search(pattern, lowered_input) for pattern in specific_metric_patterns)
+                
+                # Only do ticker summary for bare ticker mentions, NOT questions, forecasting, filter queries, or specific metric queries
+                if not is_question and not is_filter_query and not is_specific_metric:
                     # Check for dashboard keyword first
                     dashboard_keywords = ["dashboard", "full dashboard", "comprehensive dashboard", 
                                          "detailed dashboard", "show me dashboard", "give me dashboard"]
@@ -2323,14 +2331,25 @@ class BenchmarkOSChatbot:
         ]
         is_filter_query = any(re.search(pattern, lowered) for pattern in filter_query_patterns)
         
-        if is_question or is_filter_query:
-            # Natural language question or filter query - let LLM handle with context
-            # Clear dashboard to prevent showing wrong company
+        # CRITICAL: Check for specific metric queries - give focused LLM response, not full dashboard
+        # Pattern: "show [company]'s [specific metric]" → focused response, not dashboard
+        specific_metric_patterns = [
+            r'\b(?:show|tell|give)\s+(?:me\s+)?[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt|fcf|ev|market cap)',
+            r'\bwhat\'s\s+[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt|fcf|ev|market cap)',
+            r'\b(?:show|tell|give)\s+(?:me\s+)?the\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt)\s+(?:of|for)\s+[\w\s]+',
+        ]
+        is_specific_metric = any(re.search(pattern, lowered) for pattern in specific_metric_patterns)
+        
+        if is_question or is_filter_query or is_specific_metric:
+            # Natural language question, filter query, or specific metric - let LLM handle with context
+            # Clear dashboard to prevent showing full KPI dashboard when user wants focused answer
             if "dashboard" in self.last_structured_response:
                 self.last_structured_response["dashboard"] = None
             
             if is_filter_query:
                 self._progress("intent_filter", "Company filter/category query detected")
+            elif is_specific_metric:
+                self._progress("intent_specific_metric", "Specific metric query - routing to LLM for focused response")
             else:
                 self._progress("intent_question", "Natural language question detected")
             return None  # Will trigger LLM with enhanced context
