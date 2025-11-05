@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 
 from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -185,6 +185,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Global exception handler to ensure JSON responses for unhandled exceptions
+# Note: HTTPException is handled by FastAPI by default, so we only catch other exceptions
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Catch all unhandled exceptions and return JSON error response."""
+    import traceback
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Skip HTTPException - FastAPI handles it correctly
+    if isinstance(exc, HTTPException):
+        raise exc
+    
+    error_traceback = traceback.format_exc()
+    error_type = type(exc).__name__
+    error_msg = str(exc)
+    
+    logger.exception(f"Unhandled exception: {error_type}: {error_msg}\n{error_traceback}")
+    print(f"\n{'='*80}")
+    print(f"UNHANDLED EXCEPTION: {error_type}: {error_msg}")
+    print(f"{'='*80}")
+    print(error_traceback)
+    print(f"{'='*80}\n")
+    
+    # For other exceptions, return 500 with error details
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal Server Error: {error_type}: {error_msg}"}
+    )
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = (BASE_DIR.parent / "webui").resolve()
@@ -1456,7 +1488,7 @@ def cfi_dashboard(
 
 
 @app.get("/api/export/cfi")
-def export_cfi(
+async def export_cfi(
     format: str = Query(
         ...,
         description="Export format to generate (pdf, pptx, or xlsx).",
@@ -1466,21 +1498,55 @@ def export_cfi(
         "AAPL",
         description="Ticker symbol to export (defaults to AAPL).",
     ),
-) -> StreamingResponse:
+):
     """Generate an executive export for the classic dashboard."""
-    engine = get_engine()
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"[EXPORT] Starting export for {ticker} in format {format}")
+        engine = get_engine()
+        logger.info(f"[EXPORT] Engine obtained, generating export...")
         result = generate_dashboard_export(engine, ticker, format)
+        logger.info(f"[EXPORT] Export successful for {ticker} in format {format}")
     except ValueError as exc:
+        logger.warning(f"[EXPORT] ValueError during export: {exc}")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ImportError as exc:
+        logger.exception(f"[EXPORT] Missing dependency for export: {ticker} in format {format}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Export functionality not available: {str(exc)}"}
+        )
+    except Exception as exc:
+        error_traceback = traceback.format_exc()
+        error_type = type(exc).__name__
+        error_msg = str(exc)
+        logger.exception(f"[EXPORT] Error generating export for {ticker} in format {format}: {error_type}: {error_msg}\n{error_traceback}")
+        # Print to console for immediate visibility
+        print(f"\n{'='*80}")
+        print(f"[EXPORT ERROR] {error_type}: {error_msg}")
+        print(f"{'='*80}")
+        print(error_traceback)
+        print(f"{'='*80}\n")
+        error_detail = f"Failed to generate export: {error_type}: {error_msg}"
+        # Return JSONResponse directly to ensure JSON format
+        return JSONResponse(
+            status_code=500,
+            content={"detail": error_detail}
+        )
 
-    buffer = BytesIO(result.content)
-    buffer.seek(0)
     headers = {
         "Content-Disposition": f'attachment; filename="{result.filename}"',
         "X-Export-Format": format.lower(),
+        "Content-Length": str(len(result.content)),
     }
-    return StreamingResponse(buffer, media_type=result.media_type, headers=headers)
+    return StreamingResponse(
+        BytesIO(result.content),
+        media_type=result.media_type,
+        headers=headers,
+    )
 
 
 @app.get("/facts", response_model=FactsResponse)
@@ -2584,65 +2650,54 @@ def delete_portfolio(portfolio_id: str) -> Dict[str, Any]:
 @app.get("/api/portfolio/{portfolio_id}/export/pptx")
 def portfolio_export_pptx(portfolio_id: str) -> StreamingResponse:
     """Export portfolio as PowerPoint presentation."""
-    settings = get_settings()
-    db_path = settings.database_path
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
     
-    # Fetch all portfolio data
-    holdings_response = portfolio_holdings(portfolio_id)
-    summary_response = portfolio_summary(portfolio_id)
-    exposure_response = portfolio_exposure(portfolio_id)
-    
-    # Convert to format expected by PowerPoint builder
-    holdings = [
-        {
-            "ticker": h.ticker,
-            "weight": h.weight or 0.0,
-            "sector": h.sector,
-            "pe_ratio": h.pe_ratio,
-            "market_value": h.market_value,
+    try:
+        settings = get_settings()
+        db_path = settings.database_path
+        
+        # Build PowerPoint
+        ppt_bytes = build_portfolio_powerpoint(
+            database_path=Path(db_path),
+            portfolio_id=portfolio_id,
+            optimization_result=None,  # Optional - can be fetched if needed
+            attribution_result=None,  # Optional - can be fetched if needed
+            exposure_result=None,  # Optional - can be fetched if needed
+            scenario_results=None,  # Optional - can be fetched if needed
+        )
+        
+        # Return as streaming response
+        filename = f"portfolio_{portfolio_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.pptx"
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Export-Format": "pptx",
+            "Content-Length": str(len(ppt_bytes)),
         }
-        for h in holdings_response.holdings
-    ]
-    
-    summary = {
-        "num_holdings": summary_response.num_holdings,
-        "total_market_value": summary_response.total_market_value,
-        "weighted_avg_pe": summary_response.weighted_avg_pe,
-        "weighted_avg_dividend_yield": summary_response.weighted_avg_dividend_yield,
-        "top_10_concentration": summary_response.top_10_concentration,
-        "num_sectors": summary_response.num_sectors,
-        "sector_breakdown": summary_response.sector_breakdown,
-    }
-    
-    exposure = {
-        "sector_exposure": exposure_response.sector_exposure,
-        "factor_exposure": exposure_response.factor_exposure,
-        "concentration_metrics": exposure_response.concentration_metrics,
-    }
-    
-    # Build PowerPoint
-    ppt_bytes = build_portfolio_powerpoint(
-        database_path=Path(db_path),
-        portfolio_id=portfolio_id,
-        optimization_result=None,  # Optional - can be fetched if needed
-        attribution_result=None,  # Optional - can be fetched if needed
-        exposure_result=None,  # Optional - can be fetched if needed
-        scenario_results=None,  # Optional - can be fetched if needed
-    )
-    
-    # Return as streaming response
-    buffer = BytesIO(ppt_bytes)
-    buffer.seek(0)
-    filename = f"portfolio_{portfolio_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.pptx"
-    headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"',
-        "X-Export-Format": "pptx",
-    }
-    return StreamingResponse(
-        buffer,
-        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        headers=headers
-    )
+        return StreamingResponse(
+            BytesIO(ppt_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers=headers,
+        )
+    except ImportError as exc:
+        logger.exception(f"Missing dependency for portfolio PPT export: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"PowerPoint export not available: {str(exc)}. Install python-pptx with: pip install python-pptx"
+        ) from exc
+    except ValueError as exc:
+        logger.warning(f"Portfolio not found for PPT export: {exc}")
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        error_traceback = traceback.format_exc()
+        error_type = type(exc).__name__
+        error_msg = str(exc)
+        logger.exception(f"Error generating portfolio PPT export for {portfolio_id}: {error_type}: {error_msg}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate PowerPoint export: {error_type}: {error_msg}"
+        ) from exc
 
 
 @app.get("/api/portfolio/{portfolio_id}/export/pdf")

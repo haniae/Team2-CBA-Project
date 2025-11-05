@@ -245,13 +245,25 @@ def _generate_key_insight(label: str, value: Any, ticker: str) -> str:
 
 def _build_pdf(payload: Dict[str, Any]) -> bytes:
     """Generate professional PDF report with enhanced formatting and visual design."""
+    if FPDF is None:
+        raise ImportError("fpdf is required for PDF export. Install it with: pip install fpdf2")
+    
+    if not payload:
+        raise ValueError("Payload is empty or None")
+    
     meta = payload.get("meta", {})
-    kpis = payload.get("kpi_summary", [])
-    sources = payload.get("sources", [])
+    kpis = payload.get("kpi_summary", []) or []
+    sources = payload.get("sources", []) or []
+    
+    # Extract metadata
+    company = meta.get("company") or meta.get("ticker") or "BenchmarkOS Dashboard"
+    ticker = meta.get("ticker") or ""
+    target_price = _format_currency(meta.get("target_price"))
     
     # Initialize PDF with professional settings
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_margins(10, 10, 10)  # left, top, right margins in mm
     pdf.add_page()
 
     # Header bar with primary color
@@ -268,8 +280,6 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     if ticker:
         pdf.set_font("Helvetica", "", 16)
         pdf.set_text_color(220, 220, 255)
-    company = meta.get("company") or meta.get("ticker") or "BenchmarkOS Dashboard"
-    ticker = meta.get("ticker") or ""
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, f"{company} {f'({ticker})' if ticker else ''}".strip(), ln=1)
     pdf.set_x(40)
@@ -281,24 +291,27 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     pdf.set_text_color(*COLOR_TEXT)
     pdf.set_font("Helvetica", "", 11)
     rec = meta.get("recommendation") or "N/A"
-    target_price = _format_currency(meta.get("target_price"))
     scenario = meta.get("scenario") or meta.get("live_scenario") or "Consensus"
-    pdf.multi_cell(0, 6, f"Recommendation: {rec} | Target Price: {target_price} | Scenario: {scenario}")
+    # Reset X position to left margin before multi_cell
+    pdf.set_x(10)  # Default left margin
+    pdf.multi_cell(190, 6, f"Recommendation: {rec} | Target Price: {target_price} | Scenario: {scenario}")
     if meta.get("date"):
-        pdf.multi_cell(0, 6, f"Report Date: {meta['date']}")
+        pdf.set_x(10)  # Reset X position to left margin
+        pdf.multi_cell(190, 6, f"Report Date: {meta['date']}")
 
     pdf.ln(4)
     pdf.set_font("Helvetica", "B", 14)
     pdf.cell(0, 8, "KPI Scorecard", ln=1)
     pdf.set_font("Helvetica", "", 11)
+    highlight_count = 0
     for label, value_text, period, source in _collect_kpi_rows(kpis):
         line = f"- {label}: {value_text}"
         if period:
-            highlight_text += f" ({period})"
+            line += f" ({period})"
         
         # Reset X position before each multi_cell
-        pdf.set_x(20)
-        pdf.multi_cell(0, 5, _sanitize_text_for_pdf(highlight_text))
+        pdf.set_x(10)  # Reset to left margin
+        pdf.multi_cell(190, 5, _sanitize_text_for_pdf(line))
         highlight_count += 1
         if highlight_count >= 5:
             break
@@ -364,16 +377,16 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     
     for consideration in considerations:
         # Reset X position before each multi_cell
-        pdf.set_x(20)
-        pdf.multi_cell(0, 5, _sanitize_text_for_pdf(f"- {consideration}"))
+        pdf.set_x(10)  # Reset to left margin
+        pdf.multi_cell(190, 5, _sanitize_text_for_pdf(f"- {consideration}"))
     
     pdf.ln(4)
     
     # Disclaimer
-    pdf.set_x(20)
+    pdf.set_x(10)  # Reset to left margin
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(100, 100, 100)
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(
         "This report is generated for informational purposes only and does not constitute investment advice. "
         "Past performance is not indicative of future results. All data sourced from public filings and market data providers."
     ))
@@ -538,7 +551,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*COLOR_TEXT)
-        pdf.multi_cell(0, 5, _sanitize_text_for_pdf(
+        pdf.set_x(10)  # Reset to left margin
+        pdf.multi_cell(190, 5, _sanitize_text_for_pdf(
             f"The table above presents {company}'s valuation across three methodologies. "
             "Market valuation reflects current trading prices, DCF uses discounted cash flow "
             "projections, and Comps represent peer comparison multiples. Significant divergence "
@@ -657,7 +671,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         + (f", with year-over-year growth of {revenue_growth}" if revenue_growth != "N/A" else "")
         + ". This represents the company's most recent twelve-month performance across all business segments."
     )
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(revenue_analysis))
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(revenue_analysis))
     
     pdf.ln(3)
     
@@ -688,7 +703,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         f"gross margin {gross_margin}, operating margin {operating_margin}, and net margin {net_margin}. "
         f"These metrics represent the company's most recent reported profitability across its operations."
     )
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(profitability_analysis))
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(profitability_analysis))
     
     pdf.ln(3)
     
@@ -712,7 +728,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         f"{company} generated {fcf_value} in free cash flow over the trailing twelve months. "
         f"Free cash flow represents cash available after operational expenses and capital expenditures."
     )
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(cashflow_analysis))
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(cashflow_analysis))
     
     pdf.ln(3)
     
@@ -740,7 +757,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         + (f" and ROIC {roic_value}" if roic_value != "N/A" else "")
         + ". These metrics measure how effectively the company generates returns on equity and invested capital."
     )
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(returns_analysis))
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(returns_analysis))
     
     # ========== INVESTMENT RECOMMENDATION PAGE ==========
     pdf.add_page()
@@ -813,7 +831,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     ]
     
     for catalyst in catalysts:
-        pdf.multi_cell(0, 4, _sanitize_text_for_pdf(f"+ {catalyst}"))
+        pdf.set_x(10)  # Reset to left margin
+        pdf.multi_cell(190, 4, _sanitize_text_for_pdf(f"+ {catalyst}"))
         pdf.ln(1)
     
     pdf.ln(3)
@@ -834,7 +853,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     ]
     
     for risk in risks:
-        pdf.multi_cell(0, 4, _sanitize_text_for_pdf(f"- {risk}"))
+        pdf.set_x(10)  # Reset to left margin
+        pdf.multi_cell(190, 4, _sanitize_text_for_pdf(f"- {risk}"))
         pdf.ln(1)
     
     pdf.ln(3)
@@ -888,7 +908,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(*COLOR_TEXT)
     # More factual peer comparison intro
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(
         f"This section provides comparative valuation analysis for {company} against peer companies in the sector. "
         f"The metrics below show how the company's multiples compare to industry benchmarks."
     ))
@@ -962,7 +983,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         "and debt. Terminal value is calculated using the perpetuity growth method with a 3% long-term growth rate. "
         "These assumptions are grounded in historical performance, management guidance, and industry forecasts."
     )
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(dcf_text))
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(dcf_text))
     
     pdf.ln(3)
     
@@ -1042,7 +1064,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         f"Scale Economics - Operating at scale provides cost advantages unavailable to smaller competitors. "
         f"These moats have proven durable over multiple business cycles and continue to strengthen."
     )
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(moats_text))
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(moats_text))
     
     pdf.ln(3)
     
@@ -1061,7 +1084,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         f"any single revenue stream. Capital intensity is moderate, with manageable working capital requirements. "
         f"The model demonstrates resilience through economic cycles while maintaining flexibility to invest in growth initiatives."
     )
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(business_model_text))
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(business_model_text))
     
     pdf.ln(3)
     
@@ -1081,7 +1105,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         f"interests through equity compensation strengthens governance. The team has navigated industry disruption while "
         f"maintaining market leadership, demonstrating strategic foresight and operational excellence."
     )
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(management_text))
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(management_text))
     
     pdf.ln(3)
     
@@ -1101,7 +1126,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         f"to maintain technology leadership and customer preference. While competition remains intense, the company's moats "
         f"and strategic execution position it favorably for sustained market leadership."
     )
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(competitive_pos_text))
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(competitive_pos_text))
     
     # ========== RISK FACTORS PAGE ==========
     pdf.add_page()
@@ -1166,7 +1192,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         # Description
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*COLOR_TEXT)
-        pdf.multi_cell(0, 4, _sanitize_text_for_pdf(risk["description"]))
+        pdf.set_x(10)  # Reset to left margin
+        pdf.multi_cell(190, 4, _sanitize_text_for_pdf(risk["description"]))
         
         # Probability and Impact on same line
         pdf.set_font("Helvetica", "B", 8)
@@ -1206,7 +1233,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         # Mitigation
         pdf.set_font("Helvetica", "I", 8)
         pdf.set_text_color(80, 80, 80)
-        pdf.multi_cell(0, 4, _sanitize_text_for_pdf(f"Mitigation: {risk['mitigation']}"))
+        pdf.set_x(10)  # Reset to left margin
+        pdf.multi_cell(190, 4, _sanitize_text_for_pdf(f"Mitigation: {risk['mitigation']}"))
         
         pdf.ln(2)
         
@@ -1236,7 +1264,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         "(6) Free cash flow generation and balance sheet strength. "
         "Quarterly earnings calls and SEC filings provide updates on these key indicators."
     )
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(monitoring_text))
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(monitoring_text))
     
     # ========== SOURCES & METHODOLOGY PAGE ==========
     pdf.add_page()
@@ -1260,7 +1289,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(*COLOR_TEXT)
-    pdf.multi_cell(0, 4, _sanitize_text_for_pdf(
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 4, _sanitize_text_for_pdf(
         "All financial metrics are calculated using GAAP-reported numbers from SEC filings. "
         "Market data is sourced from real-time feeds. Ratios use trailing twelve-month (TTM) data "
         "where applicable. Peer comparisons reference sector medians from comparable companies."
@@ -1365,11 +1395,15 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     _add_page_numbers(pdf, COLOR_ACCENT)
     
     # Get PDF output as bytes
-    pdf_output = pdf.output(dest="S")
+    # fpdf2 returns bytearray when called without dest parameter (or with dest="S")
+    pdf_output = pdf.output()
     # FPDF returns bytearray, convert to bytes
     if isinstance(pdf_output, bytearray):
         return bytes(pdf_output)
-    # If it's already bytes or string, handle accordingly
+    # If it's already bytes, return as-is
+    if isinstance(pdf_output, bytes):
+        return pdf_output
+    # If it's a string, encode it
     if isinstance(pdf_output, str):
         return pdf_output.encode("latin1")
     return pdf_output
@@ -1403,6 +1437,8 @@ def _add_page_numbers(pdf: FPDF, color_accent: tuple):
 
 def _build_ppt(payload: Dict[str, Any]) -> bytes:
     """Generate CFI-style professional PowerPoint deck."""
+    if Presentation is None:
+        raise ImportError("python-pptx is required for PowerPoint export. Install it with: pip install python-pptx")
     return build_cfi_ppt(payload)
 
 
@@ -1638,9 +1674,21 @@ def generate_multi_ticker_export(
 def _get_company_name_safe(engine: AnalyticsEngine, ticker: str) -> str:
     """Get company name or return ticker if not found."""
     try:
-        facts = engine.get_metrics_over_time(ticker, ["company_name"])
-        if facts and len(facts) > 0:
-            return facts[0].get("label", ticker)
+        # Try to get company name from dashboard payload
+        payload = build_cfi_dashboard_payload(engine, ticker)
+        if payload:
+            meta = payload.get("meta", {})
+            company_name = meta.get("company") or meta.get("company_name")
+            if company_name:
+                return company_name
+        # Fallback: try to get from database using dashboard_utils
+        from .dashboard_utils import _lookup_company_name
+        settings = engine.settings if hasattr(engine, 'settings') else None
+        if settings:
+            db_path = settings.database_path
+            company_name = _lookup_company_name(db_path, ticker)
+            if company_name:
+                return company_name
         return ticker
     except Exception:
         return ticker
@@ -1788,7 +1836,8 @@ def _build_comparative_summary_pdf(engine: AnalyticsEngine, tickers: List[str]) 
     
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(*COLOR_TEXT)
-    pdf.multi_cell(0, 5, _sanitize_text_for_pdf(
+    pdf.set_x(10)  # Reset to left margin
+    pdf.multi_cell(190, 5, _sanitize_text_for_pdf(
         "This comparative analysis uses data from the following sources:"
     ))
     pdf.ln(3)
@@ -1808,9 +1857,11 @@ def _build_comparative_summary_pdf(engine: AnalyticsEngine, tickers: List[str]) 
         pdf.cell(0, 5, title, ln=1, link=url)
     
     # Output PDF
-    pdf_output = pdf.output(dest="S")
+    pdf_output = pdf.output()
     if isinstance(pdf_output, bytearray):
         return bytes(pdf_output)
+    elif isinstance(pdf_output, bytes):
+        return pdf_output
     elif isinstance(pdf_output, str):
         return pdf_output.encode("latin1")
     return pdf_output
@@ -1890,10 +1941,37 @@ def _build_comparative_summary_pptx(engine: AnalyticsEngine, tickers: List[str])
             pe_ratio = next((k for k in kpis if k.get("label", "") == "P/E Ratio"), {})
             roe = next((k for k in kpis if k.get("label", "") == "ROE"), {})
             
-            table.cell(1, col_idx).text = _format_value(revenue)
-            table.cell(2, col_idx).text = _format_value(net_income)
-            table.cell(3, col_idx).text = _format_value(pe_ratio)
-            table.cell(4, col_idx).text = _format_value(roe)
+            # Use the KPI formatting function (the one at line 2045)
+            def _format_kpi_value(kpi: dict) -> str:
+                """Format a KPI value for display in tables."""
+                if not kpi:
+                    return "N/A"
+                value = kpi.get("value", "N/A")
+                if isinstance(value, str):
+                    return value
+                # Check if it has a type field for proper formatting
+                entry_type = kpi.get("type")
+                if entry_type == "percent" and isinstance(value, (int, float)):
+                    return f"{value * 100:.1f}%"
+                elif entry_type == "multiple" and isinstance(value, (int, float)):
+                    return f"{value:.1f}×"
+                elif isinstance(value, (int, float)):
+                    # Format as currency if it's a number
+                    magnitude = abs(value)
+                    if magnitude >= 1_000_000_000:
+                        return f"${value / 1_000_000_000:.1f}B"
+                    elif magnitude >= 1_000_000:
+                        return f"${value / 1_000_000:.1f}M"
+                    elif magnitude >= 1_000:
+                        return f"${value / 1_000:.1f}K"
+                    else:
+                        return f"${value:,.2f}"
+                return str(value)
+            
+            table.cell(1, col_idx).text = _format_kpi_value(revenue)
+            table.cell(2, col_idx).text = _format_kpi_value(net_income)
+            table.cell(3, col_idx).text = _format_kpi_value(pe_ratio)
+            table.cell(4, col_idx).text = _format_kpi_value(roe)
         except Exception:
             for row_idx in range(1, 5):
                 table.cell(row_idx, col_idx).text = "N/A"
