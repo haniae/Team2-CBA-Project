@@ -2009,14 +2009,48 @@ class BenchmarkOSChatbot:
                 is_question = any(re.search(pattern, lowered_input) for pattern in question_patterns)
                 
                 # CRITICAL: Check for filter queries - these should NEVER generate dashboards
+                # Comprehensive sector patterns with all variations
+                SECTOR_PATTERNS = (
+                    # Technology variations
+                    r'tech|technology|software|hardware|semiconductor|semis?|chip|it\b',
+                    # Financial variations  
+                    r'financial?|finance|banking|banks?|insurance|fintech',
+                    # Healthcare variations
+                    r'healthcare|health|pharma|pharmaceutical|biotech|medical|drug',
+                    # Energy variations
+                    r'energy|oil|gas|petroleum|renewables?|clean energy',
+                    # Consumer variations
+                    r'consumer|retail|e-commerce|ecommerce|cpg|discretionary|staples',
+                    # Industrial variations
+                    r'industrial|manufacturing|aerospace|defense|machinery',
+                    # Real Estate variations
+                    r'real estate|property|reit|reits',
+                    # Utilities variations
+                    r'utilit(?:y|ies)|power|electric|water|infrastructure',
+                    # Materials variations
+                    r'materials?|mining|metals?|chemicals?|commodit(?:y|ies)',
+                    # Communication variations
+                    r'communication|telecom|media|entertainment|broadcasting',
+                )
+                sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
+                
                 filter_query_patterns = [
-                    r'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:companies|stocks|firms)',
-                    r'\bwhich\s+(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:company|stock|firm)',
-                    r'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial)',
-                    r'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:sector|industry)',
+                    # "Show/List/Find [sector] companies"
+                    rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
+                    # "Which [sector] company"
+                    rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
+                    # "Which companies in [sector]"
+                    rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
+                    # "Companies in [sector] sector/industry"
+                    rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+                    # "[Sector] sector companies"
+                    rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
+                    # Revenue/sales filters
                     r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
+                    # Growth filters
                     r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
                     r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+                    # Market cap filters
                     r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
                 ]
                 is_filter_query = any(re.search(pattern, lowered_input) for pattern in filter_query_patterns)
@@ -2318,12 +2352,28 @@ class BenchmarkOSChatbot:
         
         is_question = any(re.search(pattern, lowered) for pattern in question_patterns)
         
-        # CRITICAL: Also check for filter queries
+        # CRITICAL: Also check for filter queries  
+        # Comprehensive sector patterns with all variations
+        SECTOR_PATTERNS = (
+            r'tech|technology|software|hardware|semiconductor|semis?|chip|it\b',
+            r'financial?|finance|banking|banks?|insurance|fintech',
+            r'healthcare|health|pharma|pharmaceutical|biotech|medical|drug',
+            r'energy|oil|gas|petroleum|renewables?|clean energy',
+            r'consumer|retail|e-commerce|ecommerce|cpg|discretionary|staples',
+            r'industrial|manufacturing|aerospace|defense|machinery',
+            r'real estate|property|reit|reits',
+            r'utilit(?:y|ies)|power|electric|water|infrastructure',
+            r'materials?|mining|metals?|chemicals?|commodit(?:y|ies)',
+            r'communication|telecom|media|entertainment|broadcasting',
+        )
+        sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
+        
         filter_query_patterns = [
-            r'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:companies|stocks|firms)',
-            r'\bwhich\s+(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:company|stock|firm)',
-            r'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial)',
-            r'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:sector|industry)',
+            rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
+            rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
+            rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
             r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
             r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
             r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
@@ -4276,11 +4326,27 @@ class BenchmarkOSChatbot:
         
         # CRITICAL: Check if this is a filter/category query - provide company universe context
         lowered = user_input.strip().lower()
+        # Comprehensive sector patterns with all variations
+        SECTOR_PATTERNS = (
+            r'tech|technology|software|hardware|semiconductor|semis?|chip|it\b',
+            r'financial?|finance|banking|banks?|insurance|fintech',
+            r'healthcare|health|pharma|pharmaceutical|biotech|medical|drug',
+            r'energy|oil|gas|petroleum|renewables?|clean energy',
+            r'consumer|retail|e-commerce|ecommerce|cpg|discretionary|staples',
+            r'industrial|manufacturing|aerospace|defense|machinery',
+            r'real estate|property|reit|reits',
+            r'utilit(?:y|ies)|power|electric|water|infrastructure',
+            r'materials?|mining|metals?|chemicals?|commodit(?:y|ies)',
+            r'communication|telecom|media|entertainment|broadcasting',
+        )
+        sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
+        
         filter_patterns = [
-            r'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:companies|stocks|firms)',
-            r'\bwhich\s+(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:company|stock|firm)',
-            r'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial)',
-            r'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:sector|industry)',
+            rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
+            rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
+            rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
             r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
             r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
             r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
