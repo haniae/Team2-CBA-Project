@@ -62,14 +62,18 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
         r'\bportfolio\s+\w+\s+attribution\b', r'\bportfolio\s+attribution\b',
         r'\bportfolio\s+rebalancing\b', r'\bportfolio\s+rebalance\b',
         # Question patterns with portfolio (catch "what's my portfolio", "show my portfolio", etc.)
-        r'\b(?:what\'?s?|what\s+is|show|analyze|calculate|get|display|tell\s+me)\s+(?:my\s+)?portfolio\b',
-        r'\b(?:what\'?s?|what\s+is|show|analyze|calculate|get|display)\s+(?:my\s+)?(?:portfolio\s+)?(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification)\b',
+        # CRITICAL: Catch question words BEFORE individual word resolution
+        r'\b(?:what\'?s?|what\s+is|what\'s|whats|show|analyze|calculate|get|display|tell\s+me)\s+(?:my\s+)?portfolio\b',
+        r'\b(?:what\'?s?|what\s+is|what\'s|whats|show|analyze|calculate|get|display)\s+(?:my\s+)?(?:portfolio\s+)?(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification|sharpe|sortino|alpha|beta|tracking\s+error)\b',
         # Risk/other attributes with portfolio context (catch "CVAR for this portfolio", "CVaR of portfolio", etc.)
-        r'\b(?:my\s+)?portfolio\s+(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification|optimization|attribution)\b',
-        r'\b(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification)\s+(?:of|for|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
+        r'\b(?:my\s+)?portfolio\s+(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification|optimization|attribution|sharpe|sortino|alpha|beta|tracking\s+error)\b',
+        r'\b(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification|sharpe|sortino|alpha|beta|tracking\s+error)\s+(?:of|for|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
         # Catch "CVAR" or "CVaR" when portfolio context is present (prevents false match to AES)
-        r'\b(?:what\s+is|calculate|show|get)\s+(?:the\s+)?(?:cvar|cva?r)\s+(?:for|of|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
+        r'\b(?:what\s+is|what\'?s?|what\'s|whats|calculate|show|get)\s+(?:the\s+)?(?:cvar|cva?r)\s+(?:for|of|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
         r'\b(?:cvar|cva?r)\s+(?:for|of|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
+        # Catch question words followed by portfolio keywords (e.g., "What's my portfolio Sharpe ratio?")
+        r'\b(?:what\'?s?|what\s+is|what\'s|whats)\s+(?:my\s+)?portfolio\s+(?:sharpe|sortino|alpha|beta|tracking\s+error|ratio)\b',
+        r'\b(?:what\'?s?|what\s+is|what\'s|whats)\s+(?:the\s+)?(?:sharpe|sortino|alpha|beta|tracking\s+error|ratio)\s+(?:for|of|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
     ]
     
     is_portfolio_query = any(re.search(pattern, lowered_full, re.IGNORECASE) for pattern in portfolio_keywords)

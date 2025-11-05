@@ -2764,15 +2764,34 @@ def get_benchmark_returns(database_path: Path, benchmark_id: str = "sp500", look
     else:
         benchmark_ticker = benchmark_id
     
-    # Get historical prices for benchmark
+    # Get historical prices for benchmark from database
     end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=lookback_days)
     
     prices = fetch_historical_prices(database_path, benchmark_ticker, start_date, end_date)
     
+    # If database has insufficient data, try fetching from yfinance directly
     if len(prices) < 2:
-        LOGGER.warning(f"Insufficient data for benchmark {benchmark_ticker}")
-        return pd.Series([], dtype=float)
+        LOGGER.warning(f"Insufficient data for benchmark {benchmark_ticker} in database, fetching from yfinance")
+        try:
+            # Fetch from yfinance as fallback
+            ticker = yf.Ticker(benchmark_ticker)
+            period_days = max(lookback_days, 252)  # Ensure at least 1 year
+            history = ticker.history(period=f"{period_days}d", interval="1d")
+            
+            if history.empty or len(history) < 2:
+                LOGGER.warning(f"Could not fetch benchmark data from yfinance for {benchmark_ticker}")
+                return pd.Series([], dtype=float)
+            
+            # Calculate returns from yfinance data
+            close_prices = history['Close']
+            returns = close_prices.pct_change().dropna()
+            
+            LOGGER.info(f"Fetched {len(returns)} days of benchmark data from yfinance for {benchmark_ticker}")
+            return returns
+        except Exception as e:
+            LOGGER.warning(f"Error fetching benchmark data from yfinance for {benchmark_ticker}: {e}")
+            return pd.Series([], dtype=float)
     
     price_values = [p[1] for p in prices]
     returns = np.diff(price_values) / price_values[:-1]

@@ -329,14 +329,18 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
         r'\bportfolio\s+scenario\b', r'\bportfolio\s+stress\b', r'\bportfolio\s+esg\b',
         r'\bportfolio\s+tax\b', r'\bportfolio\s+tracking\b', r'\bportfolio\s+sentiment\b',
         # Question patterns with portfolio (catch "what's my portfolio", "show my portfolio", etc.)
-        r'\b(?:what\'?s?|what\s+is|show|analyze|calculate|get|display|tell\s+me)\s+(?:my\s+)?portfolio\b',
-        r'\b(?:what\'?s?|what\s+is|show|analyze|calculate|get|display)\s+(?:my\s+)?(?:portfolio\s+)?(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification)\b',
+        # CRITICAL: Catch question words BEFORE individual word resolution
+        r'\b(?:what\'?s?|what\s+is|what\'s|whats|show|analyze|calculate|get|display|tell\s+me)\s+(?:my\s+)?portfolio\b',
+        r'\b(?:what\'?s?|what\s+is|what\'s|whats|show|analyze|calculate|get|display)\s+(?:my\s+)?(?:portfolio\s+)?(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification|sharpe|sortino|alpha|beta|tracking\s+error)\b',
         # Risk/other attributes with portfolio context (catch "CVAR for this portfolio", "CVaR of portfolio", etc.)
-        r'\b(?:my\s+)?portfolio\s+(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification|optimization|attribution)\b',
-        r'\b(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification)\s+(?:of|for|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
+        r'\b(?:my\s+)?portfolio\s+(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification|optimization|attribution|sharpe|sortino|alpha|beta|tracking\s+error)\b',
+        r'\b(?:risk|cvar|cva?r|volatility|exposure|performance|allocation|diversification|sharpe|sortino|alpha|beta|tracking\s+error)\s+(?:of|for|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
         # Catch "CVAR" or "CVaR" when portfolio context is present (prevents false match to AES)
-        r'\b(?:what\s+is|calculate|show|get)\s+(?:the\s+)?(?:cvar|cva?r)\s+(?:for|of|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
+        r'\b(?:what\s+is|what\'?s?|what\'s|whats|calculate|show|get)\s+(?:the\s+)?(?:cvar|cva?r)\s+(?:for|of|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
         r'\b(?:cvar|cva?r)\s+(?:for|of|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
+        # Catch question words followed by portfolio keywords (e.g., "What's my portfolio Sharpe ratio?")
+        r'\b(?:what\'?s?|what\s+is|what\'s|whats)\s+(?:my\s+)?portfolio\s+(?:sharpe|sortino|alpha|beta|tracking\s+error|ratio)\b',
+        r'\b(?:what\'?s?|what\s+is|what\'s|whats)\s+(?:the\s+)?(?:sharpe|sortino|alpha|beta|tracking\s+error|ratio)\s+(?:for|of|in)\s+(?:my\s+|the\s+|this\s+)?portfolio\b',
     ]
     
     # Check if this is a portfolio query - if so, skip ticker resolution
@@ -352,18 +356,29 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
     
     # CRITICAL: Question stopwords to prevent false ticker matches
     # Don't resolve question words as tickers
+    # Expanded to include more variations and ensure they're checked BEFORE ticker matching
     QUESTION_STOPWORDS = {
-        "what", "whats", "what's", "how", "hows", "how's", "why", "when", "where", "who", "which",
+        "what", "whats", "what's", "whats'", "how", "hows", "how's", "why", "when", "where", "who", "which",
         "is", "are", "was", "were", "does", "did", "do", "can", "could", "would", "should", "will",
         "has", "have", "had", "to", "from", "in", "on", "by", "at", "the", "a", "an", "of", "for", "with",
         "tell", "help", "explain", "understand", "know", "think", "see", "look", "find",
         "trading", "growing", "performing", "profitable", "sales", "revenue", "profit", "margin",
         "figures", "metrics", "data", "information", "about", "their", "its", "them",
+        # Additional stopwords to prevent false matches
+        "ratio", "risk", "sharpe", "sortino", "alpha", "beta", "cvar", "cva", "volatility",
+        "portfolio", "holdings", "exposure", "allocation", "diversification",
     }
 
     for match in _TICKER_PATTERN.finditer(lowered_text):
         raw_token = match.group(0)
         token = raw_token.upper()
+        
+        # CRITICAL: Check if token is a question stopword BEFORE trying to match it as a ticker
+        # This prevents false matches like "What's" -> CPB, "risk?" -> VRSK
+        token_lower = raw_token.lower().rstrip('?.,!;:')
+        if token_lower in QUESTION_STOPWORDS:
+            continue
+        
         if len(token) <= 2 and not raw_token.isupper():
             continue
         candidate = token

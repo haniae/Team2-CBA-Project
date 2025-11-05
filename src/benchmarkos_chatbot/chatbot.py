@@ -3673,6 +3673,16 @@ class BenchmarkOSChatbot:
             context_parts.append("- Reference specific tickers, weights, and metrics from below")
             context_parts.append("- Quote the actual numbers from the data provided")
             context_parts.append("")
+            context_parts.append("HOW TO INTERPRET THESE METRICS:")
+            context_parts.append("- CVaR (Conditional Value at Risk): Expected loss in worst 5% of scenarios. Higher = more risk.")
+            context_parts.append("- VaR (Value at Risk): Maximum expected loss at 95% confidence. Higher = more risk.")
+            context_parts.append("- Volatility: Standard deviation of returns. Higher = more price fluctuation.")
+            context_parts.append("- Sharpe Ratio: Risk-adjusted return (excess return / volatility). Higher is better (typically >1 is good).")
+            context_parts.append("- Sortino Ratio: Downside risk-adjusted return. Higher is better (only penalizes negative volatility).")
+            context_parts.append("- Beta: Sensitivity to market movements. 1.0 = market, >1.0 = more volatile, <1.0 = less volatile.")
+            context_parts.append("- Alpha: Excess return vs benchmark. Positive = outperformance, negative = underperformance.")
+            context_parts.append("- Tracking Error: Volatility of excess returns vs benchmark. Lower = more consistent relative performance.")
+            context_parts.append("")
             
             # Portfolio Statistics
             context_parts.append("### Portfolio Statistics")
@@ -3744,27 +3754,38 @@ class BenchmarkOSChatbot:
             
             # Calculated Risk & Performance Metrics
             context_parts.append("### Calculated Risk & Performance Metrics")
+            context_parts.append("These metrics have been calculated from historical portfolio returns and are ready to use:")
+            context_parts.append("")
             if risk_metrics:
                 if 'cvar' in risk_metrics:
-                    context_parts.append(f"Conditional Value at Risk (CVaR, 95%): {risk_metrics['cvar']:.4f} ({risk_metrics['cvar']*100:.2f}%)")
+                    context_parts.append(f"• CVaR (Conditional Value at Risk, 95%): {risk_metrics['cvar']:.4f} ({risk_metrics['cvar']*100:.2f}%)")
+                    context_parts.append("  → Expected loss in worst 5% of scenarios")
                 if 'var' in risk_metrics:
-                    context_parts.append(f"Value at Risk (VaR, 95%): {risk_metrics['var']:.4f} ({risk_metrics['var']*100:.2f}%)")
+                    context_parts.append(f"• VaR (Value at Risk, 95%): {risk_metrics['var']:.4f} ({risk_metrics['var']*100:.2f}%)")
+                    context_parts.append("  → Maximum expected loss at 95% confidence level")
                 if 'expected_loss' in risk_metrics:
-                    context_parts.append(f"Expected Loss (95% confidence): {risk_metrics['expected_loss']:.4f} ({risk_metrics['expected_loss']*100:.2f}%)")
+                    context_parts.append(f"• Expected Loss (95% confidence): {risk_metrics['expected_loss']:.4f} ({risk_metrics['expected_loss']*100:.2f}%)")
                 if 'volatility' in risk_metrics:
-                    context_parts.append(f"Annualized Volatility: {risk_metrics['volatility']:.4f} ({risk_metrics['volatility']*100:.2f}%)")
+                    context_parts.append(f"• Annualized Volatility: {risk_metrics['volatility']:.4f} ({risk_metrics['volatility']*100:.2f}%)")
+                    context_parts.append("  → Standard deviation of returns (higher = more price fluctuation)")
                 if 'sharpe' in risk_metrics:
-                    context_parts.append(f"Sharpe Ratio (annualized): {risk_metrics['sharpe']:.3f}")
+                    context_parts.append(f"• Sharpe Ratio (annualized): {risk_metrics['sharpe']:.3f}")
+                    context_parts.append("  → Risk-adjusted return (higher is better, typically >1 is good)")
                 if 'sortino' in risk_metrics:
-                    context_parts.append(f"Sortino Ratio (annualized): {risk_metrics['sortino']:.3f}")
+                    context_parts.append(f"• Sortino Ratio (annualized): {risk_metrics['sortino']:.3f}")
+                    context_parts.append("  → Downside risk-adjusted return (higher is better)")
                 if 'beta' in risk_metrics:
-                    context_parts.append(f"Beta (vs benchmark): {risk_metrics['beta']:.3f}")
+                    context_parts.append(f"• Beta (vs benchmark): {risk_metrics['beta']:.3f}")
+                    context_parts.append("  → Sensitivity to market (1.0 = market, >1.0 = more volatile, <1.0 = less volatile)")
                 if 'alpha' in risk_metrics:
-                    context_parts.append(f"Alpha (vs benchmark, annualized): {risk_metrics['alpha']:.4f} ({risk_metrics['alpha']*100:.2f}%)")
+                    context_parts.append(f"• Alpha (vs benchmark, annualized): {risk_metrics['alpha']:.4f} ({risk_metrics['alpha']*100:.2f}%)")
+                    context_parts.append("  → Excess return vs benchmark (positive = outperformance)")
                 if 'tracking_error' in risk_metrics:
-                    context_parts.append(f"Tracking Error (vs benchmark, annualized): {risk_metrics['tracking_error']:.4f} ({risk_metrics['tracking_error']*100:.2f}%)")
+                    context_parts.append(f"• Tracking Error (vs benchmark, annualized): {risk_metrics['tracking_error']:.4f} ({risk_metrics['tracking_error']*100:.2f}%)")
+                    context_parts.append("  → Volatility of excess returns (lower = more consistent relative performance)")
             else:
                 context_parts.append("Risk metrics: Unable to calculate (insufficient historical data)")
+                context_parts.append("  → This means there is not enough historical price data to calculate these metrics")
             context_parts.append("")
             
             context_parts.append("=" * 80)
