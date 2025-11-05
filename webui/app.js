@@ -6617,11 +6617,58 @@ function buildSemanticSummary(prompt) {
   if (!trimmed) {
     return { title: "Untitled Chat", intent: "insight", tickers: [], period: "", metric: "" };
   }
+  
+  // Extract metadata for internal use
   const tickers = extractTickers(trimmed);
   const period = extractPeriod(trimmed);
   const intentInfo = detectIntentMeta(trimmed, tickers);
   const metricLabel = detectMetricLabel(trimmed, intentInfo.intent);
-  const title = composeTitleComponents({ tickers, period, metricLabel, intentInfo });
+  
+  // ChatGPT-style title: Use actual query text, cleaned up
+  let title = trimmed;
+  
+  // Remove common question/command starters (case-insensitive)
+  const startersToRemove = [
+    /^what'?s\s+/i,
+    /^how'?s\s+/i,
+    /^show\s+me\s+/i,
+    /^show\s+/i,
+    /^tell\s+me\s+/i,
+    /^give\s+me\s+/i,
+    /^can\s+you\s+/i,
+    /^could\s+you\s+/i,
+    /^please\s+/i,
+    /^i\s+want\s+to\s+know\s+/i,
+    /^i\s+need\s+/i,
+  ];
+  
+  for (const regex of startersToRemove) {
+    title = title.replace(regex, '');
+  }
+  
+  // Capitalize first letter
+  title = title.charAt(0).toUpperCase() + title.slice(1);
+  
+  // Clean up multiple spaces
+  title = title.replace(/\s+/g, ' ').trim();
+  
+  // Truncate intelligently at word boundary if too long
+  const maxLength = 50;
+  if (title.length > maxLength) {
+    // Find last space before maxLength
+    let truncateAt = title.lastIndexOf(' ', maxLength);
+    if (truncateAt === -1 || truncateAt < 20) {
+      // No good word boundary, just cut at maxLength
+      truncateAt = maxLength;
+    }
+    title = title.slice(0, truncateAt).trim() + '…';
+  }
+  
+  // Fallback if title is empty after cleaning
+  if (!title || title.length < 3) {
+    title = composeTitleComponents({ tickers, period, metricLabel, intentInfo });
+  }
+  
   return {
     title: title || "Untitled Chat",
     intent: intentInfo.intent,
