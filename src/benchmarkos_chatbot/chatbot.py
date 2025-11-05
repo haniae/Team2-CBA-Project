@@ -1861,8 +1861,24 @@ class BenchmarkOSChatbot:
                 ]
                 is_question = any(re.search(pattern, lowered_input) for pattern in question_patterns)
                 
-                # Only do ticker summary for bare ticker mentions, NOT questions
-                if not is_question:
+                # CRITICAL: Check for filter queries FIRST - these should NEVER generate dashboards
+                filter_query_patterns = [
+                    r'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:companies|stocks|firms)',
+                    r'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|utility|real estate)\s+(?:sector|industry)',
+                    r'\b(?:tech|technology|financial|healthcare|energy|consumer|industrial)\s+(?:sector|industry)\s+(?:companies|stocks)',
+                    r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below|between)',
+                    r'\b(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)\s+\$?\d+',
+                    r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
+                    r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+                    r'\b(?:companies|stocks|firms)\s+(?:that are|that have|with)\s+(?:growing|increasing)',
+                    r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+                    r'\b(?:companies|stocks|firms)\s+with\s+market\s+cap\s+(?:over|under|above|below)',
+                    r'\b(?:companies|stocks|firms)\s+(?:in|from)\s+.*\s+with\s+',
+                ]
+                is_filter_query = any(re.search(pattern, lowered_input) for pattern in filter_query_patterns)
+                
+                # Only do ticker summary for bare ticker mentions, NOT questions or filter queries
+                if not is_question and not is_filter_query:
                     # Check for dashboard keyword first
                     dashboard_keywords = ["dashboard", "full dashboard", "comprehensive dashboard", 
                                          "detailed dashboard", "show me dashboard", "give me dashboard"]
