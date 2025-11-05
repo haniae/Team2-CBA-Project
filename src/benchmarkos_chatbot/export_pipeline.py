@@ -70,24 +70,25 @@ def _safe_slug(value: str, fallback: str = "benchmarkos") -> str:
 
 
 def _format_percent(value: Any) -> str:
-    """Format percentages with 2 decimal places."""
+    """Format percentages with exactly 2 decimal places."""
     try:
         number = float(value)
     except (TypeError, ValueError):
         return "N/A"
-    return f"{number * 100:.1f}%"
+    return f"{number * 100:.2f}%"
 
 
 def _format_multiple(value: Any) -> str:
-    """Format multiples (like P/E ratio) with 2 decimal places."""
+    """Format multiples (like P/E ratio) with exactly 2 decimal places."""
     try:
         number = float(value)
     except (TypeError, ValueError):
         return "N/A"
-    return f"{number:.1f}x"
+    return f"{number:.2f}x"
 
 
 def _format_currency(value: Any) -> str:
+    """Format currency values with 2 decimal places and proper abbreviations."""
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -95,12 +96,16 @@ def _format_currency(value: Any) -> str:
     
     magnitude = abs(number)
     
+    # Format billions with 2 decimal places
     if magnitude >= 1_000_000_000:
-        return f"${number / 1_000_000_000:.1f}B"
+        return f"${number / 1_000_000_000:.2f}B"
+    # Format millions with 2 decimal places
     if magnitude >= 1_000_000:
-        return f"${number / 1_000_000:.1f}M"
+        return f"${number / 1_000_000:.2f}M"
+    # Format thousands with 2 decimal places
     if magnitude >= 1_000:
-        return f"${number / 1_000:.1f}K"
+        return f"${number / 1_000:.2f}K"
+    # Format smaller values with 2 decimal places and commas
     return f"${number:,.2f}"
 
 
@@ -215,11 +220,11 @@ def _calculate_growth_trend(kpis: List[Dict[str, Any]], metric_id: str) -> str:
                 if previous and previous != 0 and latest is not None:
                     growth = ((latest - previous) / abs(previous)) * 100
                     if growth > 2:
-                        return f"^ +{growth:.1f}%"
+                        return f"^ +{growth:.2f}%"
                     elif growth < -2:
-                        return f"v {growth:.1f}%"
+                        return f"v {growth:.2f}%"
                     else:
-                        return f"-> {growth:.1f}%"
+                        return f"-> {growth:.2f}%"
     return ""
 
 
@@ -265,44 +270,67 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_margins(10, 10, 10)  # left, top, right margins in mm
     pdf.add_page()
+    
+    # Track page numbers for headers
+    page_num = 1
 
-    # Header bar with primary color
+    # Header bar with primary color - improved design
     pdf.set_fill_color(*COLOR_PRIMARY)
-    pdf.rect(0, 0, 210, 40, 'F')
+    pdf.rect(0, 0, 210, 45, 'F')
     
-    # Company name on cover
-    pdf.set_y(12)
-    pdf.set_font("Helvetica", "B", 26)
+    # Company name on cover - centered, larger font
+    pdf.set_y(15)
+    pdf.set_font("Helvetica", "B", 28)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 12, company, align="C", ln=1)
+    pdf.cell(0, 14, _sanitize_text_for_pdf(company), align="C", ln=1)
     
-    # Ticker symbol
+    # Ticker symbol - centered below company name
     if ticker:
         pdf.set_font("Helvetica", "", 16)
         pdf.set_text_color(220, 220, 255)
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, f"{company} {f'({ticker})' if ticker else ''}".strip(), ln=1)
-    pdf.set_x(40)
-    pdf.cell(60, 8, "Target Price:", align="L")
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(*COLOR_PRIMARY)
-    pdf.cell(0, 8, target_price, align="L", ln=1)
+        pdf.cell(0, 8, f"({ticker})", align="C", ln=1)
     
+    # Move to white background area for metadata
+    pdf.set_y(55)
     pdf.set_text_color(*COLOR_TEXT)
     pdf.set_font("Helvetica", "", 11)
     rec = meta.get("recommendation") or "N/A"
     scenario = meta.get("scenario") or meta.get("live_scenario") or "Consensus"
-    # Reset X position to left margin before multi_cell
-    pdf.set_x(10)  # Default left margin
-    pdf.multi_cell(190, 6, f"Recommendation: {rec} | Target Price: {target_price} | Scenario: {scenario}")
-    if meta.get("date"):
-        pdf.set_x(10)  # Reset X position to left margin
-        pdf.multi_cell(190, 6, f"Report Date: {meta['date']}")
-
-    pdf.ln(4)
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 8, "KPI Scorecard", ln=1)
+    
+    # Key information in a clean layout
+    pdf.set_x(10)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(40, 7, "Recommendation:", align="L")
     pdf.set_font("Helvetica", "", 11)
+    pdf.cell(50, 7, rec, align="L")
+    
+    pdf.set_x(100)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(40, 7, "Target Price:", align="L")
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(*COLOR_PRIMARY)
+    pdf.cell(0, 7, target_price, align="L", ln=1)
+    
+    pdf.set_x(10)
+    pdf.set_text_color(*COLOR_TEXT)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(40, 7, "Scenario:", align="L")
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 7, scenario, align="L", ln=1)
+    
+    if meta.get("date"):
+        pdf.set_x(10)
+        pdf.set_font("Helvetica", "I", 10)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 6, f"Report Date: {meta['date']}", align="L", ln=1)
+
+    pdf.ln(8)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_text_color(*COLOR_PRIMARY)
+    pdf.cell(0, 10, "KPI Scorecard", ln=1)
+    pdf.ln(2)
+    pdf.set_text_color(*COLOR_TEXT)
+    pdf.set_font("Helvetica", "", 10)
     highlight_count = 0
     for label, value_text, period, source in _collect_kpi_rows(kpis):
         line = f"- {label}: {value_text}"
@@ -318,51 +346,56 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     
     pdf.ln(4)
     
-    # Recommendation snapshot
-    pdf.set_font("Helvetica", "B", 12)
+    pdf.ln(6)
+    # Recommendation snapshot - improved design
+    pdf.set_font("Helvetica", "B", 14)
     pdf.set_text_color(*COLOR_ACCENT)
-    pdf.cell(0, 7, "Recommendation Snapshot", ln=1)
+    pdf.cell(0, 8, "Recommendation Snapshot", ln=1)
+    pdf.ln(3)
     
+    # Enhanced box with better borders and padding
     pdf.set_fill_color(*COLOR_LIGHT_GRAY)
     pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.3)
-    pdf.rect(20, pdf.get_y(), 170, 35, 'FD')
+    pdf.set_line_width(0.5)
+    pdf.rect(15, pdf.get_y(), 180, 38, 'FD')
     
-    current_y = pdf.get_y() + 5
-    pdf.set_xy(25, current_y)
+    current_y = pdf.get_y() + 6
+    pdf.set_xy(20, current_y)
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_text_color(*COLOR_TEXT)
-    pdf.cell(60, 6, "Recommendation:", align="L")
+    pdf.cell(50, 7, "Recommendation:", align="L")
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, rec, align="L", ln=1)
+    pdf.cell(0, 7, rec, align="L", ln=1)
     
-    pdf.set_xy(25, current_y + 8)
+    pdf.set_xy(20, current_y + 9)
     pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(60, 6, "Target Price:", align="L")
-    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(*COLOR_TEXT)
+    pdf.cell(50, 7, "Target Price:", align="L")
+    pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(*COLOR_PRIMARY)
-    pdf.cell(0, 6, target_price, align="L", ln=1)
+    pdf.cell(0, 7, target_price, align="L", ln=1)
     
-    pdf.set_xy(25, current_y + 16)
+    pdf.set_xy(20, current_y + 18)
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_text_color(*COLOR_TEXT)
-    pdf.cell(60, 6, "Scenario:", align="L")
+    pdf.cell(50, 7, "Scenario:", align="L")
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, scenario, align="L", ln=1)
+    pdf.cell(0, 7, scenario, align="L", ln=1)
     
-    pdf.set_xy(25, current_y + 24)
+    pdf.set_xy(20, current_y + 27)
     pdf.set_font("Helvetica", "I", 9)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(0, 5, "Analysis based on latest financial data and market conditions", align="L")
     
     # Reset X position and move down
-    pdf.set_xy(20, current_y + 40)
-    pdf.ln(5)
+    pdf.set_y(current_y + 45)
+    pdf.ln(8)
     
-    # Risk Considerations section
-    pdf.set_font("Helvetica", "B", 12)
+    # Risk Considerations section - improved typography
+    pdf.set_font("Helvetica", "B", 14)
     pdf.set_text_color(*COLOR_ACCENT)
-    pdf.cell(0, 7, "Key Considerations", ln=1)
+    pdf.cell(0, 8, "Key Considerations", ln=1)
+    pdf.ln(3)
     
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(*COLOR_TEXT)
@@ -392,20 +425,21 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     ))
     
     # ========== KPI SCORECARD PAGE ==========
+    page_num += 1
     pdf.add_page()
-    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
+    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
     
-    pdf.set_y(40)
+    pdf.set_y(42)
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(*COLOR_PRIMARY)
     pdf.cell(0, 10, "KPI Scorecard", ln=1)
     
-    # Decorative line under header
-    pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.5)
-    pdf.line(20, 52, 190, 52)
+    # Enhanced decorative line under header
+    pdf.set_draw_color(*COLOR_PRIMARY)
+    pdf.set_line_width(0.8)
+    pdf.line(20, 54, 190, 54)
     
-    pdf.ln(5)
+    pdf.ln(6)
     
     # KPI cards in a grid layout (2 columns) - ENHANCED with trends - FIXED LAYOUT
     kpi_rows = _collect_kpi_rows(kpis, limit=20)
@@ -430,9 +464,10 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         
         # Check if we need a new page (check BEFORE drawing, only at start of row)
         if col == 0 and y_pos + card_height > 270:
+            page_num += 1
             pdf.add_page()
-            _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
-            page_y_start = 40
+            _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
+            page_y_start = 42
             cards_drawn_on_page = 0
             row_in_grid = 0
             y_pos = page_y_start
@@ -442,23 +477,28 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         
         pdf.set_xy(x_pos, y_pos)
         
-        # Draw KPI card with subtle border
+        # Draw KPI card with enhanced border and shadow effect
         pdf.set_fill_color(*COLOR_LIGHT_GRAY)
         pdf.set_draw_color(*COLOR_SECONDARY)
-        pdf.set_line_width(0.2)
+        pdf.set_line_width(0.4)
         pdf.rect(x_pos, y_pos, card_width, card_height, 'FD')
         
-        # KPI Label
-        pdf.set_xy(x_pos + 3, y_pos + 3)
+        # Add subtle top border in primary color for emphasis
+        pdf.set_draw_color(*COLOR_PRIMARY)
+        pdf.set_line_width(0.5)
+        pdf.line(x_pos, y_pos, x_pos + card_width, y_pos)
+        
+        # KPI Label - improved spacing
+        pdf.set_xy(x_pos + 4, y_pos + 4)
         pdf.set_font("Helvetica", "B", 9)
         pdf.set_text_color(*COLOR_ACCENT)
-        pdf.multi_cell(card_width - 6, 4, _sanitize_text_for_pdf(label[:50]), align="L")
+        pdf.multi_cell(card_width - 8, 4, _sanitize_text_for_pdf(label[:50]), align="L")
         
-        # KPI Value with trend indicator
-        pdf.set_xy(x_pos + 3, y_pos + 11)
-        pdf.set_font("Helvetica", "B", 13)
+        # KPI Value - more prominent display
+        pdf.set_xy(x_pos + 4, y_pos + 12)
+        pdf.set_font("Helvetica", "B", 14)
         pdf.set_text_color(*COLOR_PRIMARY)
-        pdf.cell(card_width - 6, 6, _sanitize_text_for_pdf(value_text), align="L")
+        pdf.cell(card_width - 8, 7, _sanitize_text_for_pdf(value_text), align="L")
         
         # Try to find and add trend indicator
         trend = _calculate_growth_trend(kpis, label)
@@ -484,17 +524,19 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     # ========== VALUATION SUMMARY PAGE ==========
     valuation = payload.get("valuation_table") or []
     if valuation:
+        page_num += 1
         pdf.add_page()
-        _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
+        _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
         
-        pdf.set_y(40)
+        pdf.set_y(42)
         pdf.set_font("Helvetica", "B", 18)
         pdf.set_text_color(*COLOR_PRIMARY)
         pdf.cell(0, 10, "Valuation Summary", ln=1)
         
-        pdf.set_draw_color(*COLOR_SECONDARY)
-        pdf.set_line_width(0.5)
-        pdf.line(20, 52, 190, 52)
+        # Enhanced decorative line
+        pdf.set_draw_color(*COLOR_PRIMARY)
+        pdf.set_line_width(0.8)
+        pdf.line(20, 54, 190, 54)
         
         pdf.ln(8)
         
@@ -502,24 +544,25 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         col_widths = [65, 33, 33, 33]  # Total: 164mm (safe fit)
         headers = ["Metric", "Market", "DCF", "Comps"]
         
-        # Table header
+        # Enhanced table header with better styling
         pdf.set_fill_color(*COLOR_PRIMARY)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 11)
-        pdf.set_draw_color(255, 255, 255)
+        pdf.set_draw_color(200, 200, 200)
         
         x_start = 20
         for i, (header, width) in enumerate(zip(headers, col_widths)):
             pdf.set_xy(x_start + sum(col_widths[:i]), pdf.get_y())
-            pdf.cell(width, 8, header, border=1, align="C", fill=True)
+            pdf.cell(width, 9, header, border=1, align="C", fill=True)
         pdf.ln()
         
-        # Table rows - SMALLER FONT for better fit
-        pdf.set_font("Helvetica", "", 9)  # Reduced from 10 to 9
+        # Table rows - improved formatting with better borders
+        pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*COLOR_TEXT)
+        pdf.set_draw_color(200, 200, 200)
         
         for idx, row in enumerate(valuation):
-            # Alternate row colors
+            # Alternate row colors for better readability
             if idx % 2 == 0:
                 pdf.set_fill_color(*COLOR_LIGHT_GRAY)
             else:
@@ -534,13 +577,13 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             pdf.set_xy(x_start, y_pos)
             # Better label truncation with ellipsis
             label_text = label if len(label) <= 23 else label[:20] + "..."
-            pdf.cell(col_widths[0], 7, label_text, border=1, align="L", fill=True)
+            pdf.cell(col_widths[0], 8, label_text, border=1, align="L", fill=True)
             pdf.set_xy(x_start + col_widths[0], y_pos)
-            pdf.cell(col_widths[1], 7, market, border=1, align="R", fill=True)
+            pdf.cell(col_widths[1], 8, market, border=1, align="R", fill=True)
             pdf.set_xy(x_start + col_widths[0] + col_widths[1], y_pos)
-            pdf.cell(col_widths[2], 7, dcf, border=1, align="R", fill=True)
+            pdf.cell(col_widths[2], 8, dcf, border=1, align="R", fill=True)
             pdf.set_xy(x_start + col_widths[0] + col_widths[1] + col_widths[2], y_pos)
-            pdf.cell(col_widths[3], 7, comps, border=1, align="R", fill=True)
+            pdf.cell(col_widths[3], 8, comps, border=1, align="R", fill=True)
             pdf.ln()
         
         # Add interpretation below the table
@@ -565,17 +608,19 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     rows = key_financials.get("rows") or []
     
     if columns and rows:
+        page_num += 1
         pdf.add_page()
-        _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
+        _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
         
-        pdf.set_y(40)
+        pdf.set_y(42)
         pdf.set_font("Helvetica", "B", 18)
         pdf.set_text_color(*COLOR_PRIMARY)
         pdf.cell(0, 10, "Key Financial Highlights", ln=1)
         
-        pdf.set_draw_color(*COLOR_SECONDARY)
-        pdf.set_line_width(0.5)
-        pdf.line(20, 52, 190, 52)
+        # Enhanced decorative line
+        pdf.set_draw_color(*COLOR_PRIMARY)
+        pdf.set_line_width(0.8)
+        pdf.line(20, 54, 190, 54)
         
         pdf.ln(8)
         
@@ -613,9 +658,10 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             
             # Check if we need a new page
             if y_pos > 260:
+                page_num += 1
                 pdf.add_page()
-                _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
-                y_pos = 40
+                _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
+                y_pos = 42
             
             pdf.set_xy(x_start, y_pos)
             raw_label = entry.get('label', 'N/A')
@@ -626,24 +672,27 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             values = entry.get("values") or []
             for value in values:
                 if isinstance(value, (int, float)):
-                    formatted = f"{value:,.0f}" if abs(value) >= 1 else f"{value:.2f}"
+                    # Use currency formatting with 2 decimal places and abbreviations
+                    formatted = _format_currency(value)
                 else:
                     formatted = _sanitize_text_for_pdf(str(value or "N/A")[:12])
                 pdf.cell(value_width, 6, formatted, border=1, align="R", fill=True)
             pdf.ln()
     
     # ========== FINANCIAL PERFORMANCE ANALYSIS PAGE ==========
+    page_num += 1
     pdf.add_page()
-    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
+    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
     
-    pdf.set_y(40)
+    pdf.set_y(42)
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(*COLOR_PRIMARY)
     pdf.cell(0, 10, "Financial Performance Analysis", ln=1)
     
-    pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.5)
-    pdf.line(20, 52, 190, 52)
+    # Enhanced decorative line
+    pdf.set_draw_color(*COLOR_PRIMARY)
+    pdf.set_line_width(0.8)
+    pdf.line(20, 54, 190, 54)
     
     pdf.ln(5)
     
@@ -761,17 +810,19 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     pdf.multi_cell(190, 4, _sanitize_text_for_pdf(returns_analysis))
     
     # ========== INVESTMENT RECOMMENDATION PAGE ==========
+    page_num += 1
     pdf.add_page()
-    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
+    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
     
-    pdf.set_y(40)
+    pdf.set_y(42)
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(*COLOR_PRIMARY)
     pdf.cell(0, 10, "Investment Recommendation", ln=1)
     
-    pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.5)
-    pdf.line(20, 52, 190, 52)
+    # Enhanced decorative line
+    pdf.set_draw_color(*COLOR_PRIMARY)
+    pdf.set_line_width(0.8)
+    pdf.line(20, 54, 190, 54)
     
     pdf.ln(5)
     
@@ -886,17 +937,19 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         pdf.ln(1)
     
     # ========== VALUATION DEEP DIVE PAGE ==========
+    page_num += 1
     pdf.add_page()
-    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
+    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
     
-    pdf.set_y(40)
+    pdf.set_y(42)
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(*COLOR_PRIMARY)
     pdf.cell(0, 10, "Valuation Deep Dive", ln=1)
     
-    pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.5)
-    pdf.line(20, 52, 190, 52)
+    # Enhanced decorative line
+    pdf.set_draw_color(*COLOR_PRIMARY)
+    pdf.set_line_width(0.8)
+    pdf.line(20, 54, 190, 54)
     
     pdf.ln(5)
     
@@ -1034,17 +1087,19 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         pdf.ln()
     
     # ========== BUSINESS QUALITY ASSESSMENT PAGE ==========
+    page_num += 1
     pdf.add_page()
-    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
+    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
     
-    pdf.set_y(40)
+    pdf.set_y(42)
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(*COLOR_PRIMARY)
     pdf.cell(0, 10, "Business Quality Assessment", ln=1)
     
-    pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.5)
-    pdf.line(20, 52, 190, 52)
+    # Enhanced decorative line
+    pdf.set_draw_color(*COLOR_PRIMARY)
+    pdf.set_line_width(0.8)
+    pdf.line(20, 54, 190, 54)
     
     pdf.ln(5)
     
@@ -1130,17 +1185,19 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     pdf.multi_cell(190, 4, _sanitize_text_for_pdf(competitive_pos_text))
     
     # ========== RISK FACTORS PAGE ==========
+    page_num += 1
     pdf.add_page()
-    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
+    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
     
-    pdf.set_y(40)
+    pdf.set_y(42)
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(*COLOR_PRIMARY)
     pdf.cell(0, 10, "Risk Factors & Mitigation", ln=1)
     
-    pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.5)
-    pdf.line(20, 52, 190, 52)
+    # Enhanced decorative line
+    pdf.set_draw_color(*COLOR_PRIMARY)
+    pdf.set_line_width(0.8)
+    pdf.line(20, 54, 190, 54)
     
     pdf.ln(5)
     
@@ -1240,9 +1297,10 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         
         # Check if we need a new page
         if pdf.get_y() > 250:
+            page_num += 1
             pdf.add_page()
-            _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
-            pdf.set_y(40)
+            _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
+            pdf.set_y(42)
     
     pdf.ln(3)
     
@@ -1268,17 +1326,19 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     pdf.multi_cell(190, 4, _sanitize_text_for_pdf(monitoring_text))
     
     # ========== SOURCES & METHODOLOGY PAGE ==========
+    page_num += 1
     pdf.add_page()
-    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
+    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
     
-    pdf.set_y(40)
+    pdf.set_y(42)
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(*COLOR_PRIMARY)
     pdf.cell(0, 10, "Sources & Methodology", ln=1)
     
-    pdf.set_draw_color(*COLOR_SECONDARY)
-    pdf.set_line_width(0.5)
-    pdf.line(20, 52, 190, 52)
+    # Enhanced decorative line
+    pdf.set_draw_color(*COLOR_PRIMARY)
+    pdf.set_line_width(0.8)
+    pdf.line(20, 54, 190, 54)
     
     pdf.ln(3)
     
@@ -1328,9 +1388,10 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             for idx, (display_text, url) in enumerate(sec_sources, 1):
                 y_pos = pdf.get_y()
                 if y_pos > 260:
+                    page_num += 1
                     pdf.add_page()
-                    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
-                    y_pos = 40
+                    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
+                    y_pos = 42
                     pdf.set_y(y_pos)
                 
                 pdf.set_font("Helvetica", "", 8)
@@ -1353,9 +1414,10 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             for idx, (display_text, url) in enumerate(market_sources, 1):
                 y_pos = pdf.get_y()
                 if y_pos > 260:
+                    page_num += 1
                     pdf.add_page()
-                    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
-                    y_pos = 40
+                    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
+                    y_pos = 42
                     pdf.set_y(y_pos)
                 
                 pdf.set_font("Helvetica", "", 8)
@@ -1378,9 +1440,10 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             for idx, (display_text, url) in enumerate(other_sources, 1):
                 y_pos = pdf.get_y()
                 if y_pos > 260:
+                    page_num += 1
                     pdf.add_page()
-                    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT)
-                    y_pos = 40
+                    _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
+                    y_pos = 42
                     pdf.set_y(y_pos)
                 
                 pdf.set_font("Helvetica", "", 8)
@@ -1409,22 +1472,33 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     return pdf_output
 
 
-def _add_page_header(pdf: FPDF, company: str, ticker: str, color_primary: tuple, color_text: tuple):
-    """Add consistent header to each page."""
-    pdf.set_y(10)
+def _add_page_header(pdf: FPDF, company: str, ticker: str, color_primary: tuple, color_text: tuple, page_num: int = 0):
+    """Add consistent header to each page with enhanced design."""
+    # Header background bar
+    pdf.set_fill_color(*color_primary)
+    pdf.rect(0, 0, 210, 20, 'F')
+    
+    # Company name and ticker - left side
+    pdf.set_y(6)
     pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(*color_primary)
+    pdf.set_text_color(255, 255, 255)
     header_text = _sanitize_text_for_pdf(f"{company} ({ticker})" if ticker else company)
-    pdf.cell(0, 6, header_text[:60], align="L")
+    pdf.cell(0, 7, header_text[:55], align="L")
     
+    # Date and page number - right side
     pdf.set_font("Helvetica", "", 9)
-    pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 6, datetime.utcnow().strftime("%B %d, %Y"), align="R", ln=1)
+    pdf.set_text_color(220, 220, 255)
+    date_text = datetime.utcnow().strftime("%B %d, %Y")
+    if page_num > 0:
+        page_text = f"{date_text} | Page {page_num}"
+    else:
+        page_text = date_text
+    pdf.cell(0, 7, page_text, align="R", ln=1)
     
-    # Thin line under header
+    # Enhanced line under header
     pdf.set_draw_color(200, 200, 200)
-    pdf.set_line_width(0.2)
-    pdf.line(20, 18, 190, 18)
+    pdf.set_line_width(0.3)
+    pdf.line(10, 20, 200, 20)
 
 
 def _add_page_numbers(pdf: FPDF, color_accent: tuple):
@@ -1943,7 +2017,7 @@ def _build_comparative_summary_pptx(engine: AnalyticsEngine, tickers: List[str])
             
             # Use the KPI formatting function (the one at line 2045)
             def _format_kpi_value(kpi: dict) -> str:
-                """Format a KPI value for display in tables."""
+                """Format a KPI value for display in tables with 2 decimal places."""
                 if not kpi:
                     return "N/A"
                 value = kpi.get("value", "N/A")
@@ -1952,18 +2026,18 @@ def _build_comparative_summary_pptx(engine: AnalyticsEngine, tickers: List[str])
                 # Check if it has a type field for proper formatting
                 entry_type = kpi.get("type")
                 if entry_type == "percent" and isinstance(value, (int, float)):
-                    return f"{value * 100:.1f}%"
+                    return f"{value * 100:.2f}%"
                 elif entry_type == "multiple" and isinstance(value, (int, float)):
-                    return f"{value:.1f}×"
+                    return f"{value:.2f}×"
                 elif isinstance(value, (int, float)):
-                    # Format as currency if it's a number
+                    # Format as currency if it's a number - use 2 decimal places
                     magnitude = abs(value)
                     if magnitude >= 1_000_000_000:
-                        return f"${value / 1_000_000_000:.1f}B"
+                        return f"${value / 1_000_000_000:.2f}B"
                     elif magnitude >= 1_000_000:
-                        return f"${value / 1_000_000:.1f}M"
+                        return f"${value / 1_000_000:.2f}M"
                     elif magnitude >= 1_000:
-                        return f"${value / 1_000:.1f}K"
+                        return f"${value / 1_000:.2f}K"
                     else:
                         return f"${value:,.2f}"
                 return str(value)

@@ -167,15 +167,19 @@ from .portfolio import (
 
 # ----- CORS / Static ----------------------------------------------------------
 
-ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in (
-        Path.cwd().joinpath(".allowed_origins").read_text().splitlines()
-        if Path.cwd().joinpath(".allowed_origins").exists()
-        else []
-    )
-    if origin.strip()
-]
+# Safely read allowed origins from file
+ALLOWED_ORIGINS = []
+try:
+    allowed_origins_file = Path.cwd().joinpath(".allowed_origins")
+    if allowed_origins_file.exists():
+        ALLOWED_ORIGINS = [
+            origin.strip()
+            for origin in allowed_origins_file.read_text(encoding="utf-8").splitlines()
+            if origin.strip()
+        ]
+except Exception as e:
+    LOGGER.warning(f"Could not read .allowed_origins file: {e}. Using default CORS settings.")
+    ALLOWED_ORIGINS = []
 
 app = FastAPI(title="BenchmarkOS Analyst Copilot", version="1.1.0")
 app.add_middleware(

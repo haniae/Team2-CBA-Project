@@ -586,7 +586,34 @@
       params.set("ticker", ticker);
       const response = await fetch(`/api/export/cfi?${params.toString()}`);
       if (!response.ok) {
-        throw new Error(`Export failed (${response.status})`);
+        // Try to get error details from the response
+        let errorMessage = `Export failed (${response.status})`;
+        try {
+          // Clone the response to read it without consuming the original
+          const responseClone = response.clone();
+          const errorData = await responseClone.json();
+          console.error("Export error details:", errorData);
+          if (errorData.detail) {
+            errorMessage = errorData.detail;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (jsonError) {
+          // If response is not JSON, try text
+          try {
+            const responseClone = response.clone();
+            const errorText = await responseClone.text();
+            console.error("Export error text:", errorText);
+            if (errorText && errorText.trim()) {
+              errorMessage = errorText;
+            }
+          } catch (textError) {
+            console.error("Could not read error response:", textError);
+            // Keep default message
+          }
+        }
+        console.error("Final error message:", errorMessage);
+        throw new Error(errorMessage);
       }
       const blob = await response.blob();
       const disposition = response.headers.get("Content-Disposition");
@@ -606,8 +633,11 @@
       }
     } catch (error) {
       console.error("Export failed:", error);
+      const errorMsg = error.message || "Unable to generate export.";
       if (typeof window.showToast === "function") {
-        window.showToast("Unable to generate export.", "error");
+        window.showToast(errorMsg, "error");
+      } else {
+        alert(`Export failed: ${errorMsg}`);
       }
     } finally {
       exporter.disabled = false;
@@ -1666,8 +1696,10 @@
         if (!payload) return;
         
         // Show modal with preview
-        document.getElementById("preview-format").textContent = format.toUpperCase();
-        document.getElementById("preview-company").textContent = 
+        const previewFormat = scopedQuery("preview-format");
+        const previewCompany = scopedQuery("preview-company");
+        if (previewFormat) previewFormat.textContent = format.toUpperCase();
+        if (previewCompany) previewCompany.textContent = 
           payload.meta?.company || payload.meta?.ticker || "Unknown";
         
         modal.style.display = "flex";
@@ -1677,15 +1709,18 @@
     });
     
     confirmBtn.addEventListener("click", () => {
-      if (!pendingExport) return;
+      if (!pendingExport) {
+        alert("Nothing to export yet.");
+        return;
+      }
       
       modal.style.display = "none";
       
-      // Trigger actual export
-      const { format, btn } = pendingExport;
-      if (window.handleExport && typeof window.handleExport === "function") {
-        window.handleExport({ type: format, ...pendingExport.payload });
-      }
+      // Trigger actual export using triggerExport function
+      const { format, btn, payload } = pendingExport;
+      triggerExport(btn, format, payload).catch(error => {
+        console.error("Export error:", error);
+      });
       
       pendingExport = null;
     });
