@@ -570,13 +570,14 @@ SYSTEM_PROMPT = (
     "4. **Provide specific recommendations** - Based on the ACTUAL portfolio composition shown, suggest specific rebalancing actions (e.g., 'Reduce AAPL from 15.2% to 10%')\n"
     "5. **Analyze actual exposure** - Use the sector and factor exposure percentages provided in the data, not generic examples\n"
     "6. **Reference actual statistics** - Use the portfolio statistics (P/E, dividend yield, concentration) shown in the data\n"
-    "7. **CALCULATE RISK METRICS** - When asked about risk metrics (CVaR, VaR, volatility, beta):\n"
-    "   - Use the actual holdings and weights provided to calculate or estimate these metrics\n"
-    "   - For CVaR/VaR: Calculate based on portfolio composition and weights, using sector exposure and concentration metrics\n"
-    "   - For volatility: Estimate based on sector diversification and concentration (higher concentration = higher volatility)\n"
-    "   - For beta: Use weighted average of holdings if available, or estimate from sector exposure\n"
-    "   - Provide specific numbers based on the portfolio composition shown\n"
-    "   - If you cannot calculate exact values, provide estimates based on the portfolio structure (e.g., 'Based on 15 holdings with 32% in Technology, estimated volatility is...')\n"
+    "7. **USE CALCULATED RISK METRICS** - When asked about risk metrics (CVaR, VaR, volatility, Sharpe ratio, Sortino ratio, alpha, beta, tracking error):\n"
+    "   - These metrics are ALREADY CALCULATED and shown in the 'Calculated Risk & Performance Metrics' section of the portfolio context\n"
+    "   - DO NOT say you cannot calculate these metrics - they are already calculated from historical portfolio returns\n"
+    "   - Use the ACTUAL calculated values shown in that section (e.g., 'The portfolio CVaR is X%' using the value shown)\n"
+    "   - If a metric is shown, reference it directly (e.g., 'Based on the calculated CVaR of X%, the portfolio has...')\n"
+    "   - If a metric is not shown (e.g., 'Risk metrics: Unable to calculate'), explain that insufficient historical data is available\n"
+    "   - NEVER estimate or calculate these metrics yourself - use the pre-calculated values provided\n"
+    "   - Interpret the calculated values: Explain what the CVaR, Sharpe ratio, etc. mean for this portfolio\n"
     "8. **If data is missing** - If the portfolio data doesn't include a metric you need, explicitly state 'This metric is not available in the portfolio data' BUT still try to provide estimates based on available data\n"
     "9. **DO NOT provide generic advice** - If portfolio data is provided, you MUST analyze THAT SPECIFIC portfolio, not a hypothetical one\n"
     "10. **Verify against data** - Before mentioning any ticker, weight, or metric, verify it exists in the provided portfolio data\n"
@@ -3568,7 +3569,14 @@ class BenchmarkOSChatbot:
                 enrich_holdings_with_fundamentals,
                 calculate_portfolio_statistics,
                 analyze_exposure,
+                calculate_portfolio_volatility,
+                calculate_portfolio_sharpe,
+                calculate_portfolio_sortino,
+                calculate_portfolio_alpha,
+                calculate_tracking_error,
+                calculate_portfolio_beta,
             )
+            from .portfolio_risk_metrics import calculate_cvar
             
             # Fetch holdings
             holdings = get_portfolio_holdings(self.settings.database_path, portfolio_id)
@@ -3592,6 +3600,59 @@ class BenchmarkOSChatbot:
             # Analyze exposure
             exposure = analyze_exposure(enriched_holdings, self.settings.database_path)
             
+            # Calculate risk metrics
+            risk_metrics = {}
+            try:
+                cvar_result = calculate_cvar(self.settings.database_path, portfolio_id, confidence_level=0.95)
+                if cvar_result:
+                    risk_metrics['cvar'] = cvar_result.cvar
+                    risk_metrics['var'] = cvar_result.var
+                    risk_metrics['expected_loss'] = cvar_result.expected_loss
+            except Exception as e:
+                LOGGER.warning(f"Could not calculate CVaR: {e}")
+            
+            try:
+                volatility = calculate_portfolio_volatility(self.settings.database_path, portfolio_id)
+                if volatility is not None:
+                    risk_metrics['volatility'] = volatility
+            except Exception as e:
+                LOGGER.warning(f"Could not calculate volatility: {e}")
+            
+            try:
+                sharpe = calculate_portfolio_sharpe(self.settings.database_path, portfolio_id)
+                if sharpe is not None:
+                    risk_metrics['sharpe'] = sharpe
+            except Exception as e:
+                LOGGER.warning(f"Could not calculate Sharpe ratio: {e}")
+            
+            try:
+                sortino = calculate_portfolio_sortino(self.settings.database_path, portfolio_id)
+                if sortino is not None:
+                    risk_metrics['sortino'] = sortino
+            except Exception as e:
+                LOGGER.warning(f"Could not calculate Sortino ratio: {e}")
+            
+            try:
+                beta = calculate_portfolio_beta(self.settings.database_path, portfolio_id)
+                if beta is not None:
+                    risk_metrics['beta'] = beta
+            except Exception as e:
+                LOGGER.warning(f"Could not calculate beta: {e}")
+            
+            try:
+                alpha = calculate_portfolio_alpha(self.settings.database_path, portfolio_id)
+                if alpha is not None:
+                    risk_metrics['alpha'] = alpha
+            except Exception as e:
+                LOGGER.warning(f"Could not calculate alpha: {e}")
+            
+            try:
+                tracking_error = calculate_tracking_error(self.settings.database_path, portfolio_id)
+                if tracking_error is not None:
+                    risk_metrics['tracking_error'] = tracking_error
+            except Exception as e:
+                LOGGER.warning(f"Could not calculate tracking error: {e}")
+            
             # Build comprehensive context
             context_parts = []
             context_parts.append("=" * 80)
@@ -3602,12 +3663,13 @@ class BenchmarkOSChatbot:
             context_parts.append("CRITICAL INSTRUCTIONS:")
             context_parts.append("- You MUST use ONLY the data provided below")
             context_parts.append("- DO NOT make up or hallucinate portfolio data")
-            context_parts.append("- CALCULATE RISK METRICS: When asked about CVaR, VaR, volatility, or other risk metrics:")
-            context_parts.append("  * Use the holdings, weights, sector exposure, and concentration metrics below to calculate estimates")
-            context_parts.append("  * For CVaR: Calculate based on portfolio concentration and sector exposure (higher concentration = higher CVaR)")
-            context_parts.append("  * Provide specific numbers based on the portfolio composition shown")
-            context_parts.append("  * If exact calculation requires historical returns, provide estimates based on portfolio structure")
-            context_parts.append("- If data is missing, say so - but still try to provide estimates based on available portfolio data")
+            context_parts.append("- USE CALCULATED RISK METRICS: When asked about CVaR, VaR, volatility, Sharpe ratio, Sortino ratio, alpha, beta, or tracking error:")
+            context_parts.append("  * Use the ACTUAL calculated values shown in the 'Calculated Risk & Performance Metrics' section below")
+            context_parts.append("  * These values have been calculated from historical portfolio returns and are ACCURATE")
+            context_parts.append("  * DO NOT say you cannot calculate these metrics - they are already calculated and shown below")
+            context_parts.append("  * Reference the specific calculated values (e.g., 'The portfolio CVaR is X%' using the value shown)")
+            context_parts.append("  * If a metric is not shown (e.g., 'Risk metrics: Unable to calculate'), explain that insufficient historical data is available")
+            context_parts.append("- If data is missing, say so explicitly - but use the calculated values when available")
             context_parts.append("- Reference specific tickers, weights, and metrics from below")
             context_parts.append("- Quote the actual numbers from the data provided")
             context_parts.append("")
@@ -3678,6 +3740,31 @@ class BenchmarkOSChatbot:
                     context_parts.append(f"Herfindahl-Hirschman Index (HHI): {hhi:.0f}")
             if stats and stats.top_10_weight:
                 context_parts.append(f"Top 10 Holdings Weight: {stats.top_10_weight:.1%}")
+            context_parts.append("")
+            
+            # Calculated Risk & Performance Metrics
+            context_parts.append("### Calculated Risk & Performance Metrics")
+            if risk_metrics:
+                if 'cvar' in risk_metrics:
+                    context_parts.append(f"Conditional Value at Risk (CVaR, 95%): {risk_metrics['cvar']:.4f} ({risk_metrics['cvar']*100:.2f}%)")
+                if 'var' in risk_metrics:
+                    context_parts.append(f"Value at Risk (VaR, 95%): {risk_metrics['var']:.4f} ({risk_metrics['var']*100:.2f}%)")
+                if 'expected_loss' in risk_metrics:
+                    context_parts.append(f"Expected Loss (95% confidence): {risk_metrics['expected_loss']:.4f} ({risk_metrics['expected_loss']*100:.2f}%)")
+                if 'volatility' in risk_metrics:
+                    context_parts.append(f"Annualized Volatility: {risk_metrics['volatility']:.4f} ({risk_metrics['volatility']*100:.2f}%)")
+                if 'sharpe' in risk_metrics:
+                    context_parts.append(f"Sharpe Ratio (annualized): {risk_metrics['sharpe']:.3f}")
+                if 'sortino' in risk_metrics:
+                    context_parts.append(f"Sortino Ratio (annualized): {risk_metrics['sortino']:.3f}")
+                if 'beta' in risk_metrics:
+                    context_parts.append(f"Beta (vs benchmark): {risk_metrics['beta']:.3f}")
+                if 'alpha' in risk_metrics:
+                    context_parts.append(f"Alpha (vs benchmark, annualized): {risk_metrics['alpha']:.4f} ({risk_metrics['alpha']*100:.2f}%)")
+                if 'tracking_error' in risk_metrics:
+                    context_parts.append(f"Tracking Error (vs benchmark, annualized): {risk_metrics['tracking_error']:.4f} ({risk_metrics['tracking_error']*100:.2f}%)")
+            else:
+                context_parts.append("Risk metrics: Unable to calculate (insufficient historical data)")
             context_parts.append("")
             
             context_parts.append("=" * 80)

@@ -2781,7 +2781,7 @@ def get_benchmark_returns(database_path: Path, benchmark_id: str = "sp500", look
     return pd.Series(returns, index=dates)
 
 
-def calculate_portfolio_beta(database_path: Path, portfolio_id: str, benchmark: str = "SPY", lookback_days: int = 252) -> float:
+def calculate_portfolio_beta(database_path: Path, portfolio_id: str, benchmark: str = "SPY", lookback_days: int = 252) -> Optional[float]:
     """
     Calculate portfolio beta vs benchmark.
     
@@ -2792,29 +2792,324 @@ def calculate_portfolio_beta(database_path: Path, portfolio_id: str, benchmark: 
         lookback_days: Number of days to look back
     
     Returns:
-        Portfolio beta
+        Portfolio beta, or None if insufficient data
     """
-    portfolio_returns = get_portfolio_returns(database_path, portfolio_id, lookback_days)
-    benchmark_returns = get_benchmark_returns(database_path, benchmark, lookback_days)
+    try:
+        portfolio_returns = get_portfolio_returns(database_path, portfolio_id, lookback_days)
+        if len(portfolio_returns) < 20:
+            LOGGER.warning(f"Insufficient portfolio returns for beta calculation: {len(portfolio_returns)} days")
+            return None
+        
+        benchmark_returns = get_benchmark_returns(database_path, benchmark, lookback_days)
+        
+        # If benchmark data is missing, try alternative benchmark or return None
+        if len(benchmark_returns) < 20:
+            LOGGER.warning(f"Insufficient benchmark data for {benchmark}, attempting fallback")
+            # Try alternative benchmarks
+            for alt_benchmark in ["SPY", "QQQ", "DIA", "IWM"]:
+                if alt_benchmark != benchmark:
+                    alt_returns = get_benchmark_returns(database_path, alt_benchmark, lookback_days)
+                    if len(alt_returns) >= 20:
+                        LOGGER.info(f"Using {alt_benchmark} as fallback benchmark")
+                        benchmark_returns = alt_returns
+                        break
+            
+            if len(benchmark_returns) < 20:
+                LOGGER.warning("No suitable benchmark data available for beta calculation")
+                return None
+        
+        # Align dates
+        common_dates = portfolio_returns.index.intersection(benchmark_returns.index)
+        if len(common_dates) < 20:
+            LOGGER.warning(f"Insufficient overlapping data for beta calculation: {len(common_dates)} days")
+            return None
+        
+        portfolio_aligned = portfolio_returns.loc[common_dates]
+        benchmark_aligned = benchmark_returns.loc[common_dates]
+        
+        # Calculate beta using covariance
+        covariance = np.cov(portfolio_aligned, benchmark_aligned)[0, 1]
+        benchmark_variance = np.var(benchmark_aligned)
+        
+        if benchmark_variance == 0:
+            return None
+        
+        beta = covariance / benchmark_variance
+        return float(beta)
+    except Exception as e:
+        LOGGER.warning(f"Error calculating portfolio beta: {e}")
+        return None
+
+
+def calculate_portfolio_volatility(
+    database_path: Path, portfolio_id: str, lookback_days: int = 252, annualized: bool = True
+) -> Optional[float]:
+    """
+    Calculate portfolio volatility (standard deviation of returns).
     
-    # Align dates
-    common_dates = portfolio_returns.index.intersection(benchmark_returns.index)
-    if len(common_dates) < 20:
-        LOGGER.warning(f"Insufficient overlapping data for beta calculation: {len(common_dates)} days")
-        return 1.0  # Default to market beta
+    Args:
+        database_path: Path to database
+        portfolio_id: Portfolio ID
+        lookback_days: Number of days to look back
+        annualized: If True, annualize volatility (multiply by sqrt(252))
     
-    portfolio_aligned = portfolio_returns.loc[common_dates]
-    benchmark_aligned = benchmark_returns.loc[common_dates]
+    Returns:
+        Portfolio volatility, or None if insufficient data
+    """
+    try:
+        portfolio_returns = get_portfolio_returns(database_path, portfolio_id, lookback_days)
+        if len(portfolio_returns) < 20:
+            LOGGER.warning(f"Insufficient portfolio returns for volatility calculation: {len(portfolio_returns)} days")
+            return None
+        
+        volatility = float(portfolio_returns.std())
+        
+        if annualized:
+            # Annualize by multiplying by sqrt(252) trading days
+            volatility *= np.sqrt(252)
+        
+        return volatility
+    except Exception as e:
+        LOGGER.warning(f"Error calculating portfolio volatility: {e}")
+        return None
+
+
+def calculate_portfolio_sharpe(
+    database_path: Path,
+    portfolio_id: str,
+    risk_free_rate: float = 0.02,
+    lookback_days: int = 252,
+    annualized: bool = True,
+) -> Optional[float]:
+    """
+    Calculate Sharpe ratio: (portfolio_return - risk_free_rate) / volatility.
     
-    # Calculate beta using covariance
-    covariance = np.cov(portfolio_aligned, benchmark_aligned)[0, 1]
-    benchmark_variance = np.var(benchmark_aligned)
+    Args:
+        database_path: Path to database
+        portfolio_id: Portfolio ID
+        risk_free_rate: Risk-free rate (default: 0.02 = 2%)
+        lookback_days: Number of days to look back
+        annualized: If True, annualize returns and volatility
     
-    if benchmark_variance == 0:
-        return 1.0
+    Returns:
+        Sharpe ratio, or None if insufficient data
+    """
+    try:
+        portfolio_returns = get_portfolio_returns(database_path, portfolio_id, lookback_days)
+        if len(portfolio_returns) < 20:
+            LOGGER.warning(f"Insufficient portfolio returns for Sharpe calculation: {len(portfolio_returns)} days")
+            return None
+        
+        # Calculate mean return
+        mean_return = float(portfolio_returns.mean())
+        
+        # Calculate volatility
+        volatility = float(portfolio_returns.std())
+        
+        if volatility == 0:
+            return None
+        
+        if annualized:
+            # Annualize: mean return * 252, volatility * sqrt(252)
+            mean_return *= 252
+            volatility *= np.sqrt(252)
+        
+        # Sharpe ratio = (return - risk_free) / volatility
+        sharpe = (mean_return - risk_free_rate) / volatility
+        return float(sharpe)
+    except Exception as e:
+        LOGGER.warning(f"Error calculating portfolio Sharpe ratio: {e}")
+        return None
+
+
+def calculate_portfolio_sortino(
+    database_path: Path,
+    portfolio_id: str,
+    risk_free_rate: float = 0.02,
+    lookback_days: int = 252,
+    annualized: bool = True,
+) -> Optional[float]:
+    """
+    Calculate Sortino ratio: (portfolio_return - risk_free_rate) / downside_deviation.
     
-    beta = covariance / benchmark_variance
-    return float(beta)
+    Sortino ratio uses only downside deviation (negative returns) instead of total volatility.
+    
+    Args:
+        database_path: Path to database
+        portfolio_id: Portfolio ID
+        risk_free_rate: Risk-free rate (default: 0.02 = 2%)
+        lookback_days: Number of days to look back
+        annualized: If True, annualize returns and downside deviation
+    
+    Returns:
+        Sortino ratio, or None if insufficient data
+    """
+    try:
+        portfolio_returns = get_portfolio_returns(database_path, portfolio_id, lookback_days)
+        if len(portfolio_returns) < 20:
+            LOGGER.warning(f"Insufficient portfolio returns for Sortino calculation: {len(portfolio_returns)} days")
+            return None
+        
+        # Calculate mean return
+        mean_return = float(portfolio_returns.mean())
+        
+        # Calculate downside deviation (only negative returns)
+        downside_returns = portfolio_returns[portfolio_returns < 0]
+        if len(downside_returns) == 0:
+            # If no negative returns, Sortino is undefined (or infinite)
+            return None
+        
+        downside_deviation = float(downside_returns.std())
+        
+        if downside_deviation == 0:
+            return None
+        
+        if annualized:
+            # Annualize: mean return * 252, downside deviation * sqrt(252)
+            mean_return *= 252
+            downside_deviation *= np.sqrt(252)
+        
+        # Sortino ratio = (return - risk_free) / downside_deviation
+        sortino = (mean_return - risk_free_rate) / downside_deviation
+        return float(sortino)
+    except Exception as e:
+        LOGGER.warning(f"Error calculating portfolio Sortino ratio: {e}")
+        return None
+
+
+def calculate_portfolio_alpha(
+    database_path: Path,
+    portfolio_id: str,
+    benchmark: str = "SPY",
+    risk_free_rate: float = 0.02,
+    lookback_days: int = 252,
+) -> Optional[float]:
+    """
+    Calculate portfolio alpha vs benchmark: alpha = portfolio_return - (risk_free + beta * (benchmark_return - risk_free)).
+    
+    Args:
+        database_path: Path to database
+        portfolio_id: Portfolio ID
+        benchmark: Benchmark ticker (default: SPY)
+        risk_free_rate: Risk-free rate (default: 0.02 = 2%)
+        lookback_days: Number of days to look back
+    
+    Returns:
+        Alpha (excess return), or None if insufficient data
+    """
+    try:
+        portfolio_returns = get_portfolio_returns(database_path, portfolio_id, lookback_days)
+        if len(portfolio_returns) < 20:
+            LOGGER.warning(f"Insufficient portfolio returns for alpha calculation: {len(portfolio_returns)} days")
+            return None
+        
+        benchmark_returns = get_benchmark_returns(database_path, benchmark, lookback_days)
+        
+        # If benchmark data is missing, try alternative benchmark
+        if len(benchmark_returns) < 20:
+            for alt_benchmark in ["SPY", "QQQ", "DIA", "IWM"]:
+                if alt_benchmark != benchmark:
+                    alt_returns = get_benchmark_returns(database_path, alt_benchmark, lookback_days)
+                    if len(alt_returns) >= 20:
+                        benchmark_returns = alt_returns
+                        break
+            
+            if len(benchmark_returns) < 20:
+                LOGGER.warning("No suitable benchmark data available for alpha calculation")
+                return None
+        
+        # Align dates
+        common_dates = portfolio_returns.index.intersection(benchmark_returns.index)
+        if len(common_dates) < 20:
+            LOGGER.warning(f"Insufficient overlapping data for alpha calculation: {len(common_dates)} days")
+            return None
+        
+        portfolio_aligned = portfolio_returns.loc[common_dates]
+        benchmark_aligned = benchmark_returns.loc[common_dates]
+        
+        # Calculate mean returns (annualized)
+        portfolio_mean = float(portfolio_aligned.mean()) * 252
+        benchmark_mean = float(benchmark_aligned.mean()) * 252
+        
+        # Calculate beta
+        covariance = np.cov(portfolio_aligned, benchmark_aligned)[0, 1]
+        benchmark_variance = np.var(benchmark_aligned)
+        
+        if benchmark_variance == 0:
+            return None
+        
+        beta = covariance / benchmark_variance
+        
+        # Alpha = portfolio_return - (risk_free + beta * (benchmark_return - risk_free))
+        expected_return = risk_free_rate + beta * (benchmark_mean - risk_free_rate)
+        alpha = portfolio_mean - expected_return
+        
+        return float(alpha)
+    except Exception as e:
+        LOGGER.warning(f"Error calculating portfolio alpha: {e}")
+        return None
+
+
+def calculate_tracking_error(
+    database_path: Path, portfolio_id: str, benchmark: str = "SPY", lookback_days: int = 252, annualized: bool = True
+) -> Optional[float]:
+    """
+    Calculate tracking error: standard deviation of (portfolio_return - benchmark_return).
+    
+    Args:
+        database_path: Path to database
+        portfolio_id: Portfolio ID
+        benchmark: Benchmark ticker (default: SPY)
+        lookback_days: Number of days to look back
+        annualized: If True, annualize tracking error (multiply by sqrt(252))
+    
+    Returns:
+        Tracking error, or None if insufficient data
+    """
+    try:
+        portfolio_returns = get_portfolio_returns(database_path, portfolio_id, lookback_days)
+        if len(portfolio_returns) < 20:
+            LOGGER.warning(f"Insufficient portfolio returns for tracking error calculation: {len(portfolio_returns)} days")
+            return None
+        
+        benchmark_returns = get_benchmark_returns(database_path, benchmark, lookback_days)
+        
+        # If benchmark data is missing, try alternative benchmark
+        if len(benchmark_returns) < 20:
+            for alt_benchmark in ["SPY", "QQQ", "DIA", "IWM"]:
+                if alt_benchmark != benchmark:
+                    alt_returns = get_benchmark_returns(database_path, alt_benchmark, lookback_days)
+                    if len(alt_returns) >= 20:
+                        benchmark_returns = alt_returns
+                        break
+            
+            if len(benchmark_returns) < 20:
+                LOGGER.warning("No suitable benchmark data available for tracking error calculation")
+                return None
+        
+        # Align dates
+        common_dates = portfolio_returns.index.intersection(benchmark_returns.index)
+        if len(common_dates) < 20:
+            LOGGER.warning(f"Insufficient overlapping data for tracking error calculation: {len(common_dates)} days")
+            return None
+        
+        portfolio_aligned = portfolio_returns.loc[common_dates]
+        benchmark_aligned = benchmark_returns.loc[common_dates]
+        
+        # Calculate excess returns (portfolio - benchmark)
+        excess_returns = portfolio_aligned - benchmark_aligned
+        
+        # Calculate standard deviation of excess returns
+        tracking_error = float(excess_returns.std())
+        
+        if annualized:
+            # Annualize by multiplying by sqrt(252)
+            tracking_error *= np.sqrt(252)
+        
+        return tracking_error
+    except Exception as e:
+        LOGGER.warning(f"Error calculating tracking error: {e}")
+        return None
 
 
 def get_historical_returns(database_path: Path, ticker_list: List[str], periods: int = 252) -> pd.DataFrame:
