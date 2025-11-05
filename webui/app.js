@@ -526,13 +526,11 @@ let companyUniverseMetrics = null;
 let companyUniverseTable = null;
 let companyUniverseEmpty = null;
 let companyUniverseSkeleton = null;
+let companyUniverseStatCompanies = null;
+let companyUniverseStatSectors = null;
 let companySearchInput = null;
 let companySectorSelect = null;
 let companyCoverageSelect = null;
-let companyUniverseMetaUniverse = null;
-let companyUniverseMetaSectors = null;
-let companyUniverseMetaLatest = null;
-let companyUniverseMetaCoverage = null;
 
 const KPI_LIBRARY_PATH = "/static/data/kpi_library.json";
 const COMPANY_UNIVERSE_PATH = "/static/data/company_universe.json";
@@ -1076,53 +1074,10 @@ async function renderCompanyUniverseSection({ container } = {}) {
   companySearchInput = null;
   companySectorSelect = null;
   companyCoverageSelect = null;
-  companyUniverseMetaUniverse = null;
-  companyUniverseMetaSectors = null;
-  companyUniverseMetaLatest = null;
-  companyUniverseMetaCoverage = null;
 
   container.innerHTML = `
     <div class="company-universe" role="region" aria-live="polite">
-      <section class="company-universe__hero">
-        <div class="company-universe__badge" aria-hidden="true">CU</div>
-        <div class="company-universe__hero-copy">
-          <h3 class="company-universe__title">Company Universe</h3>
-          <p class="company-universe__subtitle">
-            Explore coverage across every tracked company, segment results, and monitor ingestion progress inside this financial dataset view.
-          </p>
-          <p class="company-universe__context">Coverage includes all S&amp;P 500 firms and major tech leaders, refreshed weekly.</p>
-          <div class="company-universe__status">
-            <div class="company-universe__status-card" role="status">
-              <span class="company-universe__status-icon" aria-hidden="true">📈</span>
-              <div class="company-universe__status-text">
-                <span class="company-universe__status-label">Universe</span>
-                <span class="company-universe__status-value" data-role="company-universe-meta-universe">Loading...</span>
-              </div>
-            </div>
-            <div class="company-universe__status-card" role="status">
-              <span class="company-universe__status-icon" aria-hidden="true">🏭</span>
-              <div class="company-universe__status-text">
-                <span class="company-universe__status-label">Sectors</span>
-                <span class="company-universe__status-value" data-role="company-universe-meta-sectors">Loading...</span>
-              </div>
-            </div>
-            <div class="company-universe__status-card" role="status">
-              <span class="company-universe__status-icon" aria-hidden="true">🗓</span>
-              <div class="company-universe__status-text">
-                <span class="company-universe__status-label">Latest filing</span>
-                <span class="company-universe__status-value" data-role="company-universe-meta-latest">Loading...</span>
-              </div>
-            </div>
-            <div class="company-universe__status-card" role="status">
-              <span class="company-universe__status-icon" aria-hidden="true">✅</span>
-              <div class="company-universe__status-text">
-                <span class="company-universe__status-label">Coverage mix</span>
-                <span class="company-universe__status-value" data-role="company-universe-meta-coverage">Loading...</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <h3 class="company-universe__title">Company Universe</h3>
       <div class="company-universe__controls">
         <label class="sr-only" for="company-universe-search-input">Search companies</label>
         <input
@@ -1144,16 +1099,15 @@ async function renderCompanyUniverseSection({ container } = {}) {
           <option value="missing">Missing coverage</option>
         </select>
       </div>
-      <div class="company-universe__legend" role="note" aria-label="Dataset cues">
-        <span class="company-universe__legend-title">Data cues</span>
-        <span class="company-universe__legend-item" title="Market cap benchmark"> 
-          <span class="company-universe__legend-dot company-universe__legend-dot--mega" aria-hidden="true"></span>
-          Market cap ≥ $1T
-        </span>
-        <span class="company-universe__legend-item" title="Filing recency benchmark">
-          <span class="company-universe__legend-dot company-universe__legend-dot--stale" aria-hidden="true"></span>
-          Filing > 180 days
-        </span>
+      <div class="company-universe__stats" data-role="company-universe-stats">
+        <div class="company-universe__stat">
+          <span class="company-universe__stat-label">Companies</span>
+          <span class="company-universe__stat-value" data-role="company-universe-stat-companies">—</span>
+        </div>
+        <div class="company-universe__stat">
+          <span class="company-universe__stat-label">Sectors</span>
+          <span class="company-universe__stat-value" data-role="company-universe-stat-sectors">—</span>
+        </div>
       </div>
       <div class="company-universe__metrics" data-role="company-universe-metrics">
         <div class="utility-loading">Loading coverage snapshot...</div>
@@ -1202,10 +1156,8 @@ async function renderCompanyUniverseSection({ container } = {}) {
   companyUniverseTable = container.querySelector("[data-role='company-universe-table']");
   companyUniverseEmpty = container.querySelector("[data-role='company-universe-empty']");
   companyUniverseSkeleton = container.querySelector("[data-role='company-universe-skeleton']");
-  companyUniverseMetaUniverse = container.querySelector("[data-role='company-universe-meta-universe']");
-  companyUniverseMetaSectors = container.querySelector("[data-role='company-universe-meta-sectors']");
-  companyUniverseMetaLatest = container.querySelector("[data-role='company-universe-meta-latest']");
-  companyUniverseMetaCoverage = container.querySelector("[data-role='company-universe-meta-coverage']");
+  companyUniverseStatCompanies = container.querySelector("[data-role='company-universe-stat-companies']");
+  companyUniverseStatSectors = container.querySelector("[data-role='company-universe-stat-sectors']");
 
   if (companySearchInput) {
     companySearchInput.value = "";
@@ -1252,10 +1204,8 @@ async function renderCompanyUniverseSection({ container } = {}) {
     companySearchInput = null;
     companySectorSelect = null;
     companyCoverageSelect = null;
-    companyUniverseMetaUniverse = null;
-    companyUniverseMetaSectors = null;
-    companyUniverseMetaLatest = null;
-    companyUniverseMetaCoverage = null;
+    companyUniverseStatCompanies = null;
+    companyUniverseStatSectors = null;
     if (!container.isConnected) {
       return;
     }
@@ -7320,53 +7270,16 @@ function updateCompanyUniverseMeta({
   latestRecord = null,
   coverage = null,
 } = {}) {
-  if (companyUniverseMetaUniverse) {
-    if (totalCount > 0) {
-      const displayFiltered = typeof filteredCount === "number" ? filteredCount : totalCount;
-      if (displayFiltered === totalCount) {
-        companyUniverseMetaUniverse.textContent = `${totalCount.toLocaleString()} companies tracked`;
-      } else {
-        companyUniverseMetaUniverse.textContent = `${displayFiltered.toLocaleString()} of ${totalCount.toLocaleString()} companies`;
-      }
-    } else if (typeof filteredCount === "number" && filteredCount > 0) {
-      companyUniverseMetaUniverse.textContent = `${filteredCount.toLocaleString()} companies`;
+  if (companyUniverseStatCompanies) {
+    if (filteredCount === totalCount) {
+      companyUniverseStatCompanies.textContent = totalCount.toLocaleString();
     } else {
-      companyUniverseMetaUniverse.textContent = "No companies loaded";
+      companyUniverseStatCompanies.textContent = `${filteredCount.toLocaleString()} of ${totalCount.toLocaleString()}`;
     }
   }
-
-  if (companyUniverseMetaSectors) {
-    if (typeof sectorsCount === "number" && sectorsCount > 0) {
-      companyUniverseMetaSectors.textContent = `${sectorsCount} sector${sectorsCount === 1 ? "" : "s"} in view`;
-    } else {
-      companyUniverseMetaSectors.textContent = "No sectors";
-    }
-  }
-
-  if (companyUniverseMetaLatest) {
-    if (latestRecord && latestRecord.latest_filing) {
-      const dateLabel = formatDateHuman(latestRecord.latest_filing);
-      const ticker = latestRecord.ticker ? ` | ${latestRecord.ticker}` : "";
-      companyUniverseMetaLatest.textContent = `${dateLabel}${ticker}`;
-    } else {
-      companyUniverseMetaLatest.textContent = "No filings ingested";
-    }
-  }
-
-  if (companyUniverseMetaCoverage) {
-    const complete = coverage && typeof coverage.complete === "number" ? coverage.complete : 0;
-    const partial = coverage && typeof coverage.partial === "number" ? coverage.partial : 0;
-    const missing = coverage && typeof coverage.missing === "number" ? coverage.missing : 0;
-    const total = complete + partial + missing;
-    const detail = `${complete} complete | ${partial} partial | ${missing} missing`;
-    if (total > 0) {
-      const percent = Math.round((complete / total) * 100);
-      companyUniverseMetaCoverage.textContent = `${percent}% complete (${detail})`;
-    } else if (totalCount > 0) {
-      companyUniverseMetaCoverage.textContent = `No coverage for current filters (${detail})`;
-    } else {
-      companyUniverseMetaCoverage.textContent = "Coverage data unavailable";
-    }
+  
+  if (companyUniverseStatSectors) {
+    companyUniverseStatSectors.textContent = sectorsCount.toLocaleString();
   }
 }
 

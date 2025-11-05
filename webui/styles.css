@@ -3978,10 +3978,11 @@ body::-webkit-scrollbar {
 }
 
 .company-universe__title {
-  margin: 0;
-  font-size: 22px;
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--text-primary);
+  color: #1e40af;
 }
 
 .company-universe__subtitle {
@@ -4002,30 +4003,30 @@ body::-webkit-scrollbar {
 .company-universe__status {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
   margin-top: 4px;
 }
 
 .company-universe__status-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: 16px;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
-  min-width: 180px;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06);
+  min-width: 140px;
 }
 
 .company-universe__status-icon {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .company-universe__status-text {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .company-universe__status-label {
@@ -4036,7 +4037,7 @@ body::-webkit-scrollbar {
 }
 
 .company-universe__status-value {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
   word-break: break-word;
@@ -4044,13 +4045,12 @@ body::-webkit-scrollbar {
 
 .company-universe__controls {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 12px;
-  padding: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 14px;
-  background: rgba(248, 250, 252, 0.92);
-  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .company-universe__legend {
@@ -4098,11 +4098,59 @@ body::-webkit-scrollbar {
 
 .company-universe__controls input,
 .company-universe__controls select {
-  flex: 1 1 220px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 8px 12px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #3b82f6;
+  padding: 10px 14px;
   font-size: 14px;
+  background: #ffffff;
+  color: #1e293b;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.company-universe__controls input:focus,
+.company-universe__controls select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.company-universe__controls input::placeholder {
+  color: #94a3b8;
+}
+
+.company-universe__controls select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231e293b' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.company-universe__stats {
+  display: flex;
+  gap: 24px;
+  margin-top: 16px;
+  padding: 16px 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.company-universe__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.company-universe__stat-label {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.company-universe__stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e40af;
 }
 
 .company-universe__metrics {
@@ -4255,10 +4303,10 @@ body::-webkit-scrollbar {
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 4px;
+  padding: 3px 8px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -4299,11 +4347,11 @@ body::-webkit-scrollbar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: rgba(37, 99, 235, 0.12);
   color: rgba(37, 99, 235, 0.92);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
