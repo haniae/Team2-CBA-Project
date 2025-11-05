@@ -17,6 +17,7 @@ const chatLog = document.getElementById("chat-log");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const sendButton = document.getElementById("send-button");
+const stopButton = document.getElementById("stop-button");
 const scrollBtn = document.getElementById("scrollBtn");
 const statusDot = document.getElementById("api-status");
 const statusMessage = document.getElementById("status-message");
@@ -1263,221 +1264,24 @@ async function renderCompanyUniverseSection({ container } = {}) {
 
 
 const HELP_PROMPTS = [
-  "What is Apple's revenue?",
-  "Show Microsoft's EBITDA margin",
-  "Why is Tesla's margin declining?",
-  "Compare AAPL and MSFT profitability",
-  "Is Tesla overvalued?",
-  "What's my portfolio exposure?",
-  "Show me a dashboard for Apple",
-  "What are the key risks for Tesla?",
+  "Show Apple KPIs for 2022–2024",
+  "Compare Microsoft and Amazon in FY2023",
+  "What was Tesla's 2022 revenue?",
 ];
 
 const HELP_SECTIONS = [
   {
     icon: "📊",
-    title: "Company Metrics & Analysis",
-    command: "What is [TICKER]'s [metric]?",
-    purpose: "Get single metrics, trends, or comprehensive company analysis.",
-    examples: [
-      "What is Apple's revenue?",
-      "Show Microsoft's EBITDA margin",
-      "What's Tesla's free cash flow?",
-      "What is Google's net income?",
-      "Show NVDA's gross margin",
-      "What is META's return on equity?",
-      "Tell me about Amazon's balance sheet",
-      "What's Microsoft's P/E ratio?",
-    ],
-    delivers: "Direct answers, YoY growth, 3-5 year CAGRs, business drivers, SEC sources.",
-  },
-  {
-    icon: "🔍",
-    title: "Why Questions (Deep Analysis)",
-    command: "Why is [TICKER]'s [metric] [trend]?",
-    purpose: "Get multi-factor explanations for changes in financial metrics.",
-    examples: [
-      "Why is Tesla's margin declining?",
-      "Why is Apple's revenue growing?",
-      "Why is Microsoft more profitable?",
-      "Why did NVDA's stock price increase?",
-      "Why is Amazon investing more in CapEx?",
-      "Why is Google's margin expanding?",
-    ],
-    delivers: "Multi-factor analysis (3-5 reasons), quantified impacts, business context, forward outlook.",
-  },
-  {
-    icon: "⚖️",
-    title: "Comparisons",
-    command: "Compare [TICKER1] and [TICKER2] [metric]",
-    purpose: "Side-by-side analysis of companies, metrics, or performance.",
-    examples: [
-      "Compare AAPL and MSFT profitability",
-      "Is Apple more profitable than Microsoft?",
-      "Compare Tesla and Ford margins",
-      "Which is better: Apple or Microsoft?",
-      "Compare FAANG revenue growth",
-      "Compare valuation metrics for AAPL, MSFT, GOOGL",
-    ],
-    delivers: "Side-by-side metrics, percentage differences, rankings, performance indicators.",
-  },
-  {
-    icon: "💎",
-    title: "Valuation & Multiples",
-    command: "What's [TICKER]'s [valuation metric]?",
-    purpose: "Analyze valuation multiples, P/E ratios, and relative valuation.",
-    examples: [
-      "What's Apple's P/E ratio?",
-      "Is Tesla overvalued?",
-      "What multiples is Microsoft trading at?",
-      "Compare Apple's P/E to the S&P 500",
-      "What's Amazon's PEG ratio?",
-      "How does Tesla's valuation compare to Ford?",
-      "Compare valuation metrics for FAANG stocks",
-      "Which is cheaper: Apple or Microsoft?",
-    ],
-    delivers: "Valuation metrics, peer comparison, analyst target prices, historical multiples.",
-  },
-  {
-    icon: "💪",
-    title: "Financial Health & Risk",
-    command: "What's [TICKER]'s [risk/health metric]?",
-    purpose: "Assess balance sheet strength, leverage, and risk factors.",
-    examples: [
-      "What's Tesla's debt-to-equity ratio?",
-      "How leveraged is Apple?",
-      "What's Microsoft's net debt?",
-      "What are the key risks for Tesla?",
-      "Is Amazon's balance sheet strong?",
-      "How much cash does Apple have?",
-      "What's Apple's interest coverage ratio?",
-      "What could go wrong with Apple's business?",
-    ],
-    delivers: "Balance sheet metrics, leverage ratios, credit analysis, risk factors from 10-K.",
-  },
-  {
-    icon: "📈",
-    title: "Profitability & Margins",
-    command: "What's [TICKER]'s [margin metric]?",
-    purpose: "Analyze margins, profitability trends, and operating efficiency.",
-    examples: [
-      "What's Apple's gross margin?",
-      "What's Apple's gross margin trend?",
-      "Which is more profitable: Microsoft or Google?",
-      "What's driving Tesla's margin compression?",
-      "Compare EBITDA margins across FAANG",
-      "Show me Microsoft's operating margin",
-      "What's Amazon's profit margin?",
-    ],
-    delivers: "Margin breakdown, multi-year trends, peer comparison, drivers of margin changes.",
-  },
-  {
-    icon: "🚀",
-    title: "Growth & Performance",
-    command: "What's [TICKER]'s [growth metric]?",
-    purpose: "Analyze revenue growth, earnings growth, and growth outlook.",
-    examples: [
-      "Is Apple growing faster than Microsoft?",
-      "What's Tesla's revenue CAGR?",
-      "How fast is Amazon growing?",
-      "What's Apple's earnings growth?",
-      "What's the revenue forecast for Microsoft?",
-      "Which tech stock has the best growth trajectory?",
-      "Show me NVDA's 3-year revenue CAGR",
-    ],
-    delivers: "Historical growth rates (3-5 years), segment breakdown, growth drivers, analyst forecasts.",
-  },
-  {
-    icon: "💵",
-    title: "Cash Flow & Capital Allocation",
-    command: "What's [TICKER]'s [cash flow metric]?",
-    purpose: "Analyze cash generation, capital allocation, and shareholder returns.",
-    examples: [
-      "What's Apple's free cash flow?",
-      "How much cash does Microsoft generate?",
-      "How is Amazon allocating capital?",
-      "What's Microsoft's dividend yield?",
-      "Is Apple doing share buybacks?",
-      "Compare ROI across mega-cap tech",
-      "What's Tesla's cash burn rate?",
-    ],
-    delivers: "Cash flow statements, FCF trends, capex plans, dividend history, buyback programs.",
-  },
-  {
-    icon: "🎯",
-    title: "Investment Analysis",
-    command: "Should I invest in [TICKER]?",
-    purpose: "Get investment thesis, bull/bear cases, and recommendations.",
-    examples: [
-      "Should I invest in Apple or Microsoft?",
-      "What's the bull case for Tesla?",
-      "What's the bear case for Amazon?",
-      "Should I buy Apple stock?",
-      "What's the investment thesis for NVDA?",
-      "Is Microsoft a good investment?",
-    ],
-    delivers: "Bull/bear cases, investment thesis, analyst consensus, target prices, risk factors.",
-  },
-  {
-    icon: "📦",
-    title: "Portfolio Management",
-    command: "What's my portfolio [metric]?",
-    purpose: "Analyze portfolio holdings, exposure, and optimization.",
-    examples: [
-      "What's my portfolio exposure?",
-      "Show my portfolio holdings",
-      "Optimize my portfolio to maximize Sharpe",
-      "What if the market drops 20%?",
-      "Show my portfolio performance",
-      "Analyze my portfolio risk",
-      "What's my portfolio's sector allocation?",
-    ],
-    delivers: "Portfolio analysis, holdings breakdown, risk metrics, optimization suggestions.",
-  },
-  {
-    icon: "📊",
-    title: "Dashboards",
-    command: "Show me a dashboard for [TICKER]",
-    purpose: "Get interactive visualizations and comprehensive financial tables.",
-    examples: [
-      "Show me a dashboard for Apple",
-      "Dashboard AAPL",
-      "Show dashboard for Microsoft",
-      "Create a dashboard for Tesla",
-    ],
-    delivers: "Interactive charts, multi-year comparisons, comprehensive metrics table, downloadable data.",
-  },
-  {
-    icon: "🏭",
-    title: "Market Position & Competition",
-    command: "Who are [TICKER]'s competitors?",
-    purpose: "Analyze competitive landscape and market position.",
-    examples: [
-      "Who are Apple's main competitors?",
-      "Is Apple losing market share to Samsung?",
-      "What's Microsoft's competitive advantage?",
-      "Compare Tesla to traditional automakers",
-      "What's Amazon's market share?",
-    ],
-    delivers: "Competitor analysis, market share data, competitive advantages, industry positioning.",
-  },
-  {
-    icon: "📋",
-    title: "Sector & Industry Analysis",
-    command: "Compare [TICKER] to [sector/industry]",
-    purpose: "Benchmark companies against sector averages and industry peers.",
-    examples: [
-      "How does Apple compare to the technology sector?",
-      "Compare Tesla to the automotive sector",
-      "What's Microsoft's position in cloud computing?",
-      "Show me tech sector benchmarks",
-    ],
-    delivers: "Sector benchmarks, percentile rankings, industry averages, peer comparisons.",
+    title: "KPI & Comparisons",
+    command: "Metrics TICKER [YEAR | YEAR–YEAR] [+ peers]",
+    purpose: "Summarise a company's finance snapshot or line up peers on one table.",
+    example: "Metrics AAPL 2023 vs MSFT",
+    delivers: "Revenue, profitability, free cash flow, ROE, valuation ratios.",
   },
   {
     icon: "🧾",
-    title: "SEC Filing Facts",
-    command: "Fact [TICKER] [YEAR] [metric]",
+    title: "Facts from SEC Filings",
+    command: "Fact TICKER YEAR [metric]",
     purpose: "Retrieve exactly what was reported in 10-K/10-Q filings.",
     example: "Fact TSLA 2022 revenue",
     delivers: "Original value, adjustment notes, and source reference.",
@@ -1485,7 +1289,7 @@ const HELP_SECTIONS = [
   {
     icon: "🧮",
     title: "Scenario Modelling",
-    command: "Scenario [TICKER] [NAME] rev=+X% margin=+Y% mult=+Z",
+    command: "Scenario TICKER NAME rev=+X% margin=+Y% mult=+Z",
     purpose: "Run what-if cases for growth, margin shifts, or valuation moves.",
     example: "Scenario NVDA Bull rev=+8% margin=+1.5% mult=+0.5",
     delivers: "Projected revenue, margins, EPS/FCF change, implied valuation.",
@@ -1493,7 +1297,7 @@ const HELP_SECTIONS = [
   {
     icon: "⚙️",
     title: "Data Management",
-    command: ["Ingest [TICKER] [years]", "Ingest status [TICKER]", "Audit [TICKER] [year]"],
+    command: ["Ingest TICKER [years]", "Ingest status TICKER", "Audit TICKER [year]"],
     purpose: "Refresh data, track ingestion progress, or review the audit log.",
     examples: [
       "Ingest META 5 — refreshes five fiscal years of filings and quotes.",
@@ -2752,499 +2556,6 @@ async function renderFilingViewerSection({ container } = {}) {
   }
 }
 
-function renderPortfolioManagementSection({ container } = {}) {
-  if (!container) {
-    return;
-  }
-
-  // Remove any existing dashboards from the entire page when portfolio management is active
-  document.querySelectorAll(".financial-dashboard, .message-dashboard, .cfi-dashboard, [class*='dashboard'], [class*='chart'], [class*='Chart']").forEach((el) => {
-    el.remove();
-  });
-  
-  // Remove dashboard classes from messages
-  document.querySelectorAll(".message--has-dashboard").forEach((el) => {
-    el.classList.remove("message--has-dashboard");
-  });
-
-  let activeTab = "upload";
-
-  // Find the root element - it should already exist from the HTML template set in openUtilityPanel
-  let root = container.querySelector("[data-role='portfolio-management-root']");
-  
-  // If root doesn't exist, the container itself is the root (fallback)
-  if (!root) {
-    root = container;
-  }
-
-  root.innerHTML = `
-    <div class="portfolio-management">
-      <section class="portfolio-management__hero">
-        <div class="portfolio-management__badge">💼</div>
-        <div class="portfolio-management__hero-copy">
-          <h3 class="portfolio-management__title">Portfolio Management</h3>
-          <p class="portfolio-management__subtitle">
-            Upload and manage investment portfolios. Analyze exposures, optimize allocations, and run scenarios.
-          </p>
-        </div>
-      </section>
-      
-      <div class="portfolio-management__tabs">
-        <button class="portfolio-management__tab ${activeTab === "upload" ? "is-active" : ""}" data-tab="upload">
-          <span class="portfolio-management__tab-icon">📤</span>
-          <span>Upload Portfolio</span>
-        </button>
-        <button class="portfolio-management__tab ${activeTab === "list" ? "is-active" : ""}" data-tab="list">
-          <span class="portfolio-management__tab-icon">📋</span>
-          <span>My Portfolios</span>
-        </button>
-      </div>
-
-      <div class="portfolio-management__content" data-role="portfolio-content">
-        <div class="portfolio-management__tab-panel ${activeTab === "upload" ? "is-active" : ""}" data-panel="upload">
-          <form class="portfolio-upload-form" data-role="portfolio-upload-form" novalidate>
-            <div class="portfolio-upload-form__field">
-              <label for="portfolio-file">Portfolio File</label>
-              <div class="portfolio-upload-form__file-input">
-                <input type="file" id="portfolio-file" name="file" accept=".csv,.xlsx,.xls,.json" required />
-                <label for="portfolio-file" class="portfolio-upload-form__file-label">
-                  <span class="portfolio-upload-form__file-button">Choose File</span>
-                  <span class="portfolio-upload-form__file-name">No file chosen</span>
-                </label>
-              </div>
-              <p class="portfolio-upload-form__hint">Supported formats: CSV, Excel (.xlsx, .xls), JSON</p>
-            </div>
-            
-            <button type="submit" class="portfolio-upload-form__submit">Upload Portfolio</button>
-            
-            <div class="portfolio-upload-form__status" data-role="upload-status" aria-live="polite"></div>
-            
-            <div class="portfolio-upload-form__instructions">
-              <h4>File Format</h4>
-              <p>CSV/Excel should have columns: <code>ticker</code>, <code>shares</code> (optional), <code>weight</code> (optional), <code>price</code> (optional), <code>date</code> (optional)</p>
-              
-              <h4>Example CSV</h4>
-              <pre><code>ticker, shares, weight, price
-AAPL, 1000, 8.5, 175.50
-MSFT, 800, 10.0, 375.20</code></pre>
-            </div>
-          </form>
-        </div>
-
-        <div class="portfolio-management__tab-panel ${activeTab === "list" ? "is-active" : ""}" data-panel="list">
-          <div class="portfolio-list" data-role="portfolio-list">
-            <div class="portfolio-list__loading">Loading portfolios...</div>
-          </div>
-          <button class="portfolio-list__refresh" data-role="portfolio-refresh">Refresh</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="portfolio-holdings-modal hidden" data-role="holdings-modal">
-      <div class="portfolio-holdings-modal__backdrop"></div>
-      <div class="portfolio-holdings-modal__content">
-        <div class="portfolio-holdings-modal__header">
-          <h3 class="portfolio-holdings-modal__title" data-role="holdings-title">Holdings</h3>
-          <button class="portfolio-holdings-modal__close" data-role="holdings-close" aria-label="Close">×</button>
-        </div>
-        <div class="portfolio-holdings-modal__body" data-role="holdings-body">
-          <div class="portfolio-holdings-table" data-role="holdings-table"></div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Remove any dashboards that might have been rendered
-  const removeDashboards = () => {
-    // Remove from the portfolio management section
-    root.querySelectorAll(".financial-dashboard, .message-dashboard, .cfi-dashboard, [class*='dashboard'], [class*='chart'], [class*='Chart']").forEach((el) => {
-      el.remove();
-    });
-    // Remove from the entire document (but preserve chat messages)
-    document.querySelectorAll(".financial-dashboard, .message-dashboard, .cfi-dashboard, [class*='dashboard'], [class*='chart'], [class*='Chart']").forEach((el) => {
-      // Only remove if it's not in a chat message (chat messages handle their own removal)
-      if (!el.closest(".message--assistant")) {
-        el.remove();
-      }
-    });
-  };
-  
-  // Remove dashboards immediately
-  removeDashboards();
-  
-  // Set up MutationObserver to catch dashboards that appear later
-  const dashboardObserver = new MutationObserver(() => {
-    removeDashboards();
-  });
-  
-  dashboardObserver.observe(root, { childList: true, subtree: true });
-  // Clean up observer after 30 seconds to avoid memory leaks
-  setTimeout(() => dashboardObserver.disconnect(), 30000);
-
-  // Tab switching
-  const tabs = root.querySelectorAll("[data-tab]");
-  const panels = root.querySelectorAll("[data-panel]");
-  
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const tabName = tab.dataset.tab;
-      activeTab = tabName;
-      
-      tabs.forEach((t) => t.classList.toggle("is-active", t === tab));
-      panels.forEach((p) => p.classList.toggle("is-active", p.dataset.panel === tabName));
-      
-      // Remove dashboards when switching tabs
-      removeDashboards();
-      
-      if (tabName === "list") {
-        loadPortfolioList();
-      }
-    });
-  });
-
-  // File input handler
-  const fileInput = root.querySelector("#portfolio-file");
-  const fileNameDisplay = root.querySelector(".portfolio-upload-form__file-name");
-  
-  if (fileInput && fileNameDisplay) {
-    fileInput.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        fileNameDisplay.textContent = file.name;
-      } else {
-        fileNameDisplay.textContent = "No file chosen";
-      }
-    });
-  }
-
-  // Upload form handler
-  const uploadForm = root.querySelector("[data-role='portfolio-upload-form']");
-  if (uploadForm) {
-    uploadForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const fileInput = uploadForm.querySelector("#portfolio-file");
-      const file = fileInput?.files[0];
-      const statusEl = root.querySelector("[data-role='upload-status']");
-      
-      if (!file) {
-        if (statusEl) {
-          statusEl.textContent = "Please select a file";
-          statusEl.dataset.tone = "error";
-        }
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("file", file);
-
-      if (statusEl) {
-        statusEl.textContent = "Uploading...";
-        statusEl.dataset.tone = "info";
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/api/portfolio/upload`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
-          throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.success) {
-          if (statusEl) {
-            statusEl.textContent = `Portfolio "${data.portfolio_name}" uploaded successfully!${data.num_holdings ? ` (${data.num_holdings} holdings)` : ""}`;
-            statusEl.dataset.tone = "success";
-          }
-          uploadForm.reset();
-          if (fileNameDisplay) {
-            fileNameDisplay.textContent = "No file chosen";
-          }
-          // Switch to list tab and refresh
-          activeTab = "list";
-          tabs.forEach((t) => t.classList.toggle("is-active", t.dataset.tab === "list"));
-          panels.forEach((p) => p.classList.toggle("is-active", p.dataset.panel === "list"));
-          loadPortfolioList();
-        } else {
-          const errors = data.errors || ["Upload failed"];
-          const warnings = data.warnings || [];
-          const errorMessage = errors.join("; ");
-          const warningMessage = warnings.length > 0 ? ` Warnings: ${warnings.join("; ")}` : "";
-          if (statusEl) {
-            statusEl.textContent = errorMessage + warningMessage;
-            statusEl.dataset.tone = "error";
-          }
-        }
-      } catch (error) {
-        if (statusEl) {
-          statusEl.textContent = `Upload failed: ${error.message}`;
-          statusEl.dataset.tone = "error";
-        }
-      }
-    });
-  }
-
-  // Load portfolio list
-  async function loadPortfolioList() {
-    const listEl = root.querySelector("[data-role='portfolio-list']");
-    if (!listEl) return;
-
-    listEl.innerHTML = '<div class="portfolio-list__loading">Loading portfolios...</div>';
-
-    try {
-      const response = await fetch(`${API_BASE}/api/portfolio/list`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const portfolios = await response.json();
-
-      if (portfolios.length === 0) {
-        listEl.innerHTML = '<div class="portfolio-list__empty">No portfolios found. Upload your first portfolio to get started.</div>';
-        return;
-      }
-
-      listEl.innerHTML = portfolios.map((portfolio) => `
-        <div class="portfolio-list__item" data-portfolio-id="${portfolio.portfolio_id}">
-          <div class="portfolio-list__item-header">
-            <h4 class="portfolio-list__item-name">${escapeHtml(portfolio.name)}</h4>
-            <span class="portfolio-list__item-id">${portfolio.portfolio_id}</span>
-          </div>
-          <div class="portfolio-list__item-meta">
-            <span>Currency: ${portfolio.base_currency || "USD"}</span>
-            <span>Created: ${formatDisplayDate(portfolio.created_at)}</span>
-          </div>
-          <div class="portfolio-list__item-actions">
-            <button class="portfolio-list__action-button" data-action="view-holdings" data-portfolio-id="${portfolio.portfolio_id}">
-              View Holdings
-            </button>
-            <button class="portfolio-list__action-button" data-action="use-in-chat" data-portfolio-id="${portfolio.portfolio_id}">
-              Use in Chat
-            </button>
-            <button class="portfolio-list__action-button portfolio-list__action-button--danger" data-action="delete" data-portfolio-id="${portfolio.portfolio_id}">
-              Delete
-            </button>
-          </div>
-        </div>
-      `).join("");
-
-      // Attach event listeners
-      listEl.querySelectorAll("[data-action]").forEach((button) => {
-        button.addEventListener("click", async () => {
-          const action = button.dataset.action;
-          const portfolioId = button.dataset.portfolioId;
-
-          if (action === "view-holdings") {
-            // Remove any dashboards before showing holdings
-            document.querySelectorAll(".financial-dashboard, .message-dashboard, .cfi-dashboard, [class*='dashboard'], [class*='chart'], [class*='Chart']").forEach((el) => {
-              if (!el.closest(".message--assistant")) {
-                el.remove();
-              }
-            });
-            await showHoldingsModal(portfolioId);
-          } else if (action === "use-in-chat") {
-            // Remove any dashboards before using in chat
-            document.querySelectorAll(".financial-dashboard, .message-dashboard, .cfi-dashboard, [class*='dashboard'], [class*='chart'], [class*='Chart']").forEach((el) => {
-              if (!el.closest(".message--assistant")) {
-                el.remove();
-              }
-            });
-            usePortfolioInChat(portfolioId);
-          } else if (action === "delete") {
-            if (confirm(`Are you sure you want to delete portfolio "${portfolios.find(p => p.portfolio_id === portfolioId)?.name}"?`)) {
-              await deletePortfolio(portfolioId);
-            }
-          }
-        });
-      });
-    } catch (error) {
-      listEl.innerHTML = `<div class="portfolio-list__error">Failed to load portfolios: ${error.message}</div>`;
-    }
-  }
-
-  // Refresh button
-  const refreshBtn = root.querySelector("[data-role='portfolio-refresh']");
-  if (refreshBtn) {
-    refreshBtn.addEventListener("click", loadPortfolioList);
-  }
-
-  // Setup modal close handlers once
-  const modal = root.querySelector("[data-role='holdings-modal']");
-  const closeBtn = modal?.querySelector("[data-role='holdings-close']");
-  const backdrop = modal?.querySelector(".portfolio-holdings-modal__backdrop");
-  
-  const closeModal = () => {
-    if (modal) modal.classList.add("hidden");
-  };
-  
-  if (closeBtn) {
-    closeBtn.addEventListener("click", closeModal);
-  }
-  if (backdrop) {
-    backdrop.addEventListener("click", closeModal);
-  }
-
-  // Show holdings modal
-  async function showHoldingsModal(portfolioId) {
-    const titleEl = root.querySelector("[data-role='holdings-title']");
-    const bodyEl = root.querySelector("[data-role='holdings-body']");
-    const tableEl = root.querySelector("[data-role='holdings-table']");
-    
-    if (!modal || !titleEl || !tableEl) return;
-
-    modal.classList.remove("hidden");
-    bodyEl.innerHTML = '<div class="portfolio-holdings-table"><div class="portfolio-holdings-table__loading">Loading holdings...</div></div>';
-
-    try {
-      const response = await fetch(`${API_BASE}/api/portfolio/${portfolioId}/holdings`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const data = await response.json();
-
-      titleEl.textContent = `Holdings for ${data.name}`;
-
-      if (!data.holdings || data.holdings.length === 0) {
-        bodyEl.innerHTML = '<div class="portfolio-holdings-table"><div class="portfolio-holdings-table__empty">No holdings found.</div></div>';
-        return;
-      }
-
-      // Build table
-      const table = document.createElement("table");
-      table.className = "portfolio-holdings-table__table";
-      
-      const thead = document.createElement("thead");
-      thead.innerHTML = `
-        <tr>
-          <th>Ticker</th>
-          <th>Weight</th>
-          <th>Shares</th>
-          <th>Market Value</th>
-          <th>Sector</th>
-          <th>P/E</th>
-        </tr>
-      `;
-      table.append(thead);
-
-      const tbody = document.createElement("tbody");
-      data.holdings.forEach((holding) => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${escapeHtml(holding.ticker)}</td>
-          <td>${formatNumber(holding.weight || 0, 2)}%</td>
-          <td>${formatNumber(holding.shares || 0, 0)}</td>
-          <td>$${formatNumber(holding.market_value || 0, 2)}</td>
-          <td>${escapeHtml(holding.sector || "N/A")}</td>
-          <td>${holding.pe_ratio ? formatNumber(holding.pe_ratio, 2) : "N/A"}</td>
-        `;
-        tbody.append(row);
-      });
-      table.append(tbody);
-
-      // Put the table in the tableEl (which is inside bodyEl)
-      tableEl.innerHTML = "";
-      tableEl.append(table);
-    } catch (error) {
-      bodyEl.innerHTML = `<div class="portfolio-holdings-table"><div class="portfolio-holdings-table__error">Failed to load holdings: ${error.message}</div></div>`;
-    }
-  }
-
-  // Use portfolio in chat
-  function usePortfolioInChat(portfolioId) {
-    // Close the utility panel first to show the chat
-    closeUtilityPanel();
-    
-    // Ensure chat panel is visible
-    if (chatPanel) {
-      chatPanel.classList.remove("chat-panel--collapsed");
-    }
-    if (chatLog) {
-      chatLog.classList.remove("hidden");
-    }
-    if (chatFormContainer) {
-      chatFormContainer.classList.remove("chat-form--collapsed");
-    }
-    
-    // Wait a bit for the panel to close and UI to update
-    setTimeout(() => {
-      if (chatInput) {
-        // Set a helpful message about the portfolio
-        chatInput.value = `Analyze portfolio ${portfolioId}`;
-        
-        // Trigger input event to update send button state and auto-resize
-        const inputEvent = new Event("input", { bubbles: true, cancelable: true });
-        chatInput.dispatchEvent(inputEvent);
-        
-        // Also manually update send button if it exists (ensure it's enabled)
-        if (sendButton) {
-          const hasText = !!chatInput.value && chatInput.value.trim().length > 0;
-          sendButton.disabled = !hasText;
-          // Force enable if there's text (in case disabled state is stuck)
-          if (hasText && sendButton.disabled) {
-            sendButton.disabled = false;
-          }
-        }
-        
-        // Trigger auto-resize if function exists
-        if (typeof autoResizeTextarea === "function") {
-          autoResizeTextarea();
-        }
-        
-        // Focus the input so user can edit if needed
-        chatInput.focus();
-        
-        // Scroll chat input into view
-        chatInput.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        
-        // Don't auto-submit - let the user review and edit the message first
-        // They can press Enter or click the submit button when ready
-      }
-    }, 150);
-  }
-
-  // Delete portfolio
-  async function deletePortfolio(portfolioId) {
-    try {
-      const response = await fetch(`${API_BASE}/api/portfolio/${portfolioId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Delete failed");
-      }
-
-      await loadPortfolioList();
-    } catch (error) {
-      alert(`Failed to delete portfolio: ${error.message}`);
-    }
-  }
-
-  // Helper functions
-  function escapeHtml(text) {
-    if (!text) return "";
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  function formatNumber(value, decimals = 2) {
-    if (value == null || isNaN(value)) return "N/A";
-    return Number(value).toLocaleString(undefined, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
-  }
-
-  // Initial load if on list tab
-  if (activeTab === "list") {
-    loadPortfolioList();
-  }
-}
-
 function renderSettingsSection({ container } = {}) {
   if (!container) {
     return;
@@ -3456,11 +2767,6 @@ const UTILITY_SECTIONS = {
     html: `<div class="filing-viewer" data-role="filing-viewer-root"></div>`,
     render: renderFilingViewerSection,
   },
-  portfolio: {
-    title: "Portfolio Management",
-    html: `<div class="portfolio-management-panel" data-role="portfolio-management-root"></div>`,
-    render: renderPortfolioManagementSection,
-  },
   projects: {
     title: "Projects",
     html: `
@@ -3658,120 +2964,12 @@ function renderMessageArtifacts(wrapper, artifacts) {
     wrapper.classList.remove("message--has-dashboard");
     return;
   }
-  
-  // Check if this is a portfolio-related response - skip dashboard rendering completely
-  // Find the previous user message in the conversation
-  let userMessageText = "";
-  let messageElement = wrapper.previousElementSibling;
-  while (messageElement && !userMessageText) {
-    if (messageElement.classList.contains("message--user")) {
-      userMessageText = messageElement.querySelector(".message-body")?.textContent || "";
-      break;
-    }
-    messageElement = messageElement.previousElementSibling;
-  }
-  
-  // Also check the current message text and all message elements in the chat
-  const messageText = wrapper.querySelector(".message-body")?.textContent || "";
-  const chatLog = wrapper.closest(".chat-log");
-  const allUserMessages = chatLog ? Array.from(chatLog.querySelectorAll(".message--user .message-body")) : [];
-  const recentUserMessage = allUserMessages.length > 0 ? allUserMessages[allUserMessages.length - 1]?.textContent || "" : "";
-  
-  const combinedText = (messageText + " " + userMessageText + " " + recentUserMessage).toLowerCase();
-  
-  // Check for portfolio ID pattern (port_xxxxx or port_xxxx)
-  const portfolioIdPattern = /port_[a-z0-9]{4,8}/i;
-  const hasPortfolioId = portfolioIdPattern.test(combinedText);
-  
-  // Check comparison table for portfolio indicators
-  const comparisonTableHasPortfolio = artifacts.comparisonTable && 
-    (/portfolio|port_/i.test(JSON.stringify(artifacts.comparisonTable)) ||
-     artifacts.comparisonTable.headers?.some(h => /portfolio|port_/i.test(String(h))));
-  
-  const isPortfolioQuery = 
-    /portfolio|port_|holdings|exposure|allocation|optimize portfolio|portfolio analysis|analyze portfolio|portfolio management/i.test(combinedText) ||
-    hasPortfolioId ||
-    artifacts.dashboard?.kind?.includes("portfolio") ||
-    artifacts.dashboard?.kind?.includes("Portfolio") ||
-    comparisonTableHasPortfolio ||
-    wrapper.closest("[data-role='portfolio-management-root']") !== null;
-  
-  // Skip ALL dashboard rendering for portfolio-related queries - be very aggressive
-  if (isPortfolioQuery) {
-    wrapper.classList.remove("message--has-dashboard");
-    // Remove any existing dashboard elements aggressively
-    wrapper.querySelectorAll(".financial-dashboard, .message-dashboard, .cfi-dashboard, [class*='dashboard'], [class*='chart'], [class*='Chart']").forEach((el) => el.remove());
-    body.querySelectorAll(".financial-dashboard, .message-dashboard, .cfi-dashboard, [class*='dashboard'], [class*='chart'], [class*='Chart']").forEach((el) => el.remove());
-    // Also remove from parent elements
-    const parent = wrapper.parentElement;
-    if (parent) {
-      parent.querySelectorAll(".financial-dashboard, .message-dashboard, .cfi-dashboard, [class*='dashboard'], [class*='chart'], [class*='Chart']").forEach((el) => el.remove());
-    }
-    
-    // Use MutationObserver to catch dashboards that appear after rendering
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === 1) { // Element node
-            const dashboardSelectors = [
-              ".financial-dashboard",
-              ".message-dashboard",
-              ".cfi-dashboard",
-              "[class*='dashboard']",
-              "[class*='chart']",
-              "[class*='Chart']"
-            ];
-            dashboardSelectors.forEach((selector) => {
-              if (node.matches && node.matches(selector)) {
-                node.remove();
-              }
-              if (node.querySelectorAll) {
-                node.querySelectorAll(selector).forEach((el) => el.remove());
-              }
-            });
-          }
-        });
-      });
-    });
-    
-    observer.observe(wrapper, { childList: true, subtree: true });
-    observer.observe(body, { childList: true, subtree: true });
-    
-    // Stop observing after 5 seconds
-    setTimeout(() => observer.disconnect(), 5000);
-    
-    // Continue to render other artifacts (highlights, tables, etc.) but skip dashboard
-    const sections = [];
-    const highlightsSection = createHighlightsSection(artifacts.highlights);
-    if (highlightsSection) {
-      sections.push(highlightsSection);
-    }
-    const tableSection = createComparisonTableSection(artifacts.comparisonTable);
-    if (tableSection) {
-      sections.push(tableSection);
-    }
-    const conclusionSection = createConclusionSection(artifacts.conclusion);
-    if (conclusionSection) {
-      sections.push(conclusionSection);
-    }
-    if (sections.length > 0) {
-      const artifactsContainer = document.createElement("div");
-      artifactsContainer.className = "message-artifacts";
-      sections.forEach((section) => artifactsContainer.append(section));
-      body.append(artifactsContainer);
-    }
-    return;
-  }
-  
   let hasDashboard = false;
   const inlineDashboard = renderDashboardArtifact(artifacts.dashboard);
   const dashboardKind = artifacts.dashboard?.kind || "";
   const isInlineClassic =
     inlineDashboard && (dashboardKind === "cfi-classic" || dashboardKind === "cfi-compare" || dashboardKind === "multi-classic" || dashboardKind === "multi-cfi-classic");
-  
-  // Skip inline dashboard if it's portfolio-related
-  const isPortfolioDashboard = dashboardKind?.includes("portfolio") || dashboardKind?.includes("Portfolio");
-  if (inlineDashboard && !isPortfolioDashboard) {
+  if (inlineDashboard) {
     hasDashboard = true;
     body.append(inlineDashboard);
     if (!isInlineClassic) {
@@ -3779,7 +2977,6 @@ function renderMessageArtifacts(wrapper, artifacts) {
       return;
     }
   }
-  
   const dashboard = createDashboardLayout(artifacts);
   if (dashboard && dashboardKind !== "cfi-classic" && dashboardKind !== "multi-classic" && dashboardKind !== "multi-cfi-classic") {
     hasDashboard = true;
@@ -3788,31 +2985,6 @@ function renderMessageArtifacts(wrapper, artifacts) {
       body.querySelectorAll(".message-table").forEach((tableNode) => tableNode.remove());
     }
     wrapper.classList.toggle("message--has-dashboard", hasDashboard);
-    
-    // Post-render cleanup: remove dashboard if it contains portfolio indicators
-    const cleanupDashboard = () => {
-      const dashboardElements = wrapper.querySelectorAll(".financial-dashboard, .message-dashboard, .cfi-dashboard, [class*='dashboard'], [class*='chart'], [class*='Chart'], [id*='dashboard'], [id*='chart']");
-      dashboardElements.forEach((el) => {
-        const elText = el.textContent || "";
-        const elHtml = el.innerHTML || "";
-        if (/portfolio|port_|holdings|exposure|allocation|port_[a-z0-9]{4,8}|financial model dashboard|multi-company|trend|valuation chart/i.test(elText + " " + elHtml)) {
-          el.remove();
-          wrapper.classList.remove("message--has-dashboard");
-        }
-      });
-    };
-    
-    // Cleanup immediately and repeatedly
-    cleanupDashboard();
-    setTimeout(cleanupDashboard, 100);
-    setTimeout(cleanupDashboard, 500);
-    setTimeout(cleanupDashboard, 1000);
-    
-    // Also use MutationObserver for ongoing cleanup
-    const cleanupObserver = new MutationObserver(() => cleanupDashboard());
-    cleanupObserver.observe(wrapper, { childList: true, subtree: true });
-    setTimeout(() => cleanupObserver.disconnect(), 5000);
-    
     return;
   }
   const sections = [];
@@ -3857,13 +3029,6 @@ function renderMessageArtifacts(wrapper, artifacts) {
 }
 
 function createDashboardLayout(artifacts) {
-  // Skip dashboard creation for portfolio-related queries
-  if (artifacts.dashboard?.kind?.includes("portfolio") || 
-      artifacts.dashboard?.kind?.includes("Portfolio") ||
-      (artifacts.comparisonTable && /portfolio|port_/i.test(JSON.stringify(artifacts.comparisonTable)))) {
-    return null;
-  }
-  
   const hasComparison =
     artifacts?.comparisonTable &&
     Array.isArray(artifacts.comparisonTable.rows) &&
@@ -6397,6 +5562,9 @@ function copyShareLink() {
 function setSending(state) {
   isSending = state;
   sendButton.disabled = state; // block double-submit
+  if (stopButton) {
+    stopButton.disabled = !state; // enable stop button when sending
+  }
   chatInput.disabled = false;  // still allow typing while processing
   // keep icon-only; don't swap label
 }
@@ -7178,12 +6346,10 @@ function deleteConversation(conversationId) {
 }
 
 function setActiveNav(action) {
-  // Query fresh each time to ensure we get the latest elements
-  const items = document.querySelectorAll(".nav-item");
-  if (!items || !items.length) {
+  if (!navItems || !navItems.length) {
     return;
   }
-  items.forEach((item) => {
+  navItems.forEach((item) => {
     const itemAction = item.dataset.action || "";
     item.classList.toggle("active", Boolean(action && itemAction === action));
   });
@@ -7230,7 +6396,7 @@ function openUtilityPanel(key) {
     }
   }
   setActiveNav(`open-${key}`);
-  if (["help", "kpi-library", "company-universe", "filing-viewer", "portfolio"].includes(key)) {
+  if (["help", "kpi-library", "company-universe", "filing-viewer"].includes(key)) {
     if (chatPanel) {
       chatPanel.classList.add("chat-panel--collapsed");
     }
@@ -7756,7 +6922,13 @@ function setCachedPrompt(key, reply, artifacts) {
   }
 }
 
+let currentAbortController = null;
+
 async function sendPrompt(prompt, requestId) {
+  // Create new AbortController for this request
+  currentAbortController = new AbortController();
+  const signal = currentAbortController.signal;
+
   const payload = { prompt };
   if (requestId) {
     payload.request_id = requestId;
@@ -7765,29 +6937,35 @@ async function sendPrompt(prompt, requestId) {
     payload.conversation_id = activeConversation.remoteId;
   }
 
-  const response = await fetch(`${API_BASE}/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetch(`${API_BASE}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: signal,
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API ${response.status}: ${errorText || "Unknown error"}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API ${response.status}: ${errorText || "Unknown error"}`);
+    }
+
+    const data = await response.json();
+    if (activeConversation && data.conversation_id) {
+      activeConversation.remoteId = data.conversation_id;
+      promoteConversation(activeConversation);
+      saveConversations();
+      renderConversationList();
+    }
+    return data;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('Request cancelled');
+    }
+    throw error;
+  } finally {
+    currentAbortController = null;
   }
-
-  const data = await response.json();
-  if (activeConversation && data.conversation_id) {
-    activeConversation.remoteId = data.conversation_id;
-    promoteConversation(activeConversation);
-    saveConversations();
-    renderConversationList();
-  }
-  return data;
-}
-
-if (!chatForm || !chatInput || !sendButton) {
-  console.error("Chat form elements not found:", { chatForm, chatInput, sendButton });
 }
 
 if (chatForm) {
@@ -7797,10 +6975,10 @@ if (chatForm) {
       return;
     }
 
-    const prompt = chatInput.value.trim();
-    if (!prompt) {
-      return;
-    }
+  const prompt = chatInput.value.trim();
+  if (!prompt) {
+    return;
+  }
   const canonicalPrompt = canonicalisePrompt(prompt);
 
   recordMessage("user", prompt);
@@ -7876,22 +7054,33 @@ if (chatForm) {
     }
     setCachedPrompt(canonicalPrompt, messageText, artifacts);
   } catch (error) {
-    const fallback = error && error.message ? error.message : "Something went wrong. Please try again.";
-    recordMessage("system", fallback);
-    resolvePendingMessage(pendingMessage, "system", fallback, { forceScroll: true });
+    // Don't show error for cancelled requests
+    if (error.message !== 'Request cancelled') {
+      const fallback = error && error.message ? error.message : "Something went wrong. Please try again.";
+      recordMessage("system", fallback);
+      resolvePendingMessage(pendingMessage, "system", fallback, { forceScroll: true });
+    } else {
+      // Show cancelled message
+      if (pendingMessage) {
+        resolvePendingMessage(pendingMessage, "system", "Request cancelled", { forceScroll: true });
+      }
+    }
   } finally {
     await stopProgressTracking(requestId, { flush: true });
     setSending(false);
+    currentAbortController = null;
     chatInput.focus();
   }
   });
 }
 
-if (chatInput && chatForm) {
-  chatInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      chatForm.requestSubmit();
+// Stop button handler
+if (stopButton) {
+  stopButton.addEventListener("click", () => {
+    if (currentAbortController && isSending) {
+      currentAbortController.abort();
+      currentAbortController = null;
+      setSending(false);
     }
   });
 }
@@ -8004,125 +7193,11 @@ function renderPromptChips() {
   });
 }
 
-// Set up navigation button event listeners
-// Use both direct attachment and event delegation for maximum reliability
-let navListenersInitialized = false;
-
-function setupNavListeners() {
-  if (navListenersInitialized) {
-    console.log("Navigation listeners already initialized, skipping...");
-    return;
-  }
-  
-  console.log("=== Setting up navigation listeners ===");
-  
-  // Get all nav items
-  const navItems = document.querySelectorAll(".nav-item");
-  console.log("Found nav items:", navItems.length);
-  
-  if (navItems && navItems.length > 0) {
-    navItems.forEach((button, index) => {
-      const action = button.dataset.action;
-      console.log(`Setting up nav item ${index}:`, action);
-      
-      // Remove any existing listeners by cloning
-      const newButton = button.cloneNode(true);
-      button.parentNode?.replaceChild(newButton, button);
-      
-      // Attach click listener directly to the button
-      newButton.addEventListener("click", function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const action = this.dataset.action;
-        console.log("=== Nav button clicked! ===", "action:", action, "button:", this);
-        
-        if (action) {
-          handleNavAction(action);
-        }
-      }, false);
-      
-      console.log(`✓ Attached listener to nav item ${index} (${action})`);
-    });
-    
-    // Also set up event delegation on containers as backup
-    // This catches clicks on child elements (like spans) inside buttons
-    const sidebarNavs = document.querySelectorAll(".sidebar-nav");
-    sidebarNavs.forEach((navContainer) => {
-      if (!navContainer.dataset.delegationAttached) {
-        navContainer.addEventListener("click", function(e) {
-          const button = e.target.closest(".nav-item");
-          if (button) {
-            // If clicked on button or any child element, handle it
-            const action = button.dataset.action;
-            if (action) {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log("Delegation handler triggered for:", action);
-              handleNavAction(action);
-            }
-          }
-        }, false);
-        navContainer.dataset.delegationAttached = "true";
-      }
-    });
-    
-    // Also check for saved reports search button
-    const savedSearchBtn = document.querySelector("[data-action='search-saved']");
-    if (savedSearchBtn && !savedSearchBtn.dataset.listenerAttached) {
-      savedSearchBtn.addEventListener("click", function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleNavAction("search-saved");
-      });
-      savedSearchBtn.dataset.listenerAttached = "true";
-    }
-    
-    navListenersInitialized = true;
-    console.log(`✓ Navigation listeners set up successfully for ${navItems.length} buttons`);
-  } else {
-    console.error("No navigation items found!");
-  }
-}
-
-// Set up listeners when DOM is ready
-function initializeNavListeners() {
-  const trySetup = () => {
-    const navItems = document.querySelectorAll(".nav-item");
-    if (navItems.length > 0) {
-      setupNavListeners();
-    } else {
-      console.log("Nav items not found yet, will retry...");
-      setTimeout(trySetup, 100);
-    }
-  };
-  
-  if (document.readyState === "loading") {
-    console.log("Document is loading, waiting for DOMContentLoaded");
-    document.addEventListener("DOMContentLoaded", () => {
-      console.log("=== DOMContentLoaded fired ===");
-      trySetup();
-    });
-  } else {
-    console.log("Document already loaded, setting up immediately");
-    trySetup();
-  }
-  
-  // Also set up on window load as backup
-  window.addEventListener("load", () => {
-    console.log("=== Window load event fired ===");
-    if (!navListenersInitialized) {
-      const navItems = document.querySelectorAll(".nav-item");
-      console.log("Nav items found on window load:", navItems.length);
-      if (navItems.length > 0) {
-        setupNavListeners();
-      }
-    }
+if (navItems && navItems.length) {
+  navItems.forEach((item) => {
+    item.addEventListener("click", () => handleNavAction(item.dataset.action));
   });
 }
-
-// Initialize navigation listeners
-initializeNavListeners();
 
 if (savedSearchTrigger) {
   savedSearchTrigger.addEventListener("click", () => handleNavAction("search-saved"));
@@ -8618,18 +7693,8 @@ async function ensureCfiCompareRenderer() {
 }
 
 function resolveDashboardHost() {
-  // Don't use utility-content if utility panel is visible (utility panel takes priority)
-  const utilityPanel = document.getElementById("utility-panel");
-  const utilityContent = document.getElementById("utility-content");
-  if (utilityPanel && !utilityPanel.classList.contains("hidden") && utilityContent) {
-    // Utility panel is open, don't use it for dashboard
-    return (
-      document.querySelector(".standalone-content") ||
-      document.querySelector(".chat-panel")
-    );
-  }
   return (
-    utilityContent ||
+    document.getElementById("utility-content") ||
     document.querySelector(".standalone-content") ||
     document.querySelector(".chat-panel")
   );
@@ -9039,11 +8104,6 @@ async function showCfiCompareDashboard(options = {}) {
   if (!host) {
     throw new Error("Unable to resolve dashboard host container.");
   }
-  
-  // Set the active container for CFI compare script
-  const previousContainer = window.__cfiActiveContainer;
-  window.__cfiActiveContainer = host;
-  
   host.innerHTML = '<div class="cfi-loading">Loading CFI Compare dashboard...</div>';
   try {
     await loadCfiCompareMarkup(host);
@@ -9056,10 +8116,6 @@ async function showCfiCompareDashboard(options = {}) {
       '<div class="cfi-error">Unable to load CFI Compare dashboard layout. Check console for details.</div>';
     if (typeof showToast === "function") {
       showToast("Unable to load CFI Compare dashboard.", "error");
-    }
-    // Restore previous container on error
-    if (window.__cfiActiveContainer === host) {
-      window.__cfiActiveContainer = previousContainer;
     }
     return;
   }
@@ -9086,10 +8142,6 @@ async function showCfiCompareDashboard(options = {}) {
     if (typeof showToast === "function") {
       showToast("CFI Compare renderer unavailable.", "error");
     }
-    // Restore previous container on error
-    if (window.__cfiActiveContainer === host) {
-      window.__cfiActiveContainer = previousContainer;
-    }
     return;
   }
 
@@ -9103,24 +8155,13 @@ async function showCfiCompareDashboard(options = {}) {
     if (typeof showToast === "function") {
       showToast("Unable to render CFI Compare dashboard.", "error");
     }
-  } finally {
-    // Restore previous container after rendering
-    if (window.__cfiActiveContainer === host) {
-      window.__cfiActiveContainer = previousContainer;
-    }
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Only auto-load dashboard if utility panel is not open
-  const utilityPanel = document.getElementById("utility-panel");
-  if (!utilityPanel || utilityPanel.classList.contains("hidden")) {
-    showCfiCompareDashboard().catch(() => {});
-  }
+  showCfiCompareDashboard().catch(() => {});
 });
 
 window.showCfiDenseDashboard = showCfiDenseDashboard;
 window.showCfiDashboard = showCfiDashboard;
 window.showCfiCompareDashboard = showCfiCompareDashboard;
-
-console.log("=== app.js END OF FILE ===");

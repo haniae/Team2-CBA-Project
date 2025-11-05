@@ -2049,6 +2049,9 @@ body::-webkit-scrollbar {
   top: 50%;
   transform: translateY(-50%);
   z-index: 1; /* keep above textarea content */
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .chat-actions .hint {
@@ -2064,32 +2067,92 @@ body::-webkit-scrollbar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(0, 102, 255, 0.95), rgba(59, 130, 246, 0.9));
   color: #ffffff;
   cursor: pointer;
-  transition: transform 120ms ease-out, box-shadow 160ms ease-out;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  position: relative;
+  overflow: hidden;
 }
 
-.chat-actions button svg { width: 16px; height: 16px; stroke: #ffffff; }
+.chat-actions button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.chat-actions button:not(:disabled):hover::before {
+  opacity: 1;
+}
+
+/* Send Button - Blue/Green */
+#send-button {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(59, 130, 246, 0.9), rgba(34, 197, 94, 0.9));
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+#send-button:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 30px rgba(37, 99, 235, 0.35);
+  background: linear-gradient(135deg, #2563eb, #3b82f6, #22c55e);
+  background-size: 200% 200%;
+}
+
+#send-button:not(:disabled):active {
+  transform: translateY(0);
+  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.3);
+}
+
+/* Stop Button - Red */
+#stop-button {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.9));
+}
+
+#stop-button:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 30px rgba(239, 68, 68, 0.35);
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+#stop-button:not(:disabled):active {
+  transform: translateY(0);
+  box-shadow: 0 10px 18px rgba(239, 68, 68, 0.3);
+}
+
+.chat-actions button svg { 
+  width: 16px; 
+  height: 16px; 
+  stroke: #ffffff; 
+  stroke-width: 2;
+  position: relative;
+  z-index: 1;
+}
 
 .chat-actions button:disabled {
   opacity: 0.5;
-  cursor: default;
+  cursor: not-allowed;
   box-shadow: none;
-  background: rgba(148, 163, 184, 0.45);
+  background: rgba(148, 163, 184, 0.45) !important;
+  transform: none !important;
 }
-.chat-actions button:disabled svg { stroke: #f8fafc; }
 
-.chat-actions button:not(:disabled):hover {
-  transform: translateY(-1px);
-  box-shadow: 0 18px 30px rgba(37, 99, 235, 0.26);
+.chat-actions button:disabled svg { 
+  stroke: #f8fafc; 
 }
-.chat-actions button:not(:disabled):active {
-  transform: translateY(0);
-  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.24);
+
+.chat-actions button:focus-visible { 
+  outline: 2px solid rgba(255,255,255,0.5); 
+  outline-offset: 2px; 
 }
-.chat-actions button:focus-visible { outline: 2px solid rgba(255,255,255,0.3); outline-offset: 2px; }
 
 @media (max-width: 1024px) {
   .layout {
