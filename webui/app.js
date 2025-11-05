@@ -341,11 +341,17 @@ const PREFERS_REDUCED_MOTION = (() => {
 
 const TICKER_STOPWORDS = new Set([
   // Common words
-  "THE", "AND", "WITH", "FOR", "FROM", "ABOUT", "HAVE", "SHOW", "TELL",
+  "THE", "AND", "WITH", "FOR", "FROM", "ABOUT", "SHOW", "TELL",
   "THIS", "THAT", "THEM", "THEIR", "THOSE", "THESE",
+  "ARE", "WAS", "WERE", "BEEN", "BEING",
   
   // Question words
   "WHAT", "WHICH", "WHERE", "WHEN", "WHY", "HOW", "WHO",
+  
+  // Verbs (prevent "HAS", "CAN", "DID", etc. being treated as tickers)
+  "HAS", "HAVE", "HAD", "CAN", "COULD", "WOULD", "SHOULD", "WILL",
+  "DID", "DOES", "DO", "DONE", "MAY", "MIGHT", "MUST",
+  "IS", "ARE", "WAS", "WERE",
   
   // Sector/industry words (prevent "TECH" being treated as ticker)
   "TECH", "TECHNOLOGY", "FINANCIAL", "HEALTHCARE", "ENERGY", "CONSUMER",
@@ -353,17 +359,20 @@ const TICKER_STOPWORDS = new Set([
   
   // Company descriptors
   "COMPANY", "COMPANIES", "STOCK", "STOCKS", "FIRM", "FIRMS",
-  "BEST", "TOP", "GOOD", "BETTER", "HIGHEST", "LOWEST",
+  "BEST", "TOP", "GOOD", "BETTER", "HIGHEST", "LOWEST", "WORST",
+  "MOST", "LEAST", "MORE", "LESS",
   
   // Metrics (existing)
   "KPI", "EPS", "ROE", "FCF", "PE", "TSR", "LTM", "FY",
   "YOY", "TTM", "GROWTH", "METRIC", "METRICS",
+  "MARGIN", "MARGINS", "PROFIT", "REVENUE", "EARNINGS",
   
   // Report types
   "SUMMARY", "REPORT", "SCENARIO", "ANALYSIS", "INSIGHT",
   
-  // Other
-  "API", "DATA", "K",
+  // Other common words
+  "API", "DATA", "K", "ALL", "ANY", "SOME", "EACH",
+  "GET", "GIVE", "LIST", "FIND",
 ]);
 
 let reportMenu = null;

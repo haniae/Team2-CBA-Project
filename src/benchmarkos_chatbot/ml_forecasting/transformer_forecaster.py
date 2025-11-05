@@ -27,6 +27,35 @@ try:
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
+    # Dummy classes for when PyTorch is not available
+    class Dataset:
+        pass
+    class nn:
+        class Module:
+            pass
+        class Linear:
+            pass
+        class Parameter:
+            pass
+        class TransformerEncoderLayer:
+            pass
+        class TransformerEncoder:
+            pass
+        class Sequential:
+            pass
+        class ReLU:
+            pass
+        class Dropout:
+            pass
+    class torch:
+        class Tensor:
+            pass
+        @staticmethod
+        def randn(*args):
+            return None
+        @staticmethod
+        def FloatTensor(*args):
+            return None
     LOGGER.warning("PyTorch not available - Transformer forecasting will not work")
 
 from .ml_forecaster import BaseForecaster
@@ -64,8 +93,12 @@ class TimeSeriesDataset(Dataset):
     """Dataset for time series forecasting."""
     
     def __init__(self, sequences: np.ndarray, targets: np.ndarray):
-        self.sequences = torch.FloatTensor(sequences)
-        self.targets = torch.FloatTensor(targets)
+        if TORCH_AVAILABLE:
+            self.sequences = torch.FloatTensor(sequences)
+            self.targets = torch.FloatTensor(targets)
+        else:
+            self.sequences = sequences
+            self.targets = targets
     
     def __len__(self):
         return len(self.sequences)
