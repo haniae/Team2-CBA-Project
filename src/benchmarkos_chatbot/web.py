@@ -1492,7 +1492,7 @@ async def export_cfi(
     format: str = Query(
         ...,
         description="Export format to generate (pdf, pptx, or xlsx).",
-        regex="^(?i)(pdf|pptx?|xlsx|excel)$",
+        pattern="^(?i)(pdf|pptx?|xlsx|excel)$",
     ),
     ticker: str = Query(
         "AAPL",
@@ -2851,8 +2851,8 @@ def portfolio_export_xlsx(portfolio_id: str) -> StreamingResponse:
 def optimize_portfolio_multi_period_endpoint(
     portfolio_id: str,
     periods: int = Query(4, ge=1, le=12, description="Number of periods to optimize"),
-    rebalance_frequency: str = Query("quarterly", regex="^(quarterly|monthly|weekly)$", description="Rebalance frequency"),
-    objective: str = Query("sharpe", regex="^(sharpe|tracking_error|return)$", description="Optimization objective"),
+    rebalance_frequency: str = Query("quarterly", pattern="^(quarterly|monthly|weekly)$", description="Rebalance frequency"),
+    objective: str = Query("sharpe", pattern="^(sharpe|tracking_error|return)$", description="Optimization objective"),
 ) -> Dict[str, Any]:
     """Optimize portfolio over multiple periods with rebalancing."""
     settings = get_settings()
@@ -3012,7 +3012,7 @@ def backtest_portfolio_endpoint(
     portfolio_id: str,
     start_date: str = Query(..., description="Start date (ISO format: YYYY-MM-DD)"),
     end_date: str = Query(..., description="End date (ISO format: YYYY-MM-DD)"),
-    rebalance_frequency: str = Query("quarterly", regex="^(quarterly|monthly|weekly)$", description="Rebalance frequency"),
+    rebalance_frequency: str = Query("quarterly", pattern="^(quarterly|monthly|weekly)$", description="Rebalance frequency"),
 ) -> Dict[str, Any]:
     """Backtest portfolio strategy over historical period."""
     settings = get_settings()
@@ -3084,7 +3084,7 @@ def optimize_portfolio_cvar_constrained_endpoint(
     portfolio_id: str,
     max_cvar: float = Body(..., description="Maximum allowed CVaR (as decimal, e.g., -0.05 for -5%)"),
     confidence_level: float = Body(0.95, description="Confidence level for CVaR"),
-    objective: str = Body("sharpe", regex="^(sharpe|return|minimize_variance)$", description="Optimization objective"),
+    objective: str = Body("sharpe", pattern="^(sharpe|return|minimize_variance)$", description="Optimization objective"),
 ) -> Dict[str, Any]:
     """Optimize portfolio with CVaR constraint."""
     settings = get_settings()
@@ -3156,7 +3156,7 @@ def custom_scenario_endpoint(
 @app.post("/api/portfolio/{portfolio_id}/scenario/geopolitical", response_model=Dict[str, Any])
 def geopolitical_scenario_endpoint(
     portfolio_id: str,
-    event_type: str = Body(..., regex="^(trade_war|sanctions|conflict|pandemic)$", description="Type of geopolitical event"),
+    event_type: str = Body(..., pattern="^(trade_war|sanctions|conflict|pandemic)$", description="Type of geopolitical event"),
     severity: float = Body(0.5, ge=0.0, le=1.0, description="Severity level (0.0 to 1.0)"),
 ) -> Dict[str, Any]:
     """Run geopolitical stress test scenario."""
@@ -3307,7 +3307,7 @@ def portfolio_esg_exposure_endpoint(
 def optimize_portfolio_esg_constrained_endpoint(
     portfolio_id: str,
     min_esg_score: float = Body(6.0, ge=0.0, le=10.0, description="Minimum portfolio ESG score"),
-    objective: str = Body("sharpe", regex="^(sharpe|return|minimize_variance)$", description="Optimization objective"),
+    objective: str = Body("sharpe", pattern="^(sharpe|return|minimize_variance)$", description="Optimization objective"),
 ) -> Dict[str, Any]:
     """Optimize portfolio with ESG constraints."""
     settings = get_settings()
@@ -3342,7 +3342,7 @@ def optimize_portfolio_tax_aware_endpoint(
     tax_rate_short: float = Body(0.37, ge=0.0, le=1.0, description="Short-term capital gains tax rate"),
     tax_rate_long: float = Body(0.20, ge=0.0, le=1.0, description="Long-term capital gains tax rate"),
     harvest_losses: bool = Body(True, description="Identify tax-loss harvesting opportunities"),
-    objective: str = Body("sharpe", regex="^(sharpe|return|minimize_variance)$", description="Optimization objective"),
+    objective: str = Body("sharpe", pattern="^(sharpe|return|minimize_variance)$", description="Optimization objective"),
 ) -> Dict[str, Any]:
     """Optimize portfolio with tax considerations."""
     settings = get_settings()
@@ -3408,7 +3408,7 @@ def optimize_portfolio_tracking_error_endpoint(
     portfolio_id: str,
     benchmark_id: str = Body("sp500", description="Benchmark identifier"),
     max_tracking_error: float = Body(0.025, ge=0.0, le=0.5, description="Maximum allowed tracking error"),
-    objective: str = Body("minimize_tracking_error", regex="^(minimize_tracking_error|sharpe|return)$", description="Optimization objective"),
+    objective: str = Body("minimize_tracking_error", pattern="^(minimize_tracking_error|sharpe|return)$", description="Optimization objective"),
 ) -> Dict[str, Any]:
     """Optimize portfolio to minimize tracking error."""
     settings = get_settings()
@@ -3805,7 +3805,7 @@ def enrich_portfolio_endpoint(
 def get_sentiment_score_endpoint(
     portfolio_id: str,
     ticker: str,
-    source: str = Query("news", regex="^(news|analyst|social)$", description="Sentiment source"),
+    source: str = Query("news", pattern="^(news|analyst|social)$", description="Sentiment source"),
 ) -> Dict[str, Any]:
     """Get sentiment score for ticker."""
     try:
