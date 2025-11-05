@@ -8,9 +8,18 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-import cvxpy as cp
 import numpy as np
-import scipy.optimize as sco
+
+# Optional imports for optimization
+try:
+    import cvxpy as cp  # type: ignore
+except ImportError:
+    cp = None  # type: ignore
+
+try:
+    import scipy.optimize as sco  # type: ignore
+except ImportError:
+    sco = None  # type: ignore
 
 from . import database
 

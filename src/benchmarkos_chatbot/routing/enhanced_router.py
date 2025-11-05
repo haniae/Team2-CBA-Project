@@ -132,6 +132,10 @@ def enhance_structured_parse(
         (r"\b(?:generate|create|download)\s+(?:powerpoint|ppt|pptx)\s+(?:for|of)\s+(?:portfolio\s+)?port_[\w]+", EnhancedIntent.PORTFOLIO_EXPORT),
         (r"\b(?:generate|create|download)\s+(?:pdf|pdf\s+report)\s+(?:for|of)\s+(?:portfolio\s+)?port_[\w]+", EnhancedIntent.PORTFOLIO_EXPORT),
         (r"\b(?:generate|create|download)\s+(?:excel|xlsx)\s+(?:for|of)\s+(?:portfolio\s+)?port_[\w]+", EnhancedIntent.PORTFOLIO_EXPORT),
+        (r"\bexport\s+(?:to\s+)?(?:excel|xlsx|powerpoint|ppt|pdf|spreadsheet)", EnhancedIntent.PORTFOLIO_EXPORT),
+        (r"\b(?:create|generate)\s+(?:powerpoint|ppt)\s+(?:presentation|for)", EnhancedIntent.PORTFOLIO_EXPORT),
+        (r"\b(?:download|generate)\s+(?:portfolio\s+)?(?:report\s+as\s+)?(?:pdf|powerpoint|ppt|excel)", EnhancedIntent.PORTFOLIO_EXPORT),
+        (r"\b(?:generate|create)\s+(?:excel|xlsx)\s+(?:file|for)", EnhancedIntent.PORTFOLIO_EXPORT),
         # CVaR patterns
         (r"\b(?:calculate|compute|show|what\s+is)\s+(?:cvar|conditional\s+value\s+at\s+risk|expected\s+shortfall)", EnhancedIntent.PORTFOLIO_CVAR),
         (r"\b(?:cvar|conditional\s+value\s+at\s+risk|expected\s+shortfall)\s+(?:for|of)\s+(?:my\s+)?portfolio", EnhancedIntent.PORTFOLIO_CVAR),
@@ -427,8 +431,8 @@ def enhance_structured_parse(
     dashboard_keywords = ["dashboard", "full dashboard", "comprehensive dashboard", "detailed dashboard"]
     if any(kw in lowered for kw in dashboard_keywords):
         # Check if it's a single ticker dashboard request
-        tickers = existing_structured.get("tickers", [])
-        if len(tickers) == 1:
+        tickers = existing_structured.get("tickers", []) if existing_structured else []
+        if isinstance(tickers, list) and len(tickers) == 1:
             return EnhancedRouting(
                 intent=EnhancedIntent.DASHBOARD_EXPLICIT,
                 force_dashboard=True,

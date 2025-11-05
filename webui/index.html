@@ -5,7 +5,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <title>BenchmarkOS Copilot</title>
-<link href="/static/styles.css?v=20250202132000" rel="stylesheet"/>
+<link href="/static/styles.css?v=20241027N" rel="stylesheet"/>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
 </head>
 <body>
@@ -114,17 +114,17 @@
 <form autocomplete="off" class="chat-form" id="chat-form">
 <textarea id="chat-input" placeholder="Ask anything about tickers or metrics…" required="" rows="1"></textarea>
 <div class="chat-actions">
-<label for="chat-file-upload" class="chat-file-upload-btn" title="Upload portfolio file">
-  <input id="chat-file-upload" type="file" accept=".csv,.xlsx,.xls,.json" style="display: none;" />
+<button id="upload-button" type="button" class="chat-file-upload-btn" aria-label="Upload file" title="Upload file">
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
     <polyline points="17 8 12 3 7 8"></polyline>
     <line x1="12" y1="3" x2="12" y2="15"></line>
   </svg>
-</label>
-<button id="stop-button" type="button" aria-label="Stop chat" title="Stop" disabled style="display: inline-flex !important; visibility: visible !important; opacity: 1 !important; background: rgba(148, 163, 184, 0.4) !important; width: 40px !important; height: 40px !important; border: none !important; border-radius: 12px !important; margin: 0 !important; padding: 0 !important; z-index: 10 !important; position: relative !important; align-items: center !important; justify-content: center !important; cursor: pointer !important; transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1) !important; box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08) !important;">
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block !important; width: 16px !important; height: 16px !important;">
-    <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+  <input type="file" id="file-input" accept=".txt,.csv,.json" style="display: none;" />
+</button>
+<button id="stop-button" type="button" aria-label="Stop generation" title="Stop" disabled>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="6" y="6" width="12" height="12" rx="1"></rect>
   </svg>
 </button>
 <button id="send-button" type="submit" aria-label="Send message" title="Send">
@@ -156,141 +156,42 @@
     </section>
   </aside>
 </div>
-<script defer="" src="/static/app.js?v=20250202140000"></script>
+<script defer="" src="/static/app.js?v=20250202150000"></script>
 <script>
-// CRITICAL: Force stop button to be visible - run IMMEDIATELY
-console.log("=== INLINE SCRIPT LOADED ===");
+// Simple immediate health check - runs before app.js loads
 (function() {
-  console.log("=== STOP BUTTON SCRIPT STARTING ===");
-  
-  function ensureStopButtonExists() {
-    let btn = document.getElementById("stop-button");
-    const chatActions = document.querySelector(".chat-actions");
-    
-    console.log("Checking for stop button. Found:", !!btn);
-    console.log("Chat actions found:", !!chatActions);
-    
-    // If button doesn't exist, create it
-    if (!btn && chatActions) {
-      console.log("CREATING STOP BUTTON...");
-      btn = document.createElement("button");
-      btn.id = "stop-button";
-      btn.type = "button";
-      btn.setAttribute("aria-label", "Stop chat");
-      btn.title = "Stop";
-      btn.disabled = true;
-      
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("width", "16");
-      svg.setAttribute("height", "16");
-      svg.setAttribute("viewBox", "0 0 24 24");
-      svg.setAttribute("fill", "none");
-      svg.setAttribute("stroke", "#FFFFFF");
-      svg.setAttribute("stroke-width", "3");
-      
-      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      rect.setAttribute("x", "6");
-      rect.setAttribute("y", "6");
-      rect.setAttribute("width", "12");
-      rect.setAttribute("height", "12");
-      rect.setAttribute("rx", "2");
-      svg.appendChild(rect);
-      btn.appendChild(svg);
-      
-      // Insert before send button
-      const sendBtn = document.getElementById("send-button");
-      if (sendBtn && sendBtn.parentNode) {
-        sendBtn.parentNode.insertBefore(btn, sendBtn);
-        console.log("Stop button inserted before send button");
-      } else if (chatActions) {
-        chatActions.appendChild(btn);
-        console.log("Stop button appended to chat-actions");
-      }
+  console.log("Quick health check starting...");
+  fetch('/health?ts=' + Date.now(), {
+    method: 'GET',
+    headers: { 'Accept': 'application/json' },
+    cache: 'no-store'
+  })
+  .then(res => {
+    if (res.ok) {
+      return res.json();
     }
-    
-      // Force visibility with maximum priority - match theme colors
-      if (btn) {
-        btn.style.cssText = "display: inline-flex !important; visibility: visible !important; opacity: 1 !important; background: rgba(148, 163, 184, 0.4) !important; width: 40px !important; height: 40px !important; min-width: 40px !important; min-height: 40px !important; border: none !important; border-radius: 12px !important; margin: 0 !important; padding: 0 !important; z-index: 10 !important; position: relative !important; align-items: center !important; justify-content: center !important; cursor: pointer !important; transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1) !important; box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08) !important;";
-      
-      // Ensure SVG is visible
-      const svgEl = btn.querySelector("svg");
-      if (svgEl) {
-        svgEl.style.cssText = "display: block !important; width: 16px !important; height: 16px !important;";
-      }
-      
-      // Attach handler
-      if (!btn.hasAttribute("data-handler-attached")) {
-        btn.setAttribute("data-handler-attached", "true");
-        btn.addEventListener("click", function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log("STOP BUTTON CLICKED");
-          
-          if (btn.disabled || !window.isSending) {
-            return;
-          }
-          
-          // Abort request
-          if (window.chatAbortController) {
-            window.chatAbortController.abort();
-            window.chatAbortController = null;
-          }
-          
-          // Remove typing messages
-          const chatLog = document.getElementById("chat-log");
-          if (chatLog) {
-            chatLog.querySelectorAll(".message.typing").forEach((msg) => msg.remove());
-            chatLog.querySelectorAll(".message-stream").forEach((stream) => {
-              const wrapper = stream.closest(".message");
-              if (wrapper && wrapper.classList.contains("typing")) wrapper.remove();
-            });
-          }
-          
-          // Reset UI
-          window.isSending = false;
-          const sendBtn = document.getElementById("send-button");
-          if (sendBtn) sendBtn.disabled = false;
-          const chatInput = document.getElementById("chat-input");
-          if (chatInput) {
-            chatInput.value = "";
-            chatInput.focus();
-            chatInput.disabled = false;
-          }
-          btn.disabled = true;
-          // Update color to disabled state
-          btn.style.background = "rgba(148, 163, 184, 0.4)";
-          btn.style.boxShadow = "0 2px 4px rgba(15, 23, 42, 0.08)";
-          console.log("Chat stopped");
-        });
-        console.log("Handler attached");
-      }
-      
-      console.log("Stop button is now visible:", btn);
-      console.log("Button computed styles:", window.getComputedStyle(btn).display);
-      return btn;
-    } else {
-      console.error("FAILED: Could not create or find stop button!");
-      return null;
+    throw new Error('HTTP ' + res.status);
+  })
+  .then(data => {
+    console.log("Quick health check successful:", data);
+    const statusMsg = document.getElementById("status-message");
+    const statusDot = document.getElementById("api-status");
+    if (statusMsg) statusMsg.textContent = "API online";
+    if (statusDot) {
+      statusDot.classList.remove("offline");
+      statusDot.classList.add("online");
     }
-  }
-  
-  // Run immediately
-  ensureStopButtonExists();
-  
-  // Run on DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', ensureStopButtonExists);
-  } else {
-    setTimeout(ensureStopButtonExists, 0);
-  }
-  
-  // Run multiple times to ensure it works
-  setTimeout(ensureStopButtonExists, 100);
-  setTimeout(ensureStopButtonExists, 500);
-  setTimeout(ensureStopButtonExists, 1000);
-  setTimeout(ensureStopButtonExists, 2000);
-  
-  console.log("=== STOP BUTTON SCRIPT COMPLETE ===");
+  })
+  .catch(err => {
+    console.error("Quick health check failed:", err);
+    const statusMsg = document.getElementById("status-message");
+    const statusDot = document.getElementById("api-status");
+    if (statusMsg) statusMsg.textContent = "Checking API...";
+    if (statusDot) {
+      statusDot.classList.remove("online");
+      statusDot.classList.add("offline");
+    }
+  });
 })();
 </script>
 </body>

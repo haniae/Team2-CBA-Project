@@ -5,10 +5,13 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING
 
 from . import database
 from .analytics_engine import METRIC_LABELS, MULTIPLE_METRICS, PERCENTAGE_METRICS
+
+if TYPE_CHECKING:
+    from .analytics_engine import AnalyticsEngine
 
 DASHBOARD_KPI_ORDER: Tuple[str, ...] = (
     # Growth Metrics

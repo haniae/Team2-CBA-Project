@@ -6,9 +6,22 @@ from datetime import datetime
 from io import BytesIO
 from typing import Any, Dict, List, Optional
 
-from fpdf import FPDF
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
+# Optional imports for export functionality
+try:
+    from fpdf import FPDF  # type: ignore
+except ImportError:
+    FPDF = None  # type: ignore
+
+try:
+    from openpyxl import Workbook  # type: ignore
+    from openpyxl.styles import Alignment, Font, PatternFill, Border, Side  # type: ignore
+except ImportError:
+    Workbook = None  # type: ignore
+    Alignment = None  # type: ignore
+    Font = None  # type: ignore
+    PatternFill = None  # type: ignore
+    Border = None  # type: ignore
+    Side = None  # type: ignore
 
 
 def _format_currency(value: Any) -> str:

@@ -55,7 +55,9 @@
       root = document.createElement("div");
       root.id = "cfix-root";
       root.className = "cfix-grid";
-      (scope || document.body).appendChild(root);
+      // If scope is document, append to document.body instead
+      const container = (scope instanceof HTMLElement) ? scope : document.body;
+      container.appendChild(root);
     }
     return root;
   }

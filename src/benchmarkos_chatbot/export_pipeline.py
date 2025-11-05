@@ -5,19 +5,53 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple, TYPE_CHECKING
 
-from fpdf import FPDF
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font
-from pptx import Presentation
-from pptx.chart.data import ChartData
-from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
-from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
-from pptx.util import Inches, Pt
+if TYPE_CHECKING:
+    from .analytics_engine import AnalyticsEngine
+
+# Optional imports for export functionality
+try:
+    from fpdf import FPDF  # type: ignore
+except ImportError:
+    FPDF = None  # type: ignore
+
+try:
+    from openpyxl import Workbook  # type: ignore
+    from openpyxl.styles import Alignment, Font, PatternFill  # type: ignore
+except ImportError:
+    Workbook = None  # type: ignore
+    Alignment = None  # type: ignore
+    Font = None  # type: ignore
+    PatternFill = None  # type: ignore
+
+try:
+    from pptx import Presentation  # type: ignore
+    from pptx.chart.data import ChartData  # type: ignore
+    from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION  # type: ignore
+    from pptx.dml.color import RGBColor  # type: ignore
+    from pptx.enum.text import PP_ALIGN, MSO_ANCHOR  # type: ignore
+    from pptx.util import Inches, Pt  # type: ignore
+except ImportError:
+    Presentation = None  # type: ignore
+    ChartData = None  # type: ignore
+    XL_CHART_TYPE = None  # type: ignore
+    XL_LEGEND_POSITION = None  # type: ignore
+    RGBColor = None  # type: ignore
+    PP_ALIGN = None  # type: ignore
+    MSO_ANCHOR = None  # type: ignore
+    Inches = None  # type: ignore
+    Pt = None  # type: ignore
+
 from .dashboard_utils import build_cfi_dashboard_payload
 from .cfi_ppt_builder import build_cfi_ppt
+
+# Color constants for PDF/PPT generation (RGB tuples)
+COLOR_PRIMARY = (59, 130, 246)  # Blue
+COLOR_SECONDARY = (100, 116, 139)  # Gray
+COLOR_ACCENT = (245, 158, 11)  # Amber
+COLOR_TEXT = (15, 23, 42)  # Dark slate
+COLOR_LIGHT_GRAY = (241, 245, 249)  # Light gray
 
 
 @dataclass(frozen=True)
@@ -60,7 +94,6 @@ def _format_currency(value: Any) -> str:
         return "N/A"
     
     magnitude = abs(number)
-    prefix = "$" if is_currency else ""
     
     if magnitude >= 1_000_000_000:
         return f"${number / 1_000_000_000:.1f}B"
@@ -1485,7 +1518,7 @@ def _build_excel(payload: Dict[str, Any]) -> bytes:
     return buffer.getvalue()
 
 
-def build_export_payload(engine: "AnalyticsEngine", ticker: str) -> Dict[str, Any]:
+def build_export_payload(engine: "AnalyticsEngine", ticker: str) -> Dict[str, Any]:  # type: ignore
     payload = build_cfi_dashboard_payload(engine, ticker)
     if not payload:
         raise ValueError(f"No dashboard payload available for {ticker}.")
@@ -1617,9 +1650,10 @@ def _get_company_name_safe(engine: AnalyticsEngine, ticker: str) -> str:
 # COMPARATIVE SUMMARY GENERATORS
 # ============================================================================
 
-def _build_comparative_summary_pdf(engine: AnalyticsEngine, tickers: List[str]) -> bytes:
+def _build_comparative_summary_pdf(engine: AnalyticsEngine, tickers: List[str]) -> bytes:  # type: ignore
     """Build a PDF comparative summary for multiple companies."""
-    from fpdf import FPDF
+    if FPDF is None:
+        raise ImportError("fpdf is required for PDF export. Install it with: pip install fpdf2")
     from datetime import datetime
     
     pdf = FPDF()
@@ -1782,10 +1816,10 @@ def _build_comparative_summary_pdf(engine: AnalyticsEngine, tickers: List[str]) 
     return pdf_output
 
 
-def _build_comparative_summary_pptx(engine: AnalyticsEngine, tickers: List[str]) -> bytes:
+def _build_comparative_summary_pptx(engine: AnalyticsEngine, tickers: List[str]) -> bytes:  # type: ignore
     """Build a PowerPoint comparative summary for multiple companies."""
-    from pptx import Presentation
-    from pptx.util import Inches, Pt
+    if Presentation is None or Inches is None or Pt is None:
+        raise ImportError("python-pptx is required for PowerPoint export. Install it with: pip install python-pptx")
     from datetime import datetime
     import io
     
@@ -1893,10 +1927,10 @@ def _build_comparative_summary_pptx(engine: AnalyticsEngine, tickers: List[str])
     return output.getvalue()
 
 
-def _build_comparative_summary_xlsx(engine: AnalyticsEngine, tickers: List[str]) -> bytes:
+def _build_comparative_summary_xlsx(engine: AnalyticsEngine, tickers: List[str]) -> bytes:  # type: ignore
     """Build an Excel comparative summary for multiple companies."""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment
+    if Workbook is None or Font is None:
+        raise ImportError("openpyxl is required for Excel export. Install it with: pip install openpyxl")
     import io
     
     wb = Workbook()
@@ -1904,6 +1938,8 @@ def _build_comparative_summary_xlsx(engine: AnalyticsEngine, tickers: List[str])
     ws.title = "Summary"
     
     # Header styling
+    if PatternFill is None:
+        raise ImportError("openpyxl is required for Excel export. Install it with: pip install openpyxl")
     header_fill = PatternFill(start_color="3A4AB5", end_color="3A4AB5", fill_type="solid")
     header_font = Font(color="FFFFFF", bold=True)
     

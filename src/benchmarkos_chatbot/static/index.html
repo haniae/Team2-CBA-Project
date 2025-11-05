@@ -144,5 +144,42 @@
   </aside>
 </div>
 <script defer="" src="/static/app.js?v=20250202150000"></script>
+<script>
+// Simple immediate health check - runs before app.js loads
+(function() {
+  console.log("Quick health check starting...");
+  fetch('/health?ts=' + Date.now(), {
+    method: 'GET',
+    headers: { 'Accept': 'application/json' },
+    cache: 'no-store'
+  })
+  .then(res => {
+    if (res.ok) {
+      return res.json();
+    }
+    throw new Error('HTTP ' + res.status);
+  })
+  .then(data => {
+    console.log("Quick health check successful:", data);
+    const statusMsg = document.getElementById("status-message");
+    const statusDot = document.getElementById("api-status");
+    if (statusMsg) statusMsg.textContent = "API online";
+    if (statusDot) {
+      statusDot.classList.remove("offline");
+      statusDot.classList.add("online");
+    }
+  })
+  .catch(err => {
+    console.error("Quick health check failed:", err);
+    const statusMsg = document.getElementById("status-message");
+    const statusDot = document.getElementById("api-status");
+    if (statusMsg) statusMsg.textContent = "Checking API...";
+    if (statusDot) {
+      statusDot.classList.remove("online");
+      statusDot.classList.add("offline");
+    }
+  });
+})();
+</script>
 </body>
 </html>

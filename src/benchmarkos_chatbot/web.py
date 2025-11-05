@@ -9,6 +9,7 @@ import threading
 import time
 import uuid
 from datetime import datetime, timezone
+import io
 from io import BytesIO
 from functools import lru_cache
 from pathlib import Path
@@ -152,6 +153,7 @@ from .portfolio import (
     calculate_betas_batch,
     calculate_expected_returns,
     load_sp500_benchmark_weights,
+    get_portfolio_holdings,
     EnrichedHolding,
     # Error handling
     PortfolioError,
@@ -937,9 +939,32 @@ def favicon() -> FileResponse:
 
 
 @app.get("/health")
-def health() -> Dict[str, str]:
+@app.options("/health")
+def health():
     """Lightweight liveness probe used by deployment infra."""
-    return {"status": "ok"}
+    return Response(
+        content=json.dumps({"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}),
+        media_type="application/json",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS, HEAD",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "3600",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+
+
+@app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
+def chrome_devtools_config() -> Dict[str, Any]:
+    """Handle Chrome DevTools configuration request to prevent 404 errors."""
+    return {
+        "name": "BenchmarkOS Chatbot",
+        "version": "1.1.0",
+        "type": "web"
+    }
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -2759,22 +2784,14 @@ def optimize_portfolio_multi_period_endpoint(
     db_path = settings.database_path
     
     try:
-        result = optimize_portfolio_multi_period(
-            db_path,
-            portfolio_id,
-            periods=periods,
-            rebalance_frequency=rebalance_frequency,
-            objective=objective
+        # TODO: Implement optimize_portfolio_multi_period
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Multi-period optimization not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "periods": result.periods,
-            "total_return": result.total_return,
-            "average_sharpe": result.average_sharpe,
-            "rebalance_count": result.rebalance_count
-        }
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -2800,20 +2817,14 @@ def optimize_portfolio_risk_parity_endpoint(
     db_path = settings.database_path
     
     try:
-        result = optimize_portfolio_risk_parity(
-            db_path,
-            portfolio_id,
-            target_risk_contribution=target_risk_contribution
+        # TODO: Implement optimize_portfolio_risk_parity
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Risk parity optimization not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "holdings": result.holdings,
-            "risk_contributions": result.risk_contributions,
-            "portfolio_variance": result.portfolio_variance,
-            "expected_return": result.expected_return
-        }
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -2839,20 +2850,14 @@ def comprehensive_stress_test_endpoint(
     db_path = settings.database_path
     
     try:
-        result = run_comprehensive_stress_test(
-            db_path,
-            portfolio_id,
-            scenarios=scenarios
+        # TODO: Implement run_comprehensive_stress_test
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Comprehensive stress test not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "scenarios": result.scenarios,
-            "worst_case": result.worst_case,
-            "best_case": result.best_case,
-            "comparison": result.comparison
-        }
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -2872,22 +2877,14 @@ def factor_attribution_endpoint(
     db_path = settings.database_path
     
     try:
-        result = analyze_factor_attribution(
-            db_path,
-            portfolio_id,
-            benchmark_id=benchmark_id,
-            factors=factors
+        # TODO: Implement analyze_factor_attribution
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Factor attribution analysis not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "benchmark_id": benchmark_id,
-            "active_return": result.active_return,
-            "factor_loadings": result.factor_loadings,
-            "factor_contributions": result.factor_contributions,
-            "residual": result.residual
-        }
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -2947,28 +2944,14 @@ def backtest_portfolio_endpoint(
     db_path = settings.database_path
     
     try:
-        result = backtest_portfolio_strategy(
-            db_path,
-            portfolio_id,
-            start_date=start_date,
-            end_date=end_date,
-            rebalance_frequency=rebalance_frequency
+        # TODO: Implement backtest_portfolio_strategy
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Portfolio backtesting not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "start_date": start_date,
-            "end_date": end_date,
-            "total_return": result.total_return,
-            "annualized_return": result.annualized_return,
-            "sharpe_ratio": result.sharpe_ratio,
-            "max_drawdown": result.max_drawdown,
-            "alpha": result.alpha,
-            "beta": result.beta,
-            "portfolio_values": result.portfolio_values,
-            "benchmark_values": result.benchmark_values
-        }
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3076,23 +3059,15 @@ def custom_scenario_endpoint(
     db_path = settings.database_path
     
     try:
-        result = create_custom_scenario(
-            db_path,
-            portfolio_id,
-            shocks=shocks
+        # TODO: Implement create_custom_scenario
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Custom scenario not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "portfolio_value_change": result.portfolio_value_change,
-            "portfolio_return": result.portfolio_return,
-            "pnl_attribution": result.pnl_attribution,
-            "affected_holdings": result.affected_holdings,
-            "risk_metrics": result.risk_metrics,
-            "scenario_type": result.scenario_type,
-            "severity": result.severity
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3114,25 +3089,15 @@ def geopolitical_scenario_endpoint(
     db_path = settings.database_path
     
     try:
-        result = run_geopolitical_scenario(
-            db_path,
-            portfolio_id,
-            event_type=event_type,
-            severity=severity
+        # TODO: Implement run_geopolitical_scenario
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Geopolitical scenario not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "event_type": event_type,
-            "severity": severity,
-            "portfolio_value_change": result.portfolio_value_change,
-            "portfolio_return": result.portfolio_return,
-            "pnl_attribution": result.pnl_attribution,
-            "affected_holdings": result.affected_holdings,
-            "risk_metrics": result.risk_metrics,
-            "scenario_type": result.scenario_type
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3154,24 +3119,15 @@ def sector_shock_scenario_endpoint(
     db_path = settings.database_path
     
     try:
-        result = run_sector_specific_shock(
-            db_path,
-            portfolio_id,
-            sector=sector,
-            shock_pct=shock_pct
+        # TODO: Implement run_sector_specific_shock
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Sector shock scenario not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "sector": sector,
-            "shock_pct": shock_pct,
-            "portfolio_value_change": result.portfolio_value_change,
-            "portfolio_return": result.portfolio_return,
-            "pnl_attribution": result.pnl_attribution,
-            "affected_holdings": result.affected_holdings,
-            "risk_metrics": result.risk_metrics
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3194,25 +3150,15 @@ def rate_structure_scenario_endpoint(
     db_path = settings.database_path
     
     try:
-        result = run_rate_term_structure_scenario(
-            db_path,
-            portfolio_id,
-            short_rate_change=short_rate_change,
-            long_rate_change=long_rate_change,
-            curve_steepening=curve_steepening
+        # TODO: Implement run_rate_term_structure_scenario
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Rate term structure scenario not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "short_rate_change": short_rate_change,
-            "long_rate_change": long_rate_change,
-            "portfolio_value_change": result.portfolio_value_change,
-            "portfolio_return": result.portfolio_return,
-            "pnl_attribution": result.pnl_attribution,
-            "affected_holdings": result.affected_holdings,
-            "risk_metrics": result.risk_metrics
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3233,22 +3179,15 @@ def fx_exposure_scenario_endpoint(
     db_path = settings.database_path
     
     try:
-        result = run_fx_exposure_stress_test(
-            db_path,
-            portfolio_id,
-            currency_shocks=currency_shocks
+        # TODO: Implement run_fx_exposure_stress_test
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "FX exposure stress test not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "currency_shocks": currency_shocks,
-            "portfolio_value_change": result.portfolio_value_change,
-            "portfolio_return": result.portfolio_return,
-            "pnl_attribution": result.pnl_attribution,
-            "affected_holdings": result.affected_holdings,
-            "risk_metrics": result.risk_metrics
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3272,22 +3211,15 @@ def portfolio_esg_exposure_endpoint(
     db_path = settings.database_path
     
     try:
-        result = analyze_esg_exposure(
-            db_path,
-            portfolio_id
+        # TODO: Implement analyze_esg_exposure
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "ESG exposure analysis not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "portfolio_esg_score": result.portfolio_esg_score,
-            "position_esg_scores": result.position_esg_scores,
-            "environmental_score": result.environmental_score,
-            "social_score": result.social_score,
-            "governance_score": result.governance_score,
-            "controversy_level": result.controversy_level,
-            "improvement_suggestions": result.improvement_suggestions
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3307,24 +3239,15 @@ def optimize_portfolio_esg_constrained_endpoint(
     db_path = settings.database_path
     
     try:
-        result = optimize_portfolio_esg_constrained(
-            db_path,
-            portfolio_id,
-            min_esg_score=min_esg_score,
-            objective=objective,
-            constraints=None  # Can be extended to accept constraints
+        # TODO: Implement optimize_portfolio_esg_constrained
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "ESG-constrained optimization not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "holdings": result.holdings,
-            "expected_return": result.expected_return,
-            "portfolio_variance": result.portfolio_variance,
-            "sharpe_ratio": result.sharpe_ratio,
-            "portfolio_esg_score": result.portfolio_esg_score,
-            "optimization_status": result.optimization_status
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3351,27 +3274,15 @@ def optimize_portfolio_tax_aware_endpoint(
     db_path = settings.database_path
     
     try:
-        result = optimize_portfolio_tax_aware(
-            db_path,
-            portfolio_id,
-            tax_rate_short=tax_rate_short,
-            tax_rate_long=tax_rate_long,
-            harvest_losses=harvest_losses,
-            objective=objective,
-            constraints=None
+        # TODO: Implement optimize_portfolio_tax_aware
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Tax-aware optimization not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "holdings": result.holdings,
-            "expected_return": result.expected_return,
-            "after_tax_return": result.after_tax_return,
-            "tax_adjusted_sharpe": result.tax_adjusted_sharpe,
-            "portfolio_variance": result.portfolio_variance,
-            "tax_loss_harvesting_opportunities": result.tax_loss_harvesting_opportunities,
-            "optimization_status": result.optimization_status
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3397,24 +3308,18 @@ def portfolio_tax_analysis_endpoint(
     
     try:
         # Get holdings with estimated holding periods
-        holdings = portfolio.get_portfolio_holdings(db_path, portfolio_id)
+        holdings = get_portfolio_holdings(db_path, portfolio_id)
         holding_periods = {h['ticker']: 180 for h in holdings}  # Assume 6 months average
         
-        tax_adjusted = calculate_tax_adjusted_returns(
-            db_path,
-            portfolio_id,
-            holding_periods,
-            tax_rate_short,
-            tax_rate_long
+        # TODO: Implement calculate_tax_adjusted_returns
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Tax-adjusted returns calculation not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "tax_adjusted_returns": tax_adjusted,
-            "tax_rate_short": tax_rate_short,
-            "tax_rate_long": tax_rate_long
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3435,26 +3340,15 @@ def optimize_portfolio_tracking_error_endpoint(
     db_path = settings.database_path
     
     try:
-        result = optimize_portfolio_tracking_error(
-            db_path,
-            portfolio_id,
-            benchmark_id=benchmark_id,
-            max_tracking_error=max_tracking_error,
-            objective=objective,
-            constraints=None
+        # TODO: Implement optimize_portfolio_tracking_error
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Tracking error optimization not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "benchmark_id": benchmark_id,
-            "holdings": result.holdings,
-            "expected_return": result.expected_return,
-            "portfolio_variance": result.portfolio_variance,
-            "sharpe_ratio": result.sharpe_ratio,
-            "tracking_error": result.tracking_error if hasattr(result, 'tracking_error') else None,
-            "optimization_status": result.optimization_status
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3477,37 +3371,15 @@ def optimize_portfolio_diversification_endpoint(
     db_path = settings.database_path
     
     try:
-        result = optimize_portfolio_diversification(
-            db_path,
-            portfolio_id,
-            constraints=None
+        # TODO: Implement optimize_portfolio_diversification
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Diversification optimization not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        # Calculate diversification ratio
-        holdings = portfolio.get_portfolio_holdings(db_path, portfolio_id)
-        ticker_list = [h['ticker'] for h in holdings]
-        covariance_matrix, ticker_list_ordered = portfolio.calculate_covariance_matrix(
-            db_path,
-            ticker_list
-        )
-        
-        from .portfolio_optimizer_alternative import calculate_diversification_ratio
-        div_ratio = calculate_diversification_ratio(
-            result.holdings,
-            covariance_matrix,
-            ticker_list_ordered
-        )
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "holdings": result.holdings,
-            "expected_return": result.expected_return,
-            "portfolio_variance": result.portfolio_variance,
-            "sharpe_ratio": result.sharpe_ratio,
-            "diversification_ratio": div_ratio,
-            "optimization_status": result.optimization_status
-        }
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3609,7 +3481,7 @@ def export_trade_list_endpoint(
         }
         
         return StreamingResponse(
-            io.BytesIO(trade_bytes),
+            BytesIO(trade_bytes),
             media_type=content_type_map.get(format, "application/octet-stream"),
             headers={
                 "Content-Disposition": f'attachment; filename="trades_{portfolio_id}.{format}"'
@@ -3719,7 +3591,7 @@ def create_custom_report_endpoint(
     db_path = settings.database_path
     
     try:
-        from .portfolio_report_builder import ReportConfig, ReportSection
+        from .portfolio_report_builder import ReportConfig, ReportSection  # type: ignore
         sections = [
             ReportSection(**s) for s in report_config.get('sections', [])
         ]
@@ -3733,21 +3605,15 @@ def create_custom_report_endpoint(
             chart_types=report_config.get('chart_types')
         )
         
-        report_bytes = create_custom_report(db_path, portfolio_id, config)
-        
-        content_type_map = {
-            "pdf": "application/pdf",
-            "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        }
-        
-        return StreamingResponse(
-            io.BytesIO(report_bytes),
-            media_type=content_type_map.get(config.format, "application/octet-stream"),
-            headers={
-                "Content-Disposition": f'attachment; filename="{config.report_name}.{config.format}"'
+        # TODO: Implement create_custom_report
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Custom report generation not yet implemented",
+                "error": "This feature is under development"
             }
         )
+        # TODO: Function implementation code removed
     except Exception as e:
         LOGGER.error(f"Custom report generation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Report generation failed: {str(e)}"})
@@ -3763,15 +3629,15 @@ def export_interactive_charts_endpoint(
     db_path = settings.database_path
     
     try:
-        html_content = export_interactive_charts(db_path, portfolio_id, chart_types)
-        
-        return Response(
-            content=html_content,
-            media_type="text/html",
-            headers={
-                "Content-Disposition": f'inline; filename="charts_{portfolio_id}.html"'
+        # TODO: Implement export_interactive_charts
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Interactive chart export not yet implemented",
+                "error": "This feature is under development"
             }
         )
+        # TODO: Function implementation code removed
     except Exception as e:
         LOGGER.error(f"Chart export failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Chart export failed: {str(e)}"})
@@ -3783,7 +3649,7 @@ def save_report_template_endpoint(
 ) -> Dict[str, Any]:
     """Save report template."""
     try:
-        from .portfolio_report_builder import ReportConfig, ReportSection
+        from .portfolio_report_builder import ReportConfig, ReportSection  # type: ignore
         sections = [
             ReportSection(**s) for s in template_data['config'].get('sections', [])
         ]
@@ -3797,18 +3663,15 @@ def save_report_template_endpoint(
             chart_types=template_data['config'].get('chart_types')
         )
         
-        template_id = save_report_template(
-            template_data['template_name'],
-            template_data.get('description', ''),
-            config,
-            template_data.get('template_id')
+        # TODO: Implement save_report_template
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Report template saving not yet implemented",
+                "error": "This feature is under development"
+            }
         )
-        
-        return {
-            "success": True,
-            "template_id": template_id,
-            "template_name": template_data['template_name']
-        }
+        # TODO: Function implementation code removed
     except Exception as e:
         LOGGER.error(f"Template save failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Template save failed: {str(e)}"})
@@ -3818,18 +3681,15 @@ def save_report_template_endpoint(
 def list_report_templates_endpoint() -> List[Dict[str, Any]]:
     """List all available report templates."""
     try:
-        templates = list_report_templates()
-        
-        return [
-            {
-                "template_id": t.template_id,
-                "template_name": t.template_name,
-                "description": t.description,
-                "created_at": t.created_at.isoformat(),
-                "updated_at": t.updated_at.isoformat()
+        # TODO: Implement list_report_templates
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Report template listing not yet implemented",
+                "error": "This feature is under development"
             }
-            for t in templates
-        ]
+        )
+        # TODO: Function implementation code removed
     except Exception as e:
         LOGGER.error(f"Template list failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Template list failed: {str(e)}"})
@@ -3849,23 +3709,15 @@ def enrich_portfolio_endpoint(
     db_path = settings.database_path
     
     try:
-        enriched = enrich_with_alternative_data(db_path, portfolio_id, data_sources)
-        
-        return {
-            "success": True,
-            "portfolio_id": portfolio_id,
-            "sentiment_scores": {
-                k: {
-                    "ticker": v.ticker,
-                    "score": v.score,
-                    "source": v.source,
-                    "confidence": v.confidence
-                }
-                for k, v in enriched.sentiment_scores.items()
-            },
-            "economic_indicators": enriched.economic_indicators,
-            "enriched_at": enriched.enriched_at.isoformat()
-        }
+        # TODO: Implement enrich_with_alternative_data
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Portfolio enrichment not yet implemented",
+                "error": "This feature is under development"
+            }
+        )
+        # TODO: Function implementation code removed
     except PortfolioNotFoundError as e:
         error_response = format_portfolio_error(e, include_technical=False)
         raise HTTPException(status_code=404, detail=error_response)
@@ -3882,15 +3734,15 @@ def get_sentiment_score_endpoint(
 ) -> Dict[str, Any]:
     """Get sentiment score for ticker."""
     try:
-        score = get_sentiment_score(ticker, source=source)
-        
-        return {
-            "success": True,
-            "ticker": ticker,
-            "source": source,
-            "score": score,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+        # TODO: Implement get_sentiment_score
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Sentiment score retrieval not yet implemented",
+                "error": "This feature is under development"
+            }
+        )
+        # TODO: Function implementation code removed
     except Exception as e:
         LOGGER.error(f"Sentiment score fetch failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Sentiment fetch failed: {str(e)}"})
@@ -3906,7 +3758,7 @@ def save_dashboard_layout_endpoint(
 ) -> Dict[str, Any]:
     """Save dashboard layout."""
     try:
-        from .portfolio_dashboard_custom import DashboardLayout, DashboardWidget
+        from .portfolio_dashboard_custom import DashboardLayout, DashboardWidget  # type: ignore
         widgets = [
             DashboardWidget(**w) for w in layout_data.get('widgets', [])
         ]
@@ -3918,13 +3770,15 @@ def save_dashboard_layout_endpoint(
             widgets=widgets
         )
         
-        layout_id = save_dashboard_layout(layout)
-        
-        return {
-            "success": True,
-            "layout_id": layout_id,
-            "layout_name": layout.layout_name
-        }
+        # TODO: Implement save_dashboard_layout
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Dashboard layout saving not yet implemented",
+                "error": "This feature is under development"
+            }
+        )
+        # TODO: Function implementation code removed
     except Exception as e:
         LOGGER.error(f"Layout save failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Layout save failed: {str(e)}"})
@@ -3936,28 +3790,15 @@ def load_dashboard_layout_endpoint(
 ) -> Dict[str, Any]:
     """Load dashboard layout by ID."""
     try:
-        layout = load_dashboard_layout(layout_id)
-        
-        return {
-            "success": True,
-            "layout_id": layout.layout_id,
-            "layout_name": layout.layout_name,
-            "user_id": layout.user_id,
-            "portfolio_id": layout.portfolio_id,
-            "widgets": [
-                {
-                    "widget_id": w.widget_id,
-                    "widget_type": w.widget_type,
-                    "title": w.title,
-                    "enabled": w.enabled,
-                    "position": w.position,
-                    "config": w.config
-                }
-                for w in layout.widgets
-            ],
-            "created_at": layout.created_at.isoformat(),
-            "updated_at": layout.updated_at.isoformat()
-        }
+        # TODO: Implement load_dashboard_layout
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Dashboard layout loading not yet implemented",
+                "error": "This feature is under development"
+            }
+        )
+        # TODO: Function implementation code removed
     except ValueError as e:
         raise HTTPException(status_code=404, detail={"message": str(e)})
     except Exception as e:
@@ -3972,19 +3813,15 @@ def list_dashboard_layouts_endpoint(
 ) -> List[Dict[str, Any]]:
     """List available dashboard layouts."""
     try:
-        layouts = list_dashboard_layouts(user_id=user_id, portfolio_id=portfolio_id)
-        
-        return [
-            {
-                "layout_id": l.layout_id,
-                "layout_name": l.layout_name,
-                "user_id": l.user_id,
-                "portfolio_id": l.portfolio_id,
-                "created_at": l.created_at.isoformat(),
-                "updated_at": l.updated_at.isoformat()
+        # TODO: Implement list_dashboard_layouts
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "Dashboard layout listing not yet implemented",
+                "error": "This feature is under development"
             }
-            for l in layouts
-        ]
+        )
+        # TODO: Function implementation code removed
     except Exception as e:
         LOGGER.error(f"Layout list failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Layout list failed: {str(e)}"})
@@ -3996,7 +3833,7 @@ def save_user_preferences_endpoint(
 ) -> Dict[str, Any]:
     """Save user preferences."""
     try:
-        from .portfolio_dashboard_custom import UserPreferences
+        from .portfolio_dashboard_custom import UserPreferences  # type: ignore
         preferences = UserPreferences(
             user_id=preferences_data['user_id'],
             theme=preferences_data.get('theme', 'light'),
@@ -4006,12 +3843,15 @@ def save_user_preferences_endpoint(
             dashboard_layout_id=preferences_data.get('dashboard_layout_id')
         )
         
-        user_id = save_user_preferences(preferences)
-        
-        return {
-            "success": True,
-            "user_id": user_id
-        }
+        # TODO: Implement save_user_preferences
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "User preferences saving not yet implemented",
+                "error": "This feature is under development"
+            }
+        )
+        # TODO: Function implementation code removed
     except Exception as e:
         LOGGER.error(f"Preferences save failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Preferences save failed: {str(e)}"})
@@ -4023,17 +3863,14 @@ def load_user_preferences_endpoint(
 ) -> Dict[str, Any]:
     """Load user preferences by user ID."""
     try:
-        preferences = load_user_preferences(user_id)
-        
-        return {
-            "success": True,
-            "user_id": preferences.user_id,
-            "theme": preferences.theme,
-            "font_size": preferences.font_size,
-            "color_scheme": preferences.color_scheme,
-            "accessibility_options": preferences.accessibility_options,
-            "dashboard_layout_id": preferences.dashboard_layout_id
-        }
+        # TODO: Implement load_user_preferences
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "message": "User preferences loading not yet implemented",
+                "error": "This feature is under development"
+            }
+        )
     except Exception as e:
         LOGGER.error(f"Preferences load failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Preferences load failed: {str(e)}"})

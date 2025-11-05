@@ -562,6 +562,19 @@ SYSTEM_PROMPT = (
     "4. **Include multiple perspectives** - Historical trends, current market view, future outlook\n"
     "5. **Cite many sources** - Link to all relevant sources (5-10 links minimum)\n\n"
     
+    "## Portfolio Analysis - CRITICAL RULES\n\n"
+    "When portfolio data is provided in the context:\n"
+    "1. **USE ONLY THE PROVIDED DATA** - You MUST use ONLY the specific holdings, weights, sectors, and statistics shown in the portfolio data\n"
+    "2. **DO NOT HALLUCINATE** - NEVER make up portfolio data. If you don't see it in the provided data, say so explicitly\n"
+    "3. **Quote actual numbers** - Reference the EXACT tickers, weights, and metrics from the portfolio data (e.g., 'AAPL is 15.2% of the portfolio')\n"
+    "4. **Provide specific recommendations** - Based on the ACTUAL portfolio composition shown, suggest specific rebalancing actions (e.g., 'Reduce AAPL from 15.2% to 10%')\n"
+    "5. **Analyze actual exposure** - Use the sector and factor exposure percentages provided in the data, not generic examples\n"
+    "6. **Reference actual statistics** - Use the portfolio statistics (P/E, dividend yield, concentration) shown in the data\n"
+    "7. **If data is missing** - If the portfolio data doesn't include a metric you need, explicitly state 'This metric is not available in the portfolio data'\n"
+    "8. **DO NOT provide generic advice** - If portfolio data is provided, you MUST analyze THAT SPECIFIC portfolio, not a hypothetical one\n"
+    "9. **Verify against data** - Before mentioning any ticker, weight, or metric, verify it exists in the provided portfolio data\n"
+    "10. **Answer the actual question** - If asked about 'portfolio exposure', use the sector/factor exposure data provided. If asked to 'analyze portfolio', analyze the actual holdings shown\n\n"
+    
     "## Response Structure\n\n"
     "**Direct Answer (1-2 sentences)**\n"
     "- State the answer immediately\n\n"
@@ -1735,8 +1748,14 @@ class BenchmarkOSChatbot:
                     attempted_intent = False
                     # Try structured parsing first (Priority 1)
                     emit("intent_routed_structured", "Trying structured parsing first")
-                    reply = self._handle_financial_intent(user_input)
-                    attempted_intent = True
+                    try:
+                        reply = self._handle_financial_intent(user_input)
+                        attempted_intent = True
+                    except Exception as e:
+                        LOGGER.exception(f"Error in _handle_financial_intent: {e}")
+                        emit("intent_error", f"Structured parsing error: {str(e)}")
+                        attempted_intent = True
+                        reply = None
                     
                     # Fallback to normalized command if structured parsing fails
                     if reply is None and normalized_command and normalized_command.strip().lower() != lowered_input:
@@ -1845,15 +1864,30 @@ class BenchmarkOSChatbot:
 
             if reply is None:
                 emit("context_build_start", "Gathering enhanced financial context")
-                context = self._build_enhanced_rag_context(user_input)
-                emit(
-                    "context_build_ready",
-                    "Context compiled" if context else "Context not required",
-                )
+                
+                # Check if this is a portfolio query FIRST - portfolio queries get special handling
+                portfolio_context = self._build_portfolio_context(user_input)
+                
+                if portfolio_context:
+                    # For portfolio queries, use portfolio context as PRIMARY context
+                    # This ensures the LLM focuses on the actual portfolio data
+                    context = portfolio_context
+                    LOGGER.info("Using portfolio context for query")
+                    emit("context_build_ready", "Portfolio context compiled - using actual portfolio data")
+                else:
+                    # For non-portfolio queries, use regular financial context
+                    context = self._build_enhanced_rag_context(user_input)
+                    emit(
+                        "context_build_ready",
+                        "Context compiled" if context else "Context not required",
+                    )
+                
                 messages = self._prepare_llm_messages(context)
+                LOGGER.debug(f"Prepared {len(messages)} messages for LLM")
                 emit("llm_query_start", "Composing explanation")
                 reply = self.llm_client.generate_reply(messages)
                 emit("llm_query_complete", "Explanation drafted")
+                LOGGER.info(f"Generated reply length: {len(reply) if reply else 0} characters")
 
             if reply is None:
                 emit("fallback", "Using enhanced fallback reply")
@@ -1959,6 +1993,10 @@ class BenchmarkOSChatbot:
             # Optional: Enhanced routing
             if self.settings.enable_enhanced_routing:
                 enhanced_routing = enhance_structured_parse(text, structured)
+                # Check for portfolio intents early
+                if enhanced_routing and enhanced_routing.intent.value.startswith("portfolio_"):
+                    # Portfolio intents should be handled by LLM with portfolio context
+                    return None
                 self.last_structured_response["enhanced_routing"] = {
                     "intent": enhanced_routing.intent.value,
                     "confidence": enhanced_routing.confidence,
@@ -1967,43 +2005,76 @@ class BenchmarkOSChatbot:
                 if enhanced_routing.confidence < 0.5:
                     return None
             
-            structured_reply = self._handle_structured_metrics(structured)
-            if structured_reply:
-                return structured_reply
+            if structured:
+                structured_reply = self._handle_structured_metrics(structured)
+                if structured_reply:
+                    return structured_reply
 
         # 6. Check for complex natural language that should use LLM
         if self._is_complex_natural_language_query(text):
             return None
         
         # 7. Try structured parsing as fallback (but with lower priority)
-        structured = parse_to_structured(text)
+        try:
+            structured = parse_to_structured(text)
+        except Exception as e:
+            LOGGER.debug(f"Structured parsing failed: {e}")
+            structured = {}
+        
         self.last_structured_response["parser"] = structured
         
         # Optional: Enhanced routing
         enhanced_routing = None
         if self.settings.enable_enhanced_routing:
-            enhanced_routing = enhance_structured_parse(text, structured)
-            self.last_structured_response["enhanced_routing"] = {
-                "intent": enhanced_routing.intent.value,
-                "confidence": enhanced_routing.confidence,
-                "force_dashboard": enhanced_routing.force_dashboard,
-                "force_text_only": enhanced_routing.force_text_only,
-            }
+            try:
+                enhanced_routing = enhance_structured_parse(text, structured)
+            except Exception as e:
+                LOGGER.debug(f"Enhanced routing failed: {e}")
+                enhanced_routing = None
             
-            # Higher threshold now - prefer LLM unless very confident
-            if enhanced_routing.confidence < 0.8:
-                return None
+            if enhanced_routing:
+                try:
+                    self.last_structured_response["enhanced_routing"] = {
+                        "intent": enhanced_routing.intent.value,
+                        "confidence": enhanced_routing.confidence,
+                        "force_dashboard": enhanced_routing.force_dashboard,
+                        "force_text_only": enhanced_routing.force_text_only,
+                    }
+                except Exception as e:
+                    LOGGER.debug(f"Failed to store enhanced routing: {e}")
+                
+                # Higher threshold now - prefer LLM unless very confident
+                if enhanced_routing.confidence < 0.8:
+                    return None
+                
+                # Check for portfolio intents first (before other checks)
+                if enhanced_routing.intent.value.startswith("portfolio_"):
+                    # Portfolio intents should be handled by LLM with portfolio context
+                    # Don't try to process them as structured metrics
+                    return None
         
         # If structured parsing detected compare intent, handle it
-        if (structured and 
-            structured.get('intent') == 'compare' and 
-            len(structured.get('tickers', [])) >= 2):
-            structured_reply = self._handle_structured_metrics(structured)
-            if structured_reply:
-                return structured_reply
+        if structured:
+            tickers_list = structured.get('tickers')
+            if tickers_list is None:
+                tickers_list = []
+            if (isinstance(tickers_list, list) and
+                len(tickers_list) >= 2 and
+                structured.get('intent') == 'compare'):
+                try:
+                    structured_reply = self._handle_structured_metrics(structured)
+                    if structured_reply:
+                        return structured_reply
+                except Exception as e:
+                    LOGGER.debug(f"Failed to handle structured metrics: {e}")
 
         # Check for natural language fallback conditions
-        if self._should_fallback_to_llm(structured):
+        try:
+            if self._should_fallback_to_llm(structured):
+                return None
+        except Exception as e:
+            LOGGER.debug(f"Failed to check fallback: {e}")
+            # If fallback check fails, default to LLM
             return None
         
         # 8. Default: Let LLM handle with context
@@ -2068,39 +2139,73 @@ class BenchmarkOSChatbot:
         
         return False
 
-    def _should_fallback_to_llm(self, structured: Dict[str, Any]) -> bool:
+    def _should_fallback_to_llm(self, structured: Optional[Dict[str, Any]]) -> bool:
         """Determine if the query should fall back to LLM instead of structured parsing."""
-        intent = structured.get("intent")
-        tickers = structured.get("tickers", [])
-        metrics = structured.get("vmetrics", [])
-        norm_text = structured.get("norm_text", "")
-        
-        # Fall back to LLM if:
-        # 1. Intent is unclear or parsing seems forced
-        if not intent or (intent == "lookup" and not tickers and not metrics):
+        if not structured:
             return True
-        
-        # 2. Too many ambiguous tickers parsed (likely over-parsing)
-        if len(tickers) > 3:
-            return True
+        try:
+            intent = structured.get("intent")
+            tickers_raw = structured.get("tickers")
+            metrics_raw = structured.get("vmetrics")
+            norm_text = structured.get("norm_text", "") or ""
             
-        # 3. Complex natural language patterns that don't fit structured intents
-        complex_patterns = [
-            "tell me about", "how is", "what are the key", "explain the risks",
-            "sector analysis", "market outlook", "investment advice"
-        ]
-        
-        for pattern in complex_patterns:
-            if pattern in norm_text.lower():
+            # Safely extract tickers - handle None and non-list values
+            tickers = []
+            if tickers_raw is not None:
+                if isinstance(tickers_raw, list):
+                    # Filter out None values and extract ticker strings from dicts
+                    for item in tickers_raw:
+                        if item is None:
+                            continue
+                        if isinstance(item, dict):
+                            ticker = item.get("ticker")
+                            if ticker and isinstance(ticker, str):
+                                tickers.append(ticker)
+                        elif isinstance(item, str):
+                            tickers.append(item)
+            
+            # Safely extract metrics
+            metrics = []
+            if metrics_raw is not None:
+                if isinstance(metrics_raw, list):
+                    metrics = [m for m in metrics_raw if m is not None]
+            
+            # Fall back to LLM if:
+            # 1. Intent is unclear or parsing seems forced
+            if not intent or (intent == "lookup" and not tickers and not metrics):
+                return True
+            
+            # 2. Too many ambiguous tickers parsed (likely over-parsing)
+            if len(tickers) > 3:
                 return True
                 
-        # 4. Ambiguous ticker parsing for ranking/explain queries
-        if intent in ["rank", "explain_metric"]:
-            # If tickers were parsed but shouldn't have been
-            if tickers and not any(ticker in norm_text.upper() for ticker in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]):
-                return True
-        
-        return False
+            # 3. Complex natural language patterns that don't fit structured intents
+            complex_patterns = [
+                "tell me about", "how is", "what are the key", "explain the risks",
+                "sector analysis", "market outlook", "investment advice"
+            ]
+            
+            for pattern in complex_patterns:
+                if norm_text and pattern in norm_text.lower():
+                    return True
+                    
+            # 4. Ambiguous ticker parsing for ranking/explain queries
+            if intent in ["rank", "explain_metric"]:
+                # If tickers were parsed but shouldn't have been
+                if tickers and norm_text:
+                    # Filter out None values from tickers list
+                    valid_tickers = [t for t in tickers if t is not None and isinstance(t, str)]
+                    if valid_tickers:
+                        # Check if any ticker is in the norm_text
+                        norm_upper = norm_text.upper()
+                        if not any(ticker in norm_upper for ticker in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]):
+                            return True
+            
+            return False
+        except Exception as e:
+            LOGGER.debug(f"Error in _should_fallback_to_llm: {e}")
+            # If any error occurs, default to LLM
+            return True
 
     def _get_company_name(self, ticker: str) -> str:
         """Get company name for ticker symbol."""
@@ -2133,7 +2238,9 @@ class BenchmarkOSChatbot:
             return "Usage: compare <TICKER_A> <TICKER_B> [MORE] [YEAR]"
         resolution = self._resolve_tickers(tickers)
         if resolution.missing:
-            return self._format_missing_message(tickers, resolution.available)
+            return self._format_missing_message(tickers, resolution.available or [])
+        if not resolution.available:
+            return self._format_missing_message(tickers, [])
         return self._format_metrics_table(
             resolution.available, period_filters=period_filters
         )
@@ -2156,19 +2263,29 @@ class BenchmarkOSChatbot:
 
     def _handle_structured_metrics(self, structured: Dict[str, Any]) -> Optional[str]:
         """Handle parsed structured intents without relying on legacy commands."""
-        tickers = structured.get("tickers") or []
+        if not structured:
+            return None
+        tickers = structured.get("tickers")
+        if tickers is None:
+            tickers = []
+        if not isinstance(tickers, list):
+            return None
         unique_tickers: List[str] = []
         for entry in tickers:
+            if entry is None:
+                continue
+            if not isinstance(entry, dict):
+                continue
             ticker = entry.get("ticker")
-            if ticker and ticker not in unique_tickers:
+            if ticker and isinstance(ticker, str) and ticker not in unique_tickers:
                 unique_tickers.append(ticker)
 
         if not unique_tickers:
             return None
 
         resolution = self._resolve_tickers(unique_tickers)
-        if resolution.missing and not resolution.available:
-            return self._format_missing_message(unique_tickers, resolution.available)
+        if resolution.missing and (not resolution.available or len(resolution.available) == 0):
+            return self._format_missing_message(unique_tickers, resolution.available or [])
 
         resolved_tickers = resolution.available if resolution.available else unique_tickers
         period_filters = self._periods_to_filters(structured.get("periods", {}))
@@ -2176,10 +2293,18 @@ class BenchmarkOSChatbot:
         intent = structured.get("intent")
         if intent == "compare" and len(resolved_tickers) >= 2:
             # Check if specific metrics are requested
-            requested_metrics = structured.get("vmetrics", [])
-            if requested_metrics:
+            requested_metrics = structured.get("vmetrics", []) or []
+            if requested_metrics and isinstance(requested_metrics, list):
                 # Filter to only requested metrics
-                metric_keys = [metric.get("key") for metric in requested_metrics if metric.get("key")]
+                metric_keys = []
+                for metric in requested_metrics:
+                    if metric is None:
+                        continue
+                    if not isinstance(metric, dict):
+                        continue
+                    key = metric.get("key")
+                    if key and isinstance(key, str):
+                        metric_keys.append(key)
                 if metric_keys:
                     return self._format_metrics_table(resolved_tickers, period_filters=period_filters, metric_filter=metric_keys)
             return self._format_metrics_table(resolved_tickers, period_filters=period_filters)
@@ -2601,9 +2726,11 @@ class BenchmarkOSChatbot:
         return BenchmarkOSChatbot._TickerResolution(available=available, missing=missing)
 
     def _format_missing_message(
-        self, requested: Sequence[str], available: Sequence[str]
+        self, requested: Sequence[str], available: Optional[Sequence[str]]
     ) -> str:
         """Build a friendly message for unresolved tickers."""
+        if available is None:
+            available = []
         missing = [ticker for ticker in requested if ticker.upper() not in available]
         suggestions = self._suggest_tickers(missing)
         hint_parts: List[str] = []
@@ -3336,8 +3463,194 @@ class BenchmarkOSChatbot:
             self._store_cached_context(cache_key, final_context)
         return final_context
 
+    def _build_portfolio_context(self, user_input: str) -> Optional[str]:
+        """Build comprehensive portfolio context for portfolio-related queries."""
+        import re
+        lowered = user_input.lower()
+        
+        # Check if this is a portfolio query (even without explicit ID)
+        portfolio_keywords = [
+            "portfolio", "my portfolio", "the portfolio", "this portfolio",
+            "portfolio exposure", "portfolio analysis", "portfolio optimize",
+            "portfolio holdings", "portfolio risk", "portfolio allocation",
+            "portfolio diversification", "portfolio performance"
+        ]
+        is_portfolio_query = any(kw in lowered for kw in portfolio_keywords)
+        
+        # Extract portfolio ID from query - try both explicit ID and "my portfolio"
+        portfolio_id_pattern = r"\bport_[\w]{4,12}\b"
+        match = re.search(portfolio_id_pattern, user_input, re.IGNORECASE)
+        
+        portfolio_id = None
+        if match:
+            portfolio_id = match.group(0)
+            LOGGER.info(f"Found explicit portfolio ID: {portfolio_id}")
+        elif is_portfolio_query:
+            # If it's a portfolio query but no explicit ID, try to get the most recent portfolio
+            try:
+                # Try to get list of portfolios from database
+                import sqlite3
+                with sqlite3.connect(self.settings.database_path) as conn:
+                    cursor = conn.execute(
+                        "SELECT portfolio_id FROM portfolios ORDER BY created_at DESC LIMIT 1"
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        portfolio_id = row[0]
+                        LOGGER.info(f"Using most recent portfolio: {portfolio_id}")
+            except Exception as e:
+                LOGGER.warning(f"Could not fetch most recent portfolio: {e}")
+        
+        if not portfolio_id:
+            if is_portfolio_query:
+                LOGGER.warning(f"Portfolio query detected but no portfolio ID found: {user_input}")
+            return None
+        
+        try:
+            from .portfolio import (
+                get_portfolio_holdings,
+                enrich_holdings_with_fundamentals,
+                calculate_portfolio_statistics,
+                analyze_exposure,
+            )
+            
+            # Fetch holdings
+            holdings = get_portfolio_holdings(self.settings.database_path, portfolio_id)
+            if not holdings:
+                LOGGER.warning(f"No holdings found for portfolio {portfolio_id}")
+                return None
+            
+            LOGGER.info(f"Fetched {len(holdings)} holdings for portfolio {portfolio_id}")
+            
+            # Enrich with fundamentals
+            enriched_holdings = enrich_holdings_with_fundamentals(
+                self.settings.database_path, holdings
+            )
+            
+            if not enriched_holdings:
+                return None
+            
+            # Calculate portfolio statistics
+            stats = calculate_portfolio_statistics(enriched_holdings)
+            
+            # Analyze exposure
+            exposure = analyze_exposure(enriched_holdings, self.settings.database_path)
+            
+            # Build comprehensive context
+            context_parts = []
+            context_parts.append("=" * 80)
+            context_parts.append("PORTFOLIO ANALYSIS DATA - USE THIS DATA ONLY")
+            context_parts.append(f"Portfolio ID: {portfolio_id}")
+            context_parts.append("=" * 80)
+            context_parts.append("")
+            context_parts.append("CRITICAL INSTRUCTIONS:")
+            context_parts.append("- You MUST use ONLY the data provided below")
+            context_parts.append("- DO NOT make up or hallucinate portfolio data")
+            context_parts.append("- If data is missing, say so - do not invent numbers")
+            context_parts.append("- Reference specific tickers, weights, and metrics from below")
+            context_parts.append("- Quote the actual numbers from the data provided")
+            context_parts.append("")
+            
+            # Portfolio Statistics
+            context_parts.append("### Portfolio Statistics")
+            if stats:
+                if stats.total_market_value:
+                    context_parts.append(f"Total Market Value: ${stats.total_market_value:,.2f}")
+                if stats.num_holdings:
+                    context_parts.append(f"Number of Positions: {stats.num_holdings}")
+                if stats.weighted_avg_pe:
+                    context_parts.append(f"Weighted Average P/E Ratio: {stats.weighted_avg_pe:.2f}")
+                if stats.weighted_avg_dividend_yield:
+                    context_parts.append(f"Weighted Average Dividend Yield: {stats.weighted_avg_dividend_yield:.2%}")
+                if stats.top_10_weight:
+                    context_parts.append(f"Top 10 Holdings Concentration: {stats.top_10_weight:.1%}")
+                if stats.num_sectors:
+                    context_parts.append(f"Number of Sectors: {stats.num_sectors}")
+            context_parts.append("")
+            
+            # Sector Exposure
+            context_parts.append("### Sector Exposure (by weight)")
+            if exposure and exposure.sector_exposure:
+                for sector, weight in sorted(exposure.sector_exposure.items(), key=lambda x: x[1], reverse=True)[:10]:
+                    context_parts.append(f"{sector}: {weight:.1%}")
+            elif stats and stats.sector_concentration:
+                for sector, weight in sorted(stats.sector_concentration.items(), key=lambda x: x[1], reverse=True)[:10]:
+                    context_parts.append(f"{sector}: {weight:.1%}")
+            context_parts.append("")
+            
+            # Factor Exposure
+            context_parts.append("### Factor Exposure")
+            if exposure and exposure.factor_exposure:
+                for factor, value in sorted(exposure.factor_exposure.items(), key=lambda x: abs(x[1]), reverse=True)[:10]:
+                    context_parts.append(f"{factor}: {value:.3f}")
+            context_parts.append("")
+            
+            # Top Holdings - DETAILED
+            context_parts.append("### Top Holdings (by weight)")
+            sorted_holdings = sorted(enriched_holdings, key=lambda h: h.weight or 0, reverse=True)[:20]
+            for i, holding in enumerate(sorted_holdings, 1):
+                parts = [f"{i}. {holding.ticker}"]
+                if holding.weight:
+                    parts.append(f"({holding.weight:.1%} weight)")
+                if holding.shares:
+                    parts.append(f"{holding.shares:.0f} shares")
+                if holding.market_value:
+                    parts.append(f"${holding.market_value:,.0f}")
+                if holding.sector:
+                    parts.append(f"[{holding.sector}]")
+                if holding.pe_ratio:
+                    parts.append(f"P/E: {holding.pe_ratio:.1f}")
+                if holding.dividend_yield:
+                    parts.append(f"Div: {holding.dividend_yield:.2%}")
+                if holding.roe:
+                    parts.append(f"ROE: {holding.roe:.1%}")
+                if holding.roic:
+                    parts.append(f"ROIC: {holding.roic:.1%}")
+                context_parts.append(" ".join(parts))
+            context_parts.append("")
+            
+            # Risk/Concentration Metrics
+            context_parts.append("### Concentration & Risk Metrics")
+            if exposure and exposure.concentration_metrics:
+                hhi = exposure.concentration_metrics.get("hhi")
+                if hhi:
+                    context_parts.append(f"Herfindahl-Hirschman Index (HHI): {hhi:.0f}")
+            if stats and stats.top_10_weight:
+                context_parts.append(f"Top 10 Holdings Weight: {stats.top_10_weight:.1%}")
+            context_parts.append("")
+            
+            context_parts.append("=" * 80)
+            context_parts.append("END OF PORTFOLIO DATA")
+            context_parts.append("=" * 80)
+            context_parts.append("")
+            context_parts.append("FINAL REMINDER - CRITICAL RULES:")
+            context_parts.append("1. You MUST use ONLY the data shown above")
+            context_parts.append("2. DO NOT invent or hallucinate any portfolio data")
+            context_parts.append("3. Reference the ACTUAL tickers and weights listed above")
+            context_parts.append("4. Use the ACTUAL sector exposure percentages provided")
+            context_parts.append("5. Calculate recommendations based on THESE SPECIFIC holdings")
+            context_parts.append("6. Quote the ACTUAL numbers (weights, values, metrics) from above")
+            context_parts.append("7. If data is missing, explicitly state it - do not make up numbers")
+            context_parts.append("8. DO NOT provide generic portfolio advice - analyze THIS SPECIFIC portfolio")
+            context_parts.append("")
+            context_parts.append("USER QUESTION: " + user_input)
+            context_parts.append("")
+            context_parts.append("Now answer the user's question using ONLY the portfolio data shown above.")
+            
+            context_str = "\n".join(context_parts)
+            LOGGER.info(f"Built portfolio context for {portfolio_id}: {len(context_str)} characters, {len(enriched_holdings)} holdings")
+            return context_str
+        except Exception as e:
+            LOGGER.exception(f"Could not build portfolio context: {e}")
+            return None
+    
     def _build_enhanced_rag_context(self, user_input: str) -> Optional[str]:
         """Enhanced RAG context building with comprehensive financial data."""
+        # Skip financial context for portfolio queries (they have their own context)
+        portfolio_id_pattern = r"\bport_[\w]{4,12}\b"
+        if re.search(portfolio_id_pattern, user_input, re.IGNORECASE):
+            return None
+        
         # First, try the smart context builder for natural language formatting
         try:
             financial_context = build_financial_context(
@@ -3709,10 +4022,13 @@ class BenchmarkOSChatbot:
     def _export_to_pdf(self, data: Dict[str, Any], filename: str) -> str:
         """Export data to PDF format."""
         try:
-            from reportlab.lib.pagesizes import letter
-            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-            from reportlab.lib.styles import getSampleStyleSheet
-            from reportlab.lib import colors
+            try:
+                from reportlab.lib.pagesizes import letter  # type: ignore
+                from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer  # type: ignore
+                from reportlab.lib.styles import getSampleStyleSheet  # type: ignore
+                from reportlab.lib import colors  # type: ignore
+            except ImportError:
+                raise ImportError("reportlab is required for PDF export. Install it with: pip install reportlab")
             
             doc = SimpleDocTemplate(filename, pagesize=letter)
             styles = getSampleStyleSheet()

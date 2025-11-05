@@ -18,14 +18,32 @@ from functools import lru_cache, wraps
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import cvxpy as cp
 import numpy as np
 import pandas as pd
-import pdfplumber
-import PyPDF2
-import scipy.optimize as sco
-from scipy import stats
 import yfinance as yf
+
+# Optional imports for optimization and PDF processing
+try:
+    import cvxpy as cp  # type: ignore
+except ImportError:
+    cp = None  # type: ignore
+
+try:
+    import pdfplumber  # type: ignore
+except ImportError:
+    pdfplumber = None  # type: ignore
+
+try:
+    import PyPDF2  # type: ignore
+except ImportError:
+    PyPDF2 = None  # type: ignore
+
+try:
+    import scipy.optimize as sco  # type: ignore
+    from scipy import stats  # type: ignore
+except ImportError:
+    sco = None  # type: ignore
+    stats = None  # type: ignore
 
 from . import database
 from .sector_analytics import SECTOR_MAP

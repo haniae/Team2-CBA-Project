@@ -47,6 +47,20 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
     metric_matches = resolve_metrics(text, lowered_full)
     periods = parse_periods(norm, prefer_fiscal=False)
 
+    # Ensure ticker_matches and metric_matches are lists (not None)
+    if ticker_matches is None:
+        ticker_matches = []
+    if metric_matches is None:
+        metric_matches = []
+    if periods is None:
+        periods = {}
+    
+    # Ensure they're lists of dicts
+    if not isinstance(ticker_matches, list):
+        ticker_matches = []
+    if not isinstance(metric_matches, list):
+        metric_matches = []
+
     intent = classify_intent(norm, ticker_matches, metric_matches, periods)
 
     warnings = list(periods.get("warnings", [])) + ticker_warnings
@@ -57,16 +71,40 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
     if not metric_matches:
         warnings.append("missing_metric")
 
+    # Safely build tickers list - filter out None entries
+    tickers_list = []
+    for entry in ticker_matches:
+        if entry is None:
+            continue
+        if not isinstance(entry, dict):
+            continue
+        input_val = entry.get("input")
+        ticker_val = entry.get("ticker")
+        if input_val is not None and ticker_val is not None:
+            tickers_list.append({"input": input_val, "ticker": ticker_val})
+    
+    # Safely build metrics list - filter out None entries
+    metrics_list = []
+    for entry in metric_matches:
+        if entry is None:
+            continue
+        if not isinstance(entry, dict):
+            continue
+        input_val = entry.get("input")
+        metric_id = entry.get("metric_id")
+        if input_val is not None and metric_id is not None:
+            metrics_list.append({"input": input_val, "key": metric_id})
+    
     structured = {
         "intent": intent,
-        "tickers": [{"input": entry["input"], "ticker": entry["ticker"]} for entry in ticker_matches],
-        "vmetrics": [{"input": entry["input"], "key": entry["metric_id"]} for entry in metric_matches],
-        "periods": periods,
-        "computed": infer_computed(metric_matches),
+        "tickers": tickers_list,
+        "vmetrics": metrics_list,
+        "periods": periods or {},
+        "computed": infer_computed(metric_matches) if metric_matches else [],
         "filters": {"currency": "USD", "unit_preference": "auto"},
         "free_text": text,
         "norm_text": norm,  # Fix: Add norm_text field
-        "warnings": warnings,
+        "warnings": warnings or [],
     }
     return structured
 
@@ -108,25 +146,42 @@ def classify_intent(
 ) -> str:
     """Infer the user's intent from tokens, tickers, metrics, and period metadata."""
 
-    unique_tickers = {entry["ticker"] for entry in tickers}
-    period_type = periods.get("type")
+    # Safely extract unique tickers
+    unique_tickers = set()
+    if tickers and isinstance(tickers, list):
+        for entry in tickers:
+            if entry is None:
+                continue
+            if not isinstance(entry, dict):
+                continue
+            ticker = entry.get("ticker")
+            if ticker and isinstance(ticker, str):
+                unique_tickers.add(ticker)
+    
+    period_type = None
+    if periods and isinstance(periods, dict):
+        period_type = periods.get("type")
 
     # Priority order: rank > explain > trend > compare > lookup
     
     # Check for rank intent first (highest priority for ranking questions)
     if INTENT_RANK_PATTERN.search(norm_text):
         # For ranking queries, only parse tickers if explicitly mentioned
-        if tickers and not any(ticker in norm_text.upper() for ticker in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"]):
-            # Likely over-parsing, return rank without ticker dependency
-            pass
+        if tickers and isinstance(tickers, list) and unique_tickers:
+            norm_upper = norm_text.upper()
+            if not any(ticker in norm_upper for ticker in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"]):
+                # Likely over-parsing, return rank without ticker dependency
+                pass
         return "rank"
 
     # Check for explain intent (second priority)
     if INTENT_EXPLAIN_PATTERN.search(norm_text):
         # For explain queries, only parse tickers if explicitly mentioned
-        if tickers and not any(ticker in norm_text.upper() for ticker in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"]):
-            # Likely over-parsing, return explain without ticker dependency
-            pass
+        if tickers and isinstance(tickers, list) and unique_tickers:
+            norm_upper = norm_text.upper()
+            if not any(ticker in norm_upper for ticker in ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META"]):
+                # Likely over-parsing, return explain without ticker dependency
+                pass
         return "explain_metric"
 
     # Check for trend intent (third priority)
@@ -141,7 +196,7 @@ def classify_intent(
     # Check for compare intent (fourth priority)
     # Only classify as compare if explicitly compare keywords OR multiple tickers with clear compare context
     if (INTENT_COMPARE_PATTERN.search(norm_text) or 
-        (len(unique_tickers) >= 2 and ("compare" in norm_text or "vs" in norm_text or "versus" in norm_text))):
+        (unique_tickers and len(unique_tickers) >= 2 and ("compare" in norm_text or "vs" in norm_text or "versus" in norm_text))):
         return "compare"
 
     # Default to lookup intent
