@@ -2141,6 +2141,13 @@ class BenchmarkOSChatbot:
                 ]
                 is_specific_metric = any(re.search(pattern, lowered_input) for pattern in specific_metric_patterns)
                 
+                # CRITICAL: For filter queries, IMMEDIATELY clear any existing dashboards
+                # This prevents old cached dashboards from being shown
+                if is_filter_query:
+                    self.last_structured_response["dashboard"] = None
+                    self.last_structured_response["summary"] = None
+                    emit("filter_query_dashboard_clear", "Filter query detected - clearing all dashboards")
+                
                 # Only do ticker summary for bare ticker mentions, NOT questions, forecasting, filter queries, or specific metric queries
                 if not is_question and not is_filter_query and not is_specific_metric:
                     # Check for dashboard keyword first
@@ -4486,15 +4493,27 @@ class BenchmarkOSChatbot:
                 from .context_builder import build_company_universe_context
                 universe_context = build_company_universe_context(self.settings.database_path)
                 if universe_context:
+                    LOGGER.info(f"Filter query detected - returning company universe context ({len(universe_context)} chars)")
                     return universe_context
                 else:
-                    # Even if universe context is empty, return empty to prevent fallback ticker extraction
-                    LOGGER.warning(f"Filter query detected but universe context is empty - returning empty to prevent hallucination")
-                    return ""
+                    # Even if universe context is empty, return a basic instruction to prevent fallback ticker extraction
+                    LOGGER.warning(f"Filter query detected but universe context is empty - returning basic instruction")
+                    return (
+                        "USER QUERY IS A FILTER/CATEGORY QUERY\n"
+                        "The user is asking to filter companies by sector, metrics, or other criteria.\n"
+                        "Please provide a narrative response explaining that you can help with company filtering,\n"
+                        "but you need the company database to be available to provide specific results.\n"
+                        "Do NOT show company dashboards for filter queries.\n"
+                    )
             except Exception as e:
-                LOGGER.error(f"Company universe context builder failed for filter query: {e}")
-                # Return empty to prevent fallback ticker extraction which causes hallucinations
-                return ""
+                LOGGER.error(f"Company universe context builder failed for filter query: {e}", exc_info=True)
+                # Return basic instruction to prevent fallback ticker extraction which causes hallucinations
+                return (
+                    "USER QUERY IS A FILTER/CATEGORY QUERY\n"
+                    "The user is asking to filter companies by sector, metrics, or other criteria.\n"
+                    "Please provide a narrative response explaining that you encountered an error loading the company database.\n"
+                    "Do NOT show company dashboards for filter queries.\n"
+                )
         
         # First, try the smart context builder for natural language formatting
         try:
