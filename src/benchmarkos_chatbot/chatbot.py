@@ -625,6 +625,38 @@ SYSTEM_PROMPT = (
     "- ### Business Drivers (what's causing the numbers)\n"
     "- ### Future Outlook (implications, catalysts, risks)\n\n"
     
+    "## Table Formatting - CRITICAL RULES\n\n"
+    "When creating tables in your response:\n\n"
+    "**✅ DO:**\n"
+    "- Use consistent markdown table format\n"
+    "- Keep ALL cells plain text (no bold within table cells)\n"
+    "- Bold the ANSWER company name ONLY in the text ABOVE the table\n"
+    "- Use proper alignment for numbers (right-align)\n"
+    "- Include column headers\n\n"
+    
+    "**❌ DON'T:**\n"
+    "- DON'T bold individual cells within the table\n"
+    "- DON'T bold only the first row of data\n"
+    "- DON'T use inconsistent formatting across rows\n"
+    "- DON'T mix bold and non-bold text in table cells\n\n"
+    
+    "**Example CORRECT table:**\n"
+    "| Company | Profit Margin | Revenue |\n"
+    "| --- | ---: | ---: |\n"
+    "| Apple | 26.92% | $391.8B |\n"
+    "| Microsoft | 35.71% | $222.9B |\n"
+    "| Google | 27.99% | $221.7B |\n\n"
+    
+    "**Example INCORRECT table (DO NOT DO THIS):**\n"
+    "| Company | Profit Margin | Revenue |\n"
+    "| --- | ---: | ---: |\n"
+    "| **Apple** | **26.92%** | **$391.8B** |\n"
+    "| Microsoft | 35.71% | $222.9B |\n"
+    "| Google | 27.99% | $221.7B |\n\n"
+    
+    "If you want to highlight the answer company, mention it in the TEXT above the table,\n"
+    "not by bolding its row in the table.\n\n"
+    
     "🚨 **MANDATORY SOURCES REQUIREMENT - EVERY RESPONSE MUST INCLUDE:**\n\n"
     "**CRITICAL: You MUST include a '📊 Sources:' section at the END of EVERY response with clickable links.**\n\n"
     "**Requirements:**\n"

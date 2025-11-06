@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
+LOGGER = logging.getLogger(__name__)
+
 try:
     import yfinance as yf
     YFINANCE_AVAILABLE = True
@@ -26,8 +28,6 @@ try:
 except ImportError:
     FRED_AVAILABLE = False
     LOGGER.warning("fredapi not available - economic indicators will be limited")
-
-LOGGER = logging.getLogger(__name__)
 
 
 class ExternalFactorsProvider:
