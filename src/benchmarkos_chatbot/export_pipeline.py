@@ -110,6 +110,7 @@ def _format_currency(value: Any) -> str:
 
 
 def _format_value(entry: Dict[str, Any]) -> str:
+    """Format KPI values with exactly 2 decimal places."""
     value = entry.get("value")
     entry_type = entry.get("type")
     label = (entry.get("label") or entry.get("id") or "").lower()
@@ -117,58 +118,43 @@ def _format_value(entry: Dict[str, Any]) -> str:
     if value in (None, ""):
         return "N/A"
     
+    # Always ensure we have a numeric value
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    
     # Try to infer type from label if not explicitly set
     if not entry_type:
-        if isinstance(value, (int, float)):
-            # Check for specific patterns in label
-            if any(term in label for term in ["coverage", "turnover", "conversion"]):
-                # These are typically multiples
-                entry_type = "multiple"
-            elif any(term in label for term in ["ratio", "x", "times"]):
-                # Explicitly ratios/multiples
-                entry_type = "multiple"
-            elif any(term in label for term in ["cagr", "margin", "growth", "return"]):
-                # These are typically percentages
-                if abs(value) <= 1.5:
-                    entry_type = "percent"
-                elif abs(value) > 1.5 and abs(value) < 100:
-                    # Could be percentage (like 126% ROE) or multiple
-                    if "return" in label and abs(value) > 1:
-                        # Return metrics > 1 are typically percentages (126% = 1.26)
-                        entry_type = "percent"
-                    else:
-                        entry_type = "percent"
-                else:
+        # Check for specific patterns in label
+        if any(term in label for term in ["coverage", "turnover", "conversion", "ratio", "x", "times", "debt to equity"]):
+            # These are typically multiples
+            entry_type = "multiple"
+        elif any(term in label for term in ["cagr", "margin", "growth", "return"]):
+            # These are typically percentages
+            # For return metrics, values > 1 are still percentages (e.g., 1.26 = 126%)
+            entry_type = "percent"
+        else:
+            # Default inference based on value magnitude
+            if abs(number) <= 1.5:
+                entry_type = "percent"
+            elif abs(number) > 1.5 and abs(number) < 100:
+                # Could be percentage or multiple - check label
+                if any(term in label for term in ["ratio", "coverage", "conversion", "turnover"]):
                     entry_type = "multiple"
+                else:
+                    entry_type = "percent"
             else:
-                # Default inference based on value magnitude
-                if abs(value) <= 1.5:
-                    entry_type = "percent"
-                elif abs(value) > 1.5 and abs(value) < 100:
-                    entry_type = "multiple"
-                else:
-                    entry_type = "multiple"
+                entry_type = "multiple"
     
-    # Format based on type
+    # Format based on type - ALWAYS use 2 decimal places
     if entry_type == "percent":
         return _format_percent(value)
     if entry_type == "multiple":
         return _format_multiple(value)
     
-    # Default: format as number with 2 decimal places
-    try:
-        number = float(value)
-        # If it's a small number (< 100), format as percentage
-        if abs(number) < 100 and abs(number) > 0.01:
-            # Check if it looks like a percentage (between 0 and 1)
-            if abs(number) <= 1.5:
-                return _format_percent(value)
-            # Otherwise format as number with 2 decimals
-            return f"{number:.2f}"
-        # For larger numbers, format as currency
-        return _format_currency(value)
-    except (TypeError, ValueError):
-        return str(value)
+    # Default: format as number with exactly 2 decimal places
+    return f"{number:.2f}"
 
 
 def _collect_kpi_rows(
@@ -674,28 +660,34 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         
         pdf.ln(8)
         
-        # Dynamic column widths - FIXED to prevent overflow
+        # Dynamic column widths - FIXED to prevent overflow and show ALL columns
         num_cols = len(columns) + 1  # +1 for metric label
-        max_page_width = 165  # Safe maximum (170mm - 5mm buffer)
-        label_width = 55  # Label column
-        value_width = (max_page_width - label_width) / len(columns) if columns else 30
-        value_width = max(value_width, 22)  # Minimum 22mm per column (reduced from 25mm)
+        max_page_width = 190  # Use full page width (210mm - 20mm margins)
+        label_width = 50  # Label column (reduced slightly)
+        # Calculate value width to fit all columns
+        if columns:
+            available_width = max_page_width - label_width - 20  # 20mm for margins
+            value_width = available_width / len(columns)
+            # Minimum 18mm per column, but allow smaller if needed to fit all
+            value_width = max(value_width, 15)  # Minimum 15mm per column
+        else:
+            value_width = 30
         
-        # Table header
+        # Table header - use smaller font to fit more columns
         pdf.set_fill_color(*COLOR_PRIMARY)
         pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_font("Helvetica", "B", 8)  # Reduced from 9 to 8
         
-        x_start = 20
+        x_start = 10  # Start closer to left margin
         pdf.set_xy(x_start, pdf.get_y())
-        pdf.cell(label_width, 7, "Metric", border=1, align="L", fill=True)
+        pdf.cell(label_width, 6, "Metric", border=1, align="L", fill=True)  # Reduced height from 7 to 6
         
         for col in columns:
-            pdf.cell(value_width, 7, str(col), border=1, align="C", fill=True)
+            pdf.cell(value_width, 6, str(col), border=1, align="C", fill=True)  # Reduced height from 7 to 6
         pdf.ln()
         
         # Table rows - show ALL rows with proper page breaks
-        pdf.set_font("Helvetica", "", 9)
+        pdf.set_font("Helvetica", "", 8)  # Reduced from 9 to 8
         pdf.set_text_color(*COLOR_TEXT)
         
         for idx, entry in enumerate(rows):  # Show all rows, not limited to 15
@@ -723,25 +715,28 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
                 # Re-draw table header row
                 pdf.set_fill_color(*COLOR_PRIMARY)
                 pdf.set_text_color(255, 255, 255)
-                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_font("Helvetica", "B", 8)  # Reduced from 9 to 8
                 pdf.set_xy(x_start, pdf.get_y())
-                pdf.cell(label_width, 7, "Metric", border=1, align="L", fill=True)
+                pdf.cell(label_width, 6, "Metric", border=1, align="L", fill=True)  # Reduced height from 7 to 6
                 for col in columns:
-                    pdf.cell(value_width, 7, str(col), border=1, align="C", fill=True)
+                    pdf.cell(value_width, 6, str(col), border=1, align="C", fill=True)  # Reduced height from 7 to 6
                 pdf.ln()
-                pdf.set_font("Helvetica", "", 9)
+                pdf.set_font("Helvetica", "", 8)  # Reduced from 9 to 8
                 pdf.set_text_color(*COLOR_TEXT)
                 y_pos = pdf.get_y()
             
             pdf.set_xy(x_start, y_pos)
             raw_label = entry.get('label', 'N/A')
             # Better truncation with ellipsis
-            label = _sanitize_text_for_pdf(raw_label if len(raw_label) <= 27 else raw_label[:24] + "...")
-            pdf.cell(label_width, 6, label, border=1, align="L", fill=True)
+            label = _sanitize_text_for_pdf(raw_label if len(raw_label) <= 25 else raw_label[:22] + "...")
+            pdf.cell(label_width, 5, label, border=1, align="L", fill=True)  # Reduced height from 6 to 5
             
             values = entry.get("values") or []
             row_type = entry.get("type")  # Get type from row (percent, multiple, currency, etc.)
-            for value in values:
+            # Ensure we process ALL values for ALL columns
+            for col_idx, value in enumerate(values):
+                if col_idx >= len(columns):
+                    break  # Safety check - don't process more values than columns
                 if isinstance(value, (int, float)):
                     # Format based on row type with 2 decimal places
                     if row_type == "percent":
@@ -757,8 +752,8 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
                         # Default: format as currency with 2 decimal places
                         formatted = _format_currency(value)
                 else:
-                    formatted = _sanitize_text_for_pdf(str(value or "N/A")[:12])
-                pdf.cell(value_width, 6, formatted, border=1, align="R", fill=True)
+                    formatted = _sanitize_text_for_pdf(str(value or "N/A")[:10])  # Reduced from 12 to 10
+                pdf.cell(value_width, 5, formatted, border=1, align="R", fill=True)  # Reduced height from 6 to 5
             pdf.ln()
     
     # ========== FINANCIAL PERFORMANCE ANALYSIS PAGE ==========
@@ -2261,11 +2256,3 @@ def _build_comparative_summary_xlsx(engine: AnalyticsEngine, tickers: List[str])
     return output.getvalue()
 
 
-def _format_value(kpi: dict) -> str:
-    """Format a KPI value for display in tables."""
-    if not kpi:
-        return "N/A"
-    value = kpi.get("value", "N/A")
-    if isinstance(value, str):
-        return value
-    return str(value)
