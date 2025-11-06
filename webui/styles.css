@@ -2597,17 +2597,32 @@ body::-webkit-scrollbar {
 .message-progress {
   display: none;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid rgba(59, 130, 246, 0.28);
-  border-radius: 10px;
-  background: rgba(59, 130, 246, 0.08);
+  gap: 8px;
+  padding: 16px 18px;
+  border: 2px solid rgba(59, 130, 246, 0.35);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.1), 0 2px 8px rgba(59, 130, 246, 0.05);
   font-size: 13px;
   color: var(--text-primary);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
 }
 
 .message-progress.active {
   display: flex;
+  animation: fadeInProgress 0.4s ease-out;
+}
+
+@keyframes fadeInProgress {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .message-progress.pending .message-progress-title {
@@ -2615,13 +2630,15 @@ body::-webkit-scrollbar {
 }
 
 .message-progress.complete {
-  border-color: rgba(34, 197, 94, 0.35);
-  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.4);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(34, 197, 94, 0.06) 100%);
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.12), 0 2px 8px rgba(34, 197, 94, 0.06);
 }
 
 .message-progress.error {
-  border-color: rgba(248, 113, 113, 0.4);
-  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.45);
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.12) 0%, rgba(248, 113, 113, 0.06) 100%);
+  box-shadow: 0 4px 16px rgba(248, 113, 113, 0.12), 0 2px 8px rgba(248, 113, 113, 0.06);
 }
 
 .message-progress-title {
@@ -2642,7 +2659,7 @@ body::-webkit-scrollbar {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .progress-step {
@@ -2650,79 +2667,122 @@ body::-webkit-scrollbar {
   align-items: flex-start;
   gap: 18px;
   position: relative;
-  transition: all var(--transition-base);
-  padding: 8px 12px;
-  margin: -8px -12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 10px 14px;
+  margin: -10px -14px;
   border-radius: 12px;
+  animation: fadeInStep 0.4s ease-out;
+}
+
+@keyframes fadeInStep {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .progress-step:hover {
-  background: rgba(0, 102, 255, 0.02);
+  background: rgba(0, 102, 255, 0.03);
+  transform: translateX(2px);
 }
 
 .progress-step.active {
-  background: rgba(0, 102, 255, 0.04);
-  box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.08);
+  background: rgba(0, 102, 255, 0.06);
+  box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.12), 0 2px 8px rgba(0, 102, 255, 0.08);
+}
+
+.progress-step.completed {
+  animation: bounceInStep 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes bounceInStep {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* Connect steps with a line */
 .progress-step:not(:last-child)::after {
   content: '';
   position: absolute;
-  left: 21px;
-  top: 32px;
-  bottom: -8px;
-  width: 3px;
+  left: 25px;
+  top: 36px;
+  bottom: -10px;
+  width: 4px;
   background: linear-gradient(180deg, 
-    rgba(0, 102, 255, 0.2) 0%, 
-    rgba(0, 102, 255, 0.1) 50%, 
+    rgba(0, 102, 255, 0.25) 0%, 
+    rgba(0, 102, 255, 0.15) 30%,
+    rgba(0, 102, 255, 0.1) 60%,
     rgba(0, 102, 255, 0.05) 100%);
   border-radius: 2px;
-  box-shadow: 0 0 4px rgba(0, 102, 255, 0.1);
+  box-shadow: 0 0 6px rgba(0, 102, 255, 0.15), inset 0 0 2px rgba(0, 102, 255, 0.2);
+  transition: all 0.4s ease;
 }
 
 .progress-step.completed:not(:last-child)::after {
   background: linear-gradient(180deg, 
-    rgba(22, 163, 74, 0.35) 0%, 
-    rgba(22, 163, 74, 0.15) 50%, 
-    rgba(22, 163, 74, 0.08) 100%);
-  box-shadow: 0 0 4px rgba(22, 163, 74, 0.15);
+    rgba(22, 163, 74, 0.45) 0%, 
+    rgba(22, 163, 74, 0.25) 30%,
+    rgba(22, 163, 74, 0.15) 60%,
+    rgba(22, 163, 74, 0.1) 100%);
+  box-shadow: 0 0 8px rgba(22, 163, 74, 0.2), inset 0 0 2px rgba(22, 163, 74, 0.3);
 }
 
 .progress-step.active:not(:last-child)::after {
   background: linear-gradient(180deg, 
-    rgba(0, 102, 255, 0.4) 0%, 
-    rgba(0, 102, 255, 0.2) 50%, 
-    rgba(0, 102, 255, 0.1) 100%);
-  animation: flow-down 1.5s ease-in-out infinite;
+    rgba(0, 102, 255, 0.5) 0%, 
+    rgba(0, 102, 255, 0.3) 30%,
+    rgba(0, 102, 255, 0.2) 60%,
+    rgba(0, 102, 255, 0.15) 100%);
+  animation: flow-down 2s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(0, 102, 255, 0.25), inset 0 0 3px rgba(0, 102, 255, 0.3);
 }
 
 @keyframes flow-down {
   0% {
-    opacity: 0.3;
-    transform: translateY(-4px);
+    opacity: 0.4;
+    transform: translateY(-6px);
+    background-position: 0 0;
   }
   50% {
     opacity: 1;
+    transform: translateY(0);
+    background-position: 0 50%;
   }
   100% {
-    opacity: 0.3;
-    transform: translateY(4px);
+    opacity: 0.4;
+    transform: translateY(6px);
+    background-position: 0 100%;
   }
 }
 
 .progress-indicator {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 3px solid transparent;
   margin-top: 2px;
-  background: linear-gradient(135deg, rgba(0, 102, 255, 0.12) 0%, rgba(0, 102, 255, 0.08) 100%);
-  box-shadow: 0 2px 8px rgba(0, 102, 255, 0.15);
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.15) 0%, rgba(0, 102, 255, 0.1) 50%, rgba(0, 102, 255, 0.08) 100%);
+  box-shadow: 0 2px 10px rgba(0, 102, 255, 0.2), 
+              0 1px 4px rgba(0, 102, 255, 0.15),
+              inset 0 1px 2px rgba(255, 255, 255, 0.3);
   flex-shrink: 0;
   position: relative;
-  transition: all var(--transition-base);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 
 .progress-step.completed .progress-indicator {
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
@@ -2737,8 +2797,24 @@ body::-webkit-scrollbar {
   left: 50%;
   transform: translate(-50%, -50%);
   color: white;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  animation: checkmarkAppear 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes checkmarkAppear {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
 }
 
 .progress-step.active .progress-indicator {
@@ -2765,11 +2841,12 @@ body::-webkit-scrollbar {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   background: white;
   border-radius: 50%;
-  animation: spin 1.5s linear infinite;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+  animation: spin 1.2s linear infinite;
 }
 
 @keyframes spin {
@@ -2794,8 +2871,24 @@ body::-webkit-scrollbar {
   left: 50%;
   transform: translate(-50%, -50%);
   color: white;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  animation: errorAppear 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes errorAppear {
+  0% {
+    transform: translate(-50%, -50%) scale(0) rotate(-90deg);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2) rotate(10deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    opacity: 1;
+  }
 }
 
 .progress-copy {
@@ -2808,46 +2901,58 @@ body::-webkit-scrollbar {
 
 .progress-label {
   font-weight: 600;
-  font-size: 14px;
-  color: var(--indigo);
+  font-size: 15px;
+  color: #2563eb;
   letter-spacing: -0.01em;
-  transition: color var(--transition-fast);
+  transition: color 0.3s ease, font-weight 0.3s ease;
+  line-height: 1.4;
 }
 
 .progress-step.completed .progress-label {
   color: #16a34a;
+  font-weight: 600;
 }
 
 .progress-step.pending .progress-label {
-  color: var(--text-muted);
+  color: #64748b;
   font-weight: 500;
 }
 
 .progress-step.error .progress-label {
   color: #dc2626;
+  font-weight: 600;
 }
 
 .progress-detail {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: 1.6;
+  font-weight: 500;
+  margin-top: 2px;
 }
 
 .progress-step.active .progress-label {
-  color: var(--navy);
+  color: #1e40af;
   font-weight: 600;
 }
 
 .progress-log {
   list-style: none;
-  margin: 8px 0 0;
-  padding: 10px 12px;
+  margin: 10px 0 0;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  background: rgba(0, 102, 255, 0.03);
-  border-radius: 8px;
-  border-left: 3px solid rgba(0, 102, 255, 0.2);
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.05) 0%, rgba(0, 102, 255, 0.02) 100%);
+  border-radius: 10px;
+  border-left: 4px solid rgba(0, 102, 255, 0.3);
+  box-shadow: inset 0 1px 2px rgba(0, 102, 255, 0.05);
+  transition: all 0.3s ease;
+}
+
+.progress-log:hover {
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.07) 0%, rgba(0, 102, 255, 0.04) 100%);
+  border-left-color: rgba(0, 102, 255, 0.4);
 }
 
 .progress-log li {
@@ -2857,25 +2962,42 @@ body::-webkit-scrollbar {
   gap: 12px;
   font-size: 13px;
   color: var(--text-secondary);
-  padding: 2px 0;
+  padding: 4px 0;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+}
+
+.progress-log li:hover {
+  background: rgba(0, 102, 255, 0.03);
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 .progress-log li span:first-child {
   flex: 1;
   color: var(--text-primary);
   font-weight: 500;
+  line-height: 1.5;
 }
 
 .progress-timestamp {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--indigo);
-  opacity: 0.75;
+  color: #2563eb;
+  opacity: 0.9;
   font-weight: 600;
-  background: rgba(0, 102, 255, 0.08);
-  padding: 2px 8px;
-  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(37, 99, 235, 0.08) 100%);
+  padding: 3px 10px;
+  border-radius: 8px;
   white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  transition: all 0.2s ease;
+}
+
+.progress-timestamp:hover {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.18) 0%, rgba(37, 99, 235, 0.12) 100%);
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
 }
 
 .message-timestamp {
@@ -2887,20 +3009,172 @@ body::-webkit-scrollbar {
   opacity: 0.25;
 }
 
+/* Dark mode support for progress indicator */
+[data-theme="dark"] .message-progress {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.08) 100%);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2), 0 2px 8px rgba(59, 130, 246, 0.1);
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .message-progress.complete {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.08) 100%);
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.2), 0 2px 8px rgba(34, 197, 94, 0.1);
+}
+
+[data-theme="dark"] .message-progress.error {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.15) 0%, rgba(248, 113, 113, 0.08) 100%);
+  box-shadow: 0 4px 16px rgba(248, 113, 113, 0.2), 0 2px 8px rgba(248, 113, 113, 0.1);
+}
+
+[data-theme="dark"] .message-progress-title {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .message-progress.error .message-progress-title {
+  color: #f87171;
+}
+
+[data-theme="dark"] .progress-step:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+[data-theme="dark"] .progress-step.active {
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2), 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+[data-theme="dark"] .progress-indicator {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.12) 100%);
+  box-shadow: 0 2px 10px rgba(59, 130, 246, 0.3), 
+              0 1px 4px rgba(59, 130, 246, 0.25),
+              inset 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .progress-label {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .progress-step.completed .progress-label {
+  color: #4ade80;
+}
+
+[data-theme="dark"] .progress-step.pending .progress-label {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .progress-step.error .progress-label {
+  color: #f87171;
+}
+
+[data-theme="dark"] .progress-step.active .progress-label {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .progress-detail {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .progress-log {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+  border-left-color: rgba(59, 130, 246, 0.4);
+  box-shadow: inset 0 1px 2px rgba(59, 130, 246, 0.1);
+}
+
+[data-theme="dark"] .progress-log:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border-left-color: rgba(59, 130, 246, 0.5);
+}
+
+[data-theme="dark"] .progress-log li:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+[data-theme="dark"] .progress-log li span:first-child {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .progress-timestamp {
+  color: #93c5fd;
+  background: linear-gradient(135deg, rgba(147, 197, 253, 0.2) 0%, rgba(147, 197, 253, 0.15) 100%);
+  border-color: rgba(147, 197, 253, 0.3);
+  box-shadow: 0 1px 3px rgba(147, 197, 253, 0.2);
+}
+
+[data-theme="dark"] .progress-timestamp:hover {
+  background: linear-gradient(135deg, rgba(147, 197, 253, 0.25) 0%, rgba(147, 197, 253, 0.18) 100%);
+  box-shadow: 0 2px 4px rgba(147, 197, 253, 0.3);
+}
+
+[data-theme="dark"] .processing-timeline {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 50%, rgba(30, 41, 59, 0.95) 100%);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3), 
+              0 4px 12px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .processing-timeline h4 {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .timeline-label {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .timeline-detail {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .timeline-log li span:first-child {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .timeline-timestamp {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .timeline-indicator {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(148, 163, 184, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .timeline-step.pending .timeline-indicator {
+  background: rgba(30, 41, 59, 0.5);
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+
 .processing-timeline {
-  border: 2px solid rgba(0, 102, 255, 0.15);
+  border: 2px solid rgba(0, 102, 255, 0.2);
   border-radius: 18px;
-  padding: 24px 28px;
+  padding: 28px 32px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 50%, rgba(241, 245, 249, 0.94) 100%);
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  box-shadow: 0 8px 32px rgba(0, 102, 255, 0.12), 
-              0 2px 8px rgba(0, 31, 68, 0.08),
+  gap: 24px;
+  box-shadow: 0 10px 40px rgba(0, 102, 255, 0.15), 
+              0 4px 12px rgba(0, 31, 68, 0.1),
               inset 0 1px 0 rgba(255, 255, 255, 1);
   backdrop-filter: blur(12px);
   position: relative;
   overflow: hidden;
+  transition: all 0.3s ease;
+  animation: fadeInTimeline 0.5s ease-out;
+}
+
+@keyframes fadeInTimeline {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .processing-timeline::before {
@@ -2925,24 +3199,26 @@ body::-webkit-scrollbar {
 
 .processing-timeline h4 {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  color: var(--navy);
+  color: #1e40af;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-bottom: 4px;
+  gap: 12px;
+  padding-bottom: 6px;
+  line-height: 1.4;
 }
 
 .processing-timeline h4::before {
   content: '';
-  width: 5px;
-  height: 18px;
-  background: linear-gradient(180deg, var(--indigo) 0%, #0052cc 100%);
+  width: 6px;
+  height: 20px;
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
   border-radius: 3px;
-  box-shadow: 0 2px 8px rgba(0, 102, 255, 0.3);
+  box-shadow: 0 2px 10px rgba(59, 130, 246, 0.4), 
+              0 1px 4px rgba(59, 130, 246, 0.3);
 }
 
 .processing-timeline h4::after {
@@ -3004,29 +3280,47 @@ body::-webkit-scrollbar {
 }
 
 .timeline-indicator {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  border: 2px solid rgba(148, 163, 184, 0.5);
+  border: 3px solid rgba(148, 163, 184, 0.6);
   margin-top: 4px;
   background: #ffffff;
+  box-shadow: 0 2px 6px rgba(148, 163, 184, 0.2);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .timeline-step.completed .timeline-indicator {
-  background: #2563eb;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border-color: #16a34a;
+  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.25), 
+              0 2px 8px rgba(34, 197, 94, 0.3);
 }
 
 .timeline-step.active .timeline-indicator {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-  box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.12);
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.2), 
+              0 2px 8px rgba(59, 130, 246, 0.4);
+  animation: timelinePulse 2s ease-in-out infinite;
+}
+
+@keyframes timelinePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.2), 
+                0 2px 8px rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.15), 
+                0 3px 12px rgba(59, 130, 246, 0.5);
+  }
 }
 
 .timeline-step.pending .timeline-indicator {
-  border-color: rgba(148, 163, 184, 0.5);
-  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(148, 163, 184, 0.6);
+  background: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 1px 3px rgba(148, 163, 184, 0.15);
 }
 
 .timeline-copy {
