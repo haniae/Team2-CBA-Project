@@ -923,6 +923,28 @@ def _sanitize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
+def _collect_series_from_facts(
+    engine: "AnalyticsEngine",
+    ticker: str,
+    metric: str,
+) -> Dict[int, float]:
+    """Query financial_facts directly for a metric and return year -> value mapping."""
+    series: Dict[int, float] = {}
+    try:
+        facts = engine.financial_facts(ticker=ticker, metric=metric)
+        for fact in facts:
+            if fact.fiscal_year and fact.value is not None:
+                series[fact.fiscal_year] = float(fact.value)
+        if series:
+            import logging
+            logging.getLogger(__name__).debug(f"Found {len(series)} years of {metric} from financial_facts for {ticker}")
+    except Exception as e:
+        # If query fails, return empty dict
+        import logging
+        logging.getLogger(__name__).debug(f"Failed to query {metric} from financial_facts for {ticker}: {e}")
+    return series
+
+
 def build_cfi_dashboard_payload(
     engine: "AnalyticsEngine",
     ticker: str,
@@ -1038,17 +1060,121 @@ def build_cfi_dashboard_payload(
     revenue_series = _collect_series(records, "revenue")
     ebitda_series = _collect_series(records, "ebitda")
     net_income_series = _collect_series(records, "net_income")
+    # If net_income not in metric_snapshots, try financial_facts
+    if not net_income_series:
+        net_income_series = _collect_series_from_facts(engine, canonical, "net_income")
+    
     net_margin_series = _collect_series(records, "net_margin")
     fcf_series = _collect_series(records, "free_cash_flow")
-    enterprise_series = _collect_series(records, "enterprise_value")
     operating_income_series = _collect_series(records, "operating_income")
     gross_profit_series = _collect_series(records, "gross_profit")
-    eps_series = _collect_series(records, "eps")
+    
+    # EPS: Try eps_diluted first, then eps_basic, then eps, then query financial_facts
+    eps_series = _collect_series(records, "eps_diluted")
+    if not eps_series:
+        eps_series = _collect_series(records, "eps_basic")
+    if not eps_series:
+        eps_series = _collect_series(records, "eps")
+    # If still not found, try querying financial_facts directly
+    if not eps_series:
+        eps_series = _collect_series_from_facts(engine, canonical, "eps_diluted")
+    if not eps_series:
+        eps_series = _collect_series_from_facts(engine, canonical, "eps_basic")
+    
     total_assets_series = _collect_series(records, "total_assets")
+    
+    # Total Debt: Try total_debt first, then calculate from long_term_debt + short_term_debt
     total_debt_series = _collect_series(records, "total_debt")
+    if not total_debt_series:
+        long_term_debt_series = _collect_series(records, "long_term_debt")
+        short_term_debt_series = _collect_series(records, "short_term_debt")
+        # If components not in metric_snapshots, try financial_facts
+        if not long_term_debt_series:
+            long_term_debt_series = _collect_series_from_facts(engine, canonical, "long_term_debt")
+        if not short_term_debt_series:
+            short_term_debt_series = _collect_series_from_facts(engine, canonical, "short_term_debt")
+        # Calculate total_debt from components
+        total_debt_series = {}
+        all_debt_years = set(long_term_debt_series) | set(short_term_debt_series)
+        for year in all_debt_years:
+            lt_debt = long_term_debt_series.get(year, 0) or 0
+            st_debt = short_term_debt_series.get(year, 0) or 0
+            if lt_debt or st_debt:
+                total_debt_series[year] = lt_debt + st_debt
+    # If still not found, try querying financial_facts directly
+    if not total_debt_series:
+        total_debt_series = _collect_series_from_facts(engine, canonical, "total_debt")
+    
+    # Enterprise Value: Try enterprise_value first, then calculate from market_cap + total_debt - cash
+    enterprise_series = _collect_series(records, "enterprise_value")
+    # If enterprise_value not in metric_snapshots, try financial_facts
+    if not enterprise_series:
+        enterprise_series = _collect_series_from_facts(engine, canonical, "enterprise_value")
+    
+    # If still not found, calculate enterprise_value from market_cap + total_debt - cash
+    if not enterprise_series:
+        market_cap_series = _collect_series(records, "market_cap")
+        if not market_cap_series:
+            market_cap_series = _collect_series_from_facts(engine, canonical, "market_cap")
+        cash_series = _collect_series(records, "cash_and_cash_equivalents")
+        if not cash_series:
+            cash_series = _collect_series(records, "cash")
+        if not cash_series:
+            cash_series = _collect_series_from_facts(engine, canonical, "cash_and_cash_equivalents")
+        if not cash_series:
+            cash_series = _collect_series_from_facts(engine, canonical, "cash")
+        
+        # Calculate EV = Market Cap + Total Debt - Cash
+        # Use years from any available series
+        ev_years = set()
+        if market_cap_series:
+            ev_years |= set(market_cap_series)
+        if total_debt_series:
+            ev_years |= set(total_debt_series)
+        if cash_series:
+            ev_years |= set(cash_series)
+        
+        if ev_years and (market_cap_series or total_debt_series):
+            enterprise_series = {}
+            for year in ev_years:
+                market_cap = market_cap_series.get(year, 0) if market_cap_series else 0
+                debt = total_debt_series.get(year, 0) if total_debt_series else 0
+                cash = cash_series.get(year, 0) if cash_series else 0
+                # Only calculate if we have at least market_cap or debt
+                if market_cap or debt:
+                    enterprise_series[year] = (market_cap or 0) + (debt or 0) - (cash or 0)
+            if enterprise_series:
+                import logging
+                logging.getLogger(__name__).debug(f"Calculated {len(enterprise_series)} years of enterprise_value from market_cap+debt-cash for {canonical}")
+    
     shares_series = _collect_series(records, "shares_outstanding")
+    if not shares_series:
+        shares_series = _collect_series(records, "weighted_avg_diluted_shares")
+    # If still not found, try querying financial_facts directly
+    if not shares_series:
+        shares_series = _collect_series_from_facts(engine, canonical, "shares_outstanding")
+    if not shares_series:
+        shares_series = _collect_series_from_facts(engine, canonical, "weighted_avg_diluted_shares")
+    
     gross_margin_series = _collect_series(records, "gross_margin")
 
+    # Calculate EPS from net_income / shares if not directly available
+    # EPS = Net Income / Shares Outstanding
+    # Note: Both net_income and shares should be in raw units (not millions/billions)
+    if not eps_series and net_income_series and shares_series:
+        eps_series = {}
+        eps_years = set(net_income_series) & set(shares_series)
+        for year in eps_years:
+            net_income = net_income_series.get(year)
+            shares = shares_series.get(year)
+            if net_income is not None and shares is not None and shares > 0:
+                # Both should already be in raw units from the database
+                # net_income is in dollars, shares is in number of shares
+                eps_series[year] = net_income / shares
+        if eps_series:
+            import logging
+            logging.getLogger(__name__).debug(f"Calculated {len(eps_series)} years of EPS from net_income/shares for {canonical}")
+    
     # Build years list from ALL metrics that will be displayed
     # This ensures we only show years where at least some data exists
     years_set = (
@@ -1063,7 +1189,8 @@ def build_cfi_dashboard_payload(
         set(total_debt_series) |
         set(shares_series) |
         set(gross_margin_series) |
-        set(net_margin_series)
+        set(net_margin_series) |
+        set(enterprise_series)  # Include enterprise_value for EV ratios
     )
     if not years_set:
         # Fallback: use enterprise_value if nothing else has data
