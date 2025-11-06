@@ -1113,6 +1113,38 @@ class BenchmarkOSChatbot:
         while len(self._context_cache) > self._MAX_CACHE_ENTRIES:
             self._context_cache.popitem(last=False)
 
+    def _fix_markdown_tables(self, text: str) -> str:
+        """
+        Fix malformed markdown tables where separator row is concatenated to header row.
+        
+        Example malformed table:
+            | Company | Ticker | Margin ||---|---|---|
+            | Apple | AAPL | 25% |
+        
+        Becomes:
+            | Company | Ticker | Margin |
+            | --- | --- | ---: |
+            | Apple | AAPL | 25% |
+        """
+        import re
+        
+        # Pattern to match malformed tables where separator is concatenated to header
+        # Matches: | Header1 | Header2 | Header3 ||---|---|---|
+        # Group 1: The header row (| Header1 | Header2 | Header3 |)
+        # Group 2: The separator (|---|---|---|)
+        pattern = r'(\|[^|\n]+(?:\|[^|\n]+)+\|)\s*(\|\s*-+\s*(?:\|\s*-+\s*)+\|)'
+        
+        def fix_table_match(match):
+            header_row = match.group(1).strip()
+            separator_row = match.group(2).strip()
+            # Return header and separator on separate lines
+            return f"{header_row}\n{separator_row}"
+        
+        # Fix all malformed tables
+        fixed_text = re.sub(pattern, fix_table_match, text)
+        
+        return fixed_text
+
     def _fetch_metrics_cached(
         self,
         ticker: str,
@@ -2297,6 +2329,10 @@ class BenchmarkOSChatbot:
             except ImportError:
                 pass
 
+            # CRITICAL: Fix malformed markdown tables before returning
+            if reply:
+                reply = self._fix_markdown_tables(reply)
+            
             emit("complete", "Response ready")
             return reply
         finally:
