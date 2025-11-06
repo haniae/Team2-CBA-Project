@@ -112,13 +112,63 @@ def _format_currency(value: Any) -> str:
 def _format_value(entry: Dict[str, Any]) -> str:
     value = entry.get("value")
     entry_type = entry.get("type")
+    label = (entry.get("label") or entry.get("id") or "").lower()
+    
     if value in (None, ""):
         return "N/A"
+    
+    # Try to infer type from label if not explicitly set
+    if not entry_type:
+        if isinstance(value, (int, float)):
+            # Check for specific patterns in label
+            if any(term in label for term in ["coverage", "turnover", "conversion"]):
+                # These are typically multiples
+                entry_type = "multiple"
+            elif any(term in label for term in ["ratio", "x", "times"]):
+                # Explicitly ratios/multiples
+                entry_type = "multiple"
+            elif any(term in label for term in ["cagr", "margin", "growth", "return"]):
+                # These are typically percentages
+                if abs(value) <= 1.5:
+                    entry_type = "percent"
+                elif abs(value) > 1.5 and abs(value) < 100:
+                    # Could be percentage (like 126% ROE) or multiple
+                    if "return" in label and abs(value) > 1:
+                        # Return metrics > 1 are typically percentages (126% = 1.26)
+                        entry_type = "percent"
+                    else:
+                        entry_type = "percent"
+                else:
+                    entry_type = "multiple"
+            else:
+                # Default inference based on value magnitude
+                if abs(value) <= 1.5:
+                    entry_type = "percent"
+                elif abs(value) > 1.5 and abs(value) < 100:
+                    entry_type = "multiple"
+                else:
+                    entry_type = "multiple"
+    
+    # Format based on type
     if entry_type == "percent":
         return _format_percent(value)
     if entry_type == "multiple":
         return _format_multiple(value)
-    return _format_currency(value)
+    
+    # Default: format as number with 2 decimal places
+    try:
+        number = float(value)
+        # If it's a small number (< 100), format as percentage
+        if abs(number) < 100 and abs(number) > 0.01:
+            # Check if it looks like a percentage (between 0 and 1)
+            if abs(number) <= 1.5:
+                return _format_percent(value)
+            # Otherwise format as number with 2 decimals
+            return f"{number:.2f}"
+        # For larger numbers, format as currency
+        return _format_currency(value)
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def _collect_kpi_rows(
