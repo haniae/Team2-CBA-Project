@@ -111,26 +111,33 @@ def _format_currency(value: Any) -> str:
 
 def _format_value(entry: Dict[str, Any]) -> str:
     """Format KPI values with exactly 2 decimal places."""
+    # Always use the raw value and format it ourselves to ensure exactly 2 decimal places
+    # Don't use formatted_value as it might have incorrect formatting
     value = entry.get("value")
     entry_type = entry.get("type")
     label = (entry.get("label") or entry.get("id") or "").lower()
     
+    # If value is None or empty, return N/A
     if value in (None, ""):
         return "N/A"
     
-    # Always ensure we have a numeric value
+    # Always ensure we have a numeric value - convert to float
+    # This handles both numeric types and string representations
     try:
         number = float(value)
     except (TypeError, ValueError):
-        return str(value)
+        # If it's not a number, return as-is (but sanitize)
+        return str(value) if value else "N/A"
     
     # Try to infer type from label if not explicitly set
     if not entry_type:
-        # Check for specific patterns in label
-        if any(term in label for term in ["coverage", "turnover", "conversion", "ratio", "x", "times", "debt to equity"]):
+        # Check for specific patterns in label - enhanced type inference
+        # Multiples/ratios patterns
+        if any(term in label for term in ["coverage", "turnover", "conversion", "ratio", "x", "times", "debt to equity", "p/e", "price-to", "ev/", "peg"]):
             # These are typically multiples
             entry_type = "multiple"
-        elif any(term in label for term in ["cagr", "margin", "growth", "return"]):
+        # Percentage patterns - comprehensive list
+        elif any(term in label for term in ["cagr", "margin", "growth", "return", "roe", "roic", "roa", "yield", "rate", "change", "increase", "decrease", "profit margin", "gross margin", "operating margin", "net margin"]):
             # These are typically percentages
             # For return metrics, values > 1 are still percentages (e.g., 1.26 = 126%)
             entry_type = "percent"
@@ -140,7 +147,7 @@ def _format_value(entry: Dict[str, Any]) -> str:
                 entry_type = "percent"
             elif abs(number) > 1.5 and abs(number) < 100:
                 # Could be percentage or multiple - check label
-                if any(term in label for term in ["ratio", "coverage", "conversion", "turnover"]):
+                if any(term in label for term in ["ratio", "coverage", "conversion", "turnover", "p/e", "price-to", "ev/", "peg"]):
                     entry_type = "multiple"
                 else:
                     entry_type = "percent"
@@ -148,10 +155,11 @@ def _format_value(entry: Dict[str, Any]) -> str:
                 entry_type = "multiple"
     
     # Format based on type - ALWAYS use 2 decimal places
+    # Use the numeric value, not the original value (which might be a string)
     if entry_type == "percent":
-        return _format_percent(value)
+        return _format_percent(number)
     if entry_type == "multiple":
-        return _format_multiple(value)
+        return _format_multiple(number)
     
     # Default: format as number with exactly 2 decimal places
     return f"{number:.2f}"
@@ -666,10 +674,16 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
         label_width = 50  # Label column (reduced slightly)
         # Calculate value width to fit all columns
         if columns:
-            available_width = max_page_width - label_width - 20  # 20mm for margins
+            # Use full page width: start at 10mm, use 190mm total width
+            # Available width = total width - label column width
+            available_width = max_page_width - label_width
+            # Calculate width per column - ensure ALL columns fit
+            # Use calculated width, with minimum 15mm only if space allows
             value_width = available_width / len(columns)
-            # Minimum 18mm per column, but allow smaller if needed to fit all
-            value_width = max(value_width, 15)  # Minimum 15mm per column
+            # Only apply minimum if we have enough space for all columns
+            if value_width >= 15:
+                value_width = max(value_width, 15)  # Use minimum 15mm when possible
+            # Otherwise use the calculated width to ensure all columns fit
         else:
             value_width = 30
         
@@ -733,11 +747,30 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             
             values = entry.get("values") or []
             row_type = entry.get("type")  # Get type from row (percent, multiple, currency, etc.)
-            # Ensure we process ALL values for ALL columns
-            for col_idx, value in enumerate(values):
-                if col_idx >= len(columns):
-                    break  # Safety check - don't process more values than columns
-                if isinstance(value, (int, float)):
+            row_label = (entry.get("label") or "").lower()
+            
+            # Infer type from label - label-based inference takes precedence for margins
+            # Even if row_type is set, check label for margin/percentage indicators
+            if any(term in row_label for term in ["margin", "cagr", "growth", "return", "roe", "roic", "roa", "yield", "rate"]):
+                # Margins and percentages should always be formatted as percentages
+                row_type = "percent"
+            elif not row_type:
+                # Only infer from other patterns if row_type not set and not a margin
+                if any(term in row_label for term in ["ratio", "coverage", "turnover", "conversion", "p/e", "ev/", "peg"]):
+                    row_type = "multiple"
+                elif any(term in row_label for term in ["revenue", "income", "profit", "cash flow", "assets", "debt", "shares"]):
+                    row_type = "currency"
+                else:
+                    row_type = "currency"  # Default to currency
+            
+            # Ensure we process ALL columns - iterate over columns, not just values
+            for col_idx in range(len(columns)):
+                # Get value for this column (may be None if not present)
+                value = values[col_idx] if col_idx < len(values) else None
+                
+                if value is None:
+                    formatted = "N/A"
+                elif isinstance(value, (int, float)):
                     # Format based on row type with 2 decimal places
                     if row_type == "percent":
                         formatted = _format_percent(value)
@@ -752,7 +785,7 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
                         # Default: format as currency with 2 decimal places
                         formatted = _format_currency(value)
                 else:
-                    formatted = _sanitize_text_for_pdf(str(value or "N/A")[:10])  # Reduced from 12 to 10
+                    formatted = _sanitize_text_for_pdf(str(value)[:10])  # Reduced from 12 to 10
                 pdf.cell(value_width, 5, formatted, border=1, align="R", fill=True)  # Reduced height from 6 to 5
             pdf.ln()
     
