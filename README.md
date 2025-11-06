@@ -1581,41 +1581,314 @@ Project/
 
 | File | Description |
 |------|-------------|
+| run_chatbot.py | Lightweight REPL entry point that calls BenchmarkOSChatbot.create(). Provides interactive CLI for chatbot queries. |
+| serve_chatbot.py | Convenience launcher for the FastAPI app (src/benchmarkos_chatbot/web.py). Starts web server on specified port. |
+| run_data_ingestion.ps1 | Windows PowerShell script for automated data ingestion. Wraps fill_data_gaps.py with Windows-specific settings. |
+| run_data_ingestion.sh | Unix/Linux script for automated data ingestion. Wraps fill_data_gaps.py with Unix-specific settings. |
+| pyproject.toml | Project metadata, dependencies, and pytest configuration. Adds src/ to PYTHONPATH for imports. |
+| requirements.txt | Python dependencies lockfile. Lists all required packages with version constraints. |
+| CHANGELOG.md | Project changelog documenting version history and changes. |
+| LICENSE | Project license (MIT). |
+| SECURITY.md | Security policy and vulnerability reporting guidelines. |
+| CODE_OF_CONDUCT.md | Code of conduct for contributors. |
+| CONTRIBUTING.md | Contribution guidelines and development workflow. |
+
+### 📜 Scripts
+
+#### Ingestion Scripts
+
+| File | Description |
+|------|-------------|
+| scripts/ingestion/fill_data_gaps.py | ⭐ **Recommended**: Smart gap-filling script that detects missing data, fetches from SEC EDGAR with rate limiting, handles retries, and provides progress tracking. |
+| scripts/ingestion/ingest_20years_sp500.py | Full 20-year historical ingestion for S&P 500 companies. Fetches comprehensive historical data. |
+| scripts/ingestion/batch_ingest.py | Batch ingestion with retry/backoff. Loads curated watch list with intelligent error handling. |
+| scripts/ingestion/ingest_companyfacts.py | SEC CompanyFacts API ingestion. Fetches company facts from SEC EDGAR CompanyFacts endpoint. |
+| scripts/ingestion/ingest_companyfacts_batch.py | Batch CompanyFacts ingestion. Processes multiple companies with rate limiting. |
+| scripts/ingestion/ingest_frames.py | SEC data frames ingestion. Downloads SEC data frames into Postgres for benchmarking. |
+| scripts/ingestion/ingest_from_file.py | Ingestion from file input. Reads ticker list from file and ingests data. |
+| scripts/ingestion/ingest_universe.py | Universe-based ingestion with resume support. Batch ingester that refreshes metrics after each chunk. |
+| scripts/ingestion/load_prices_stooq.py | Stooq price loader (fallback). Imports Stooq prices as a fallback when Yahoo throttles. |
+| scripts/ingestion/load_prices_yfinance.py | Yahoo Finance price loader. Fetches real-time and historical prices from Yahoo Finance. |
+| scripts/ingestion/load_ticker_cik.py | Ticker to CIK mapping loader. Maps ticker symbols to SEC CIK numbers. |
+| scripts/generate_aliases.py | Regenerates the S&P 500 alias universe (aliases.json). Updates ticker aliases for parser. |
+
+#### Utility Scripts
+
+| File | Description |
+|------|-------------|
 | scripts/utility/main.py | Rich CLI wrapper exposing metrics/table commands, abbreviations, and scenario helpers. |
-| run_chatbot.py | Lightweight REPL entry point that calls BenchmarkOSChatbot.create(). |
-| serve_chatbot.py | Convenience launcher for the FastAPI app (src/benchmarkos_chatbot/web.py). |
-| scripts/ingestion/batch_ingest.py | Loads the curated watch list with retry/backoff. |
-| scripts/ingestion/ingest_universe.py | Batch ingester with resume support; refreshes metrics after each chunk. |
-| scripts/ingestion/ingest_frames.py | Downloads SEC data frames into Postgres for benchmarking. |
-| scripts/ingestion/load_prices_stooq.py | Imports Stooq prices as a fallback when Yahoo throttles. |
-| scripts/generate_aliases.py | Regenerates the S&P 500 alias universe (aliases.json). |
-| requirements.txt | Runtime dependency lockfile. |
-| pyproject.toml | Project metadata, dependencies, and pytest configuration (adds src/ to PYTHONPATH). |
+| scripts/utility/check_database_simple.py | Database verification utility. Checks database integrity and connectivity. |
+| scripts/utility/check_ingestion_status.py | Ingestion status checker. Monitors ingestion progress and completion. |
+| scripts/utility/check_kpi_values.py | KPI validation utility. Validates KPI calculations and data quality. |
+| scripts/utility/check_braces.py | Syntax checking utility. Validates Python brace matching. |
+| scripts/utility/check_syntax.py | Code syntax validation. Checks Python syntax errors. |
+| scripts/utility/find_unclosed_brace.py | Brace matching utility. Finds unclosed braces in code. |
+| scripts/utility/combine_portfolio_files.py | Portfolio file combiner. Merges multiple portfolio files into one. |
+| scripts/utility/chat_terminal.py | Terminal chat interface. Provides terminal-based chatbot interface. |
+| scripts/utility/monitor_progress.py | Progress monitoring utility. Tracks and displays ingestion progress. |
+| scripts/utility/quick_status.py | Quick status check. Provides fast status overview of system. |
+| scripts/utility/show_complete_attribution.py | Attribution display utility. Shows complete performance attribution. |
+| scripts/utility/plotly_demo.py | Plotly chart examples. Demonstrates Plotly chart generation. |
+| scripts/utility/chat_metrics.py | Chat metrics utility. Analyzes chatbot usage metrics. |
+| scripts/utility/data_sources_backup.py | Data sources backup utility. Backs up data source configurations. |
+| scripts/utility/refresh_ticker_catalog.py | Ticker catalog refresh utility. Updates ticker catalog with latest data. |
 
-### 🔤 Parsing & Retrieval Components
-
-| File | Description |
-|------|-------------|
-| parsing/alias_builder.py | Normalises company mentions, loads alias sets, applies overrides, and resolves tickers with fuzzy fallbacks. |
-| parsing/aliases.json | Generated alias universe consumed at runtime. |
-| parsing/parse.py | Converts prompts into structured intents (tickers, metrics, periods, warnings). |
-| parsing/time_grammar.py | Flexible period parser covering fiscal/calendar ranges, lists, quarters, and relative windows. |
-
-### 🧪 Parser-Focused Tests
+### 🏗️ Core Components
 
 | File | Description |
 |------|-------------|
-| tests/test_alias_resolution.py | Validates alias coverage, manual overrides, fuzzy warnings, and ordering. |
-| tests/test_time_grammar.py | Ensures the time grammar handles ranges, lists, quarter formats, and two-digit years. |
-| tests/test_nl_parser.py | End-to-end structured intent checks for compare/trend prompts and parser warnings. |
+| src/benchmarkos_chatbot/analytics_engine.py | Core analytics engine performing KPI calculations, metric aggregations, and financial analysis. Central component for all financial calculations. |
+| src/benchmarkos_chatbot/chatbot.py | Main chatbot orchestration module. Integrates RAG layer, LLM client, context builder, and response verifier. Handles conversation flow and intent routing. |
+| src/benchmarkos_chatbot/config.py | Configuration management and settings loader. Reads environment variables, .env files, and provides default settings. |
+| src/benchmarkos_chatbot/database.py | Database abstraction layer supporting both SQLite and PostgreSQL. Handles schema migrations, connection pooling, and query execution. |
+| src/benchmarkos_chatbot/llm_client.py | LLM provider abstraction layer. Supports OpenAI API and local echo mode. Handles API calls, error handling, and response formatting. |
+| src/benchmarkos_chatbot/web.py | FastAPI web server providing REST API endpoints. Handles /chat, /metrics, /facts, /audit, and /health endpoints. Serves static files and web UI. |
+
+### 📥 Data & Ingestion
+
+| File | Description |
+|------|-------------|
+| src/benchmarkos_chatbot/data_ingestion.py | Data ingestion pipeline orchestrating SEC, Yahoo Finance, and Bloomberg data sources. Handles async ingestion, rate limiting, and error recovery. |
+| src/benchmarkos_chatbot/data_sources.py | Data source integrations for SEC EDGAR, Yahoo Finance, and Bloomberg. Provides client classes for each data source. |
+| src/benchmarkos_chatbot/external_data.py | External data providers for FRED (Federal Reserve Economic Data) and IMF (International Monetary Fund). Fetches macroeconomic indicators. |
+| src/benchmarkos_chatbot/macro_data.py | Macroeconomic data provider. Aggregates and normalizes macroeconomic indicators from multiple sources. |
+| src/benchmarkos_chatbot/multi_source_aggregator.py | Multi-source data aggregation. Combines data from multiple sources (SEC, Yahoo, FRED, IMF) into unified format. |
+| src/benchmarkos_chatbot/sec_bulk.py | SEC bulk data access. Provides caching and bulk access to SEC EDGAR data. |
+| src/benchmarkos_chatbot/secdb.py | SEC database utilities. Helper functions for SEC data access and normalization. |
+
+### 🧠 Context & RAG
+
+| File | Description |
+|------|-------------|
+| src/benchmarkos_chatbot/context_builder.py | Financial context builder for RAG layer. Assembles ML forecast details, portfolio data, financial metrics, SEC filings, and macroeconomic context. Includes "EXPLICIT DATA DUMP" section for technical details. |
+| src/benchmarkos_chatbot/ml_response_verifier.py | ML forecast response verification and enhancement. Verifies LLM responses include all required technical details (model architecture, hyperparameters, training details). Automatically enhances responses if details are missing. |
+| src/benchmarkos_chatbot/followup_context.py | Follow-up question context management. Maintains conversation context for follow-up questions and pronoun resolution. |
+| src/benchmarkos_chatbot/intent_carryover.py | Intent carryover between conversations. Preserves user intent across conversation turns for better context understanding. |
+
+### 🔤 Parsing & NLP
+
+| File | Description |
+|------|-------------|
+| src/benchmarkos_chatbot/parsing/alias_builder.py | Ticker alias resolution for S&P 500. Normalizes company mentions, loads alias sets, applies overrides, and resolves tickers with fuzzy fallbacks. |
+| src/benchmarkos_chatbot/parsing/aliases.json | Generated ticker aliases covering S&P 500 companies. Consumed at runtime by parser for ticker resolution. |
+| src/benchmarkos_chatbot/parsing/ontology.py | Metric ontology defining KPI definitions, synonyms, and relationships. Provides structured knowledge base for financial metrics. |
+| src/benchmarkos_chatbot/parsing/parse.py | Natural language parser converting prompts into structured intents. Extracts tickers, metrics, periods, and warnings from user queries. |
+| src/benchmarkos_chatbot/parsing/time_grammar.py | Time period parser handling fiscal/calendar ranges, lists, quarters, and relative windows. Flexible grammar for temporal expressions. |
+| src/benchmarkos_chatbot/parsing/abbreviations.py | Abbreviation expansion. Expands common financial abbreviations (e.g., "rev" → "revenue"). |
+| src/benchmarkos_chatbot/parsing/company_groups.py | Company group detection. Identifies and handles company groups (e.g., "FAANG", "tech companies"). |
+| src/benchmarkos_chatbot/parsing/comparative.py | Comparative language parsing. Handles comparative queries (e.g., "better than", "higher than", "compare"). |
+| src/benchmarkos_chatbot/parsing/conditionals.py | Conditional statement parsing. Handles conditional queries (e.g., "if revenue > 100B", "when P/E < 20"). |
+| src/benchmarkos_chatbot/parsing/fuzzy_quantities.py | Fuzzy quantity parsing. Handles approximate quantities (e.g., "around 100B", "roughly 50%"). |
+| src/benchmarkos_chatbot/parsing/metric_inference.py | Metric inference from context. Infers missing metrics from conversation context and query patterns. |
+| src/benchmarkos_chatbot/parsing/multi_intent.py | Multi-intent detection. Identifies and handles queries with multiple intents (e.g., "compare AAPL and MSFT revenue and earnings"). |
+| src/benchmarkos_chatbot/parsing/natural_filters.py | Natural language filters. Converts natural language filters into structured query filters. |
+| src/benchmarkos_chatbot/parsing/negation.py | Negation handling. Properly handles negated queries (e.g., "not revenue", "excluding tech"). |
+| src/benchmarkos_chatbot/parsing/question_chaining.py | Question chaining detection. Identifies related questions and maintains context across question chains. |
+| src/benchmarkos_chatbot/parsing/sentiment.py | Sentiment analysis. Analyzes sentiment in user queries and financial data. |
+| src/benchmarkos_chatbot/parsing/temporal_relationships.py | Temporal relationship parsing. Handles temporal relationships (e.g., "before 2020", "after Q3", "during 2021-2023"). |
+| src/benchmarkos_chatbot/parsing/trends.py | Trend detection. Identifies trend-related queries (e.g., "increasing", "declining", "stable"). |
+
+### ✏️ Spelling & Correction
+
+| File | Description |
+|------|-------------|
+| src/benchmarkos_chatbot/spelling/company_corrector.py | Company name spelling correction. Corrects misspelled company names using fuzzy matching. |
+| src/benchmarkos_chatbot/spelling/correction_engine.py | Main spelling correction engine. Orchestrates spelling correction for companies, metrics, and other entities. |
+| src/benchmarkos_chatbot/spelling/fuzzy_matcher.py | Fuzzy string matching. Provides fuzzy matching algorithms for entity resolution. |
+| src/benchmarkos_chatbot/spelling/metric_corrector.py | Metric name spelling correction. Corrects misspelled metric names using fuzzy matching. |
+
+### 🧭 Routing
+
+| File | Description |
+|------|-------------|
+| src/benchmarkos_chatbot/routing/enhanced_router.py | Enhanced intent routing with dashboard detection. Routes queries to appropriate handlers (dashboard, chatbot, export, etc.). |
+
+### 📊 Analytics Modules
+
+| File | Description |
+|------|-------------|
+| src/benchmarkos_chatbot/sector_analytics.py | Sector benchmarking using GICS sectors. Compares company metrics against sector averages and peers. |
+| src/benchmarkos_chatbot/anomaly_detection.py | Anomaly detection using Z-score analysis. Identifies outliers in financial metrics. |
+| src/benchmarkos_chatbot/predictive_analytics.py | Predictive analytics including regression and CAGR calculations. Provides forward-looking analysis. |
+| src/benchmarkos_chatbot/advanced_kpis.py | Advanced KPI calculator with 30+ financial ratios. Calculates complex metrics like EV/EBITDA, ROIC, FCF yield, etc. |
+
+### 💼 Portfolio Management
+
+| File | Description |
+|------|-------------|
+| src/benchmarkos_chatbot/portfolio.py | Main portfolio management module (combined). Provides portfolio validation, enrichment, statistics, exposure analysis, attribution, scenarios, and risk metrics. Central module for all portfolio operations. |
+| src/benchmarkos_chatbot/portfolio_optimizer.py | Portfolio optimization using mean-variance optimization. Optimizes portfolios for maximum Sharpe ratio, minimum variance, or target return. |
+| src/benchmarkos_chatbot/portfolio_risk_metrics.py | Risk metrics calculation including CVaR, VaR, Sharpe ratio, Sortino ratio, tracking error, and beta. Provides comprehensive risk analysis. |
+| src/benchmarkos_chatbot/portfolio_attribution.py | Performance attribution using Brinson-Fachler model. Decomposes active return into allocation, selection, and interaction effects. |
+| src/benchmarkos_chatbot/portfolio_scenarios.py | Scenario analysis and stress testing. Runs equity drawdown scenarios, sector rotation scenarios, and custom scenarios. |
+| src/benchmarkos_chatbot/portfolio_exposure.py | Exposure analysis for sector and factor exposure. Calculates sector allocation, factor exposures (beta, momentum, value, size, quality), and concentration metrics. |
+| src/benchmarkos_chatbot/portfolio_calculations.py | Portfolio calculation utilities. Helper functions for portfolio calculations (weights, returns, correlations, etc.). |
+| src/benchmarkos_chatbot/portfolio_enrichment.py | Portfolio enrichment with fundamentals. Enriches portfolio holdings with P/E ratios, dividend yields, ROE, ROIC, and sector classifications. |
+| src/benchmarkos_chatbot/portfolio_enhancements.py | Portfolio enhancement utilities. Additional utilities for portfolio enhancements and transformations. |
+| src/benchmarkos_chatbot/portfolio_reporting.py | Portfolio reporting utilities. Generates portfolio reports and summaries. |
+| src/benchmarkos_chatbot/portfolio_trades.py | Trade recommendation utilities. Generates buy/sell recommendations for portfolio rebalancing. |
+| src/benchmarkos_chatbot/portfolio_export.py | Portfolio export functionality for PowerPoint, PDF, and Excel. Generates professional portfolio reports. |
+| src/benchmarkos_chatbot/portfolio_ppt_builder.py | Portfolio PowerPoint builder. Creates 12-slide professional portfolio presentations. |
+
+### 🤖 ML Forecasting
+
+| File | Description |
+|------|-------------|
+| src/benchmarkos_chatbot/ml_forecasting/ml_forecaster.py | Main ML forecaster with model selection. Orchestrates all ML forecasting models and selects best model based on historical performance. |
+| src/benchmarkos_chatbot/ml_forecasting/arima_forecaster.py | ARIMA model for statistical time series forecasting. Best for short-term forecasts and trend-following patterns. Automatically optimizes hyperparameters using AIC/BIC. |
+| src/benchmarkos_chatbot/ml_forecasting/prophet_forecaster.py | Prophet model for seasonal pattern forecasting. Best for seasonal patterns, holidays, and long-term trends. Handles missing data and outliers. |
+| src/benchmarkos_chatbot/ml_forecasting/ets_forecaster.py | ETS model for exponential smoothing. Best for smooth trends and exponential growth/decay patterns. Automatically selects from 30 possible configurations. |
+| src/benchmarkos_chatbot/ml_forecasting/lstm_forecaster.py | LSTM model for deep learning RNN forecasting. Best for complex patterns, non-linear relationships, and long-term dependencies. Multi-layer architecture with dropout and batch normalization. |
+| src/benchmarkos_chatbot/ml_forecasting/transformer_forecaster.py | Transformer model for attention-based forecasting. Best for long-term dependencies and complex patterns. Multi-head attention architecture with positional encoding. |
+| src/benchmarkos_chatbot/ml_forecasting/preprocessing.py | Data preprocessing for scaling, normalization, outlier handling, and missing data treatment. Prepares time series data for ML models. |
+| src/benchmarkos_chatbot/ml_forecasting/feature_engineering.py | Feature engineering utilities. Creates technical indicators, lag features, and other engineered features for ML models. |
+| src/benchmarkos_chatbot/ml_forecasting/hyperparameter_tuning.py | Hyperparameter optimization using Optuna. Optimizes model hyperparameters using Bayesian optimization. |
+| src/benchmarkos_chatbot/ml_forecasting/backtesting.py | Model backtesting utilities. Tests model performance on historical data with walk-forward validation. |
+| src/benchmarkos_chatbot/ml_forecasting/validation.py | Model validation utilities. Validates model performance using cross-validation and holdout sets. |
+| src/benchmarkos_chatbot/ml_forecasting/explainability.py | Model explainability using SHAP values and attention weights. Provides insights into model predictions. |
+| src/benchmarkos_chatbot/ml_forecasting/uncertainty.py | Uncertainty quantification. Calculates prediction intervals and confidence bounds for forecasts. |
+| src/benchmarkos_chatbot/ml_forecasting/regime_detection.py | Regime detection for identifying market states. Detects different market regimes (bull, bear, volatile) in time series data. |
+| src/benchmarkos_chatbot/ml_forecasting/technical_indicators.py | Technical indicators for feature engineering. Calculates RSI, MACD, Bollinger Bands, and other technical indicators. |
+| src/benchmarkos_chatbot/ml_forecasting/external_factors.py | External factor integration. Incorporates external factors (macroeconomic indicators, market sentiment) into forecasts. |
+| src/benchmarkos_chatbot/ml_forecasting/multivariate_forecaster.py | Multivariate forecasting. Handles forecasting with multiple input variables and dependencies. |
+
+### 📤 Export & Presentation
+
+| File | Description |
+|------|-------------|
+| src/benchmarkos_chatbot/export_pipeline.py | Export pipeline for PDF, PPTX, and Excel generation. Orchestrates export generation for dashboards and reports. |
+| src/benchmarkos_chatbot/cfi_ppt_builder.py | CFI-style PowerPoint builder generating 12-slide professional presentations. Creates investment-grade presentations with charts and analysis. |
+| src/benchmarkos_chatbot/table_renderer.py | ASCII table rendering for CLI output. Formats financial data into readable tables. |
+
+### 🛠️ Utilities
+
+| File | Description |
+|------|-------------|
+| src/benchmarkos_chatbot/tasks.py | Task queue management. Handles background tasks, async operations, and task scheduling. |
+| src/benchmarkos_chatbot/help_content.py | Help content and documentation. Provides help text and documentation for chatbot features. |
+| src/benchmarkos_chatbot/dashboard_utils.py | Dashboard utility functions. Helper functions for dashboard generation and data formatting. |
+| src/benchmarkos_chatbot/document_processor.py | Document processing utilities. Extracts text from PDFs, Word documents, and other file formats. |
+| src/benchmarkos_chatbot/imf_proxy.py | IMF data proxy. Provides proxy access to IMF data sources. |
+| src/benchmarkos_chatbot/kpi_backfill.py | KPI backfill utilities. Backfills missing KPI values using interpolation and extrapolation. |
+| src/benchmarkos_chatbot/backfill_policy.py | Backfill policy management. Defines policies for data backfilling and gap filling. |
+| src/benchmarkos_chatbot/ticker_universe.py | Ticker universe management. Manages ticker universes (S&P 500, custom, etc.) and provides ticker lists. |
 
 ### 🌐 Web Assets
 
 | Path | Description |
 |------|-------------|
-| webui/app.js | SPA logic, progress timeline updates, settings panel, and chat interactions. |
-| webui/styles.css | Styling for the SPA (dark/light friendly, timeline badges, typography). |
-| webui/static/data/*.json | Precompiled KPI library and company universe metadata. |
+| webui/app.js | SPA logic, progress timeline updates, settings panel, and chat interactions. Handles real-time progress tracking and message rendering. |
+| webui/styles.css | Styling for the SPA (dark/light friendly, timeline badges, typography). Professional markdown formatting with custom fonts and spacing. |
+| webui/index.html | Web UI entry point. Main HTML file for the single-page application. |
+| webui/favicon.svg | Favicon for the web application. |
+| webui/package.json | Node.js dependencies for web UI development. |
+| webui/service-worker.js | Service worker for PWA functionality. Enables offline support and caching. |
+| webui/start_dashboard.js | Dashboard startup script. Initializes dashboard components. |
+| webui/cfi_dashboard.html | CFI dashboard HTML. Standalone dashboard page for company financial analysis. |
+| webui/cfi_dashboard.js | CFI dashboard JavaScript. Dashboard logic and interactivity. |
+| webui/cfi_dashboard.css | CFI dashboard styling. Dashboard-specific CSS. |
+| webui/cfi_compare.html | CFI compare view HTML. Comparison dashboard for multiple companies. |
+| webui/cfi_compare.js | CFI compare view JavaScript. Comparison logic and interactivity. |
+| webui/cfi_compare.css | CFI compare view styling. Comparison-specific CSS. |
+| webui/cfi_dense.html | CFI dense view HTML. Compact dashboard view. |
+| webui/cfi_dense.js | CFI dense view JavaScript. Dense view logic. |
+| webui/cfi_dense.css | CFI dense view styling. Dense view-specific CSS. |
+| src/benchmarkos_chatbot/static/app.js | Frontend application logic (SPA). Main JavaScript for web UI. |
+| src/benchmarkos_chatbot/static/styles.css | UI styling (markdown, progress indicator). Comprehensive CSS for all UI components. |
+| src/benchmarkos_chatbot/static/index.html | Web UI entry point. Main HTML file. |
+| src/benchmarkos_chatbot/static/favicon.svg | Favicon. |
+| src/benchmarkos_chatbot/static/cfi_dashboard.html | CFI dashboard HTML. |
+| src/benchmarkos_chatbot/static/cfi_dashboard.js | CFI dashboard JavaScript. |
+| src/benchmarkos_chatbot/static/cfi_dashboard.css | CFI dashboard styling. |
+| src/benchmarkos_chatbot/static/portfolio_dashboard.html | Portfolio dashboard HTML. Portfolio analysis dashboard. |
+| src/benchmarkos_chatbot/static/portfolio_dashboard.js | Portfolio dashboard JavaScript. Portfolio dashboard logic. |
+| src/benchmarkos_chatbot/static/data/company_universe.json | Company universe metadata. Precompiled company data for web UI. |
+| src/benchmarkos_chatbot/static/data/kpi_library.json | KPI library definitions. Precompiled KPI definitions for web UI. |
+
+### 🧪 Tests
+
+#### Unit Tests
+
+| File | Description |
+|------|-------------|
+| tests/unit/test_analytics.py | Analytics unit tests. Tests analytics engine functionality. |
+| tests/unit/test_analytics_engine.py | Analytics engine unit tests. Tests core analytics calculations. |
+| tests/unit/test_cli_tables.py | CLI table rendering tests. Tests ASCII table formatting. |
+| tests/unit/test_database.py | Database unit tests. Tests database operations and queries. |
+| tests/unit/test_data_ingestion.py | Data ingestion unit tests. Tests data ingestion pipeline. |
+
+#### Integration Tests
+
+| File | Description |
+|------|-------------|
+| tests/integration/test_chatbot_sec_fix.py | SEC integration tests. Tests SEC API integration and error handling. |
+| tests/integration/test_sec_api_fix.py | SEC API integration tests. Tests SEC API client functionality. |
+| tests/integration/test_new_analytics.py | New analytics integration tests. Tests new analytics features. |
+| tests/integration/test_dashboard_flow.py | Dashboard workflow integration tests. Tests end-to-end dashboard generation. |
+| tests/integration/test_fixes.py | General fixes integration tests. Tests various bug fixes. |
+| tests/integration/test_enhanced_routing.py | Enhanced routing integration tests. Tests intent routing functionality. |
+
+#### End-to-End Tests
+
+| File | Description |
+|------|-------------|
+| tests/e2e/test_all_sp500_dashboards.py | Full S&P 500 dashboard test. Tests dashboard generation for all S&P 500 companies. |
+| tests/e2e/test_sample_companies.py | Sample companies test (10 companies). Tests dashboard generation for sample companies. |
+| tests/e2e/test_single_company.py | Single company test (Apple). Tests dashboard generation for single company. |
+| tests/e2e/test_chatbot_stress_test.py | Chatbot stress test. Tests chatbot under high load. |
+| tests/e2e/test_chatgpt_style.py | ChatGPT-style test. Tests ChatGPT-style responses. |
+| tests/e2e/test_comprehensive_sources.py | Comprehensive sources test. Tests multi-source data aggregation. |
+| tests/e2e/test_ml_detailed_answers.py | ML detailed answers test. Tests ML forecast response detail and verification. |
+
+#### Parser & NLP Tests
+
+| File | Description |
+|------|-------------|
+| tests/test_alias_resolution.py | Alias resolution tests. Validates alias coverage, manual overrides, fuzzy warnings, and ordering. |
+| tests/test_time_grammar.py | Time grammar tests. Ensures time grammar handles ranges, lists, quarter formats, and two-digit years. |
+| tests/test_nl_parser.py | Natural language parser tests. End-to-end structured intent checks for compare/trend prompts and parser warnings. |
+| tests/test_abbreviations.py | Abbreviation tests. Tests abbreviation expansion functionality. |
+| tests/test_advanced_followups.py | Advanced follow-up tests. Tests follow-up question handling. |
+| tests/test_company_groups.py | Company group tests. Tests company group detection. |
+| tests/test_comparative_language.py | Comparative language tests. Tests comparative query parsing. |
+| tests/test_conditionals.py | Conditional statement tests. Tests conditional query parsing. |
+| tests/test_enhanced_intents.py | Enhanced intent tests. Tests enhanced intent detection. |
+| tests/test_enhanced_metric_synonyms.py | Enhanced metric synonym tests. Tests metric synonym expansion. |
+| tests/test_enhanced_question_patterns.py | Enhanced question pattern tests. Tests question pattern recognition. |
+| tests/test_followup_features_unit.py | Follow-up feature unit tests. Tests follow-up feature functionality. |
+| tests/test_fuzzy_quantities.py | Fuzzy quantity tests. Tests fuzzy quantity parsing. |
+| tests/test_metric_inference.py | Metric inference tests. Tests metric inference from context. |
+| tests/test_multi_intent.py | Multi-intent tests. Tests multi-intent detection. |
+| tests/test_natural_filters.py | Natural filter tests. Tests natural language filter parsing. |
+| tests/test_negation_handling.py | Negation handling tests. Tests negation handling in queries. |
+| tests/test_performance_benchmarks.py | Performance benchmark tests. Tests parser performance. |
+| tests/test_period_normalization.py | Period normalization tests. Tests period normalization. |
+| tests/test_pronoun_resolution.py | Pronoun resolution tests. Tests pronoun resolution in queries. |
+| tests/test_question_chaining.py | Question chaining tests. Tests question chaining detection. |
+| tests/test_sentiment.py | Sentiment analysis tests. Tests sentiment analysis functionality. |
+| tests/test_spelling_correction.py | Spelling correction tests. Tests spelling correction functionality. |
+| tests/test_temporal_relationships.py | Temporal relationship tests. Tests temporal relationship parsing. |
+| tests/test_time_period_enhancement.py | Time period enhancement tests. Tests time period enhancement. |
+| tests/test_trend_direction.py | Trend direction tests. Tests trend detection. |
+
+#### Portfolio Tests
+
+| File | Description |
+|------|-------------|
+| tests/test_portfolio_detection_working.py | Portfolio detection tests. Tests portfolio detection from user queries. |
+| tests/test_portfolio_patterns.py | Portfolio pattern tests. Tests portfolio pattern recognition. |
+| tests/test_portfolio_questions.py | Portfolio question tests. Tests portfolio question handling. |
+| tests/test_portfolio_stress_test.py | Portfolio stress test. Tests portfolio analysis under stress scenarios. |
+
+#### ML Forecasting Tests
+
+| File | Description |
+|------|-------------|
+| tests/test_all_forecast_prompts.py | All forecast prompt tests. Tests all ML forecasting prompt patterns. |
+| tests/test_forecast_detection.py | Forecast detection tests. Tests forecast query detection. |
+| tests/test_forecast_prompts.py | Forecast prompt tests. Tests forecast prompt patterns. |
+| tests/test_ml_context_debug.py | ML context debug tests. Tests ML context building and debugging. |
+| tests/test_ml_detailed_response.py | ML detailed response tests. Tests ML forecast response detail and verification. |
 
 ## ✅ Quality and Testing
 
