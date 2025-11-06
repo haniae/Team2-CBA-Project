@@ -237,9 +237,19 @@ body {
   display: none;
 }
 
-/* Hide valuation bar chart */
+/* Show valuation bar chart */
 .cfi-panel[data-area="valbar"] {
-  display: none;
+  display: flex;
+}
+
+/* Ensure chart panels are visible */
+.cfi-panel[data-area="rev"],
+.cfi-panel[data-area="ebitda"],
+.cfi-panel[data-area="pricechart"],
+.cfi-panel[data-area="valbar"] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .cfi-panel[data-area="sources"] .cfi-strip {
@@ -824,11 +834,14 @@ body {
 
 .plot {
   width: 100%;
+  min-height: 240px;
   height: 240px;
   border-radius: 4px;
   background: #ffffff;
   padding: 10px;
   position: relative;
+  display: block;
+  overflow: visible;
 }
 
 .plot::before {

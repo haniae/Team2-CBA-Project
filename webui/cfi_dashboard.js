@@ -990,21 +990,49 @@
 
   function plotRevenueChart(data) {
     const node = scopedQuery("cfi-rev");
-    if (!node) return;
+    if (!node) {
+      console.warn('[plotRevenueChart] Chart node not found');
+      return;
+    }
+    if (!window.Plotly) {
+      node.textContent = "Chart library loading...";
+      return;
+    }
     if (!data || !Array.isArray(data.Year) || !Array.isArray(data.Revenue)) {
+      console.warn('[plotRevenueChart] Invalid data:', { hasData: !!data, hasYear: Array.isArray(data?.Year), hasRevenue: Array.isArray(data?.Revenue) });
       node.textContent = "No revenue data.";
       return;
     }
+    
+    console.log('[plotRevenueChart] Data received:', {
+      yearCount: data.Year.length,
+      revenueCount: data.Revenue.length,
+      sampleYear: data.Year.slice(0, 3),
+      sampleRevenue: data.Revenue.slice(0, 3)
+    });
 
     const revenueSeries = buildNumericSeries(data.Year, data.Revenue, "Revenue");
+    console.log('[plotRevenueChart] Built series:', {
+      seriesLength: revenueSeries.length,
+      samplePoints: revenueSeries.slice(0, 3)
+    });
+    
     if (!revenueSeries.length) {
+      console.warn('[plotRevenueChart] No valid series data after buildNumericSeries');
       node.textContent = "No revenue data.";
       return;
     }
     const xValues = revenueSeries.map((point) => point.x);
     const yValues = revenueSeries.map((point) => point.y).filter(v => Number.isFinite(v));
     
+    console.log('[plotRevenueChart] Filtered values:', {
+      xValuesLength: xValues.length,
+      yValuesLength: yValues.length,
+      sampleYValues: yValues.slice(0, 3)
+    });
+    
     if (yValues.length === 0) {
+      console.warn('[plotRevenueChart] All values filtered out - no finite numbers');
       node.textContent = "No valid revenue data.";
       return;
     }
@@ -1066,12 +1094,68 @@
       bargap: 0.25,
       bargroupgap: 0.1
     };
-    Plotly.newPlot(node, sanitizePlotlyData(traces), sanitizePlotlyData(layout), CONFIG);
+    
+    // Debug logging
+    console.log('[plotRevenueChart] Rendering chart:', {
+      tracesCount: traces.length,
+      xValuesLength: xValues.length,
+      yValuesLength: yValues.length,
+      hasData: xValues.length > 0 && yValues.length > 0,
+      xValues: xValues.slice(0, 5),
+      yValues: yValues.slice(0, 5),
+      traces: traces.map(t => ({ 
+        type: t.type, 
+        name: t.name,
+        xLength: t.x?.length, 
+        yLength: t.y?.length,
+        xSample: t.x?.slice(0, 3),
+        ySample: t.y?.slice(0, 3),
+        yMin: t.y ? Math.min(...t.y.filter(v => Number.isFinite(v))) : null,
+        yMax: t.y ? Math.max(...t.y.filter(v => Number.isFinite(v))) : null
+      }))
+    });
+    
+    // Ensure we have valid traces with data
+    const validTraces = traces.filter(trace => {
+      const hasX = Array.isArray(trace.x) && trace.x.length > 0;
+      const hasY = Array.isArray(trace.y) && trace.y.length > 0;
+      return hasX && hasY;
+    });
+    
+    if (validTraces.length === 0) {
+      console.warn('[plotRevenueChart] No valid traces to render');
+      node.textContent = "No valid revenue data to display.";
+      return;
+    }
+    
+    try {
+      // Ensure node is visible and has dimensions
+      node.style.display = 'block';
+      node.style.visibility = 'visible';
+      node.style.opacity = '1';
+      if (node.offsetHeight === 0) {
+        node.style.minHeight = '240px';
+        node.style.height = '240px';
+      }
+      Plotly.newPlot(node, sanitizePlotlyData(validTraces), sanitizePlotlyData(layout), CONFIG);
+      // Resize chart to ensure it's visible
+      setTimeout(() => {
+        Plotly.Plots.resize(node);
+      }, 100);
+      console.log('[plotRevenueChart] Chart rendered successfully with', validTraces.length, 'traces');
+    } catch (error) {
+      console.error('[plotRevenueChart] Error rendering chart:', error);
+      node.textContent = `Chart error: ${error.message}`;
+    }
   }
 
   function plotEbitdaChart(data) {
     const node = scopedQuery("cfi-ebitda");
     if (!node) return;
+    if (!window.Plotly) {
+      node.textContent = "Chart library loading...";
+      return;
+    }
     if (!data || !Array.isArray(data.Year) || !Array.isArray(data.EBITDA)) {
       node.textContent = "No EBITDA data.";
       return;
@@ -1146,12 +1230,68 @@
       bargap: 0.25,
       bargroupgap: 0.1
     };
-    Plotly.newPlot(node, sanitizePlotlyData(traces), sanitizePlotlyData(layout), CONFIG);
+    
+    // Debug logging
+    console.log('[plotEbitdaChart] Rendering chart:', {
+      tracesCount: traces.length,
+      xValuesLength: xValues.length,
+      yValuesLength: yValues.length,
+      hasData: xValues.length > 0 && yValues.length > 0,
+      xValues: xValues.slice(0, 5),
+      yValues: yValues.slice(0, 5),
+      traces: traces.map(t => ({ 
+        type: t.type, 
+        name: t.name,
+        xLength: t.x?.length, 
+        yLength: t.y?.length,
+        xSample: t.x?.slice(0, 3),
+        ySample: t.y?.slice(0, 3),
+        yMin: t.y ? Math.min(...t.y.filter(v => Number.isFinite(v))) : null,
+        yMax: t.y ? Math.max(...t.y.filter(v => Number.isFinite(v))) : null
+      }))
+    });
+    
+    // Ensure we have valid traces with data
+    const validTraces = traces.filter(trace => {
+      const hasX = Array.isArray(trace.x) && trace.x.length > 0;
+      const hasY = Array.isArray(trace.y) && trace.y.length > 0;
+      return hasX && hasY;
+    });
+    
+    if (validTraces.length === 0) {
+      console.warn('[plotEbitdaChart] No valid traces to render');
+      node.textContent = "No valid EBITDA data to display.";
+      return;
+    }
+    
+    try {
+      // Ensure node is visible and has dimensions
+      node.style.display = 'block';
+      node.style.visibility = 'visible';
+      node.style.opacity = '1';
+      if (node.offsetHeight === 0) {
+        node.style.minHeight = '240px';
+        node.style.height = '240px';
+      }
+      Plotly.newPlot(node, sanitizePlotlyData(validTraces), sanitizePlotlyData(layout), CONFIG);
+      // Resize chart to ensure it's visible
+      setTimeout(() => {
+        Plotly.Plots.resize(node);
+      }, 100);
+      console.log('[plotEbitdaChart] Chart rendered successfully with', validTraces.length, 'traces');
+    } catch (error) {
+      console.error('[plotEbitdaChart] Error rendering chart:', error);
+      node.textContent = `Chart error: ${error.message}`;
+    }
   }
 
   function plotForecastChart(data) {
     const node = scopedQuery("cfi-forecast");
     if (!node) return;
+    if (!window.Plotly) {
+      node.textContent = "Chart library loading...";
+      return;
+    }
     if (!data || !Array.isArray(data.Year)) {
       node.textContent = "No forecast data.";
       return;
@@ -1213,12 +1353,66 @@
       },
       showlegend: true
     };
-    Plotly.newPlot(node, sanitizePlotlyData(traces), sanitizePlotlyData(layout), CONFIG);
+    
+    // Debug logging
+    console.log('[plotForecastChart] Rendering chart:', {
+      tracesCount: traces.length,
+      hasData: traces.length > 0,
+      traces: traces.map(t => ({ 
+        name: t.name, 
+        type: t.type, 
+        xLength: t.x?.length, 
+        yLength: t.y?.length,
+        xSample: t.x?.slice(0, 3),
+        ySample: t.y?.slice(0, 3),
+        yMin: t.y ? Math.min(...t.y.filter(v => v !== null && Number.isFinite(v))) : null,
+        yMax: t.y ? Math.max(...t.y.filter(v => v !== null && Number.isFinite(v))) : null
+      }))
+    });
+    
+    // Ensure we have valid traces with data
+    const validTraces = traces.filter(trace => {
+      const hasX = Array.isArray(trace.x) && trace.x.length > 0;
+      const hasY = Array.isArray(trace.y) && trace.y.length > 0;
+      // Check if y array has at least one finite number
+      const hasValidY = hasY && trace.y.some(v => v !== null && Number.isFinite(v));
+      return hasX && hasValidY;
+    });
+    
+    if (validTraces.length === 0) {
+      console.warn('[plotForecastChart] No valid traces to render');
+      node.textContent = "No valid forecast data to display.";
+      return;
+    }
+    
+    try {
+      // Ensure node is visible and has dimensions
+      node.style.display = 'block';
+      node.style.visibility = 'visible';
+      node.style.opacity = '1';
+      if (node.offsetHeight === 0) {
+        node.style.minHeight = '240px';
+        node.style.height = '240px';
+      }
+      Plotly.newPlot(node, sanitizePlotlyData(validTraces), sanitizePlotlyData(layout), CONFIG);
+      // Resize chart to ensure it's visible
+      setTimeout(() => {
+        Plotly.Plots.resize(node);
+      }, 100);
+      console.log('[plotForecastChart] Chart rendered successfully with', validTraces.length, 'traces');
+    } catch (error) {
+      console.error('[plotForecastChart] Error rendering chart:', error);
+      node.textContent = `Chart error: ${error.message}`;
+    }
   }
 
   function plotValuationBar(data, meta = {}) {
     const node = scopedQuery("cfi-valbar");
     if (!node) return;
+    if (!window.Plotly) {
+      node.textContent = "Chart library loading...";
+      return;
+    }
     if (!data || !Array.isArray(data.Case) || !Array.isArray(data.Value)) {
       node.textContent = "No valuation data.";
       return;
@@ -1339,7 +1533,58 @@
     const sanitizedTraces = sanitizePlotlyData(traces);
     const sanitizedLayout = sanitizePlotlyData(layout);
     
-    Plotly.newPlot(node, sanitizedTraces, sanitizedLayout, CONFIG);
+    // Debug logging
+    console.log('[plotValuationBar] Rendering chart:', {
+      tracesCount: sanitizedTraces.length,
+      xValuesLength: xValues.length,
+      yValuesLength: yValues.length,
+      hasData: xValues.length > 0 && yValues.length > 0,
+      xValues: xValues.slice(0, 5),
+      yValues: yValues.slice(0, 5),
+      traces: sanitizedTraces.map(t => ({ 
+        name: t.name, 
+        type: t.type, 
+        xLength: t.x?.length, 
+        yLength: t.y?.length,
+        xSample: t.x?.slice(0, 3),
+        ySample: t.y?.slice(0, 3),
+        yMin: t.y ? Math.min(...t.y.filter(v => Number.isFinite(v))) : null,
+        yMax: t.y ? Math.max(...t.y.filter(v => Number.isFinite(v))) : null
+      }))
+    });
+    
+    // Ensure we have valid traces with data
+    const validTraces = sanitizedTraces.filter(trace => {
+      const hasX = Array.isArray(trace.x) && trace.x.length > 0;
+      const hasY = Array.isArray(trace.y) && trace.y.length > 0;
+      return hasX && hasY;
+    });
+    
+    if (validTraces.length === 0) {
+      console.warn('[plotValuationBar] No valid traces to render');
+      node.textContent = "No valid valuation data to display.";
+      return;
+    }
+    
+    try {
+      // Ensure node is visible and has dimensions
+      node.style.display = 'block';
+      node.style.visibility = 'visible';
+      node.style.opacity = '1';
+      if (node.offsetHeight === 0) {
+        node.style.minHeight = '240px';
+        node.style.height = '240px';
+      }
+      Plotly.newPlot(node, validTraces, sanitizedLayout, CONFIG);
+      // Resize chart to ensure it's visible
+      setTimeout(() => {
+        Plotly.Plots.resize(node);
+      }, 100);
+      console.log('[plotValuationBar] Chart rendered successfully with', validTraces.length, 'traces');
+    } catch (error) {
+      console.error('[plotValuationBar] Error rendering chart:', error);
+      node.textContent = `Chart error: ${error.message}`;
+    }
   }
 
   function renderMeta(meta = {}) {
@@ -1815,10 +2060,106 @@
       
       attachExportHandlers(payload);
       const charts = payload.charts || {};
-      plotRevenueChart(charts.revenue_ev || null);
-      plotEbitdaChart(charts.ebitda_ev || null);
-      plotValuationBar(charts.valuation_bar || null, payload.valuation_data || {});
-      plotForecastChart(charts.forecast || null);
+      
+      // Debug logging
+      console.log('[CFI Dashboard] Charts data:', {
+        hasRevenueEv: !!charts.revenue_ev,
+        hasEbitdaEv: !!charts.ebitda_ev,
+        hasValuationBar: !!charts.valuation_bar,
+        hasForecast: !!charts.forecast,
+        plotlyLoaded: !!window.Plotly,
+        revenueEvData: charts.revenue_ev ? {
+          hasYear: Array.isArray(charts.revenue_ev.Year),
+          yearCount: charts.revenue_ev.Year?.length || 0,
+          hasRevenue: Array.isArray(charts.revenue_ev.Revenue),
+          revenueCount: charts.revenue_ev.Revenue?.length || 0,
+          sampleRevenue: charts.revenue_ev.Revenue?.slice(0, 3),
+          hasValidRevenue: charts.revenue_ev.Revenue?.some(v => v !== null && v !== undefined && Number.isFinite(v))
+        } : null,
+        ebitdaEvData: charts.ebitda_ev ? {
+          hasYear: Array.isArray(charts.ebitda_ev.Year),
+          yearCount: charts.ebitda_ev.Year?.length || 0,
+          hasEbitda: Array.isArray(charts.ebitda_ev.EBITDA),
+          ebitdaCount: charts.ebitda_ev.EBITDA?.length || 0,
+          sampleEbitda: charts.ebitda_ev.EBITDA?.slice(0, 3),
+          hasValidEbitda: charts.ebitda_ev.EBITDA?.some(v => v !== null && v !== undefined && Number.isFinite(v))
+        } : null,
+        forecastData: charts.forecast ? {
+          hasYear: Array.isArray(charts.forecast.Year),
+          yearCount: charts.forecast.Year?.length || 0,
+          hasBull: Array.isArray(charts.forecast.Bull),
+          hasBase: Array.isArray(charts.forecast.Base),
+          hasBear: Array.isArray(charts.forecast.Bear)
+        } : null,
+        valuationBarData: charts.valuation_bar ? {
+          hasCase: Array.isArray(charts.valuation_bar.Case),
+          caseCount: charts.valuation_bar.Case?.length || 0,
+          hasValue: Array.isArray(charts.valuation_bar.Value),
+          valueCount: charts.valuation_bar.Value?.length || 0,
+          hasValidValue: charts.valuation_bar.Value?.some(v => v !== null && v !== undefined && Number.isFinite(v))
+        } : null
+      });
+      
+      // Function to render charts with proper checks
+      const renderCharts = () => {
+        // Check if chart containers exist
+        const revNode = scopedQuery("cfi-rev");
+        const ebitdaNode = scopedQuery("cfi-ebitda");
+        const forecastNode = scopedQuery("cfi-forecast");
+        const valbarNode = scopedQuery("cfi-valbar");
+        
+        console.log('[CFI Dashboard] Chart containers:', {
+          revNode: !!revNode,
+          ebitdaNode: !!ebitdaNode,
+          forecastNode: !!forecastNode,
+          valbarNode: !!valbarNode
+        });
+        
+        if (!revNode || !ebitdaNode || !forecastNode || !valbarNode) {
+          console.warn('[CFI Dashboard] Chart containers not found, waiting for DOM...');
+          return false;
+        }
+        
+        if (!window.Plotly) {
+          console.warn('[CFI Dashboard] Plotly not loaded yet');
+          return false;
+        }
+        
+        // Ensure chart panels are visible
+        const revPanel = scopedSelect('[data-area="rev"]');
+        const ebitdaPanel = scopedSelect('[data-area="ebitda"]');
+        const forecastPanel = scopedSelect('[data-area="pricechart"]');
+        const valbarPanel = scopedSelect('[data-area="valbar"]');
+        
+        if (revPanel) revPanel.style.display = 'flex';
+        if (ebitdaPanel) ebitdaPanel.style.display = 'flex';
+        if (forecastPanel) forecastPanel.style.display = 'flex';
+        if (valbarPanel) valbarPanel.style.display = 'flex';
+        
+        // All checks passed, render charts
+        console.log('[CFI Dashboard] Rendering charts...');
+        plotRevenueChart(charts.revenue_ev || null);
+        plotEbitdaChart(charts.ebitda_ev || null);
+        plotValuationBar(charts.valuation_bar || null, payload.valuation_data || {});
+        plotForecastChart(charts.forecast || null);
+        return true;
+      };
+      
+      // Try to render immediately
+      if (!renderCharts()) {
+        // If containers don't exist or Plotly isn't loaded, wait and retry
+        let attempts = 0;
+        const maxAttempts = 50; // 5 seconds max
+        const checkInterval = setInterval(() => {
+          attempts++;
+          if (renderCharts() || attempts >= maxAttempts) {
+            clearInterval(checkInterval);
+            if (attempts >= maxAttempts) {
+              console.error('[CFI Dashboard] Failed to render charts after', maxAttempts, 'attempts');
+            }
+          }
+        }, 100);
+      }
       
       // Initialize enhancements
       setupSearch();
