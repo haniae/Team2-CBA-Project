@@ -1218,11 +1218,13 @@ class BenchmarkOSChatbot:
 
     def _fix_markdown_tables(self, text: str) -> str:
         """
-        Fix malformed markdown tables where separator row is concatenated to header row.
+        Fix malformed markdown tables:
+        1. Separator row concatenated to header row
+        2. Bold formatting within table cells (breaks alignment)
         
         Example malformed table:
             | Company | Ticker | Margin ||---|---|---|
-            | Apple | AAPL | 25% |
+            | **Apple** | AAPL | **25%** |
         
         Becomes:
             | Company | Ticker | Margin |
@@ -1231,7 +1233,7 @@ class BenchmarkOSChatbot:
         """
         import re
         
-        # Pattern to match malformed tables where separator is concatenated to header
+        # Fix 1: Pattern to match malformed tables where separator is concatenated to header
         # Matches: | Header1 | Header2 | Header3 ||---|---|---|
         # Group 1: The header row (| Header1 | Header2 | Header3 |)
         # Group 2: The separator (|---|---|---|)
@@ -1246,7 +1248,48 @@ class BenchmarkOSChatbot:
         # Fix all malformed tables
         fixed_text = re.sub(pattern, fix_table_match, text)
         
-        return fixed_text
+        # Fix 2: Remove bold formatting from table cells (not headers)
+        # Split text into lines and process each line
+        lines = fixed_text.split('\n')
+        fixed_lines = []
+        in_table = False
+        past_separator = False
+        
+        for line in lines:
+            # Detect table rows (lines starting with |)
+            if line.strip().startswith('|'):
+                in_table = True
+                # Detect separator row (contains only |, -, :, and whitespace)
+                if re.match(r'^\s*\|[\s\-:|]+\s*$', line):
+                    past_separator = True
+                    fixed_lines.append(line)
+                    continue
+                
+                # If we're past the separator (in data rows), remove bold from cells
+                if past_separator:
+                    # Remove ** from table cells but preserve the | delimiters
+                    # Split by | to get cells
+                    cells = line.split('|')
+                    cleaned_cells = []
+                    for i, cell in enumerate(cells):
+                        # Don't modify first/last empty cells (before first | and after last |)
+                        if i == 0 or i == len(cells) - 1:
+                            cleaned_cells.append(cell)
+                        else:
+                            # Remove ** bold formatting from cell content
+                            cleaned_cell = cell.replace('**', '')
+                            cleaned_cells.append(cleaned_cell)
+                    line = '|'.join(cleaned_cells)
+                
+                fixed_lines.append(line)
+            else:
+                # Not a table line - reset table state
+                if in_table:
+                    in_table = False
+                    past_separator = False
+                fixed_lines.append(line)
+        
+        return '\n'.join(fixed_lines)
 
     def _fetch_metrics_cached(
         self,
