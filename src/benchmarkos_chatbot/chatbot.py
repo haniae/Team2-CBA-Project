@@ -4862,11 +4862,28 @@ class BenchmarkOSChatbot:
         """Best-effort ticker extraction from user text (tickers + company names)."""
         candidates: List[str] = []
         seen = set()
+        
+        # CRITICAL: Check if this is a sector comparison query
+        # If asking about "tech sector" or "finance sector", don't extract sector names as tickers
+        lowered = text.lower()
+        sector_context_patterns = [
+            r'\b(?:tech|technology|financial?|finance|healthcare|energy)\s+(?:sector|industry|companies)',
+            r'\b(?:the\s+)?(?:tech|technology|financial?|finance|healthcare|energy)\s+(?:sector|industry)',
+            r'\bsector.*compare|compare.*sector',
+        ]
+        is_sector_query = any(re.search(pattern, lowered) for pattern in sector_context_patterns)
 
         for token in _TICKER_TOKEN_PATTERN.findall(text.upper()):
             normalized = token.upper()
             if normalized in _COMMON_WORDS:
                 continue
+            
+            # CRITICAL: If this is a sector query, filter out sector names that are also tickers
+            if is_sector_query:
+                sector_names_as_tickers = {"TECH", "IT", "FINANCE", "OIL", "GAS", "RETAIL"}
+                if normalized in sector_names_as_tickers:
+                    continue
+            
             if normalized not in seen:
                 seen.add(normalized)
                 candidates.append(normalized)
