@@ -2068,6 +2068,11 @@ class BenchmarkOSChatbot:
                 sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
                 
                 filter_query_patterns = [
+                    # CRITICAL: Sector-to-sector comparison queries (e.g., "How does finance compare to tech?")
+                    rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+                    rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+                    rf'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+                    rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)\s+(?:the\s+)?(?:{sector_pattern})',
                     # "Analyze the [sector] sector: which companies..." (sector mentioned earlier in sentence)
                     rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
                     # "Show/List/Find [sector] companies"
@@ -2410,6 +2415,11 @@ class BenchmarkOSChatbot:
         sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
         
         filter_query_patterns = [
+            # CRITICAL: Sector-to-sector comparison queries (e.g., "How does finance compare to tech?")
+            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+            rf'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)\s+(?:the\s+)?(?:{sector_pattern})',
             # "Analyze the [sector] sector: which companies..." (sector mentioned earlier)
             rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
             # "Show/List/Find [sector] companies"
@@ -4399,6 +4409,11 @@ class BenchmarkOSChatbot:
         sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
         
         filter_patterns = [
+            # CRITICAL: Sector-to-sector comparison queries (e.g., "How does finance compare to tech?")
+            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+            rf'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)\s+(?:the\s+)?(?:{sector_pattern})',
             # "Analyze the [sector] sector: which companies..." (sector mentioned earlier)
             rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
             # "Show/List/Find [sector] companies"
@@ -4920,6 +4935,10 @@ class BenchmarkOSChatbot:
             r'\b(?:tech|technology|financial?|finance|healthcare|energy)\s+(?:sector|industry|companies)',
             r'\b(?:the\s+)?(?:tech|technology|financial?|finance|healthcare|energy)\s+(?:sector|industry)',
             r'\bsector.*compare|compare.*sector',
+            r'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:tech|technology|financial?|finance)\s+(?:sector|industry)\s+compare',
+            r'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:tech|technology|financial?|finance)\s+compare\s+(?:to|with|vs\.?)',
+            r'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:tech|technology|financial?|finance)\s+(?:sector|industry)',
+            r'\b(?:tech|technology|financial?|finance)\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)',
         ]
         is_sector_query = any(re.search(pattern, lowered) for pattern in sector_context_patterns)
 
