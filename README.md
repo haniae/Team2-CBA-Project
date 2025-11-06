@@ -22,10 +22,10 @@ This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washin
 
 ### 👥 Team
 
-- **Hania A.** - Analytics Lead
-- **Van Nhi Vuong** - Portfolio Strategy
-- **Malcolm Muoriyarwa** - Risk Officer
-- **Devarsh Patel** - Compliance Analyst
+- **Hania A.** 
+- **Van Nhi Vuong** 
+- **Malcolm Muoriyarwa**
+- **Devarsh Patel** 
 - **Professor Patrick Hall** - Supervising Faculty (The George Washington University)
 
 ### 🎯 Project Focus
@@ -35,8 +35,6 @@ This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washin
 - 📚 **Practitioner-Ready Documentation** - Deliver deployment runbooks and testing strategies so stakeholders can re-create the practicum outcomes after the semester concludes
 
 ## 💼 User Story and Pain Points
-
-> **Real-World Scenario:** Picture a Monday 8 a.m. stand-up in GW's practicum lab. Hania, acting as the analytics lead at a mid-sized asset manager, receives an urgent request from Van Nhi, who plays the portfolio strategist responsible for deciding which industrial names to overweight this quarter. Malcolm, the risk officer, wants to confirm that every metric driving the recommendation can be traced back to a filing or price feed, while Devarsh, modeling the compliance analyst, needs evidence that no unvetted prompt will expose sensitive data. Before BenchmarkOS, the team burned hours stitching CSVs from EDGAR, refreshing brittle spreadsheets, and copy-pasting numbers into chat threads-introducing latency, version drift, and audit nightmares. With the chatbot, they ask "Compare RTX and LMT revenue trajectories post-2022" and receive deterministic KPIs, lineage breadcrumbs, and warnings when data freshness slips. The story mirrors the real stakeholders we observed during practicum interviews: analysts juggling multiple tickers, risk partners demanding reproducibility, and compliance leaders seeking transparent guardrails. BenchmarkOS exists to calm that Monday chaos by fusing reliable data pipelines with an explainable conversational layer.
 
 | Main group | Sub-group | Role / examples | Goals when using chatbot | Current pain points | Key needs from chatbot |
 |------------|-----------|----------------|-------------------------|-------------------|----------------------|
@@ -163,28 +161,445 @@ Four sophisticated analytics modules deliver institutional-grade capabilities:
 
 These modules transform BenchmarkOS into a professional analytics platform comparable to Bloomberg Terminal and FactSet.
 
+## 📊 Portfolio Management 
+
+BenchmarkOS includes comprehensive **portfolio management capabilities** that enable institutional-grade portfolio analysis, optimization, and risk management. The portfolio system supports multiple portfolios, automatic detection from user queries, and sophisticated analytics.
+
+### 🎯 Core Portfolio Features
+
+#### 1. **Portfolio Detection & Management**
+- **Automatic Detection**: System automatically detects portfolio-related queries and extracts portfolio identifiers
+- **Multiple Portfolios**: Support for managing multiple portfolios simultaneously (e.g., `port_abc123`, `port_xyz789`)
+- **Portfolio Upload**: Upload portfolios via CSV files with ticker, weight, or shares+price columns
+- **Portfolio Storage**: Persistent storage of portfolio holdings, metadata, and analysis results
+
+#### 2. **Portfolio Holdings Analysis**
+- **Holdings Display**: View all tickers, weights, shares, current prices, and market values
+- **Fundamental Enrichment**: Automatic enrichment with P/E ratios, dividend yields, ROE, ROIC, and sector classifications
+- **Sector Breakdown**: GICS sector classification for all holdings
+- **Concentration Metrics**: HHI (Herfindahl-Hirschman Index), top 10 concentration, max weights
+
+**Example Queries:**
+```
+✅ "Show my portfolio holdings"
+✅ "What are the holdings for port_abc123?"
+✅ "Show holdings for port_abc123"
+✅ "Use portfolio port_abc123"
+```
+
+#### 3. **Portfolio Exposure Analysis**
+- **Sector Exposure**: Weight breakdown across 11 GICS sectors (Technology, Financials, Healthcare, etc.)
+- **Factor Exposure**: Beta, momentum, value, size, and quality factor exposures
+- **Concentration Analysis**: HHI, top 10 concentration ratio, maximum position weights
+- **Geographic Exposure**: Regional allocation (if available in data)
+
+**Example Queries:**
+```
+✅ "What's my portfolio exposure?"
+✅ "Show portfolio sector exposure"
+✅ "Analyze exposure for port_abc123"
+✅ "What's my factor exposure?"
+```
+
+#### 4. **Portfolio Optimization**
+- **Mean-Variance Optimization**: Optimize for maximum Sharpe ratio, minimum variance, or target return
+- **Constraint Support**: Sector limits, position limits, turnover constraints
+- **Rebalancing Recommendations**: Specific buy/sell recommendations with expected impact
+- **Performance Projections**: Expected return, variance, and Sharpe ratio for optimized portfolio
+
+**Example Queries:**
+```
+✅ "Optimize my portfolio"
+✅ "Rebalance portfolio port_abc123"
+✅ "Optimize for maximum Sharpe ratio"
+```
+
+#### 5. **Performance Attribution (Brinson-Fachler)**
+- **Active Return Decomposition**: Total active return broken down into allocation, selection, and interaction effects
+- **Top Contributors**: Best performing positions and their contribution to portfolio returns
+- **Top Detractors**: Worst performing positions and their impact
+- **Sector-Level Analysis**: Which sectors drove portfolio performance
+
+**Example Queries:**
+```
+✅ "Show portfolio attribution"
+✅ "What's driving my portfolio performance?"
+✅ "Attribution analysis for port_abc123"
+```
+
+#### 6. **Risk Metrics & Stress Testing**
+- **CVaR (Conditional Value at Risk)**: Expected shortfall at 95% confidence level
+- **VaR (Value at Risk)**: Maximum expected loss at specified confidence level
+- **Volatility**: Portfolio volatility and individual position contributions
+- **Sharpe Ratio**: Risk-adjusted return metric
+- **Sortino Ratio**: Downside risk-adjusted return
+- **Tracking Error**: Active risk vs. benchmark (S&P 500)
+- **Beta**: Portfolio beta vs. market
+
+**Example Queries:**
+```
+✅ "What's my portfolio CVaR?"
+✅ "Calculate CVaR for port_abc123"
+✅ "Portfolio expected shortfall"
+✅ "What's my portfolio tracking error?"
+```
+
+#### 7. **Scenario Analysis & Stress Testing**
+- **Equity Drawdown Scenarios**: Test portfolio performance under market crashes (e.g., -20%, -30%)
+- **Sector Rotation Scenarios**: Analyze impact of sector-specific shocks (e.g., tech sector -30%)
+- **Custom Scenarios**: Define custom market scenarios with position-specific impacts
+- **Monte Carlo Simulation**: Probabilistic scenario analysis with thousands of simulations
+
+**Example Queries:**
+```
+✅ "What if the market crashes 20%?"
+✅ "Stress test my portfolio"
+✅ "What happens if tech sector drops 30%?"
+✅ "Monte Carlo simulation for port_abc123"
+```
+
+#### 8. **ESG & Sustainability Analysis**
+- **ESG Scores**: Overall portfolio ESG score and component scores (Environmental, Social, Governance)
+- **Holding-Level ESG**: ESG scores for individual positions
+- **Sector ESG**: Average ESG scores by sector
+- **Controversy Detection**: Portfolio controversy level and flagging of controversial holdings
+
+**Example Queries:**
+```
+✅ "What's my portfolio ESG score?"
+✅ "Show ESG exposure for port_abc123"
+✅ "Analyze portfolio ESG"
+```
+
+#### 9. **Tax Analysis**
+- **Tax Liability Estimation**: Estimated taxes if positions were sold
+- **Tax-Adjusted Returns**: Returns after accounting for tax implications
+- **Gain/Loss Breakdown**: Unrealized gains and losses by position
+- **Holding Period Classification**: Short-term vs. long-term capital gains
+- **Wash Sale Detection**: Identification of potential wash sale issues
+
+**Example Queries:**
+```
+✅ "Tax analysis for my portfolio"
+✅ "What's my tax-adjusted return?"
+✅ "Tax-aware analysis for port_abc123"
+```
+
+#### 10. **Diversification Analysis**
+- **Diversification Ratio**: Measure of diversification benefit
+- **Effective Number of Holdings**: Equivalent number of equal-weighted positions
+- **Risk Contribution Analysis**: Which positions drive portfolio risk
+- **Diversification Recommendations**: Specific suggestions to improve diversification
+
+**Example Queries:**
+```
+✅ "How diversified is my portfolio?"
+✅ "Diversification score for port_abc123"
+✅ "Show portfolio concentration"
+```
+
+#### 11. **Portfolio Export & Reporting**
+- **PowerPoint Export**: 12-slide professional presentation with portfolio summary, holdings, exposure charts, performance attribution, risk metrics, and recommendations
+- **PDF Export**: Multi-page PDF report with executive summary, holdings table, charts, and risk analysis
+- **Excel Export**: Multi-tab workbook with holdings sheet, exposure breakdowns, performance attribution table, and risk metrics
+
+**Example Queries:**
+```
+✅ "Export portfolio as PowerPoint"
+✅ "Generate PDF report for port_abc123"
+✅ "Export to Excel"
+```
+
+### 📋 Portfolio Data Structure
+
+Portfolios are stored with the following structure:
+- **Portfolio ID**: Unique identifier (e.g., `port_abc123`)
+- **Holdings**: List of tickers with weights, shares, prices, and market values
+- **Metadata**: Creation date, last updated, portfolio name, description
+- **Statistics**: Pre-calculated portfolio statistics (P/E, dividend yield, concentration, etc.)
+- **Risk Metrics**: Pre-calculated risk metrics (CVaR, VaR, volatility, Sharpe ratio, etc.)
+- **Exposure**: Sector and factor exposure breakdowns
+
+### 🔧 Technical Implementation
+
+**Key Files:**
+- `src/benchmarkos_chatbot/portfolio.py` - Main portfolio management module
+- `src/benchmarkos_chatbot/portfolio_optimizer.py` - Portfolio optimization algorithms
+- `src/benchmarkos_chatbot/portfolio_risk_metrics.py` - Risk metric calculations
+- `src/benchmarkos_chatbot/portfolio_attribution.py` - Performance attribution (Brinson-Fachler)
+- `src/benchmarkos_chatbot/portfolio_scenarios.py` - Scenario analysis and stress testing
+- `src/benchmarkos_chatbot/portfolio_export.py` - Export functionality (PowerPoint, PDF, Excel)
+
+**Documentation:** See `docs/guides/PORTFOLIO_QUESTIONS_GUIDE.md` for complete portfolio query examples and response formats.
+
+## 🤖 Machine Learning Forecasting (NEW)
+
+BenchmarkOS includes **sophisticated machine learning forecasting capabilities** that provide institutional-grade financial predictions using multiple ML models. The forecasting system integrates seamlessly with the RAG layer to provide detailed, technically accurate forecasts.
+
+### 🎯 ML Forecasting Models
+
+BenchmarkOS supports **7 different ML forecasting models**, each optimized for different use cases:
+
+#### 1. **ARIMA (AutoRegressive Integrated Moving Average)**
+- **Best For**: Short-term forecasts, trend-following patterns
+- **Method**: Statistical time series model with auto-regression and moving averages
+- **Hyperparameters**: Automatically optimized using AIC/BIC criteria
+- **Features**: Handles seasonality, trend decomposition, confidence intervals
+
+#### 2. **Prophet (Facebook's Time Series Forecasting)**
+- **Best For**: Seasonal patterns, holidays, long-term trends
+- **Method**: Additive time series model with seasonality components
+- **Hyperparameters**: Automatically tuned for yearly, weekly, daily seasonality
+- **Features**: Handles missing data, outliers, changepoints
+
+#### 3. **ETS (Exponential Smoothing State Space Model)**
+- **Best For**: Smooth trends, exponential growth/decay patterns
+- **Method**: State space model with error, trend, and seasonality components
+- **Hyperparameters**: Automatically selected from 30 possible model configurations
+- **Features**: Handles additive/multiplicative trends and seasonality
+
+#### 4. **LSTM (Long Short-Term Memory Neural Network)**
+- **Best For**: Complex patterns, non-linear relationships, long-term dependencies
+- **Method**: Deep learning recurrent neural network
+- **Architecture**: Multi-layer LSTM with dropout, batch normalization
+- **Training**: Optimized with Adam optimizer, early stopping, learning rate scheduling
+- **Features**: Handles complex patterns, learns from historical data
+
+#### 5. **GRU (Gated Recurrent Unit)**
+- **Best For**: Similar to LSTM but faster training, similar accuracy
+- **Method**: Simplified RNN architecture with gating mechanisms
+- **Architecture**: Multi-layer GRU with dropout and batch normalization
+- **Training**: Optimized with Adam optimizer, early stopping
+- **Features**: Faster than LSTM, good for real-time forecasting
+
+#### 6. **Transformer (Attention-Based Architecture)**
+- **Best For**: Long-term dependencies, complex patterns, attention to important periods
+- **Method**: Attention-based neural network architecture
+- **Architecture**: Multi-head attention, positional encoding, feed-forward layers
+- **Training**: Optimized with Adam optimizer, learning rate scheduling
+- **Features**: State-of-the-art for time series with long dependencies
+
+#### 7. **Ensemble (Combines Multiple Models)**
+- **Best For**: Maximum accuracy, robust predictions
+- **Method**: Weighted combination of ARIMA, Prophet, ETS, LSTM, GRU, and Transformer
+- **Weighting**: Optimized based on historical performance
+- **Features**: Best accuracy, reduces model-specific errors
+
+#### 8. **Auto (Automatic Model Selection)**
+- **Best For**: Ease of use, automatic best model selection
+- **Method**: Automatically selects best-performing model based on historical data
+- **Selection Criteria**: Cross-validation performance, AIC/BIC, forecast accuracy
+- **Features**: No need to specify model - system picks the best one
+
+### 📊 Forecasting Capabilities
+
+#### **Supported Metrics:**
+- **Revenue/Sales**: Revenue forecasts with growth rates
+- **Net Income/Earnings**: Earnings forecasts with margin analysis
+- **Free Cash Flow**: Cash flow forecasts with FCF margin
+- **EBITDA**: EBITDA forecasts with margin trends
+- **Other Metrics**: Profit, margin, EPS, assets, liabilities, and more
+
+#### **Forecast Horizons:**
+- **Short-term**: 1-2 years (recommended for ARIMA, Prophet)
+- **Medium-term**: 3-5 years (recommended for LSTM, GRU, Transformer)
+- **Long-term**: 5+ years (recommended for Ensemble, Auto)
+
+#### **Forecast Outputs:**
+- **Point Forecasts**: Predicted values for each period
+- **Confidence Intervals**: 95% confidence intervals (upper and lower bounds)
+- **Growth Rates**: Year-over-year growth rates and multi-year CAGR
+- **Trend Classification**: Increasing, decreasing, stable, or volatile trends
+- **Model Confidence**: Confidence score (0-1) indicating forecast reliability
+- **Technical Details**: Complete model architecture, hyperparameters, training details
+
+### 🔍 Enhanced RAG Integration
+
+The ML forecasting system is **deeply integrated with the RAG layer** to provide comprehensive, technically detailed forecasts:
+
+#### **1. Explicit Data Dump Section**
+- **Purpose**: Ensures LLM receives ALL technical details in structured format
+- **Content**: Model architecture, hyperparameters, training details, computational details, model-specific parameters
+- **Format**: Key-value pairs for easy extraction and inclusion in responses
+- **Mandate**: LLM is explicitly instructed to include EVERY value from this section
+
+#### **2. Enhanced Context Building**
+The `context_builder.py` module builds comprehensive ML forecast context including:
+- **Forecast Values**: All predicted values with confidence intervals
+- **Model Details**: Complete technical specifications (layers, units, epochs, loss, learning rate, batch size, etc.)
+- **Training Process**: Training loss, validation loss, early stopping, learning rate schedule
+- **Data Preprocessing**: Scaling methods, outlier handling, missing data treatment
+- **Feature Engineering**: Features created for the model
+- **Model Selection**: Why this model was chosen, alternative models considered
+- **Performance Metrics**: Training metrics, validation metrics, forecast accuracy
+- **Forecast Analysis**: Year-over-year growth, CAGR, confidence interval uncertainty
+- **Sector Comparison**: How forecast compares to sector averages and peers
+- **Scenario Analysis**: Bull/base/bear scenarios based on confidence intervals
+- **Risk Analysis**: Model confidence, downside risks, upside opportunities
+
+#### **3. Response Verification**
+The `ml_response_verifier.py` module ensures responses include all required technical details:
+- **Strict Mode**: When "EXPLICIT DATA DUMP" is present, verifies exact value matches
+- **Required Checks**: Verifies presence of model architecture, hyperparameters, training details, computational details
+- **Enhancement**: Automatically appends missing technical details if LLM response is incomplete
+- **Categorization**: Groups missing details by category (architecture, training, hyperparameters, etc.)
+
+#### **4. System Prompt Enhancements**
+The chatbot system prompt includes explicit instructions for ML forecasts:
+- **Mandatory Inclusion**: Instructions to include EVERY value from "EXPLICIT DATA DUMP"
+- **No Summarization**: Explicit prohibition against summarizing technical details
+- **Exact Values**: Instructions to use exact numerical values (e.g., "training loss is 0.001234" not "training loss is low")
+- **Technical Depth**: Minimum 500-1000 words for forecast responses
+- **Professional Formatting**: Markdown formatting guidelines for professional presentation
+
+### 📋 Example Forecast Queries
+
+#### **Basic Forecasts:**
+```
+✅ "Forecast Apple's revenue"
+✅ "Predict Microsoft's revenue for the next 3 years"
+✅ "What's the revenue forecast for Tesla?"
+✅ "Estimate Amazon's earnings"
+✅ "Project Google's free cash flow"
+```
+
+#### **Method-Specific:**
+```
+✅ "Forecast Apple's revenue using ARIMA"
+✅ "Predict Tesla's earnings with Prophet"
+✅ "LSTM forecast for Microsoft's revenue"
+✅ "Transformer forecast for Google's revenue"
+✅ "Ensemble forecast for NVIDIA's earnings"
+✅ "Auto forecast for Amazon's revenue"
+```
+
+#### **Metric-Specific:**
+```
+✅ "Forecast Apple's revenue"
+✅ "Predict Tesla's net income"
+✅ "Estimate Microsoft's free cash flow"
+✅ "Project Google's EBITDA"
+✅ "Forecast NVIDIA's earnings"
+```
+
+#### **Time Period-Specific:**
+```
+✅ "Forecast Apple's revenue for the next 2 years"
+✅ "Predict Tesla's earnings for the next 3 years"
+✅ "What's the revenue outlook for Microsoft over the next 5 years?"
+✅ "Estimate Amazon's revenue for upcoming years"
+```
+
+#### **Combined Queries:**
+```
+✅ "Forecast Apple's revenue using ARIMA for the next 3 years"
+✅ "Predict Tesla's earnings with Prophet for the next 5 years"
+✅ "What's the LSTM forecast for Google's revenue over the next 3 years?"
+✅ "Estimate Microsoft's free cash flow using Transformer for the next 2 years"
+```
+
+### 📚 Documentation
+
+- **Complete Prompt Guide**: See `docs/guides/ALL_ML_FORECASTING_PROMPTS.md` for all working forecast prompts
+- **Quick Reference**: See `docs/guides/ML_FORECASTING_QUICK_REFERENCE.md` for quick reference guide
+- **Technical Details**: See `src/benchmarkos_chatbot/ml_forecasting/` for implementation details
+
 ## 🏗️ Architecture Map
 
 See [`docs/architecture.md`](docs/architecture.md) for the complete component diagram. The latest revision includes the structured parsing pipeline (alias_builder.py, parse.py, time_grammar.py) and the retrieval layer that feeds grounded artefacts into the LLM alongside the existing CLI, FastAPI, analytics, and ingestion components.
 
 ## 🧠 Retrieval & ML Internals
 
-BenchmarkOS combines **deterministic data prep** with **retrieval-augmented generation (RAG)** so every answer traces back to persisted facts.
+BenchmarkOS combines **deterministic data prep** with **retrieval-augmented generation (RAG)** so every answer traces back to persisted facts. The RAG layer has been significantly enhanced to support portfolio management and machine learning forecasting with comprehensive technical details.
 
 ### 🔤 Natural-Language Parsing (Deterministic)
 
 - src/benchmarkos_chatbot/parsing/alias_builder.py loads a generated aliases.json covering the S&P 500. It normalises free-text mentions, resolves ticker aliases, applies manual overrides (Alphabet, Berkshire share classes, JP Morgan, AT&T), and when needed performs a fuzzy fallback and emits warnings.
 - parse_to_structured in parsing/parse.py orchestrates alias resolution, metric synonym detection, and the flexible time grammar (time_grammar.py). It returns a strict JSON intent schema that downstream planners consume and store (conversation.last_structured_response["parser"]).
+- **Portfolio Detection**: The parser automatically detects portfolio-related queries and extracts portfolio identifiers (e.g., `port_abc123`) from user queries.
+- **ML Forecast Detection**: The parser detects forecast-related keywords (`forecast`, `predict`, `estimate`, `projection`, etc.) and routes queries to the ML forecasting system.
 
 ### 🔍 Retrieval Layer (RAG)
 
 - 📊 Structured intents route directly into AnalyticsEngine, reading metric snapshots, KPI overrides, and fact tables from SQLite/Postgres
 - 🔐 Retrieved artefacts (tables, benchmark comparisons, audit trails) become RAG "system" messages that condition the LLM, ensuring no fabricated values slip through
+- **Portfolio Context**: When portfolio queries are detected, the system retrieves portfolio holdings, exposure data, risk metrics, and attribution results from the portfolio database
+- **ML Forecast Context**: When forecast queries are detected, the system retrieves historical time series data, runs ML forecasting models, and builds comprehensive technical context including model architecture, hyperparameters, training details, and forecast results
+- **Multi-Source Aggregation**: The RAG layer aggregates data from multiple sources (SEC EDGAR, Yahoo Finance, FRED, IMF) to provide comprehensive context for financial queries
 
 ### 🎯 Generation / Machine Learning
 
 - 🤖 `llm_client.py` abstracts provider selection (local echo vs. OpenAI). The model verbalises retrieved metrics, summarises trends, and surfaces parser warnings
 - 📈 Scenario and benchmarking flows blend deterministic calculations (growth rates, spreads) with LLM narration, preserving numeric accuracy while keeping explanations natural
+- **Enhanced ML Forecast Responses**: The system prompt includes explicit instructions for ML forecasts, mandating inclusion of ALL technical details from the "EXPLICIT DATA DUMP" section. The `ml_response_verifier.py` module post-processes responses to ensure all required technical details are present.
+- **Portfolio Response Enhancement**: The system prompt includes explicit instructions for portfolio analysis, mandating use of actual portfolio data (tickers, weights, metrics) and prohibiting hallucination of portfolio details.
+- **Response Verification**: The `ml_response_verifier.py` module verifies ML forecast responses include all required technical details (model architecture, hyperparameters, training details, computational details) and automatically enhances responses if details are missing.
+
+### 🔧 RAG Enhancements for ML Forecasting
+
+The RAG layer has been significantly enhanced to support detailed ML forecasting:
+
+#### **1. Explicit Data Dump Section**
+- **Purpose**: Ensures LLM receives ALL technical details in structured format
+- **Content**: Model architecture (layers, units, activation functions), hyperparameters (learning rate, batch size, epochs), training details (loss values, validation metrics), computational details (training time, memory usage), model-specific parameters (ARIMA orders, Prophet seasonality, LSTM/GRU/Transformer architecture)
+- **Format**: Key-value pairs for easy extraction and inclusion in responses
+- **Mandate**: LLM is explicitly instructed to include EVERY value from this section without summarization
+
+#### **2. Enhanced Context Building**
+The `context_builder.py` module builds comprehensive ML forecast context including:
+- **Forecast Values**: All predicted values with 95% confidence intervals (upper and lower bounds)
+- **Model Details**: Complete technical specifications (layers, units, epochs, loss, learning rate, batch size, optimizer, activation functions, dropout rates, etc.)
+- **Training Process**: Training loss, validation loss, early stopping criteria, learning rate schedule, convergence metrics
+- **Data Preprocessing**: Scaling methods (standardization, normalization), outlier handling, missing data treatment, feature engineering
+- **Model Selection**: Why this model was chosen, alternative models considered, model comparison metrics
+- **Performance Metrics**: Training metrics (loss, accuracy), validation metrics, forecast accuracy (MAE, RMSE, MAPE), cross-validation scores
+- **Forecast Analysis**: Year-over-year growth rates, multi-year CAGR, confidence interval uncertainty analysis
+- **Sector Comparison**: How forecast compares to sector averages and peers, percentile rankings
+- **Scenario Analysis**: Bull/base/bear scenarios based on confidence intervals, upside potential, downside risk
+- **Risk Analysis**: Model confidence scores, downside risks, upside opportunities, data quality warnings
+
+#### **3. Response Verification & Enhancement**
+The `ml_response_verifier.py` module ensures responses include all required technical details:
+- **Strict Mode**: When "EXPLICIT DATA DUMP" is present, verifies exact value matches (not just keyword mentions)
+- **Required Checks**: Verifies presence of model architecture, hyperparameters, training details, computational details, model-specific parameters
+- **Enhancement**: Automatically appends missing technical details if LLM response is incomplete, grouped by category (architecture, training, hyperparameters, computational, other)
+- **Categorization**: Groups missing details by category for better readability when appending to response
+
+#### **4. System Prompt Enhancements**
+The chatbot system prompt includes explicit instructions for ML forecasts:
+- **Mandatory Inclusion**: Instructions to include EVERY value from "EXPLICIT DATA DUMP" without summarization
+- **No Summarization**: Explicit prohibition against summarizing technical details (e.g., "training loss is low" is prohibited - must say "training loss is 0.001234")
+- **Exact Values**: Instructions to use exact numerical values from the context (e.g., "training loss is {X.XXXXXX}" not "training loss is low")
+- **Technical Depth**: Minimum 500-1000 words for forecast responses, suitable for institutional analysts
+- **Professional Formatting**: Markdown formatting guidelines for professional presentation (headers, bold text, lists, tables, blockquotes)
+
+### 🔧 RAG Enhancements for Portfolio Management
+
+The RAG layer has been enhanced to support comprehensive portfolio analysis:
+
+#### **1. Portfolio Context Building**
+The `context_builder.py` module builds comprehensive portfolio context including:
+- **Holdings Data**: All tickers, weights, shares, prices, market values, sectors, fundamental metrics
+- **Exposure Analysis**: Sector exposure, factor exposure (beta, momentum, value, size, quality), concentration metrics (HHI, top 10 concentration)
+- **Portfolio Statistics**: Weighted average P/E, dividend yield, ROE, ROIC, concentration ratios, diversification metrics
+- **Risk Metrics**: Pre-calculated CVaR, VaR, volatility, Sharpe ratio, Sortino ratio, tracking error, beta
+- **Performance Attribution**: Brinson-Fachler attribution with allocation, selection, and interaction effects
+- **Scenario Results**: Stress test results, scenario analysis outcomes, Monte Carlo simulation results
+
+#### **2. Portfolio Response Instructions**
+The system prompt includes explicit instructions for portfolio analysis:
+- **Use Actual Data**: Mandates use of actual portfolio data (tickers, weights, metrics) from the portfolio context
+- **No Hallucination**: Explicit prohibition against making up portfolio data - must use data from context
+- **Quote Exact Numbers**: Instructions to reference exact tickers, weights, and metrics (e.g., "AAPL is 15.2% of the portfolio")
+- **Specific Recommendations**: Instructions to provide specific rebalancing actions based on actual portfolio composition
+- **Risk Metric Usage**: Instructions to use pre-calculated risk metrics from portfolio context, not estimate them
+
+#### **3. Multi-Source Portfolio Context**
+The RAG layer aggregates portfolio data from multiple sources:
+- **SEC Filings**: 10-K, 10-Q filings for top holdings
+- **Yahoo Finance**: Real-time prices, analyst ratings, market data
+- **Portfolio Database**: Holdings, weights, historical performance, risk metrics
+- **Sector Analytics**: Sector benchmarks, peer comparisons, percentile rankings
 
 ### 🛠️ Tooling & Coverage
 
