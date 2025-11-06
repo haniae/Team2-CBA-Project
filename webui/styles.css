@@ -2871,10 +2871,8 @@ body::-webkit-scrollbar {
   left: 50%;
   transform: translate(-50%, -50%);
   color: white;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  animation: errorAppear 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 @keyframes errorAppear {
@@ -2927,13 +2925,6 @@ body::-webkit-scrollbar {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.6;
-  font-weight: 500;
-  margin-top: 2px;
-}
-
-.progress-step.active .progress-label {
-  color: #1e40af;
-  font-weight: 600;
 }
 
 .progress-log {
