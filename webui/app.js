@@ -340,30 +340,48 @@ const PREFERS_REDUCED_MOTION = (() => {
 })();
 
 const TICKER_STOPWORDS = new Set([
-  "THE",
-  "AND",
-  "WITH",
-  "KPI",
-  "EPS",
-  "ROE",
-  "FCF",
-  "PE",
-  "TSR",
-  "LTM",
-  "FY",
-  "API",
-  "DATA",
-  "THIS",
-  "THAT",
-  "YOY",
-  "TTM",
-  "GROWTH",
-  "METRIC",
-  "METRICS",
-  "SUMMARY",
-  "REPORT",
-  "SCENARIO",
-  "K",
+  // Common words
+  "THE", "AND", "WITH", "FOR", "FROM", "ABOUT", "SHOW", "TELL",
+  "THIS", "THAT", "THEM", "THEIR", "THOSE", "THESE",
+  "ARE", "WAS", "WERE", "BEEN", "BEING",
+  
+  // Question words
+  "WHAT", "WHICH", "WHERE", "WHEN", "WHY", "HOW", "WHO",
+  
+  // Verbs (prevent "HAS", "CAN", "DID", etc. being treated as tickers)
+  "HAS", "HAVE", "HAD", "CAN", "COULD", "WOULD", "SHOULD", "WILL",
+  "DID", "DOES", "DO", "DONE", "MAY", "MIGHT", "MUST",
+  "IS", "ARE", "WAS", "WERE",
+  
+  // Sector/industry words (prevent sector names being treated as tickers)
+  "TECH", "TECHNOLOGY", "SOFTWARE", "HARDWARE", "SEMICONDUCTOR", "SEMIS", "CHIP",
+  "FINANCIAL", "FINANCE", "BANKING", "BANK", "BANKS", "INSURANCE", "FINTECH",
+  "HEALTHCARE", "HEALTH", "PHARMA", "PHARMACEUTICAL", "BIOTECH", "MEDICAL", "DRUG",
+  "ENERGY", "OIL", "GAS", "PETROLEUM", "RENEWABLES", "CLEAN",
+  "CONSUMER", "RETAIL", "ECOMMERCE", "CPG", "DISCRETIONARY", "STAPLES",
+  "INDUSTRIAL", "MANUFACTURING", "AEROSPACE", "DEFENSE", "MACHINERY",
+  "PROPERTY", "REIT", "REITS",
+  "UTILITY", "UTILITIES", "POWER", "ELECTRIC", "WATER", "INFRASTRUCTURE",
+  "MATERIALS", "MINING", "METALS", "CHEMICALS", "COMMODITIES",
+  "COMMUNICATION", "TELECOM", "MEDIA", "ENTERTAINMENT", "BROADCASTING",
+  "SECTOR", "INDUSTRY",
+  
+  // Company descriptors
+  "COMPANY", "COMPANIES", "STOCK", "STOCKS", "FIRM", "FIRMS",
+  "BEST", "TOP", "GOOD", "BETTER", "HIGHEST", "LOWEST", "WORST",
+  "MOST", "LEAST", "MORE", "LESS",
+  
+  // Metrics (existing)
+  "KPI", "EPS", "ROE", "FCF", "PE", "TSR", "LTM", "FY",
+  "YOY", "TTM", "GROWTH", "METRIC", "METRICS",
+  "MARGIN", "MARGINS", "PROFIT", "REVENUE", "EARNINGS",
+  
+  // Report types
+  "SUMMARY", "REPORT", "SCENARIO", "ANALYSIS", "INSIGHT",
+  
+  // Other common words
+  "API", "DATA", "K", "ALL", "ANY", "SOME", "EACH",
+  "GET", "GIVE", "LIST", "FIND",
 ]);
 
 let reportMenu = null;
@@ -542,6 +560,7 @@ let companyUniversePromise = null;
 const METRIC_KEYWORD_MAP = [
   { regex: /\bgrowth|cagr|yoy\b/i, label: "Growth" },
   { regex: /\brevenue\b/i, label: "Revenue" },
+  { regex: /\bprofit\s*margin|profitability\b/i, label: "Profitability" },
   { regex: /\bmargin\b/i, label: "Margin" },
   { regex: /\bearnings|\beps\b/i, label: "Earnings" },
   { regex: /\bcash\s*flow|\bcf\b/i, label: "Cash Flow" },
@@ -6521,7 +6540,12 @@ function composeTitleComponents({ tickers, period, metricLabel, intentInfo }) {
     });
   };
 
-  if (tickers.length >= 2) {
+  // If no valid tickers, use metric as the main subject
+  if (tickers.length === 0) {
+    if (metricLabel) {
+      pushWord(metricLabel);
+    }
+  } else if (tickers.length >= 2) {
     pushWord(tickers[0]);
     pushWord("vs");
     pushWord(tickers[1]);
@@ -6573,7 +6597,7 @@ function composeTitleComponents({ tickers, period, metricLabel, intentInfo }) {
 
   const fallbackWords = ["Insight", "Report", "Overview", "Brief"];
   let fallbackIndex = 0;
-  while (words.length < 4 && fallbackIndex < fallbackWords.length) {
+  while (words.length < 2 && fallbackIndex < fallbackWords.length) {
     pushWord(fallbackWords[fallbackIndex]);
     fallbackIndex += 1;
   }
@@ -6602,11 +6626,58 @@ function buildSemanticSummary(prompt) {
   if (!trimmed) {
     return { title: "Untitled Chat", intent: "insight", tickers: [], period: "", metric: "" };
   }
+  
+  // Extract metadata for internal use
   const tickers = extractTickers(trimmed);
   const period = extractPeriod(trimmed);
   const intentInfo = detectIntentMeta(trimmed, tickers);
   const metricLabel = detectMetricLabel(trimmed, intentInfo.intent);
-  const title = composeTitleComponents({ tickers, period, metricLabel, intentInfo });
+  
+  // ChatGPT-style title: Use actual query text, cleaned up
+  let title = trimmed;
+  
+  // Remove common question/command starters (case-insensitive)
+  const startersToRemove = [
+    /^what'?s\s+/i,
+    /^how'?s\s+/i,
+    /^show\s+me\s+/i,
+    /^show\s+/i,
+    /^tell\s+me\s+/i,
+    /^give\s+me\s+/i,
+    /^can\s+you\s+/i,
+    /^could\s+you\s+/i,
+    /^please\s+/i,
+    /^i\s+want\s+to\s+know\s+/i,
+    /^i\s+need\s+/i,
+  ];
+  
+  for (const regex of startersToRemove) {
+    title = title.replace(regex, '');
+  }
+  
+  // Capitalize first letter
+  title = title.charAt(0).toUpperCase() + title.slice(1);
+  
+  // Clean up multiple spaces
+  title = title.replace(/\s+/g, ' ').trim();
+  
+  // Truncate intelligently at word boundary if too long
+  const maxLength = 50;
+  if (title.length > maxLength) {
+    // Find last space before maxLength
+    let truncateAt = title.lastIndexOf(' ', maxLength);
+    if (truncateAt === -1 || truncateAt < 20) {
+      // No good word boundary, just cut at maxLength
+      truncateAt = maxLength;
+    }
+    title = title.slice(0, truncateAt).trim() + '…';
+  }
+  
+  // Fallback if title is empty after cleaning
+  if (!title || title.length < 3) {
+    title = composeTitleComponents({ tickers, period, metricLabel, intentInfo });
+  }
+  
   return {
     title: title || "Untitled Chat",
     intent: intentInfo.intent,

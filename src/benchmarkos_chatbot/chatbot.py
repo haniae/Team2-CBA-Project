@@ -2018,8 +2018,63 @@ class BenchmarkOSChatbot:
                 ]
                 is_question = any(re.search(pattern, lowered_input) for pattern in question_patterns)
                 
-                # Only do ticker summary for bare ticker mentions, NOT questions or forecasting queries
-                if not is_question:
+                # CRITICAL: Check for filter queries - these should NEVER generate dashboards
+                # Comprehensive sector patterns with all variations
+                SECTOR_PATTERNS = (
+                    # Technology variations
+                    r'tech|technology|software|hardware|semiconductor|semis?|chip|it\b',
+                    # Financial variations  
+                    r'financial?|finance|banking|banks?|insurance|fintech',
+                    # Healthcare variations
+                    r'healthcare|health|pharma|pharmaceutical|biotech|medical|drug',
+                    # Energy variations
+                    r'energy|oil|gas|petroleum|renewables?|clean energy',
+                    # Consumer variations
+                    r'consumer|retail|e-commerce|ecommerce|cpg|discretionary|staples',
+                    # Industrial variations
+                    r'industrial|manufacturing|aerospace|defense|machinery',
+                    # Real Estate variations
+                    r'real estate|property|reit|reits',
+                    # Utilities variations
+                    r'utilit(?:y|ies)|power|electric|water|infrastructure',
+                    # Materials variations
+                    r'materials?|mining|metals?|chemicals?|commodit(?:y|ies)',
+                    # Communication variations
+                    r'communication|telecom|media|entertainment|broadcasting',
+                )
+                sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
+                
+                filter_query_patterns = [
+                    # "Show/List/Find [sector] companies"
+                    rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
+                    # "Which [sector] company"
+                    rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
+                    # "Which companies in [sector]"
+                    rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
+                    # "Companies in [sector] sector/industry"
+                    rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+                    # "[Sector] sector companies"
+                    rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
+                    # Revenue/sales filters
+                    r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
+                    # Growth filters
+                    r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
+                    r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+                    # Market cap filters
+                    r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+                ]
+                is_filter_query = any(re.search(pattern, lowered_input) for pattern in filter_query_patterns)
+                
+                # CRITICAL: Check for specific metric queries - route to LLM for focused response
+                # Pattern: "show [company]'s [specific metric]" or "what's [company]'s [metric]"
+                specific_metric_patterns = [
+                    r'\b(?:show|tell|give)\s+(?:me\s+)?[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt)',
+                    r'\bwhat\'s\s+[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt)',
+                ]
+                is_specific_metric = any(re.search(pattern, lowered_input) for pattern in specific_metric_patterns)
+                
+                # Only do ticker summary for bare ticker mentions, NOT questions, forecasting, filter queries, or specific metric queries
+                if not is_question and not is_filter_query and not is_specific_metric:
                     # Check for dashboard keyword first
                     dashboard_keywords = ["dashboard", "full dashboard", "comprehensive dashboard", 
                                          "detailed dashboard", "show me dashboard", "give me dashboard"]
@@ -2307,9 +2362,56 @@ class BenchmarkOSChatbot:
         
         is_question = any(re.search(pattern, lowered) for pattern in question_patterns)
         
-        if is_question:
-            # Natural language question - let LLM handle with context
-            self._progress("intent_question", "Natural language question detected")
+        # CRITICAL: Also check for filter queries  
+        # Comprehensive sector patterns with all variations
+        SECTOR_PATTERNS = (
+            r'tech|technology|software|hardware|semiconductor|semis?|chip|it\b',
+            r'financial?|finance|banking|banks?|insurance|fintech',
+            r'healthcare|health|pharma|pharmaceutical|biotech|medical|drug',
+            r'energy|oil|gas|petroleum|renewables?|clean energy',
+            r'consumer|retail|e-commerce|ecommerce|cpg|discretionary|staples',
+            r'industrial|manufacturing|aerospace|defense|machinery',
+            r'real estate|property|reit|reits',
+            r'utilit(?:y|ies)|power|electric|water|infrastructure',
+            r'materials?|mining|metals?|chemicals?|commodit(?:y|ies)',
+            r'communication|telecom|media|entertainment|broadcasting',
+        )
+        sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
+        
+        filter_query_patterns = [
+            rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
+            rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
+            rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
+            r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
+            r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
+            r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+            r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+        ]
+        is_filter_query = any(re.search(pattern, lowered) for pattern in filter_query_patterns)
+        
+        # CRITICAL: Check for specific metric queries - give focused LLM response, not full dashboard
+        # Pattern: "show [company]'s [specific metric]" → focused response, not dashboard
+        specific_metric_patterns = [
+            r'\b(?:show|tell|give)\s+(?:me\s+)?[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt|fcf|ev|market cap)',
+            r'\bwhat\'s\s+[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt|fcf|ev|market cap)',
+            r'\b(?:show|tell|give)\s+(?:me\s+)?the\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt)\s+(?:of|for)\s+[\w\s]+',
+        ]
+        is_specific_metric = any(re.search(pattern, lowered) for pattern in specific_metric_patterns)
+        
+        if is_question or is_filter_query or is_specific_metric:
+            # Natural language question, filter query, or specific metric - let LLM handle with context
+            # Clear dashboard to prevent showing full KPI dashboard when user wants focused answer
+            if "dashboard" in self.last_structured_response:
+                self.last_structured_response["dashboard"] = None
+            
+            if is_filter_query:
+                self._progress("intent_filter", "Company filter/category query detected")
+            elif is_specific_metric:
+                self._progress("intent_specific_metric", "Specific metric query - routing to LLM for focused response")
+            else:
+                self._progress("intent_question", "Natural language question detected")
             return None  # Will trigger LLM with enhanced context
         
         # 5. Check for explicit "show X kpis/metrics/table" pattern (table request)
@@ -4231,6 +4333,47 @@ class BenchmarkOSChatbot:
         portfolio_id_pattern = r"\bport_[\w]{4,12}\b"
         if re.search(portfolio_id_pattern, user_input, re.IGNORECASE):
             return None
+        
+        # CRITICAL: Check if this is a filter/category query - provide company universe context
+        lowered = user_input.strip().lower()
+        # Comprehensive sector patterns with all variations
+        SECTOR_PATTERNS = (
+            r'tech|technology|software|hardware|semiconductor|semis?|chip|it\b',
+            r'financial?|finance|banking|banks?|insurance|fintech',
+            r'healthcare|health|pharma|pharmaceutical|biotech|medical|drug',
+            r'energy|oil|gas|petroleum|renewables?|clean energy',
+            r'consumer|retail|e-commerce|ecommerce|cpg|discretionary|staples',
+            r'industrial|manufacturing|aerospace|defense|machinery',
+            r'real estate|property|reit|reits',
+            r'utilit(?:y|ies)|power|electric|water|infrastructure',
+            r'materials?|mining|metals?|chemicals?|commodit(?:y|ies)',
+            r'communication|telecom|media|entertainment|broadcasting',
+        )
+        sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
+        
+        filter_patterns = [
+            rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
+            rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
+            rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
+            r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
+            r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
+            r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+            r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+        ]
+        
+        is_filter_query = any(re.search(pattern, lowered) for pattern in filter_patterns)
+        
+        if is_filter_query:
+            # This is a filter query - provide company universe context
+            try:
+                from .context_builder import build_company_universe_context
+                universe_context = build_company_universe_context(self.settings.database_path)
+                if universe_context:
+                    return universe_context
+            except Exception as e:
+                LOGGER.debug(f"Company universe context builder failed: {e}")
         
         # First, try the smart context builder for natural language formatting
         try:
