@@ -562,6 +562,59 @@ SYSTEM_PROMPT = (
     "4. **Include multiple perspectives** - Historical trends, current market view, future outlook\n"
     "5. **Cite many sources** - Link to all relevant sources (5-10 links minimum)\n\n"
     
+    "## Machine Learning Forecasts - CRITICAL RULES\n\n"
+    "🚨 **MANDATORY: When ML forecast data is provided in the context:**\n\n"
+    "**⚠️ WARNING: IF YOU DO NOT INCLUDE ALL TECHNICAL DETAILS, YOUR RESPONSE IS INCOMPLETE ⚠️**\n"
+    "**⚠️ THE USER EXPECTS A HIGHLY DETAILED TECHNICAL RESPONSE WITH ALL MODEL SPECIFICATIONS ⚠️**\n"
+    "**⚠️ DO NOT PROVIDE A GENERIC SUMMARY - INCLUDE EVERY NUMBER, METRIC, AND DETAIL ⚠️**\n\n"
+    "**🚨 CRITICAL: Look for the 'EXPLICIT DATA DUMP' section in the context - it contains ALL technical details in a structured format.**\n"
+    "**🚨 YOU MUST INCLUDE EVERY SINGLE VALUE FROM THE EXPLICIT DATA DUMP SECTION IN YOUR RESPONSE.**\n"
+    "**🚨 DO NOT SKIP ANY VALUES - IF IT'S IN THE EXPLICIT DATA DUMP, IT MUST BE IN YOUR RESPONSE.**\n\n"
+    "1. **USE ALL TECHNICAL DETAILS FROM EXPLICIT DATA DUMP** - You MUST include ALL model specifications, training details, hyperparameters, and performance metrics from the 'EXPLICIT DATA DUMP' section\n"
+    "   - **DO NOT say 'the model has layers' - say 'the model has {X} layers with {Y} units each' using the EXACT numbers from the EXPLICIT DATA DUMP**\n"
+    "   - **DO NOT say 'training loss is low' - say 'training loss is {X.XXXXXX}' using the EXACT value from the EXPLICIT DATA DUMP**\n"
+    "   - **DO NOT say 'learning rate is set' - say 'learning rate is {X.XXXXXX}' using the EXACT value from the EXPLICIT DATA DUMP**\n"
+    "   - **INCLUDE EVERY NUMBER, METRIC, AND DETAIL FROM THE EXPLICIT DATA DUMP - NO EXCEPTIONS**\n"
+    "   - **If the EXPLICIT DATA DUMP shows 'Training Epochs: 50', you MUST say 'the model was trained for 50 epochs'**\n"
+    "   - **If the EXPLICIT DATA DUMP shows 'Training Loss (MSE): 0.001234', you MUST say 'training loss is 0.001234'**\n"
+    "   - **If the EXPLICIT DATA DUMP shows 'Learning Rate: 0.000100', you MUST say 'learning rate is 0.000100'**\n"
+    "2. **INCLUDE MODEL ARCHITECTURE FROM EXPLICIT DATA DUMP** - Explain the model architecture using EXACT values from the EXPLICIT DATA DUMP section\n"
+    "   - **USE THE EXACT NUMBERS FROM EXPLICIT DATA DUMP** - If EXPLICIT DATA DUMP says 'Layer 1 Units: 50', you MUST say 'Layer 1 has 50 units'\n"
+    "   - **DO NOT GENERALIZE** - Use the exact architecture details from the EXPLICIT DATA DUMP\n"
+    "   - **List ALL layers** - If the EXPLICIT DATA DUMP shows multiple layers, list each one with its exact unit count\n"
+    "   - **Include total parameters** - If the EXPLICIT DATA DUMP shows 'Total Parameters: 50,000', you MUST include this exact number\n"
+    "3. **INCLUDE TRAINING DETAILS FROM EXPLICIT DATA DUMP** - Report ALL training details using EXACT values from the EXPLICIT DATA DUMP section\n"
+    "   - **USE EXACT VALUES** - If EXPLICIT DATA DUMP says 'Training Epochs: 50', you MUST say 'the model was trained for 50 epochs'\n"
+    "   - **USE EXACT LOSS VALUES** - If EXPLICIT DATA DUMP says 'Training Loss (MSE): 0.001234', you MUST say 'training loss is 0.001234 (MSE)'\n"
+    "   - **Include validation loss** - If EXPLICIT DATA DUMP shows validation loss, include it with the exact value\n"
+    "   - **Include overfitting ratio** - If EXPLICIT DATA DUMP shows overfitting ratio, include it with the exact value\n"
+    "4. **INCLUDE ALL HYPERPARAMETERS FROM EXPLICIT DATA DUMP** - List ALL hyperparameters using EXACT values from the EXPLICIT DATA DUMP section\n"
+    "   - **Learning rate** - If EXPLICIT DATA DUMP shows 'Learning Rate: 0.000100', you MUST say 'learning rate is 0.000100'\n"
+    "   - **Batch size** - If EXPLICIT DATA DUMP shows 'Batch Size: 32', you MUST say 'batch size is 32'\n"
+    "   - **Optimizer** - If EXPLICIT DATA DUMP shows 'Optimizer: Adam', you MUST say 'optimizer is Adam'\n"
+    "   - **Dropout** - If EXPLICIT DATA DUMP shows 'Dropout Rate: 0.2000', you MUST say 'dropout rate is 0.2'\n"
+    "   - **Lookback window** - If EXPLICIT DATA DUMP shows 'Lookback Window: 10', you MUST say 'lookback window is 10 time steps'\n"
+    "   - **Include ALL hyperparameters** - Do not skip any hyperparameter shown in the EXPLICIT DATA DUMP\n"
+    "5. **INCLUDE PERFORMANCE METRICS** - Report all performance metrics (AIC, BIC, RMSE, MAE, MAPE, etc.)\n"
+    "   - **USE EXACT VALUES** - Include all metrics with their exact values from context\n"
+    "6. **INCLUDE DATA PREPROCESSING** - Explain scaling method, feature engineering, data points used, train/test split\n"
+    "   - **USE EXACT VALUES** - If context says 'data_points_used: 20', you MUST say '20 data points were used'\n"
+    "7. **INCLUDE COMPUTATIONAL DETAILS** - Report training time, model size, total parameters\n"
+    "   - **USE EXACT VALUES** - If context says 'total_parameters: 50000', you MUST say 'the model has 50,000 parameters'\n"
+    "8. **INCLUDE MODEL EXPLAINABILITY** - Explain how the model works, why it's suitable, key concepts (memory cells, attention, etc.)\n"
+    "   - **BE DETAILED** - Provide comprehensive explanation of how the model works\n"
+    "9. **INCLUDE FORECAST ANALYSIS** - Calculate and show year-over-year growth rates, CAGR, confidence intervals, uncertainty analysis\n"
+    "   - **USE CALCULATED VALUES** - If context provides growth rates, use those exact values\n"
+    "10. **INCLUDE FORECAST INTERPRETATION** - Analyze trajectory, pattern, uncertainty level\n"
+    "11. **DO NOT SUMMARIZE** - Include EVERY technical detail provided in the context - do not skip or summarize\n"
+    "    - **DO NOT say 'the model was trained' - say 'the model was trained for {X} epochs'**\n"
+    "    - **DO NOT say 'training loss is low' - say 'training loss is {X.XXXXXX}'**\n"
+    "    - **DO NOT say 'the model has layers' - say 'the model has {X} layers with {Y} units each'**\n"
+    "    - **INCLUDE EVERY NUMBER, METRIC, AND DETAIL - NO EXCEPTIONS**\n"
+    "12. **BE COMPREHENSIVE** - The forecast response should be highly detailed and technical, suitable for institutional analysts\n"
+    "    - **Minimum 500-1000 words** - The response should be comprehensive and detailed\n"
+    "    - **Include all technical specifications** - Every detail matters for institutional analysts\n\n"
+    
     "## Portfolio Analysis - CRITICAL RULES\n\n"
     "When portfolio data is provided in the context:\n"
     "1. **USE ONLY THE PROVIDED DATA** - You MUST use ONLY the specific holdings, weights, sectors, and statistics shown in the portfolio data\n"
@@ -594,27 +647,44 @@ SYSTEM_PROMPT = (
     
     "## ML Forecasting - CRITICAL RULES\n\n"
     "🚨 **MANDATORY: When ML forecast data is provided in the context (marked with '📊 ML FORECAST' or '🚨 CRITICAL: THIS IS THE PRIMARY ANSWER'):**\n\n"
+    "**⚠️ WARNING: IF YOU DO NOT INCLUDE ALL TECHNICAL DETAILS, YOUR RESPONSE IS INCOMPLETE ⚠️**\n"
+    "**⚠️ THE USER EXPECTS A HIGHLY DETAILED TECHNICAL RESPONSE WITH ALL MODEL SPECIFICATIONS ⚠️**\n"
+    "**⚠️ DO NOT PROVIDE A GENERIC SUMMARY - INCLUDE EVERY NUMBER, METRIC, AND DETAIL ⚠️**\n\n"
     "**YOU MUST FOLLOW THESE RULES EXACTLY - NO EXCEPTIONS:**\n\n"
     "1. **THE FORECAST IS THE ONLY ANSWER** - When a forecast is provided, you MUST use ONLY the ML forecast values. DO NOT provide historical snapshots, KPIs, or generic company data.\n"
     "2. **DO NOT PROVIDE GENERIC SNAPSHOTS** - If a forecast is provided, DO NOT return a standard company snapshot or historical data summary. The forecast REPLACES the snapshot.\n"
-    "3. **START WITH THE FORECAST** - Begin your response IMMEDIATELY with the forecast values (e.g., 'Based on LSTM forecasting, Apple's revenue is forecasted to reach $410.50B in 2025')\n"
-    "4. **Quote actual forecast values** - Reference the EXACT forecasted values, confidence intervals, and model used from the context. Use the exact numbers shown.\n"
-    "5. **Include ALL forecast years** - List ALL forecasted values for each year shown in the context (e.g., 2025, 2026, 2027)\n"
-    "6. **Include model details** - Mention the model used (ARIMA, Prophet, ETS, LSTM, GRU, Transformer) and its confidence level from the context\n"
-    "7. **EXPLAIN THE MODEL** - You MUST include a clear explanation of how the ML model works:\n"
+    "3. **YOU MUST INCLUDE ALL TECHNICAL DETAILS** - When ML forecast context is provided, you MUST include ALL technical details in your response:\n"
+    "   - **USE EXACT VALUES FROM CONTEXT** - Do NOT generalize or estimate - use the EXACT numbers provided\n"
+    "   - **DO NOT say 'the model has layers' - say 'the model has {X} layers' using the EXACT number from context**\n"
+    "   - **DO NOT say 'training loss is low' - say 'training loss is {X.XXXXXX}' using the EXACT value from context**\n"
+    "   - **INCLUDE EVERY NUMBER, METRIC, AND DETAIL - NO EXCEPTIONS**\n"
+    "   - **ALL Model Specifications**: Architecture, layers, units, dimensions, hyperparameters (learning rate, dropout, batch size, etc.)\n"
+    "   - **ALL Training Details**: Epochs, training loss, validation loss, training time, data points used\n"
+    "   - **ALL Performance Metrics**: MAE, RMSE, MAPE, R², directional accuracy, cross-validation results\n"
+    "   - **ALL Feature Engineering**: Features used, feature importance, engineered features\n"
+    "   - **ALL Forecast Analysis**: Year-over-year growth rates, CAGR, confidence intervals, uncertainty analysis\n"
+    "   - **ALL Model Explainability**: How the model works (detailed explanation), why this model was selected, model comparison\n"
+    "   - **ALL Preprocessing Details**: Scaling method, outlier removal, missing data handling\n"
+    "   - **ALL Computational Details**: Training time, prediction time, model size, parameter count\n"
+    "   - **DO NOT SUMMARIZE OR SKIP** - Include every technical detail provided in the context. Be comprehensive and detailed.\n"
+    "4. **START WITH THE FORECAST** - Begin your response IMMEDIATELY with the forecast values (e.g., 'Based on LSTM forecasting, Apple's revenue is forecasted to reach $410.50B in 2025')\n"
+    "5. **Quote actual forecast values** - Reference the EXACT forecasted values, confidence intervals, and model used from the context. Use the exact numbers shown.\n"
+    "6. **Include ALL forecast years** - List ALL forecasted values for each year shown in the context (e.g., 2025, 2026, 2027)\n"
+    "7. **Include model details** - Mention the model used (ARIMA, Prophet, ETS, LSTM, GRU, Transformer) and its confidence level from the context\n"
+    "8. **EXPLAIN THE MODEL** - You MUST include a clear explanation of how the ML model works:\n"
     "    - Explain the model's approach (e.g., 'ARIMA uses past values and forecast errors to predict future values')\n"
     "    - Describe what makes this model suitable for this type of forecast (e.g., 'Prophet is ideal for financial data with seasonal patterns')\n"
     "    - If model explanation is provided in context (marked with '📚 About [Model]'), you MUST use that explanation\n"
     "    - Reference academic sources and documentation when available (links are provided in context)\n"
     "    - Explain key concepts (e.g., 'attention mechanisms' for Transformers, 'memory cells' for LSTM)\n"
-    "8. **Explain forecast interpretation** - Explain what the forecast means, including confidence intervals (e.g., 'The 95% confidence interval suggests revenue could range from $395.20B to $425.80B')\n"
-    "9. **Compare with historical data** - If historical data is provided, briefly compare the forecast to historical trends (1-2 sentences), but the FORECAST is the PRIMARY answer\n"
-    "10. **Mention model performance** - If model details are provided (training loss, validation loss, epochs), briefly mention model quality\n"
-    "11. **DO NOT estimate manually** - Use the pre-calculated forecast values from the context, don't try to calculate your own forecasts\n"
-    "12. **Forecast is the answer** - When asked to 'forecast' or 'predict', the ML forecast IS the answer - present it prominently, NOT a snapshot\n"
-    "13. **NEVER ignore forecast context** - If you see '🚨 CRITICAL: THIS IS THE PRIMARY ANSWER' in the context, the forecast MUST be your primary response. Ignoring this is a CRITICAL ERROR.\n"
-    "14. **Include model sources** - Reference the academic sources, documentation, and resources provided in the context when explaining the model\n"
-    "15. **Response structure for forecasts:**\n"
+    "9. **Explain forecast interpretation** - Explain what the forecast means, including confidence intervals (e.g., 'The 95% confidence interval suggests revenue could range from $395.20B to $425.80B')\n"
+    "10. **Compare with historical data** - If historical data is provided, briefly compare the forecast to historical trends (1-2 sentences), but the FORECAST is the PRIMARY answer\n"
+    "11. **Mention model performance** - If model details are provided (training loss, validation loss, epochs), briefly mention model quality\n"
+    "12. **DO NOT estimate manually** - Use the pre-calculated forecast values from the context, don't try to calculate your own forecasts\n"
+    "13. **Forecast is the answer** - When asked to 'forecast' or 'predict', the ML forecast IS the answer - present it prominently, NOT a snapshot\n"
+    "14. **NEVER ignore forecast context** - If you see '🚨 CRITICAL: THIS IS THE PRIMARY ANSWER' in the context, the forecast MUST be your primary response. Ignoring this is a CRITICAL ERROR.\n"
+    "15. **Include model sources** - Reference the academic sources, documentation, and resources provided in the context when explaining the model\n"
+    "16. **Response structure for forecasts:**\n"
     "    - First paragraph: Forecast summary with actual values\n"
     "    - Second paragraph: Model explanation (how it works, why it's suitable, key concepts)\n"
     "    - Third paragraph: Model details and confidence\n"
@@ -1245,9 +1315,44 @@ class BenchmarkOSChatbot:
         if len(chat_history) > self._MAX_HISTORY_MESSAGES:
             chat_history = chat_history[-self._MAX_HISTORY_MESSAGES :]
         messages: List[Mapping[str, str]] = [system_message]
+        
+        # For forecasting queries, add context to the LAST user message to ensure it's seen
+        # For other queries, add as system message
+        is_forecasting = False
+        try:
+            from .context_builder import _is_forecasting_query
+            if chat_history:
+                last_user_msg = None
+                for msg in reversed(chat_history):
+                    if msg.get("role") == "user":
+                        last_user_msg = msg
+                        break
+                if last_user_msg:
+                    is_forecasting = _is_forecasting_query(last_user_msg.get("content", ""))
+        except ImportError:
+            pass
+        
         if rag_context:
-            messages.append({"role": "system", "content": rag_context})
-        messages.extend(chat_history)
+            if is_forecasting and chat_history:
+                # For forecasting queries, prepend context to the last user message
+                # This ensures the LLM sees the context as part of the user's request
+                for i in range(len(chat_history) - 1, -1, -1):
+                    if chat_history[i].get("role") == "user":
+                        # Prepend context to user message
+                        original_content = chat_history[i].get("content", "")
+                        chat_history[i] = {
+                            "role": "user",
+                            "content": f"{rag_context}\n\n---\n\nUser Question: {original_content}"
+                        }
+                        break
+                messages.extend(chat_history)
+            else:
+                # For non-forecasting queries, add context as system message
+                messages.append({"role": "system", "content": rag_context})
+                messages.extend(chat_history)
+        else:
+            messages.extend(chat_history)
+        
         return messages
 
     def _preload_popular_metrics(self) -> None:
@@ -2200,10 +2305,59 @@ class BenchmarkOSChatbot:
                 
                 messages = self._prepare_llm_messages(context)
                 LOGGER.debug(f"Prepared {len(messages)} messages for LLM")
+                
+                # Log context details for debugging
+                if context:
+                    context_length = len(context)
+                    LOGGER.info(f"Context length: {context_length} characters")
+                    if is_forecasting:
+                        # Check if ML forecast context is present
+                        has_ml_forecast = "ML FORECAST" in context or "CRITICAL: THIS IS THE PRIMARY ANSWER" in context
+                        LOGGER.info(f"Forecasting query - ML forecast context present: {has_ml_forecast}")
+                        if has_ml_forecast:
+                            # Log key sections
+                            has_model_details = "MODEL TECHNICAL DETAILS" in context or "FINAL CHECKLIST" in context
+                            has_explicit_dump = "EXPLICIT DATA DUMP" in context
+                            LOGGER.info(f"  - Model details section: {has_model_details}")
+                            LOGGER.info(f"  - Explicit data dump: {has_explicit_dump}")
+                            # Log a sample of the context to verify it's correct
+                            sample_start = context[:500] if len(context) > 500 else context
+                            LOGGER.debug(f"Context sample (first 500 chars): {sample_start}")
+                
                 emit("llm_query_start", "Composing explanation")
-                reply = self.llm_client.generate_reply(messages)
+                
+                # is_forecasting is already set above, reuse it
+                
+                # Use lower temperature and higher max_tokens for forecasting queries
+                # Lower temperature = more deterministic, follows instructions better
+                # Higher max_tokens = allows for detailed responses
+                if is_forecasting:
+                    reply = self.llm_client.generate_reply(
+                        messages,
+                        temperature=0.3,  # Lower temperature for more deterministic, instruction-following behavior
+                        max_tokens=4000,  # Higher max_tokens to allow detailed responses
+                    )
+                else:
+                    reply = self.llm_client.generate_reply(messages)
+                
                 emit("llm_query_complete", "Explanation drafted")
                 LOGGER.info(f"Generated reply length: {len(reply) if reply else 0} characters")
+                
+                # Post-process verification for ML forecast responses
+                if is_forecasting and reply:
+                    try:
+                        from .ml_response_verifier import verify_ml_forecast_response
+                        is_complete, missing_details, enhanced_reply = verify_ml_forecast_response(
+                            reply, context or "", user_input
+                        )
+                        if not is_complete:
+                            LOGGER.warning(f"ML forecast response missing {len(missing_details)} details, enhancing response")
+                            reply = enhanced_reply
+                            emit("ml_verification", f"Enhanced response with {len(missing_details)} missing details")
+                    except ImportError:
+                        LOGGER.debug("ML response verifier not available, skipping verification")
+                    except Exception as e:
+                        LOGGER.debug(f"ML response verification failed: {e}")
 
             if reply is None:
                 # CRITICAL: Final check before fallback - ensure forecasting queries never get fallback snapshots

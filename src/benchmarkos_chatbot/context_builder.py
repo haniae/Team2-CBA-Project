@@ -814,14 +814,16 @@ def _build_ml_forecast_context(
                     error_context += f"**Data Available:** {len(records) if records else 0} periods (need at least 5-10)\n"
                     error_context += f"**Recommendation:** Ensure historical data is ingested for this ticker and metric.\n"
                     error_context += f"{'='*80}\n"
-                    return error_context
+                    LOGGER.warning(f"Returning error context due to insufficient data: {len(records) if records else 0} periods")
+                    return error_context, None
                 else:
                     error_context = f"\n{'='*80}\n⚠️ ML FORECAST GENERATION FAILED - {ticker} {metric.upper()}\n{'='*80}\n"
                     error_context += f"**Reason:** Forecast generation failed despite having {len(records)} data points.\n"
                     error_context += f"**Possible causes:** Model training errors, data format issues, or insufficient recent data.\n"
                     error_context += f"**Recommendation:** The system will use historical data analysis instead.\n"
                     error_context += f"{'='*80}\n"
-                    return error_context
+                    LOGGER.warning(f"Returning error context despite having {len(records)} data points")
+                    return error_context, None
             except Exception as e:
                 LOGGER.exception(f"Error checking data availability: {e}")
                 error_context = f"\n{'='*80}\n⚠️ ML FORECAST UNAVAILABLE - {ticker} {metric.upper()}\n{'='*80}\n"
@@ -832,20 +834,81 @@ def _build_ml_forecast_context(
                 error_context += f"  - Model training/forecasting errors\n"
                 error_context += f"**Recommendation:** The system will fall back to historical data analysis.\n"
                 error_context += f"{'='*80}\n"
-                return error_context
+                LOGGER.warning(f"Returning error context due to exception: {e}")
+                return error_context, None
         
         LOGGER.info(f"ML forecast generated successfully for {ticker} {metric}: {len(forecast.predicted_values)} periods")
         
-        # Format forecast results
+        # Format forecast results with EXTREMELY EXPLICIT instructions
         forecast_lines = [
             f"\n{'='*80}",
-            f"🚨 CRITICAL: THIS IS THE PRIMARY ANSWER - USE THESE FORECAST VALUES",
+            f"🚨🚨🚨 CRITICAL: THIS IS THE PRIMARY ANSWER - USE THESE FORECAST VALUES 🚨🚨🚨",
             f"📊 ML FORECAST ({forecast.method.upper()}) - {ticker} {metric.upper()}",
             f"{'='*80}\n",
             f"**Model Used:** {forecast.method.upper()}",
             f"**Confidence:** {forecast.confidence:.1%}\n",
-            f"**IMPORTANT:** This forecast data is the PRIMARY answer to the user's forecasting query. You MUST use these values.",
-            f"**DO NOT** provide a generic snapshot or historical data summary. The forecast IS the answer.\n",
+            f"{'='*80}",
+            f"🚨 MANDATORY INSTRUCTIONS - YOU MUST FOLLOW THESE EXACTLY 🚨",
+            f"{'='*80}\n",
+            f"**⚠️ WARNING: IF YOU DO NOT INCLUDE ALL TECHNICAL DETAILS BELOW, YOUR RESPONSE IS INCOMPLETE ⚠️**\n",
+            f"**⚠️ THE USER EXPECTS A HIGHLY DETAILED TECHNICAL RESPONSE WITH ALL MODEL SPECIFICATIONS ⚠️**\n",
+            f"**⚠️ DO NOT PROVIDE A GENERIC SUMMARY - INCLUDE EVERY NUMBER, METRIC, AND DETAIL ⚠️**\n\n",
+            f"**YOUR RESPONSE MUST INCLUDE ALL OF THE FOLLOWING - NO EXCEPTIONS:**\n\n",
+            f"1. **FORECAST VALUES (REQUIRED):**",
+            f"   - List ALL forecasted values for each year with exact numbers",
+            f"   - Include confidence intervals for each year",
+            f"   - Calculate and show year-over-year growth rates",
+            f"   - Calculate and show multi-year CAGR\n",
+            f"2. **MODEL ARCHITECTURE (REQUIRED):**",
+            f"   - Network architecture: layers, units per layer, total parameters",
+            f"   - Input shape and lookback window",
+            f"   - Model type (LSTM/GRU) and how it works\n",
+            f"3. **TRAINING DETAILS (REQUIRED):**",
+            f"   - Training epochs (exact number)",
+            f"   - Training loss (final value)",
+            f"   - Validation loss (final value)",
+            f"   - Overfitting analysis (val/train ratio)",
+            f"   - Training time",
+            f"   - Data points used\n",
+            f"4. **HYPERPARAMETERS (REQUIRED):**",
+            f"   - Learning rate (with explanation)",
+            f"   - Batch size",
+            f"   - Dropout rate (if applicable)",
+            f"   - Optimizer used",
+            f"   - All other hyperparameters\n",
+            f"5. **PERFORMANCE METRICS (REQUIRED):**",
+            f"   - Training loss (MSE)",
+            f"   - Validation loss (MSE)",
+            f"   - Model confidence score",
+            f"   - Overfitting ratio\n",
+            f"6. **FORECAST ANALYSIS (REQUIRED):**",
+            f"   - Year-over-year growth rates for each period",
+            f"   - Multi-year CAGR calculation",
+            f"   - Confidence interval widths",
+            f"   - Uncertainty level assessment",
+            f"   - Trajectory analysis (accelerating/decelerating)\n",
+            f"7. **MODEL EXPLAINABILITY (REQUIRED):**",
+            f"   - Detailed explanation of how {forecast.method.upper()} works",
+            f"   - Why this model is suitable for this forecast",
+            f"   - Key concepts (memory cells, gates, etc.)",
+            f"   - Training process explanation\n",
+            f"8. **DATA PREPROCESSING (REQUIRED):**",
+            f"   - Scaling method used",
+            f"   - Feature engineering applied",
+            f"   - Data points used",
+            f"   - Train/test split\n",
+            f"9. **COMPUTATIONAL DETAILS (REQUIRED):**",
+            f"   - Training time",
+            f"   - Total model parameters",
+            f"   - Model complexity\n",
+            f"10. **FORECAST INTERPRETATION (REQUIRED):**",
+            f"    - Total growth projection",
+            f"    - Trajectory pattern (consistent growth, declining, mixed)",
+            f"    - Pattern detection (accelerating/decelerating)",
+            f"    - Uncertainty level\n",
+            f"{'='*80}",
+            f"**CRITICAL: DO NOT SUMMARIZE - INCLUDE EVERY DETAIL BELOW IN YOUR RESPONSE**",
+            f"{'='*80}\n\n",
             "**Forecasted Values:**\n",
         ]
         
@@ -872,29 +935,940 @@ def _build_ml_forecast_context(
                 f"  • **{year}:** {value_str} (95% CI: {low_str} - {high_str})"
             )
         
-        # Add model details
+        # Calculate and display growth rates IMMEDIATELY after forecast values
+        if len(forecast.predicted_values) >= 2:
+            forecast_lines.append("\n**📈 GROWTH RATES (CALCULATED - INCLUDE IN YOUR RESPONSE):**\n")
+            last_historical = None  # Will be set from historical data if available
+            for i in range(len(forecast.predicted_values)):
+                if i == 0:
+                    # First year: compare to last historical value (if available)
+                    # For now, show YoY growth within forecast
+                    if len(forecast.predicted_values) > 1:
+                        prev = forecast.predicted_values[0]
+                        curr = forecast.predicted_values[1]
+                        if prev > 0:
+                            growth = ((curr / prev) - 1) * 100
+                            forecast_lines.append(f"  • **{forecast.periods[0]} to {forecast.periods[1]}:** {growth:+.2f}% YoY growth\n")
+                else:
+                    prev = forecast.predicted_values[i-1]
+                    curr = forecast.predicted_values[i]
+                    if prev > 0:
+                        growth = ((curr / prev) - 1) * 100
+                        forecast_lines.append(f"  • **{forecast.periods[i-1]} to {forecast.periods[i]}:** {growth:+.2f}% YoY growth\n")
+            
+            # Calculate CAGR
+            if len(forecast.predicted_values) >= 3:
+                first = forecast.predicted_values[0]
+                last = forecast.predicted_values[-1]
+                years = len(forecast.predicted_values) - 1
+                if first > 0:
+                    cagr = ((last / first) ** (1/years) - 1) * 100
+                    forecast_lines.append(f"  • **Multi-Year CAGR ({years} years):** {cagr:.2f}%\n")
+        
+        # Add detailed model specifications - MAKE THIS VERY PROMINENT
         if forecast.model_details:
-            forecast_lines.append("\n**Model Details:**")
-            if 'model_params' in forecast.model_details:
-                params = forecast.model_details['model_params']
-                if 'order' in params:
-                    forecast_lines.append(f"  - ARIMA Order: {params['order']}")
-            if 'seasonality_detected' in forecast.model_details:
-                seasonality = forecast.model_details['seasonality_detected']
-                detected = [k for k, v in seasonality.items() if v]
-                if detected:
-                    forecast_lines.append(f"  - Seasonality Detected: {', '.join(detected)}")
-            if 'layers' in forecast.model_details:
-                forecast_lines.append(f"  - Network Layers: {forecast.model_details['layers']}")
+            forecast_lines.append(f"\n{'='*80}")
+            forecast_lines.append("🔧 MODEL TECHNICAL SPECIFICATIONS (INCLUDE ALL IN YOUR RESPONSE)")
+            forecast_lines.append(f"{'='*80}\n")
+            
+            # ARIMA details - MAKE VERY PROMINENT
+            if forecast.method.upper() == 'ARIMA' or 'model_params' in forecast.model_details:
+                forecast_lines.append(f"\n**📊 ARIMA MODEL ARCHITECTURE:**\n")
+                if 'model_params' in forecast.model_details:
+                    params = forecast.model_details['model_params']
+                    if isinstance(params, dict) and 'order' in params:
+                        order = params['order']
+                        if isinstance(order, (list, tuple)) and len(order) >= 3:
+                            forecast_lines.append(f"  - **ARIMA Order:** {order} (AR={order[0]}, I={order[1]}, MA={order[2]})")
+                            forecast_lines.append(f"    - **AR (AutoRegressive) Order:** {order[0]} (number of lagged observations used)")
+                            forecast_lines.append(f"    - **I (Integrated) Order:** {order[1]} (degree of differencing to make series stationary)")
+                            forecast_lines.append(f"    - **MA (Moving Average) Order:** {order[2]} (number of lagged forecast errors used)")
+                    if isinstance(params, dict) and 'seasonal_order' in params:
+                        seasonal = params['seasonal_order']
+                        if seasonal:
+                            forecast_lines.append(f"  - **Seasonal Order (SARIMA):** {seasonal} (seasonal ARIMA components)")
+                    if isinstance(params, dict) and 'ar_order' in params:
+                        forecast_lines.append(f"  - **AR Order:** {params['ar_order']}")
+                    if isinstance(params, dict) and 'diff_order' in params:
+                        forecast_lines.append(f"  - **Differencing Order:** {params['diff_order']}")
+                    if isinstance(params, dict) and 'ma_order' in params:
+                        forecast_lines.append(f"  - **MA Order:** {params['ma_order']}")
+                    if isinstance(params, dict) and 'is_seasonal' in params:
+                        is_seasonal = params['is_seasonal']
+                        forecast_lines.append(f"  - **Seasonal Model:** {'Yes (SARIMA)' if is_seasonal else 'No (ARIMA)'}")
+                if 'aic' in forecast.model_details:
+                    aic = forecast.model_details.get('aic', 'N/A')
+                    if aic != 'N/A':
+                        forecast_lines.append(f"  - **AIC (Akaike Information Criterion):** {aic:.2f} (lower is better - measures model quality)")
+                if 'bic' in forecast.model_details:
+                    bic = forecast.model_details.get('bic', 'N/A')
+                    if bic != 'N/A':
+                        forecast_lines.append(f"  - **BIC (Bayesian Information Criterion):** {bic:.2f} (lower is better - penalizes complexity)")
+                if 'log_likelihood' in forecast.model_details:
+                    ll = forecast.model_details.get('log_likelihood')
+                    if ll is not None:
+                        forecast_lines.append(f"  - **Log-Likelihood:** {ll:.2f} (higher is better - measures model fit)")
+                forecast_lines.append(f"  - **Model Type:** ARIMA (AutoRegressive Integrated Moving Average)")
+                forecast_lines.append(f"    - ARIMA models combine autoregression, differencing, and moving average components")
+                forecast_lines.append(f"    - Suitable for time series with trends and seasonality")
+                forecast_lines.append(f"    - Automatically selected optimal parameters using auto-ARIMA\n")
+            
+            # Prophet details - MAKE VERY PROMINENT
+            if forecast.method.upper() == 'PROPHET' or 'seasonality_detected' in forecast.model_details:
+                forecast_lines.append(f"\n**📈 PROPHET MODEL ARCHITECTURE:**\n")
+                if 'seasonality_detected' in forecast.model_details:
+                    seasonality = forecast.model_details['seasonality_detected']
+                    if isinstance(seasonality, dict):
+                        detected = [k for k, v in seasonality.items() if k in ['yearly', 'weekly', 'daily'] and v]
+                        if detected:
+                            forecast_lines.append(f"  - **Seasonality Detected:** {', '.join(detected)}")
+                            forecast_lines.append(f"    - Prophet automatically detects and models seasonal patterns")
+                            forecast_lines.append(f"    - Yearly seasonality captures annual patterns")
+                            forecast_lines.append(f"    - Weekly seasonality captures weekly patterns")
+                            forecast_lines.append(f"    - Daily seasonality captures daily patterns")
+                if 'changepoints' in forecast.model_details:
+                    changepoints = forecast.model_details['changepoints']
+                    if changepoints:
+                        forecast_lines.append(f"  - **Trend Changepoints:** {len(changepoints)} detected")
+                        forecast_lines.append(f"    - Changepoints identify when trend direction changes")
+                        forecast_lines.append(f"    - Prophet automatically detects these structural breaks")
+                if 'changepoint_count' in forecast.model_details:
+                    cp_count = forecast.model_details['changepoint_count']
+                    forecast_lines.append(f"  - **Changepoint Count:** {cp_count} (number of trend changes detected)")
+                if 'growth_model' in forecast.model_details:
+                    growth = forecast.model_details['growth_model']
+                    forecast_lines.append(f"  - **Growth Model:** {growth}")
+                    forecast_lines.append(f"    - Linear growth: constant growth rate")
+                    forecast_lines.append(f"    - Logistic growth: saturating growth with carrying capacity")
+                if 'hyperparameters' in forecast.model_details:
+                    hyperparams = forecast.model_details['hyperparameters']
+                    if isinstance(hyperparams, dict):
+                        forecast_lines.append(f"  - **Key Hyperparameters:**")
+                        if 'changepoint_prior_scale' in hyperparams:
+                            forecast_lines.append(f"    - Changepoint Prior Scale: {hyperparams['changepoint_prior_scale']} (controls flexibility of trend changes)")
+                        if 'seasonality_prior_scale' in hyperparams:
+                            forecast_lines.append(f"    - Seasonality Prior Scale: {hyperparams['seasonality_prior_scale']} (controls strength of seasonality)")
+                        if 'seasonality_mode' in hyperparams:
+                            forecast_lines.append(f"    - Seasonality Mode: {hyperparams['seasonality_mode']} (additive or multiplicative)")
+                forecast_lines.append(f"  - **Model Type:** Prophet (Facebook's time series forecasting tool)")
+                forecast_lines.append(f"    - Prophet decomposes time series into trend, seasonality, and holidays")
+                forecast_lines.append(f"    - Handles missing data, outliers, and changepoints automatically")
+                forecast_lines.append(f"    - Ideal for business time series with strong seasonality\n")
+            
+            # LSTM/GRU details - MAKE VERY PROMINENT
+            if 'model_type' in forecast.model_details or 'layers' in forecast.model_details:
+                model_type = forecast.model_details.get('model_type', 'lstm').upper()
+                forecast_lines.append(f"\n**🧠 {model_type} NEURAL NETWORK ARCHITECTURE:**\n")
+                if 'layers' in forecast.model_details:
+                    layers = forecast.model_details['layers']
+                    if isinstance(layers, list):
+                        forecast_lines.append(f"  - **Network Architecture:** {len(layers)} layers with {layers} units per layer")
+                        forecast_lines.append(f"    - Layer 1: {layers[0]} {model_type} units")
+                        if len(layers) > 1:
+                            for i, units in enumerate(layers[1:], 2):
+                                forecast_lines.append(f"    - Layer {i}: {units} {model_type} units")
+                    else:
+                        forecast_lines.append(f"  - **Network Architecture:** {layers} layers")
+                if 'units' in forecast.model_details:
+                    units = forecast.model_details['units']
+                    forecast_lines.append(f"  - **Hidden Units per Layer:** {units} (number of memory cells in each {model_type} layer)")
+                if 'input_shape' in forecast.model_details:
+                    input_shape = forecast.model_details['input_shape']
+                    forecast_lines.append(f"  - **Input Shape:** {input_shape} (lookback_window x features)")
+                forecast_lines.append(f"  - **Model Type:** {model_type} (Long Short-Term Memory / Gated Recurrent Unit)")
+                forecast_lines.append(f"    - {model_type} networks use memory cells with gates (forget, input, output) to learn long-term dependencies")
+                forecast_lines.append(f"    - Each memory cell can selectively remember or forget information over time")
+                forecast_lines.append(f"    - This makes {model_type} ideal for time series forecasting with complex patterns\n")
             if 'epochs_trained' in forecast.model_details:
-                forecast_lines.append(f"  - Epochs Trained: {forecast.model_details['epochs_trained']}")
+                epochs = forecast.model_details['epochs_trained']
+                forecast_lines.append(f"  - **Training Epochs:** {epochs} (number of complete passes through training data)")
+            if 'training_loss' in forecast.model_details:
+                train_loss = forecast.model_details['training_loss']
+                forecast_lines.append(f"  - **Final Training Loss (MSE):** {train_loss:.6f} (Mean Squared Error on training set - lower is better)")
+            if 'validation_loss' in forecast.model_details:
+                val_loss = forecast.model_details['validation_loss']
+                forecast_lines.append(f"  - **Final Validation Loss (MSE):** {val_loss:.6f} (Mean Squared Error on validation set - measures generalization)")
+                # Add overfitting analysis
+                if 'training_loss' in forecast.model_details:
+                    train_loss = forecast.model_details['training_loss']
+                    overfit_ratio = val_loss / train_loss if train_loss > 0 else 1.0
+                    if overfit_ratio > 1.5:
+                        forecast_lines.append(f"  - **⚠️ Overfitting Detected:** Validation loss is {overfit_ratio:.2f}x training loss (model may be overfitting)")
+                    elif overfit_ratio < 1.1:
+                        forecast_lines.append(f"  - **✅ Good Generalization:** Validation loss is {overfit_ratio:.2f}x training loss (model generalizes well)")
+                    else:
+                        forecast_lines.append(f"  - **Overfitting Ratio:** {overfit_ratio:.2f} (val/train loss ratio)")
+            if 'learning_rate' in forecast.model_details:
+                lr = forecast.model_details['learning_rate']
+                forecast_lines.append(f"  - **Learning Rate:** {lr:.6f} (controls step size in gradient descent - lower = more stable but slower convergence)")
+            if 'batch_size' in forecast.model_details:
+                batch = forecast.model_details['batch_size']
+                forecast_lines.append(f"  - **Batch Size:** {batch} (number of samples per training iteration - affects memory usage and training speed)")
+            if 'lookback_window' in forecast.model_details:
+                window = forecast.model_details['lookback_window']
+                forecast_lines.append(f"  - **Lookback Window:** {window} time steps (number of historical periods used to predict next value)")
+            if 'optimizer' in forecast.model_details:
+                optimizer = forecast.model_details['optimizer']
+                forecast_lines.append(f"  - **Optimizer:** {optimizer} (algorithm used to update model weights during training)")
+            if 'total_parameters' in forecast.model_details:
+                params = forecast.model_details['total_parameters']
+                forecast_lines.append(f"  - **Total Model Parameters:** {params:,} (total trainable weights in the network)")
+            if 'training_time' in forecast.model_details:
+                train_time = forecast.model_details['training_time']
+                forecast_lines.append(f"  - **Training Time:** {train_time:.2f} seconds")
+            if 'data_points_used' in forecast.model_details:
+                data_points = forecast.model_details['data_points_used']
+                forecast_lines.append(f"  - **Historical Data Points Used:** {data_points} periods")
+            if 'train_test_split' in forecast.model_details:
+                split = forecast.model_details['train_test_split']
+                forecast_lines.append(f"  - **Train/Test Split:** {split} (training samples / validation samples)")
+            if 'dropout' in forecast.model_details:
+                dropout = forecast.model_details['dropout']
+                forecast_lines.append(f"  - **Dropout Rate:** {dropout:.2f} (regularization to prevent overfitting - randomly sets {dropout*100:.0f}% of neurons to zero during training)")
+            
+            # ETS details - MAKE VERY PROMINENT
+            if forecast.method.upper() == 'ETS' or 'model_type' in forecast.model_details:
+                if 'model_type' in forecast.model_details and forecast.model_details['model_type']:
+                    model_type = forecast.model_details['model_type']
+                    forecast_lines.append(f"\n**📉 ETS MODEL ARCHITECTURE:**\n")
+                    forecast_lines.append(f"  - **ETS Model Type:** {model_type}")
+                    forecast_lines.append(f"    - ETS notation: Error-Trend-Seasonal (e.g., AAN = Additive Error, Additive Trend, No Seasonality)")
+                    forecast_lines.append(f"    - First letter: Error type (A=Additive, M=Multiplicative)")
+                    forecast_lines.append(f"    - Second letter: Trend type (A=Additive, M=Multiplicative, N=None)")
+                    forecast_lines.append(f"    - Third letter: Seasonal type (A=Additive, M=Multiplicative, N=None)")
+                    if 'smoothing_params' in forecast.model_details:
+                        smoothing = forecast.model_details['smoothing_params']
+                        if isinstance(smoothing, dict):
+                            forecast_lines.append(f"  - **Smoothing Parameters:**")
+                            if 'alpha' in smoothing and smoothing['alpha'] is not None:
+                                forecast_lines.append(f"    - Alpha (Level): {smoothing['alpha']:.4f} (controls how quickly level adapts to new data)")
+                            if 'beta' in smoothing and smoothing['beta'] is not None:
+                                forecast_lines.append(f"    - Beta (Trend): {smoothing['beta']:.4f} (controls how quickly trend adapts)")
+                            if 'gamma' in smoothing and smoothing['gamma'] is not None:
+                                forecast_lines.append(f"    - Gamma (Seasonal): {smoothing['gamma']:.4f} (controls how quickly seasonality adapts)")
+                    if 'trend' in forecast.model_details:
+                        trend = forecast.model_details['trend']
+                        forecast_lines.append(f"  - **Trend Component:** {trend} (additive or none)")
+                    if 'seasonal' in forecast.model_details:
+                        seasonal = forecast.model_details['seasonal']
+                        forecast_lines.append(f"  - **Seasonal Component:** {seasonal} (additive or none)")
+                    if 'error' in forecast.model_details:
+                        error = forecast.model_details['error']
+                        forecast_lines.append(f"  - **Error Component:** {error} (additive or multiplicative)")
+                    forecast_lines.append(f"  - **Model Type:** ETS (Exponential Smoothing State Space Model)")
+                    forecast_lines.append(f"    - ETS models use exponential smoothing to forecast time series")
+                    forecast_lines.append(f"    - Automatically selects optimal model type and parameters")
+                    forecast_lines.append(f"    - Suitable for time series with trends and optional seasonality\n")
+            
+            # Transformer details - MAKE VERY PROMINENT
+            if forecast.method.upper() == 'TRANSFORMER' or 'num_layers' in forecast.model_details:
+                forecast_lines.append(f"\n**🤖 TRANSFORMER MODEL ARCHITECTURE:**\n")
+                if 'num_layers' in forecast.model_details:
+                    layers = forecast.model_details['num_layers']
+                    forecast_lines.append(f"  - **Transformer Encoder Layers:** {layers} (number of stacked encoder layers)")
+                if 'num_heads' in forecast.model_details:
+                    heads = forecast.model_details['num_heads']
+                    forecast_lines.append(f"  - **Attention Heads:** {heads} (number of parallel attention mechanisms)")
+                if 'd_model' in forecast.model_details:
+                    d_model = forecast.model_details['d_model']
+                    forecast_lines.append(f"  - **Model Dimension:** {d_model} (embedding dimension for each time step)")
+                if 'dim_feedforward' in forecast.model_details:
+                    ff_dim = forecast.model_details['dim_feedforward']
+                    forecast_lines.append(f"  - **Feedforward Dimension:** {ff_dim} (dimension of feedforward network)")
+                if 'lookback_window' in forecast.model_details:
+                    window = forecast.model_details['lookback_window']
+                    forecast_lines.append(f"  - **Lookback Window:** {window} time steps (historical periods used for prediction)")
+                forecast_lines.append(f"  - **Model Type:** Transformer (Attention-based neural network)")
+                forecast_lines.append(f"    - Transformers use self-attention to learn relationships between time steps")
+                forecast_lines.append(f"    - Attention mechanism allows model to focus on relevant historical patterns")
+                forecast_lines.append(f"    - Positional encoding preserves temporal order information")
+                forecast_lines.append(f"    - Ideal for complex time series with long-range dependencies\n")
+            
+            # Ensemble details - MAKE VERY PROMINENT
+            if forecast.method.upper() == 'ENSEMBLE' or 'models_used' in forecast.model_details:
+                forecast_lines.append(f"\n**🎯 ENSEMBLE MODEL ARCHITECTURE:**\n")
+                if 'models_used' in forecast.model_details:
+                    models = forecast.model_details['models_used']
+                    if isinstance(models, list):
+                        forecast_lines.append(f"  - **Models Combined:** {', '.join([m.upper() for m in models])} ({len(models)} models)")
+                        forecast_lines.append(f"    - Ensemble combines predictions from multiple models")
+                        forecast_lines.append(f"    - Reduces individual model errors through averaging")
+                if 'weights' in forecast.model_details:
+                    weights = forecast.model_details['weights']
+                    if isinstance(weights, dict):
+                        sorted_weights = sorted(weights.items(), key=lambda x: x[1], reverse=True)
+                        forecast_lines.append(f"  - **Model Weights (Weighted Average):**")
+                        for m, w in sorted_weights[:5]:
+                            forecast_lines.append(f"    - {m.upper()}: {w:.1%} (contributes {w*100:.1f}% to final forecast)")
+                        if len(sorted_weights) > 5:
+                            forecast_lines.append(f"    - ... ({len(sorted_weights)} total models)")
+                if 'ensemble_method' in forecast.model_details:
+                    method = forecast.model_details['ensemble_method']
+                    forecast_lines.append(f"  - **Ensemble Method:** {method}")
+                    if method == 'weighted_average':
+                        forecast_lines.append(f"    - Weighted average: Combines models based on validation performance")
+                    elif method == 'stacking':
+                        forecast_lines.append(f"    - Stacking: Uses meta-learner to combine base models")
+                    elif method == 'simple_average':
+                        forecast_lines.append(f"    - Simple average: Equal weights for all models")
+                forecast_lines.append(f"  - **Model Type:** Ensemble (Combination of multiple forecasting models)")
+                forecast_lines.append(f"    - Ensemble methods improve forecast accuracy by combining multiple models")
+                forecast_lines.append(f"    - Reduces overfitting and increases robustness")
+                forecast_lines.append(f"    - Each model contributes based on its validation performance\n")
+            
+            # Feature engineering
+            if 'features_used' in forecast.model_details:
+                features = forecast.model_details['features_used']
+                if isinstance(features, list):
+                    feature_str = ", ".join(features[:5])
+                    if len(features) > 5:
+                        feature_str += f", ... ({len(features)} total features)"
+                    forecast_lines.append(f"  - Features Used: {feature_str}")
+            
+            # Hyperparameters
+            if 'hyperparameters' in forecast.model_details:
+                hyperparams = forecast.model_details['hyperparameters']
+                if isinstance(hyperparams, dict):
+                    hyper_str = ", ".join([f"{k}={v}" for k, v in list(hyperparams.items())[:3]])
+                    if len(hyperparams) > 3:
+                        hyper_str += f", ... ({len(hyperparams)} total)"
+                    forecast_lines.append(f"  - Key Hyperparameters: {hyper_str}")
+        
+        # Add detailed forecast analysis
+        forecast_lines.append("\n**Detailed Forecast Analysis:**\n")
+        
+        # Calculate year-over-year growth rates
+        if len(forecast.predicted_values) >= 2:
+            forecast_lines.append("**Year-over-Year Growth Rates:**\n")
+            for i in range(1, len(forecast.predicted_values)):
+                prev_value = forecast.predicted_values[i-1]
+                curr_value = forecast.predicted_values[i]
+                if prev_value > 0:
+                    growth_rate = ((curr_value / prev_value) - 1) * 100
+                    forecast_lines.append(f"  - {forecast.periods[i-1]} to {forecast.periods[i]}: {growth_rate:+.2f}%")
+            
+            # Calculate multi-year CAGR
+            if len(forecast.predicted_values) >= 3:
+                first_value = forecast.predicted_values[0]
+                last_value = forecast.predicted_values[-1]
+                years = len(forecast.predicted_values) - 1
+                if first_value > 0:
+                    cagr = ((last_value / first_value) ** (1/years) - 1) * 100
+                    forecast_lines.append(f"\n**Multi-Year CAGR:** {cagr:.2f}% (over {years} years)")
+        
+        # Calculate confidence interval widths
+        if forecast.confidence_intervals_low and forecast.confidence_intervals_high:
+            forecast_lines.append("\n**Forecast Uncertainty Analysis:**\n")
+            for i, year in enumerate(forecast.periods):
+                value = forecast.predicted_values[i]
+                low = forecast.confidence_intervals_low[i]
+                high = forecast.confidence_intervals_high[i]
+                interval_width = high - low
+                interval_width_pct = (interval_width / value) * 100 if value > 0 else 0
+                
+                if abs(value) >= 1_000_000_000:
+                    width_str = f"${interval_width / 1_000_000_000:.2f}B"
+                elif abs(value) >= 1_000_000:
+                    width_str = f"${interval_width / 1_000_000:.2f}M"
+                else:
+                    width_str = f"${interval_width:,.0f}"
+                
+                forecast_lines.append(f"  - {year}: 95% CI width = {width_str} ({interval_width_pct:.1f}% of forecast)")
+        
+        # Add model performance metrics if available
+        if forecast.model_details:
+            if 'mae' in forecast.model_details or 'rmse' in forecast.model_details or 'mape' in forecast.model_details:
+                forecast_lines.append("\n**Model Performance Metrics (Validation):**\n")
+                if 'mae' in forecast.model_details:
+                    mae = forecast.model_details['mae']
+                    forecast_lines.append(f"  - MAE (Mean Absolute Error): {mae:,.0f}")
+                if 'rmse' in forecast.model_details:
+                    rmse = forecast.model_details['rmse']
+                    forecast_lines.append(f"  - RMSE (Root Mean Squared Error): {rmse:,.0f}")
+                if 'mape' in forecast.model_details:
+                    mape = forecast.model_details['mape']
+                    forecast_lines.append(f"  - MAPE (Mean Absolute Percentage Error): {mape:.2f}%")
+                if 'r2' in forecast.model_details:
+                    r2 = forecast.model_details['r2']
+                    forecast_lines.append(f"  - R² (Coefficient of Determination): {r2:.4f}")
+                if 'directional_accuracy' in forecast.model_details:
+                    dir_acc = forecast.model_details['directional_accuracy']
+                    forecast_lines.append(f"  - Directional Accuracy: {dir_acc:.1%}")
+            
+            # Training process details
+            if 'training_time' in forecast.model_details:
+                train_time = forecast.model_details['training_time']
+                forecast_lines.append(f"\n**Training Process:**\n")
+                forecast_lines.append(f"  - Training Time: {train_time:.2f} seconds")
+            if 'data_points_used' in forecast.model_details:
+                data_points = forecast.model_details['data_points_used']
+                forecast_lines.append(f"  - Historical Data Points Used: {data_points}")
+            if 'train_test_split' in forecast.model_details:
+                split = forecast.model_details['train_test_split']
+                forecast_lines.append(f"  - Train/Test Split: {split}")
+            if 'cross_validation_folds' in forecast.model_details:
+                folds = forecast.model_details['cross_validation_folds']
+                forecast_lines.append(f"  - Cross-Validation Folds: {folds}")
+            
+            # Data preprocessing details
+            if 'preprocessing_applied' in forecast.model_details:
+                preprocessing = forecast.model_details['preprocessing_applied']
+                if preprocessing:
+                    forecast_lines.append(f"\n**Data Preprocessing:**\n")
+                    if isinstance(preprocessing, list):
+                        for step in preprocessing:
+                            forecast_lines.append(f"  - {step}")
+                    elif isinstance(preprocessing, dict):
+                        for step, applied in preprocessing.items():
+                            if applied:
+                                forecast_lines.append(f"  - {step}: Applied")
+            if 'scaling_method' in forecast.model_details:
+                scaling = forecast.model_details['scaling_method']
+                forecast_lines.append(f"  - Scaling Method: {scaling}")
+            if 'outlier_removal' in forecast.model_details:
+                outlier_removal = forecast.model_details['outlier_removal']
+                forecast_lines.append(f"  - Outlier Removal: {outlier_removal}")
+            if 'missing_data_handling' in forecast.model_details:
+                missing_handling = forecast.model_details['missing_data_handling']
+                forecast_lines.append(f"  - Missing Data Handling: {missing_handling}")
+            
+            # Feature engineering details
+            if 'features_engineered' in forecast.model_details:
+                features = forecast.model_details['features_engineered']
+                if features:
+                    forecast_lines.append(f"\n**Feature Engineering:**\n")
+                    if isinstance(features, list):
+                        for feature in features[:10]:  # Show first 10
+                            forecast_lines.append(f"  - {feature}")
+                        if len(features) > 10:
+                            forecast_lines.append(f"  - ... and {len(features) - 10} more features")
+                    elif isinstance(features, dict):
+                        for feature_type, count in features.items():
+                            forecast_lines.append(f"  - {feature_type}: {count} features")
+            
+            # Model selection details
+            if 'models_tested' in forecast.model_details:
+                models_tested = forecast.model_details['models_tested']
+                forecast_lines.append(f"\n**Model Selection Process:**\n")
+                forecast_lines.append(f"  - Models Tested: {', '.join(models_tested) if isinstance(models_tested, list) else models_tested}")
+            if 'selection_criteria' in forecast.model_details:
+                criteria = forecast.model_details['selection_criteria']
+                forecast_lines.append(f"  - Selection Criteria: {criteria}")
+            if 'best_model_reason' in forecast.model_details:
+                reason = forecast.model_details['best_model_reason']
+                forecast_lines.append(f"  - Why This Model: {reason}")
+        
+        # Add EXPLICIT DATA DUMP section - ALL technical details in structured format
+        # This is CRITICAL - the LLM MUST use these exact values
+        forecast_lines.append(f"\n{'='*80}")
+        forecast_lines.append("🚨🚨🚨 EXPLICIT DATA DUMP - USE THESE EXACT VALUES 🚨🚨🚨")
+        forecast_lines.append(f"{'='*80}\n")
+        forecast_lines.append("**⚠️ CRITICAL: The following section contains ALL technical details in a structured format.**")
+        forecast_lines.append("**⚠️ YOU MUST INCLUDE EVERY SINGLE VALUE BELOW IN YOUR RESPONSE - NO EXCEPTIONS ⚠️**\n")
+        
+        if forecast.model_details:
+            forecast_lines.append("**MODEL TECHNICAL DETAILS (EXACT VALUES - COPY THESE):**\n")
+            
+            # Model architecture
+            if 'layers' in forecast.model_details:
+                layers = forecast.model_details['layers']
+                if isinstance(layers, list):
+                    forecast_lines.append(f"- **Network Architecture:** {len(layers)} layers")
+                    forecast_lines.append(f"- **Layers Configuration:** {layers}")
+                    for i, units in enumerate(layers, 1):
+                        forecast_lines.append(f"- **Layer {i} Units:** {units}")
+                else:
+                    forecast_lines.append(f"- **Network Architecture:** {layers} layers")
+            if 'units' in forecast.model_details:
+                forecast_lines.append(f"- **Hidden Units per Layer:** {forecast.model_details['units']}")
             if 'num_layers' in forecast.model_details:
-                forecast_lines.append(f"  - Transformer Layers: {forecast.model_details['num_layers']}")
+                forecast_lines.append(f"- **Transformer Encoder Layers:** {forecast.model_details['num_layers']}")
+            if 'num_heads' in forecast.model_details:
+                forecast_lines.append(f"- **Attention Heads:** {forecast.model_details['num_heads']}")
+            if 'd_model' in forecast.model_details:
+                forecast_lines.append(f"- **Model Dimension:** {forecast.model_details['d_model']}")
+            if 'total_parameters' in forecast.model_details:
+                forecast_lines.append(f"- **Total Parameters:** {forecast.model_details['total_parameters']:,}")
+            if 'input_shape' in forecast.model_details:
+                forecast_lines.append(f"- **Input Shape:** {forecast.model_details['input_shape']}")
+            
+            # Training details
+            if 'epochs_trained' in forecast.model_details:
+                forecast_lines.append(f"- **Training Epochs:** {forecast.model_details['epochs_trained']}")
+            if 'training_loss' in forecast.model_details:
+                train_loss = forecast.model_details['training_loss']
+                forecast_lines.append(f"- **Training Loss (MSE):** {train_loss:.6f}")
+            if 'validation_loss' in forecast.model_details:
+                val_loss = forecast.model_details['validation_loss']
+                forecast_lines.append(f"- **Validation Loss (MSE):** {val_loss:.6f}")
+                if 'training_loss' in forecast.model_details:
+                    train_loss = forecast.model_details['training_loss']
+                    if train_loss > 0:
+                        overfit_ratio = val_loss / train_loss
+                        forecast_lines.append(f"- **Overfitting Ratio (val/train):** {overfit_ratio:.2f}")
+            
+            # Hyperparameters
+            if 'learning_rate' in forecast.model_details:
+                forecast_lines.append(f"- **Learning Rate:** {forecast.model_details['learning_rate']:.6f}")
+            if 'batch_size' in forecast.model_details:
+                forecast_lines.append(f"- **Batch Size:** {forecast.model_details['batch_size']}")
+            if 'optimizer' in forecast.model_details:
+                forecast_lines.append(f"- **Optimizer:** {forecast.model_details['optimizer']}")
+            if 'dropout' in forecast.model_details:
+                forecast_lines.append(f"- **Dropout Rate:** {forecast.model_details['dropout']:.4f}")
+            if 'lookback_window' in forecast.model_details:
+                forecast_lines.append(f"- **Lookback Window:** {forecast.model_details['lookback_window']}")
+            
+            # Computational details
+            if 'training_time' in forecast.model_details:
+                forecast_lines.append(f"- **Training Time:** {forecast.model_details['training_time']:.2f} seconds")
+            if 'data_points_used' in forecast.model_details:
+                forecast_lines.append(f"- **Data Points Used:** {forecast.model_details['data_points_used']}")
+            if 'train_test_split' in forecast.model_details:
+                forecast_lines.append(f"- **Train/Test Split:** {forecast.model_details['train_test_split']}")
+            
+            # ARIMA specific
+            if forecast.method.upper() == 'ARIMA' and 'model_params' in forecast.model_details:
+                params = forecast.model_details['model_params']
+                if isinstance(params, dict) and 'order' in params:
+                    order = params['order']
+                    if isinstance(order, (list, tuple)) and len(order) >= 3:
+                        forecast_lines.append(f"- **ARIMA Order (p,d,q):** {order}")
+                        forecast_lines.append(f"- **AR Order (p):** {order[0]}")
+                        forecast_lines.append(f"- **Differencing Order (d):** {order[1]}")
+                        forecast_lines.append(f"- **MA Order (q):** {order[2]}")
+                if 'aic' in forecast.model_details:
+                    forecast_lines.append(f"- **AIC:** {forecast.model_details['aic']:.2f}")
+                if 'bic' in forecast.model_details:
+                    forecast_lines.append(f"- **BIC:** {forecast.model_details['bic']:.2f}")
+            
+            # Prophet specific
+            if forecast.method.upper() == 'PROPHET':
+                if 'changepoint_count' in forecast.model_details:
+                    forecast_lines.append(f"- **Changepoint Count:** {forecast.model_details['changepoint_count']}")
+                if 'growth_model' in forecast.model_details:
+                    forecast_lines.append(f"- **Growth Model:** {forecast.model_details['growth_model']}")
+            
+            # ETS specific
+            if forecast.method.upper() == 'ETS':
+                if 'model_type' in forecast.model_details:
+                    forecast_lines.append(f"- **ETS Model Type:** {forecast.model_details['model_type']}")
+                if 'smoothing_params' in forecast.model_details:
+                    smoothing = forecast.model_details['smoothing_params']
+                    if isinstance(smoothing, dict):
+                        if 'alpha' in smoothing:
+                            forecast_lines.append(f"- **Alpha (Level):** {smoothing['alpha']:.4f}")
+                        if 'beta' in smoothing:
+                            forecast_lines.append(f"- **Beta (Trend):** {smoothing['beta']:.4f}")
+                        if 'gamma' in smoothing:
+                            forecast_lines.append(f"- **Gamma (Seasonal):** {smoothing['gamma']:.4f}")
+            
+            # Transformer specific
+            if forecast.method.upper() == 'TRANSFORMER':
+                if 'dim_feedforward' in forecast.model_details:
+                    forecast_lines.append(f"- **Feedforward Dimension:** {forecast.model_details['dim_feedforward']}")
+            
+            # Preprocessing
+            if 'scaling_method' in forecast.model_details:
+                forecast_lines.append(f"- **Scaling Method:** {forecast.model_details['scaling_method']}")
+        
+        forecast_lines.append(f"\n{'='*80}")
+        forecast_lines.append("END OF EXPLICIT DATA DUMP")
+        forecast_lines.append(f"{'='*80}\n")
+        forecast_lines.append("**🚨 FINAL REMINDER: You MUST include ALL of the above values in your response.**")
+        forecast_lines.append("**🚨 DO NOT summarize - list the EXACT numbers for each technical detail.**")
+        forecast_lines.append("**🚨 If a value is shown above, you MUST mention it in your response.**\n")
         
         # Add model explanation
         model_explanation = _get_model_explanation(forecast.method)
         if model_explanation:
             forecast_lines.append("\n" + model_explanation)
+        
+        # Add comprehensive forecast interpretation
+        forecast_lines.append(f"\n**Forecast Interpretation & Analysis:**\n")
+        
+        # Calculate total growth
+        if len(forecast.predicted_values) >= 2:
+            first_value = forecast.predicted_values[0]
+            last_value = forecast.predicted_values[-1]
+            total_growth = ((last_value / first_value) - 1) * 100 if first_value > 0 else 0
+            forecast_lines.append(f"- **Total Growth Projection:** {total_growth:+.1f}% from {forecast.periods[0]} to {forecast.periods[-1]}\n")
+        
+        # Analyze forecast trajectory
+        if len(forecast.predicted_values) >= 3:
+            growth_rates = []
+            for i in range(1, len(forecast.predicted_values)):
+                prev = forecast.predicted_values[i-1]
+                curr = forecast.predicted_values[i]
+                if prev > 0:
+                    growth_rates.append(((curr / prev) - 1) * 100)
+            
+            if growth_rates:
+                avg_growth = sum(growth_rates) / len(growth_rates)
+                if all(g > 0 for g in growth_rates):
+                    forecast_lines.append(f"- **Trajectory:** Consistent positive growth (avg {avg_growth:.1f}% YoY)\n")
+                elif all(g < 0 for g in growth_rates):
+                    forecast_lines.append(f"- **Trajectory:** Declining trend (avg {avg_growth:.1f}% YoY)\n")
+                else:
+                    forecast_lines.append(f"- **Trajectory:** Mixed growth pattern (avg {avg_growth:.1f}% YoY)\n")
+                
+                # Check for acceleration/deceleration
+                if len(growth_rates) >= 2:
+                    early_avg = sum(growth_rates[:len(growth_rates)//2]) / (len(growth_rates)//2)
+                    late_avg = sum(growth_rates[len(growth_rates)//2:]) / (len(growth_rates) - len(growth_rates)//2)
+                    if late_avg > early_avg * 1.1:
+                        forecast_lines.append(f"- **Pattern:** Accelerating growth (later years faster than early years)\n")
+                    elif late_avg < early_avg * 0.9:
+                        forecast_lines.append(f"- **Pattern:** Decelerating growth (later years slower than early years)\n")
+        
+        # Confidence interval analysis
+        if forecast.confidence_intervals_low and forecast.confidence_intervals_high:
+            avg_width_pct = 0
+            for i in range(len(forecast.periods)):
+                value = forecast.predicted_values[i]
+                low = forecast.confidence_intervals_low[i]
+                high = forecast.confidence_intervals_high[i]
+                width_pct = ((high - low) / value) * 100 if value > 0 else 0
+                avg_width_pct += width_pct
+            avg_width_pct /= len(forecast.periods)
+            
+            if avg_width_pct < 20:
+                forecast_lines.append(f"- **Uncertainty Level:** LOW (avg CI width: {avg_width_pct:.1f}% of forecast)\n")
+            elif avg_width_pct < 40:
+                forecast_lines.append(f"- **Uncertainty Level:** MODERATE (avg CI width: {avg_width_pct:.1f}% of forecast)\n")
+            else:
+                forecast_lines.append(f"- **Uncertainty Level:** HIGH (avg CI width: {avg_width_pct:.1f}% of forecast)\n")
+        
+        # Add comprehensive technical summary
+        forecast_lines.append(f"\n**Technical Summary:**\n")
+        forecast_lines.append(f"- **Forecast Method:** {forecast.method.upper()}\n")
+        forecast_lines.append(f"- **Confidence Level:** {forecast.confidence:.1%}\n")
+        forecast_lines.append(f"- **Forecast Horizon:** {len(forecast.periods)} years ({forecast.periods[0]} to {forecast.periods[-1]})\n")
+        if forecast.model_details:
+            if 'data_quality_score' in forecast.model_details:
+                quality = forecast.model_details['data_quality_score']
+                forecast_lines.append(f"- **Data Quality Score:** {quality:.2f}/1.00\n")
+            if 'model_complexity' in forecast.model_details:
+                complexity = forecast.model_details['model_complexity']
+                forecast_lines.append(f"- **Model Complexity:** {complexity}\n")
+            if 'forecast_reliability' in forecast.model_details:
+                reliability = forecast.model_details['forecast_reliability']
+                forecast_lines.append(f"- **Forecast Reliability:** {reliability}\n")
+        
+        # Add comprehensive summary of all details that MUST be included
+        forecast_lines.append(f"\n{'='*80}")
+        forecast_lines.append(f"📋 COMPREHENSIVE TECHNICAL DETAILS SUMMARY - INCLUDE ALL IN YOUR RESPONSE")
+        forecast_lines.append(f"{'='*80}\n")
+        forecast_lines.append(f"**YOU MUST INCLUDE ALL OF THE FOLLOWING IN YOUR RESPONSE:**\n")
+        forecast_lines.append(f"\n1. **Forecast Values & Analysis:**")
+        forecast_lines.append(f"   - All forecasted values for each year")
+        forecast_lines.append(f"   - Year-over-year growth rates")
+        forecast_lines.append(f"   - Multi-year CAGR")
+        forecast_lines.append(f"   - Confidence intervals and uncertainty analysis\n")
+        
+        forecast_lines.append(f"2. **Model Technical Specifications:**")
+        if forecast.model_details:
+            if 'model_params' in forecast.model_details:
+                forecast_lines.append(f"   - ARIMA order and parameters")
+            if 'num_layers' in forecast.model_details or 'layers' in forecast.model_details:
+                forecast_lines.append(f"   - Network architecture (layers, units, dimensions)")
+            if 'epochs_trained' in forecast.model_details:
+                forecast_lines.append(f"   - Training epochs")
+            if 'training_loss' in forecast.model_details:
+                forecast_lines.append(f"   - Training and validation loss metrics")
+            if 'hyperparameters' in forecast.model_details:
+                forecast_lines.append(f"   - All hyperparameters with values and explanations")
+        forecast_lines.append(f"\n")
+        
+        forecast_lines.append(f"3. **Model Performance Metrics:**")
+        if forecast.model_details:
+            if 'mae' in forecast.model_details or 'rmse' in forecast.model_details:
+                forecast_lines.append(f"   - MAE, RMSE, MAPE, R², directional accuracy")
+            if 'cross_validation_results' in forecast.model_details:
+                forecast_lines.append(f"   - Cross-validation results")
+        forecast_lines.append(f"\n")
+        
+        forecast_lines.append(f"4. **Training Process Details:**")
+        if forecast.model_details:
+            if 'training_time' in forecast.model_details:
+                forecast_lines.append(f"   - Training time and computational details")
+            if 'data_points_used' in forecast.model_details:
+                forecast_lines.append(f"   - Data points used, train/test split")
+            if 'preprocessing_applied' in forecast.model_details:
+                forecast_lines.append(f"   - Data preprocessing steps")
+        forecast_lines.append(f"\n")
+        
+        forecast_lines.append(f"5. **Feature Engineering:**")
+        if forecast.model_details:
+            if 'features_used' in forecast.model_details or 'features_engineered' in forecast.model_details:
+                forecast_lines.append(f"   - Features used and engineered")
+            if 'feature_importance' in forecast.model_details:
+                forecast_lines.append(f"   - Feature importance analysis")
+        forecast_lines.append(f"\n")
+        
+        forecast_lines.append(f"6. **Model Explainability:**")
+        forecast_lines.append(f"   - How the model works (detailed explanation)")
+        forecast_lines.append(f"   - Why this model was selected")
+        forecast_lines.append(f"   - Model selection process")
+        if forecast.model_details and 'alternative_models_performance' in forecast.model_details:
+            forecast_lines.append(f"   - Comparison with alternative models")
+        forecast_lines.append(f"\n")
+        
+        forecast_lines.append(f"7. **Forecast Interpretation:**")
+        forecast_lines.append(f"   - Total growth projection")
+        forecast_lines.append(f"   - Trajectory analysis (accelerating/decelerating)")
+        forecast_lines.append(f"   - Uncertainty level assessment")
+        forecast_lines.append(f"\n")
+        
+        forecast_lines.append(f"**CRITICAL:** Do NOT summarize or skip any of these details. Include ALL technical information in your response.\n")
+        forecast_lines.append(f"{'='*80}\n")
+        
+        # Final reminder with explicit checklist - MAKE THIS UNAVOIDABLE
+        forecast_lines.append(f"\n{'='*80}")
+        forecast_lines.append("🚨🚨🚨 FINAL REMINDER: THIS IS THE PRIMARY ANSWER 🚨🚨🚨")
+        forecast_lines.append(f"{'='*80}\n")
+        forecast_lines.append("**YOUR RESPONSE MUST INCLUDE ALL OF THE FOLLOWING - CHECK EACH ITEM:**\n")
+        forecast_lines.append("✅ Forecast values for each year with exact numbers")
+        forecast_lines.append("✅ Confidence intervals for each year")
+        forecast_lines.append("✅ Year-over-year growth rates (calculated above)")
+        forecast_lines.append("✅ Multi-year CAGR (calculated above)")
+        forecast_lines.append("✅ Model architecture (layers, units, parameters)")
+        forecast_lines.append("✅ Training details (epochs, training loss, validation loss)")
+        forecast_lines.append("✅ Hyperparameters (learning rate, batch size, optimizer, dropout)")
+        forecast_lines.append("✅ Performance metrics (training loss, validation loss, overfitting ratio)")
+        forecast_lines.append("✅ Data preprocessing (scaling method, feature engineering, data points)")
+        forecast_lines.append("✅ Computational details (training time, model size, parameters)")
+        forecast_lines.append("✅ Model explainability (how LSTM/GRU works, why it's suitable)")
+        forecast_lines.append("✅ Forecast interpretation (trajectory, pattern, uncertainty)")
+        forecast_lines.append(f"\n{'='*80}")
+        forecast_lines.append("**DO NOT SUMMARIZE - INCLUDE EVERY DETAIL ABOVE IN YOUR RESPONSE**")
+        forecast_lines.append(f"{'='*80}\n")
+        
+        # Add explicit data dump section - ALL DETAILS THAT MUST BE INCLUDED
+        forecast_lines.append(f"\n{'='*80}")
+        forecast_lines.append("📋 EXPLICIT DATA DUMP - COPY THESE DETAILS INTO YOUR RESPONSE")
+        forecast_lines.append(f"{'='*80}\n")
+        forecast_lines.append("**The following details are PROVIDED BELOW - you MUST include them in your response:**\n\n")
+        
+        # List all available details explicitly
+        if forecast.model_details:
+            forecast_lines.append("**AVAILABLE MODEL DETAILS (MUST BE INCLUDED):**\n")
+            
+            # Model architecture
+            if 'layers' in forecast.model_details:
+                layers = forecast.model_details['layers']
+                forecast_lines.append(f"- **Network Layers:** {layers}\n")
+            if 'units' in forecast.model_details:
+                units = forecast.model_details['units']
+                forecast_lines.append(f"- **Hidden Units per Layer:** {units}\n")
+            if 'total_parameters' in forecast.model_details:
+                params = forecast.model_details['total_parameters']
+                forecast_lines.append(f"- **Total Parameters:** {params:,}\n")
+            if 'input_shape' in forecast.model_details:
+                input_shape = forecast.model_details['input_shape']
+                forecast_lines.append(f"- **Input Shape:** {input_shape}\n")
+            
+            # Training details
+            if 'epochs_trained' in forecast.model_details:
+                epochs = forecast.model_details['epochs_trained']
+                forecast_lines.append(f"- **Training Epochs:** {epochs}\n")
+            if 'training_loss' in forecast.model_details:
+                train_loss = forecast.model_details['training_loss']
+                forecast_lines.append(f"- **Training Loss (MSE):** {train_loss:.6f}\n")
+            if 'validation_loss' in forecast.model_details:
+                val_loss = forecast.model_details['validation_loss']
+                forecast_lines.append(f"- **Validation Loss (MSE):** {val_loss:.6f}\n")
+                if 'training_loss' in forecast.model_details:
+                    train_loss = forecast.model_details['training_loss']
+                    overfit_ratio = val_loss / train_loss if train_loss > 0 else 1.0
+                    forecast_lines.append(f"- **Overfitting Ratio:** {overfit_ratio:.2f}\n")
+            
+            # Hyperparameters
+            if 'learning_rate' in forecast.model_details:
+                lr = forecast.model_details['learning_rate']
+                forecast_lines.append(f"- **Learning Rate:** {lr:.6f}\n")
+            if 'batch_size' in forecast.model_details:
+                batch = forecast.model_details['batch_size']
+                forecast_lines.append(f"- **Batch Size:** {batch}\n")
+            if 'optimizer' in forecast.model_details:
+                optimizer = forecast.model_details['optimizer']
+                forecast_lines.append(f"- **Optimizer:** {optimizer}\n")
+            if 'dropout' in forecast.model_details:
+                dropout = forecast.model_details['dropout']
+                forecast_lines.append(f"- **Dropout Rate:** {dropout:.2f}\n")
+            if 'lookback_window' in forecast.model_details:
+                window = forecast.model_details['lookback_window']
+                forecast_lines.append(f"- **Lookback Window:** {window} time steps\n")
+            
+            # Computational details
+            if 'training_time' in forecast.model_details:
+                train_time = forecast.model_details['training_time']
+                forecast_lines.append(f"- **Training Time:** {train_time:.2f} seconds\n")
+            if 'data_points_used' in forecast.model_details:
+                data_points = forecast.model_details['data_points_used']
+                forecast_lines.append(f"- **Data Points Used:** {data_points} periods\n")
+            if 'train_test_split' in forecast.model_details:
+                split = forecast.model_details['train_test_split']
+                forecast_lines.append(f"- **Train/Test Split:** {split}\n")
+            
+            # Preprocessing
+            if 'scaling_method' in forecast.model_details:
+                scaling = forecast.model_details['scaling_method']
+                forecast_lines.append(f"- **Scaling Method:** {scaling}\n")
+            if 'preprocessing_applied' in forecast.model_details:
+                preprocessing = forecast.model_details['preprocessing_applied']
+                if isinstance(preprocessing, list):
+                    forecast_lines.append(f"- **Preprocessing Applied:** {', '.join(preprocessing)}\n")
+        
+        # Growth rates (already calculated above)
+        if len(forecast.predicted_values) >= 2:
+            forecast_lines.append("\n**GROWTH RATES (MUST BE INCLUDED):**\n")
+            for i in range(1, len(forecast.predicted_values)):
+                prev = forecast.predicted_values[i-1]
+                curr = forecast.predicted_values[i]
+                if prev > 0:
+                    growth = ((curr / prev) - 1) * 100
+                    forecast_lines.append(f"- **{forecast.periods[i-1]} to {forecast.periods[i]}:** {growth:+.2f}% YoY growth\n")
+            if len(forecast.predicted_values) >= 3:
+                first = forecast.predicted_values[0]
+                last = forecast.predicted_values[-1]
+                years = len(forecast.predicted_values) - 1
+                if first > 0:
+                    cagr = ((last / first) ** (1/years) - 1) * 100
+                    forecast_lines.append(f"- **Multi-Year CAGR:** {cagr:.2f}%\n")
+        
+        forecast_lines.append(f"\n{'='*80}")
+        forecast_lines.append("**CRITICAL: The above details are PROVIDED - you MUST include them in your response**")
+        forecast_lines.append("**DO NOT say 'the model has X layers' - say 'the model has {layers} layers' with the actual number**")
+        forecast_lines.append("**DO NOT say 'training loss is low' - say 'training loss is {training_loss:.6f}' with the actual value**")
+        forecast_lines.append("**DO NOT summarize - include EVERY number and detail listed above**")
+        forecast_lines.append(f"{'='*80}\n")
+        
+        # Add methodology note
+        forecast_lines.append(f"\n**Methodology Note:**\n")
+        forecast_lines.append(f"This forecast was generated using {forecast.method.upper()} methodology.\n")
+        forecast_lines.append(f"All technical specifications, performance metrics, and model details are provided above.\n")
+        forecast_lines.append(f"For detailed explanations of how the model works, see the Model Explainability section.\n")
+        
+        # Add one final explicit section with ALL values that MUST be included
+        forecast_lines.append(f"\n{'='*80}")
+        forecast_lines.append("🎯 FINAL CHECKLIST - COPY THESE EXACT VALUES INTO YOUR RESPONSE")
+        forecast_lines.append(f"{'='*80}\n")
+        forecast_lines.append("**The following values are EXACTLY what you must include in your response:**\n\n")
+        
+        # Forecast values
+        forecast_lines.append("**FORECAST VALUES (MUST INCLUDE):**\n")
+        for i, year in enumerate(forecast.periods):
+            value = forecast.predicted_values[i]
+            low = forecast.confidence_intervals_low[i]
+            high = forecast.confidence_intervals_high[i]
+            if abs(value) >= 1_000_000_000:
+                value_str = f"${value / 1_000_000_000:.2f}B"
+                low_str = f"${low / 1_000_000_000:.2f}B"
+                high_str = f"${high / 1_000_000_000:.2f}B"
+            elif abs(value) >= 1_000_000:
+                value_str = f"${value / 1_000_000:.2f}M"
+                low_str = f"${low / 1_000_000:.2f}M"
+                high_str = f"${high / 1_000_000:.2f}M"
+            else:
+                value_str = f"${value:,.0f}"
+                low_str = f"${low:,.0f}"
+                high_str = f"${high:,.0f}"
+            forecast_lines.append(f"- **{year}:** {value_str} (95% CI: {low_str} - {high_str})\n")
+        
+        # Growth rates
+        if len(forecast.predicted_values) >= 2:
+            forecast_lines.append("\n**GROWTH RATES (MUST INCLUDE):**\n")
+            for i in range(1, len(forecast.predicted_values)):
+                prev = forecast.predicted_values[i-1]
+                curr = forecast.predicted_values[i]
+                if prev > 0:
+                    growth = ((curr / prev) - 1) * 100
+                    forecast_lines.append(f"- **{forecast.periods[i-1]} to {forecast.periods[i]}:** {growth:+.2f}% YoY growth\n")
+            if len(forecast.predicted_values) >= 3:
+                first = forecast.predicted_values[0]
+                last = forecast.predicted_values[-1]
+                years = len(forecast.predicted_values) - 1
+                if first > 0:
+                    cagr = ((last / first) ** (1/years) - 1) * 100
+                    forecast_lines.append(f"- **Multi-Year CAGR:** {cagr:.2f}%\n")
+        
+        # Model details - list ALL available values
+        if forecast.model_details:
+            forecast_lines.append("\n**MODEL TECHNICAL DETAILS (MUST INCLUDE):**\n")
+            
+            # Architecture
+            if 'layers' in forecast.model_details:
+                layers = forecast.model_details['layers']
+                if isinstance(layers, list):
+                    forecast_lines.append(f"- **Network Architecture:** {len(layers)} layers with {layers} units per layer\n")
+                else:
+                    forecast_lines.append(f"- **Network Architecture:** {layers} layers\n")
+            if 'units' in forecast.model_details:
+                units = forecast.model_details['units']
+                forecast_lines.append(f"- **Hidden Units per Layer:** {units}\n")
+            if 'total_parameters' in forecast.model_details:
+                params = forecast.model_details['total_parameters']
+                forecast_lines.append(f"- **Total Parameters:** {params:,}\n")
+            if 'input_shape' in forecast.model_details:
+                input_shape = forecast.model_details['input_shape']
+                forecast_lines.append(f"- **Input Shape:** {input_shape}\n")
+            
+            # Training
+            if 'epochs_trained' in forecast.model_details:
+                epochs = forecast.model_details['epochs_trained']
+                forecast_lines.append(f"- **Training Epochs:** {epochs}\n")
+            if 'training_loss' in forecast.model_details:
+                train_loss = forecast.model_details['training_loss']
+                forecast_lines.append(f"- **Training Loss (MSE):** {train_loss:.6f}\n")
+            if 'validation_loss' in forecast.model_details:
+                val_loss = forecast.model_details['validation_loss']
+                forecast_lines.append(f"- **Validation Loss (MSE):** {val_loss:.6f}\n")
+                if 'training_loss' in forecast.model_details:
+                    train_loss = forecast.model_details['training_loss']
+                    overfit_ratio = val_loss / train_loss if train_loss > 0 else 1.0
+                    forecast_lines.append(f"- **Overfitting Ratio:** {overfit_ratio:.2f}\n")
+            
+            # Hyperparameters
+            if 'learning_rate' in forecast.model_details:
+                lr = forecast.model_details['learning_rate']
+                forecast_lines.append(f"- **Learning Rate:** {lr:.6f}\n")
+            if 'batch_size' in forecast.model_details:
+                batch = forecast.model_details['batch_size']
+                forecast_lines.append(f"- **Batch Size:** {batch}\n")
+            if 'optimizer' in forecast.model_details:
+                optimizer = forecast.model_details['optimizer']
+                forecast_lines.append(f"- **Optimizer:** {optimizer}\n")
+            if 'dropout' in forecast.model_details:
+                dropout = forecast.model_details['dropout']
+                forecast_lines.append(f"- **Dropout Rate:** {dropout:.2f}\n")
+            if 'lookback_window' in forecast.model_details:
+                window = forecast.model_details['lookback_window']
+                forecast_lines.append(f"- **Lookback Window:** {window} time steps\n")
+            
+            # Computational
+            if 'training_time' in forecast.model_details:
+                train_time = forecast.model_details['training_time']
+                forecast_lines.append(f"- **Training Time:** {train_time:.2f} seconds\n")
+            if 'data_points_used' in forecast.model_details:
+                data_points = forecast.model_details['data_points_used']
+                forecast_lines.append(f"- **Data Points Used:** {data_points} periods\n")
+            if 'train_test_split' in forecast.model_details:
+                split = forecast.model_details['train_test_split']
+                forecast_lines.append(f"- **Train/Test Split:** {split}\n")
+            
+            # Preprocessing
+            if 'scaling_method' in forecast.model_details:
+                scaling = forecast.model_details['scaling_method']
+                forecast_lines.append(f"- **Scaling Method:** {scaling}\n")
+        
+        forecast_lines.append(f"\n{'='*80}")
+        forecast_lines.append("**🚨 CRITICAL: The above values are EXACT - you MUST include them in your response**")
+        forecast_lines.append("**🚨 DO NOT say 'the model was trained' - say 'the model was trained for {epochs} epochs'**")
+        forecast_lines.append("**🚨 DO NOT say 'training loss is low' - say 'training loss is {train_loss:.6f}'**")
+        forecast_lines.append("**🚨 DO NOT say 'the model has layers' - say 'the model has {layers} layers with {units} units each'**")
+        forecast_lines.append("**🚨 INCLUDE EVERY NUMBER, METRIC, AND DETAIL LISTED ABOVE - NO EXCEPTIONS**")
+        forecast_lines.append(f"{'='*80}\n")
         
         forecast_lines.append(f"\n{'='*80}\n")
         
@@ -905,20 +1879,1038 @@ def _build_ml_forecast_context(
         return None, None
 
 
+def _build_historical_forecast_comparison(
+    ticker: str,
+    metric: str,
+    ts: Any,  # pd.Series
+    forecast_result: Any
+) -> str:
+    """
+    Build historical comparison context for forecast.
+    
+    Compares forecast to historical growth rates, CAGR, and volatility.
+    """
+    try:
+        import numpy as np
+        
+        context_parts = []
+        context_parts.append("\n📈 HISTORICAL CONTEXT & FORECAST COMPARISON:\n")
+        
+        # Calculate historical statistics
+        if len(ts) >= 3:
+            # Historical growth rates
+            historical_values = ts.values
+            recent_values = historical_values[-min(5, len(historical_values)):]
+            
+            # Calculate historical CAGR (3-year and 5-year if available)
+            if len(historical_values) >= 4:
+                cagr_3y = ((historical_values[-1] / historical_values[-4]) ** (1/3) - 1) * 100
+                context_parts.append(f"- Historical 3-Year CAGR: {cagr_3y:.1f}%\n")
+            
+            if len(historical_values) >= 6:
+                cagr_5y = ((historical_values[-1] / historical_values[-6]) ** (1/5) - 1) * 100
+                context_parts.append(f"- Historical 5-Year CAGR: {cagr_5y:.1f}%\n")
+            
+            # Calculate historical volatility
+            if len(recent_values) >= 3:
+                pct_changes = np.diff(recent_values) / recent_values[:-1] * 100
+                historical_volatility = np.std(pct_changes)
+                context_parts.append(f"- Historical Volatility (std dev of YoY changes): {historical_volatility:.1f}%\n")
+        
+        # Calculate forecasted growth rates
+        if len(forecast_result.predicted_values) >= 2:
+            forecast_values = forecast_result.predicted_values
+            last_historical = ts.values[-1]
+            
+            # Year-over-year growth in forecast
+            forecast_growth_y1 = ((forecast_values[0] / last_historical) - 1) * 100 if last_historical > 0 else 0
+            if len(forecast_values) >= 2:
+                forecast_growth_y2 = ((forecast_values[1] / forecast_values[0]) - 1) * 100 if forecast_values[0] > 0 else 0
+                context_parts.append(f"- Forecasted YoY Growth (Year 1): {forecast_growth_y1:.1f}%\n")
+                context_parts.append(f"- Forecasted YoY Growth (Year 2): {forecast_growth_y2:.1f}%\n")
+            
+            # Forecast CAGR
+            if len(forecast_values) >= 3:
+                forecast_cagr = ((forecast_values[-1] / last_historical) ** (1/len(forecast_values)) - 1) * 100
+                context_parts.append(f"- Forecasted CAGR ({len(forecast_values)}-year): {forecast_cagr:.1f}%\n")
+        
+        # Compare forecast to historical
+        if len(historical_values) >= 4 and len(forecast_result.predicted_values) >= 3:
+            cagr_3y = ((historical_values[-1] / historical_values[-4]) ** (1/3) - 1) * 100
+            last_historical = ts.values[-1]
+            forecast_cagr = ((forecast_result.predicted_values[-1] / last_historical) ** (1/len(forecast_result.predicted_values)) - 1) * 100
+            
+            if forecast_cagr > cagr_3y * 1.1:
+                context_parts.append(f"- Trend: Forecast suggests ACCELERATING growth ({forecast_cagr:.1f}% vs {cagr_3y:.1f}% historical)\n")
+            elif forecast_cagr < cagr_3y * 0.9:
+                context_parts.append(f"- Trend: Forecast suggests DECELERATING growth ({forecast_cagr:.1f}% vs {cagr_3y:.1f}% historical)\n")
+            else:
+                context_parts.append(f"- Trend: Forecast suggests STABLE growth ({forecast_cagr:.1f}% vs {cagr_3y:.1f}% historical)\n")
+        
+        # Create comparison table
+        context_parts.append("\n**Forecast vs Historical Comparison:**\n")
+        context_parts.append(f"| Period | Value | Growth Rate |\n")
+        context_parts.append(f"|--------|-------|-------------|\n")
+        
+        # Historical values
+        if len(historical_values) >= 3:
+            for i in range(max(0, len(historical_values) - 3), len(historical_values)):
+                year = ts.index[i].year if hasattr(ts.index[i], 'year') else i
+                value = historical_values[i]
+                growth = ""
+                if i > 0:
+                    growth_pct = ((historical_values[i] / historical_values[i-1]) - 1) * 100
+                    growth = f"{growth_pct:+.1f}%"
+                
+                if abs(value) >= 1_000_000_000:
+                    value_str = f"${value / 1_000_000_000:.2f}B"
+                elif abs(value) >= 1_000_000:
+                    value_str = f"${value / 1_000_000:.2f}M"
+                else:
+                    value_str = f"${value:,.0f}"
+                
+                context_parts.append(f"| {year} (Historical) | {value_str} | {growth} |\n")
+        
+        # Forecast values
+        last_historical = ts.values[-1]
+        for i, forecast_value in enumerate(forecast_result.predicted_values):
+            year = forecast_result.periods[i]
+            growth_pct = ((forecast_value / last_historical) - 1) * 100 if i == 0 else ((forecast_value / forecast_result.predicted_values[i-1]) - 1) * 100
+            last_historical = forecast_value
+            
+            if abs(forecast_value) >= 1_000_000_000:
+                value_str = f"${forecast_value / 1_000_000_000:.2f}B"
+            elif abs(forecast_value) >= 1_000_000:
+                value_str = f"${forecast_value / 1_000_000:.2f}M"
+            else:
+                value_str = f"${forecast_value:,.0f}"
+            
+            context_parts.append(f"| {year} (Forecast) | {value_str} | {growth_pct:+.1f}% |\n")
+        
+        return "".join(context_parts)
+    except Exception as e:
+        LOGGER.debug(f"Historical comparison context failed: {e}")
+        return ""
+
+
+def _build_sector_comparison_context(
+    ticker: str,
+    metric: str,
+    forecast_result: Any,
+    database_path: str
+) -> str:
+    """
+    Build sector comparison context for forecast.
+    
+    Compares forecast to sector averages and peer companies.
+    """
+    try:
+        context_parts = []
+        
+        # Try to get sector analytics
+        try:
+            from .sector_analytics import get_sector_analytics
+            sector_analytics = get_sector_analytics(database_path)
+            
+            # Get company sector
+            sector = sector_analytics.get_company_sector(ticker)
+            if not sector:
+                return ""
+            
+            # Get latest year from forecast or use current year
+            latest_year = forecast_result.periods[0] if forecast_result.periods else 2024
+            
+            # Get sector benchmarks
+            benchmarks = sector_analytics.calculate_sector_benchmarks(sector, latest_year)
+            if not benchmarks:
+                return ""
+            
+            # Get company vs sector comparison
+            comparison = sector_analytics.compare_company_to_sector(ticker, latest_year)
+            if not comparison:
+                return ""
+            
+            context_parts.append(f"\n🏭 SECTOR & PEER COMPARISON:\n")
+            context_parts.append(f"- Sector: {sector}\n")
+            context_parts.append(f"- Sector Companies: {benchmarks.companies_count}\n")
+            
+            # Compare forecast to sector average
+            if metric == "revenue" and benchmarks.avg_revenue > 0:
+                forecast_value = forecast_result.predicted_values[0]
+                sector_avg = benchmarks.avg_revenue
+                vs_sector = (forecast_value / sector_avg) - 1
+                
+                if abs(forecast_value) >= 1_000_000_000:
+                    forecast_str = f"${forecast_value / 1_000_000_000:.2f}B"
+                    sector_str = f"${sector_avg / 1_000_000_000:.2f}B"
+                else:
+                    forecast_str = f"${forecast_value / 1_000_000:.2f}M"
+                    sector_str = f"${sector_avg / 1_000_000:.2f}M"
+                
+                context_parts.append(f"- Forecasted {metric} ({forecast_result.periods[0]}): {forecast_str}\n")
+                context_parts.append(f"- Sector Average: {sector_str}\n")
+                context_parts.append(f"- vs Sector: {vs_sector:+.1%}\n")
+            
+            # Add percentile rank if available
+            if metric in comparison.percentile_ranks:
+                percentile = comparison.percentile_ranks[metric]
+                context_parts.append(f"- Current Percentile Rank: {percentile:.0f}th percentile\n")
+                if percentile >= 75:
+                    context_parts.append(f"- Interpretation: Top quartile performer in sector\n")
+                elif percentile >= 50:
+                    context_parts.append(f"- Interpretation: Above median in sector\n")
+                else:
+                    context_parts.append(f"- Interpretation: Below median in sector\n")
+            
+        except ImportError:
+            LOGGER.debug("Sector analytics not available")
+        except Exception as e:
+            LOGGER.debug(f"Sector comparison failed: {e}")
+        
+        if len(context_parts) > 1:
+            return "".join(context_parts)
+        return ""
+    except Exception as e:
+        LOGGER.debug(f"Sector comparison context failed: {e}")
+        return ""
+
+
+def _build_scenario_analysis(
+    forecast_result: Any,
+    ts: Optional[Any]  # Optional[pd.Series]
+) -> str:
+    """
+    Build scenario analysis (bull/base/bear) from forecast.
+    
+    Uses confidence intervals to create scenarios.
+    """
+    try:
+        context_parts = []
+        context_parts.append(f"\n📊 SCENARIO ANALYSIS:\n")
+        
+        if not forecast_result.predicted_values or not forecast_result.confidence_intervals_low:
+            return ""
+        
+        # Base scenario = forecast values
+        # Bull scenario = upper confidence interval
+        # Bear scenario = lower confidence interval
+        
+        context_parts.append(f"**Forecast Scenarios (based on 95% confidence intervals):**\n\n")
+        context_parts.append(f"| Year | Base Scenario | Bull Scenario | Bear Scenario |\n")
+        context_parts.append(f"|------|---------------|---------------|---------------|\n")
+        
+        for i, year in enumerate(forecast_result.periods):
+            base = forecast_result.predicted_values[i]
+            bear = forecast_result.confidence_intervals_low[i]
+            bull = forecast_result.confidence_intervals_high[i]
+            
+            # Format values
+            def format_val(v):
+                if abs(v) >= 1_000_000_000:
+                    return f"${v / 1_000_000_000:.2f}B"
+                elif abs(v) >= 1_000_000:
+                    return f"${v / 1_000_000:.2f}M"
+                else:
+                    return f"${v:,.0f}"
+            
+            context_parts.append(f"| {year} | {format_val(base)} | {format_val(bull)} | {format_val(bear)} |\n")
+        
+        # Calculate scenario spreads
+        first_year_base = forecast_result.predicted_values[0]
+        first_year_bull = forecast_result.confidence_intervals_high[0]
+        first_year_bear = forecast_result.confidence_intervals_low[0]
+        
+        upside_potential = ((first_year_bull / first_year_base) - 1) * 100
+        downside_risk = ((first_year_bear / first_year_base) - 1) * 100
+        
+        context_parts.append(f"\n**Scenario Implications:**\n")
+        context_parts.append(f"- Upside Potential (Year 1): {upside_potential:+.1f}%\n")
+        context_parts.append(f"- Downside Risk (Year 1): {downside_risk:.1f}%\n")
+        context_parts.append(f"- Range Width: {upside_potential - downside_risk:.1f} percentage points\n")
+        
+        return "".join(context_parts)
+    except Exception as e:
+        LOGGER.debug(f"Scenario analysis failed: {e}")
+        return ""
+
+
+def _build_risk_analysis(
+    forecast_result: Any,
+    ts: Optional[Any],  # Optional[pd.Series]
+    ml_forecaster: Any
+) -> str:
+    """
+    Build risk analysis for forecast.
+    
+    Identifies downside risks, upside opportunities, and model confidence.
+    """
+    try:
+        context_parts = []
+        context_parts.append(f"\n⚠️ RISK ANALYSIS:\n")
+        
+        # Model confidence assessment
+        confidence = forecast_result.confidence
+        if confidence >= 0.8:
+            context_parts.append(f"- Model Confidence: HIGH ({confidence:.1%})\n")
+        elif confidence >= 0.6:
+            context_parts.append(f"- Model Confidence: MODERATE ({confidence:.1%})\n")
+        else:
+            context_parts.append(f"- Model Confidence: LOW ({confidence:.1%}) - Use with caution\n")
+        
+        # Downside risks
+        if forecast_result.confidence_intervals_low:
+            first_forecast = forecast_result.predicted_values[0]
+            first_low = forecast_result.confidence_intervals_low[0]
+            downside_pct = ((first_low / first_forecast) - 1) * 100
+            
+            context_parts.append(f"\n**Downside Risks:**\n")
+            if abs(downside_pct) > 20:
+                context_parts.append(f"- Significant downside risk: Forecast could be {abs(downside_pct):.1f}% lower\n")
+            elif abs(downside_pct) > 10:
+                context_parts.append(f"- Moderate downside risk: Forecast could be {abs(downside_pct):.1f}% lower\n")
+            else:
+                context_parts.append(f"- Limited downside risk: Forecast could be {abs(downside_pct):.1f}% lower\n")
+        
+        # Upside opportunities
+        if forecast_result.confidence_intervals_high:
+            first_forecast = forecast_result.predicted_values[0]
+            first_high = forecast_result.confidence_intervals_high[0]
+            upside_pct = ((first_high / first_forecast) - 1) * 100
+            
+            context_parts.append(f"\n**Upside Opportunities:**\n")
+            if upside_pct > 20:
+                context_parts.append(f"- Significant upside potential: Forecast could be {upside_pct:.1f}% higher\n")
+            elif upside_pct > 10:
+                context_parts.append(f"- Moderate upside potential: Forecast could be {upside_pct:.1f}% higher\n")
+            else:
+                context_parts.append(f"- Limited upside potential: Forecast could be {upside_pct:.1f}% higher\n")
+        
+        # Data quality warnings
+        if ts is not None:
+            if len(ts) < 10:
+                context_parts.append(f"\n**Data Quality Warning:**\n")
+                context_parts.append(f"- Limited historical data: Only {len(ts)} periods available\n")
+                context_parts.append(f"- Forecast reliability may be reduced\n")
+        
+        # Confidence interval width as risk indicator
+        if forecast_result.confidence_intervals_low and forecast_result.confidence_intervals_high:
+            first_low = forecast_result.confidence_intervals_low[0]
+            first_high = forecast_result.confidence_intervals_high[0]
+            first_forecast = forecast_result.predicted_values[0]
+            interval_width_pct = ((first_high - first_low) / first_forecast) * 100
+            
+            context_parts.append(f"\n**Forecast Uncertainty:**\n")
+            context_parts.append(f"- 95% Confidence Interval Width: {interval_width_pct:.1f}% of forecast value\n")
+            if interval_width_pct > 50:
+                context_parts.append(f"- HIGH uncertainty: Wide confidence intervals suggest significant forecast risk\n")
+            elif interval_width_pct > 30:
+                context_parts.append(f"- MODERATE uncertainty: Confidence intervals indicate reasonable forecast range\n")
+            else:
+                context_parts.append(f"- LOW uncertainty: Narrow confidence intervals suggest reliable forecast\n")
+        
+        return "".join(context_parts)
+    except Exception as e:
+        LOGGER.debug(f"Risk analysis failed: {e}")
+        return ""
+
+
+def _build_explainability_context(
+    forecast_result: Any,
+    ml_forecaster: Any,
+    ts: Optional[Any]  # Optional[pd.Series]
+) -> str:
+    """
+    Build comprehensive explainability context with detailed technical information.
+    """
+    try:
+        context_parts = []
+        context_parts.append(f"\n🔍 DETAILED MODEL EXPLAINABILITY & TECHNICAL SPECIFICATIONS:\n")
+        
+        method = forecast_result.method.lower()
+        context_parts.append(f"**Model Architecture:** {method.upper()}\n")
+        
+        # Model-specific detailed explanations
+        if method == "prophet":
+            context_parts.append(f"\n**Prophet Model Details:**\n")
+            context_parts.append(f"- **Algorithm:** Facebook Prophet - Additive time series decomposition\n")
+            context_parts.append(f"- **Components:** Trend + Seasonality + Holidays + Error\n")
+            context_parts.append(f"- **Mathematical Form:** y(t) = g(t) + s(t) + h(t) + ε(t)\n")
+            context_parts.append(f"  where g(t) = trend, s(t) = seasonality, h(t) = holidays, ε(t) = error\n")
+            
+            if forecast_result.model_details:
+                if 'seasonality_detected' in forecast_result.model_details:
+                    seasonality = forecast_result.model_details['seasonality_detected']
+                    if isinstance(seasonality, dict):
+                        detected = [k for k, v in seasonality.items() if v]
+                        if detected:
+                            context_parts.append(f"- **Seasonality Detected:** {', '.join(detected)}\n")
+                            context_parts.append(f"  - Prophet automatically detects and models seasonal patterns\n")
+                            context_parts.append(f"  - Uses Fourier series to capture periodic components\n")
+                if 'changepoints' in forecast_result.model_details:
+                    changepoints = forecast_result.model_details['changepoints']
+                    if changepoints:
+                        context_parts.append(f"- **Trend Changepoints:** {len(changepoints)} detected\n")
+                        context_parts.append(f"  - Changepoints allow the trend to change direction\n")
+                        context_parts.append(f"  - Useful for capturing structural breaks in the data\n")
+                if 'growth' in forecast_result.model_details:
+                    growth = forecast_result.model_details['growth']
+                    context_parts.append(f"- **Growth Model:** {growth}\n")
+                if 'yearly_seasonality' in forecast_result.model_details:
+                    context_parts.append(f"- **Yearly Seasonality:** {forecast_result.model_details['yearly_seasonality']}\n")
+                if 'weekly_seasonality' in forecast_result.model_details:
+                    context_parts.append(f"- **Weekly Seasonality:** {forecast_result.model_details['weekly_seasonality']}\n")
+            
+            context_parts.append(f"\n**How Prophet Works:**\n")
+            context_parts.append(f"1. **Trend Component (g(t)):** Uses piecewise linear or logistic growth\n")
+            context_parts.append(f"   - Automatically detects changepoints where trend changes\n")
+            context_parts.append(f"   - Uses L1 regularization to control changepoint flexibility\n")
+            context_parts.append(f"2. **Seasonality (s(t)):** Fourier series to model periodic patterns\n")
+            context_parts.append(f"   - Captures yearly, weekly, and daily seasonality\n")
+            context_parts.append(f"   - Automatically determines seasonality strength\n")
+            context_parts.append(f"3. **Holidays (h(t)):** User-defined or automatically detected holidays\n")
+            context_parts.append(f"4. **Forecasting:** Uses Bayesian inference with MCMC sampling\n")
+            context_parts.append(f"   - Provides uncertainty estimates through posterior sampling\n")
+        
+        elif method == "arima":
+            context_parts.append(f"\n**ARIMA Model Details:**\n")
+            context_parts.append(f"- **Algorithm:** AutoRegressive Integrated Moving Average\n")
+            context_parts.append(f"- **Mathematical Form:** ARIMA(p,d,q)\n")
+            context_parts.append(f"  where p = AR order, d = differencing order, q = MA order\n")
+            
+            if forecast_result.model_details and 'model_params' in forecast_result.model_details:
+                params = forecast_result.model_details['model_params']
+                if 'order' in params:
+                    order = params['order']
+                    context_parts.append(f"- **Model Order:** ARIMA{order}\n")
+                    context_parts.append(f"  - AR({order[0]}): Uses {order[0]} previous values\n")
+                    context_parts.append(f"  - I({order[1]}): {order[1]} differencing step(s) for stationarity\n")
+                    context_parts.append(f"  - MA({order[2]}): Uses {order[2]} previous error terms\n")
+                if 'seasonal_order' in params:
+                    seasonal = params['seasonal_order']
+                    context_parts.append(f"- **Seasonal Order:** SARIMA{seasonal}\n")
+                if 'aic' in forecast_result.model_details:
+                    aic = forecast_result.model_details.get('aic', 'N/A')
+                    context_parts.append(f"- **AIC (Akaike Information Criterion):** {aic:.2f}\n")
+                    context_parts.append(f"  - Lower AIC indicates better model fit\n")
+                    context_parts.append(f"  - Balances model complexity with goodness of fit\n")
+                if 'bic' in forecast_result.model_details:
+                    bic = forecast_result.model_details.get('bic', 'N/A')
+                    context_parts.append(f"- **BIC (Bayesian Information Criterion):** {bic:.2f}\n")
+            
+            context_parts.append(f"\n**How ARIMA Works:**\n")
+            context_parts.append(f"1. **AutoRegressive (AR) Component:**\n")
+            context_parts.append(f"   - Uses linear combination of previous values\n")
+            context_parts.append(f"   - Captures autocorrelation in the time series\n")
+            context_parts.append(f"2. **Integrated (I) Component:**\n")
+            context_parts.append(f"   - Differencing to make series stationary\n")
+            context_parts.append(f"   - Removes trend and seasonality\n")
+            context_parts.append(f"3. **Moving Average (MA) Component:**\n")
+            context_parts.append(f"   - Uses linear combination of previous forecast errors\n")
+            context_parts.append(f"   - Captures short-term dependencies\n")
+            context_parts.append(f"4. **Model Selection:**\n")
+            context_parts.append(f"   - Uses AIC/BIC to select optimal (p,d,q) parameters\n")
+            context_parts.append(f"   - Tests for stationarity using ADF test\n")
+        
+        elif method in ["lstm", "gru"]:
+            context_parts.append(f"\n**{method.upper()} Neural Network Details:**\n")
+            context_parts.append(f"- **Architecture:** Recurrent Neural Network with {method.upper()} cells\n")
+            
+            if forecast_result.model_details:
+                if 'epochs_trained' in forecast_result.model_details:
+                    epochs = forecast_result.model_details['epochs_trained']
+                    context_parts.append(f"- **Training Epochs:** {epochs}\n")
+                    context_parts.append(f"  - Number of complete passes through the training data\n")
+                if 'training_loss' in forecast_result.model_details:
+                    train_loss = forecast_result.model_details['training_loss']
+                    context_parts.append(f"- **Final Training Loss:** {train_loss:.6f}\n")
+                    context_parts.append(f"  - Mean Squared Error (MSE) on training set\n")
+                    context_parts.append(f"  - Lower values indicate better fit to training data\n")
+                if 'validation_loss' in forecast_result.model_details:
+                    val_loss = forecast_result.model_details['validation_loss']
+                    context_parts.append(f"- **Final Validation Loss:** {val_loss:.6f}\n")
+                    context_parts.append(f"  - MSE on held-out validation set\n")
+                    context_parts.append(f"  - Measures generalization performance\n")
+                    if 'training_loss' in forecast_result.model_details:
+                        train_loss = forecast_result.model_details['training_loss']
+                        overfit_ratio = val_loss / train_loss if train_loss > 0 else 1.0
+                        if overfit_ratio > 1.5:
+                            context_parts.append(f"  - ⚠️ Overfitting detected (val/train ratio: {overfit_ratio:.2f})\n")
+                        elif overfit_ratio < 1.1:
+                            context_parts.append(f"  - ✅ Good generalization (val/train ratio: {overfit_ratio:.2f})\n")
+                if 'layers' in forecast_result.model_details:
+                    layers = forecast_result.model_details['layers']
+                    context_parts.append(f"- **Network Layers:** {layers}\n")
+                if 'units' in forecast_result.model_details:
+                    units = forecast_result.model_details['units']
+                    context_parts.append(f"- **Hidden Units per Layer:** {units}\n")
+                if 'dropout' in forecast_result.model_details:
+                    dropout = forecast_result.model_details['dropout']
+                    context_parts.append(f"- **Dropout Rate:** {dropout:.2f}\n")
+                    context_parts.append(f"  - Regularization to prevent overfitting\n")
+                if 'learning_rate' in forecast_result.model_details:
+                    lr = forecast_result.model_details['learning_rate']
+                    context_parts.append(f"- **Learning Rate:** {lr:.6f}\n")
+                if 'batch_size' in forecast_result.model_details:
+                    batch = forecast_result.model_details['batch_size']
+                    context_parts.append(f"- **Batch Size:** {batch}\n")
+                if 'lookback_window' in forecast_result.model_details:
+                    window = forecast_result.model_details['lookback_window']
+                    context_parts.append(f"- **Lookback Window:** {window} time steps\n")
+                    context_parts.append(f"  - Number of historical periods used for prediction\n")
+            
+            context_parts.append(f"\n**How {method.upper()} Works:**\n")
+            if method == "lstm":
+                context_parts.append(f"1. **LSTM Cell Structure:**\n")
+                context_parts.append(f"   - **Forget Gate:** Decides what information to discard\n")
+                context_parts.append(f"   - **Input Gate:** Decides what new information to store\n")
+                context_parts.append(f"   - **Cell State:** Long-term memory storage\n")
+                context_parts.append(f"   - **Output Gate:** Decides what parts of cell state to output\n")
+            else:  # GRU
+                context_parts.append(f"1. **GRU Cell Structure:**\n")
+                context_parts.append(f"   - **Update Gate:** Controls how much past information to keep\n")
+                context_parts.append(f"   - **Reset Gate:** Controls how much past information to forget\n")
+                context_parts.append(f"   - **Hidden State:** Combines past and current information\n")
+            
+            context_parts.append(f"2. **Training Process:**\n")
+            context_parts.append(f"   - Uses backpropagation through time (BPTT)\n")
+            context_parts.append(f"   - Optimizes weights using gradient descent\n")
+            context_parts.append(f"   - Early stopping prevents overfitting\n")
+            context_parts.append(f"3. **Forecasting:**\n")
+            context_parts.append(f"   - Processes historical sequence through network\n")
+            context_parts.append(f"   - Outputs prediction for next time step\n")
+            context_parts.append(f"   - Can forecast multiple steps ahead iteratively\n")
+        
+        elif method == "transformer":
+            context_parts.append(f"\n**Transformer Model Details:**\n")
+            context_parts.append(f"- **Architecture:** Attention-based encoder-decoder model\n")
+            
+            if forecast_result.model_details:
+                if 'num_layers' in forecast_result.model_details:
+                    layers = forecast_result.model_details['num_layers']
+                    context_parts.append(f"- **Encoder Layers:** {layers}\n")
+                    context_parts.append(f"  - Each layer refines the representation\n")
+                if 'num_heads' in forecast_result.model_details:
+                    heads = forecast_result.model_details['num_heads']
+                    context_parts.append(f"- **Attention Heads:** {heads}\n")
+                    context_parts.append(f"  - Multi-head attention captures different relationships\n")
+                if 'd_model' in forecast_result.model_details:
+                    d_model = forecast_result.model_details['d_model']
+                    context_parts.append(f"- **Model Dimension:** {d_model}\n")
+                    context_parts.append(f"  - Embedding dimension for each time step\n")
+                if 'dim_feedforward' in forecast_result.model_details:
+                    ff_dim = forecast_result.model_details['dim_feedforward']
+                    context_parts.append(f"- **Feedforward Dimension:** {ff_dim}\n")
+                if 'dropout' in forecast_result.model_details:
+                    dropout = forecast_result.model_details['dropout']
+                    context_parts.append(f"- **Dropout Rate:** {dropout:.2f}\n")
+                if 'epochs_trained' in forecast_result.model_details:
+                    epochs = forecast_result.model_details['epochs_trained']
+                    context_parts.append(f"- **Training Epochs:** {epochs}\n")
+                if 'training_loss' in forecast_result.model_details:
+                    train_loss = forecast_result.model_details['training_loss']
+                    context_parts.append(f"- **Final Training Loss:** {train_loss:.6f}\n")
+                if 'validation_loss' in forecast_result.model_details:
+                    val_loss = forecast_result.model_details['validation_loss']
+                    context_parts.append(f"- **Final Validation Loss:** {val_loss:.6f}\n")
+                if 'lookback_window' in forecast_result.model_details:
+                    window = forecast_result.model_details['lookback_window']
+                    context_parts.append(f"- **Lookback Window:** {window} time steps\n")
+            
+            context_parts.append(f"\n**How Transformer Works:**\n")
+            context_parts.append(f"1. **Self-Attention Mechanism:**\n")
+            context_parts.append(f"   - Computes attention weights between all time steps\n")
+            context_parts.append(f"   - Allows model to focus on relevant historical periods\n")
+            context_parts.append(f"   - Formula: Attention(Q,K,V) = softmax(QK^T/√d_k)V\n")
+            context_parts.append(f"2. **Multi-Head Attention:**\n")
+            context_parts.append(f"   - Parallel attention heads capture different patterns\n")
+            context_parts.append(f"   - Concatenates outputs for richer representation\n")
+            context_parts.append(f"3. **Positional Encoding:**\n")
+            context_parts.append(f"   - Adds position information to time steps\n")
+            context_parts.append(f"   - Allows model to understand temporal order\n")
+            context_parts.append(f"4. **Feedforward Networks:**\n")
+            context_parts.append(f"   - Non-linear transformations between attention layers\n")
+            context_parts.append(f"   - Adds model capacity for complex patterns\n")
+            context_parts.append(f"5. **Layer Normalization & Residual Connections:**\n")
+            context_parts.append(f"   - Stabilizes training and enables deep networks\n")
+        
+        elif method == "ets":
+            context_parts.append(f"\n**ETS Model Details:**\n")
+            context_parts.append(f"- **Algorithm:** Error, Trend, Seasonality (Exponential Smoothing)\n")
+            context_parts.append(f"- **Components:** Error (E), Trend (T), Seasonality (S)\n")
+            
+            if forecast_result.model_details:
+                if 'model_params' in forecast_result.model_details:
+                    params = forecast_result.model_details['model_params']
+                    if 'model' in params:
+                        context_parts.append(f"- **ETS Model Type:** {params['model']}\n")
+                        context_parts.append(f"  - Letters indicate presence of Error, Trend, Seasonality\n")
+                    if 'alpha' in params:
+                        context_parts.append(f"- **Alpha (Level Smoothing):** {params['alpha']:.4f}\n")
+                    if 'beta' in params:
+                        context_parts.append(f"- **Beta (Trend Smoothing):** {params['beta']:.4f}\n")
+                    if 'gamma' in params:
+                        context_parts.append(f"- **Gamma (Seasonal Smoothing):** {params['gamma']:.4f}\n")
+            
+            context_parts.append(f"\n**How ETS Works:**\n")
+            context_parts.append(f"1. **Exponential Smoothing:**\n")
+            context_parts.append(f"   - Gives more weight to recent observations\n")
+            context_parts.append(f"   - Smoothing parameters control decay rate\n")
+            context_parts.append(f"2. **State Space Model:**\n")
+            context_parts.append(f"   - Models level, trend, and seasonal components\n")
+            context_parts.append(f"   - Uses maximum likelihood estimation\n")
+            context_parts.append(f"3. **Automatic Model Selection:**\n")
+            context_parts.append(f"   - Tests all ETS model variants\n")
+            context_parts.append(f"   - Selects best model using AIC\n")
+        
+        elif method == "ensemble":
+            context_parts.append(f"\n**Ensemble Model Details:**\n")
+            context_parts.append(f"- **Method:** Weighted combination of multiple models\n")
+            
+            if forecast_result.model_details and 'models_used' in forecast_result.model_details:
+                models = forecast_result.model_details['models_used']
+                context_parts.append(f"- **Models Combined:** {', '.join(models)}\n")
+                context_parts.append(f"  - {len(models)} different forecasting models\n")
+                
+                if 'weights' in forecast_result.model_details:
+                    weights = forecast_result.model_details['weights']
+                    context_parts.append(f"\n**Model Weights (Contribution to Final Forecast):**\n")
+                    sorted_weights = sorted(weights.items(), key=lambda x: x[1], reverse=True)
+                    for model_name, weight in sorted_weights:
+                        context_parts.append(f"  - {model_name.upper()}: {weight:.1%} (contributes {weight:.1%} to final prediction)\n")
+                
+                if 'ensemble_method' in forecast_result.model_details:
+                    ensemble_method = forecast_result.model_details['ensemble_method']
+                    context_parts.append(f"- **Ensemble Method:** {ensemble_method}\n")
+                    if ensemble_method == "weighted":
+                        context_parts.append(f"  - Weights based on model confidence scores\n")
+                    elif ensemble_method == "performance":
+                        context_parts.append(f"  - Weights based on validation performance (RMSE/MAE)\n")
+                    elif ensemble_method == "equal":
+                        context_parts.append(f"  - Equal weights for all models\n")
+            
+            context_parts.append(f"\n**How Ensemble Works:**\n")
+            context_parts.append(f"1. **Model Diversity:**\n")
+            context_parts.append(f"   - Combines different model types (statistical + ML)\n")
+            context_parts.append(f"   - Each model captures different patterns\n")
+            context_parts.append(f"2. **Weighted Averaging:**\n")
+            context_parts.append(f"   - Final forecast = Σ(weight_i × forecast_i)\n")
+            context_parts.append(f"   - Better models get higher weights\n")
+            context_parts.append(f"3. **Benefits:**\n")
+            context_parts.append(f"   - Reduces individual model errors\n")
+            context_parts.append(f"   - More robust and reliable predictions\n")
+            context_parts.append(f"   - Better handles different data patterns\n")
+        
+        # Model selection rationale
+        if forecast_result.model_details and 'ensemble_method' not in forecast_result.model_details:
+            context_parts.append(f"\n**Model Selection Rationale:**\n")
+            context_parts.append(f"- **Selection Method:** Cross-validation performance\n")
+            context_parts.append(f"- **Evaluation Metrics:** MAE, RMSE, MAPE\n")
+            context_parts.append(f"- **Why This Model:** Best suited for this data pattern and forecast horizon\n")
+            if ts is not None:
+                data_length = len(ts)
+                if data_length < 10:
+                    context_parts.append(f"- **Data Consideration:** Limited data ({data_length} periods) - simpler models preferred\n")
+                else:
+                    context_parts.append(f"- **Data Consideration:** Sufficient data ({data_length} periods) - complex models viable\n")
+        
+        # Feature engineering details (if available)
+        if forecast_result.model_details and 'features_used' in forecast_result.model_details:
+            features = forecast_result.model_details['features_used']
+            context_parts.append(f"\n**Feature Engineering Details:**\n")
+            if isinstance(features, list):
+                context_parts.append(f"- **Total Features:** {len(features)}\n")
+                context_parts.append(f"- **Features Used:** {', '.join(features[:10])}\n")
+                if len(features) > 10:
+                    context_parts.append(f"- **Additional Features:** {len(features) - 10} more features\n")
+            elif isinstance(features, dict):
+                for feature_type, feature_list in features.items():
+                    if isinstance(feature_list, list):
+                        context_parts.append(f"- **{feature_type}:** {len(feature_list)} features\n")
+                    else:
+                        context_parts.append(f"- **{feature_type}:** {feature_list}\n")
+            context_parts.append(f"  - Engineered features improve model performance\n")
+            context_parts.append(f"  - Features capture temporal patterns, trends, and seasonality\n")
+        
+        # Feature importance (if available)
+        if forecast_result.model_details and 'feature_importance' in forecast_result.model_details:
+            importance = forecast_result.model_details['feature_importance']
+            if isinstance(importance, dict):
+                context_parts.append(f"\n**Feature Importance Analysis:**\n")
+                sorted_features = sorted(importance.items(), key=lambda x: abs(x[1]), reverse=True)
+                context_parts.append(f"- **Top Contributing Features:**\n")
+                for feature, score in sorted_features[:5]:
+                    context_parts.append(f"  - {feature}: {score:.4f} (contributes {abs(score)*100:.1f}% to forecast)\n")
+        
+        # Hyperparameter details (if available)
+        if forecast_result.model_details and 'hyperparameters' in forecast_result.model_details:
+            hyperparams = forecast_result.model_details['hyperparameters']
+            context_parts.append(f"\n**Hyperparameter Configuration:**\n")
+            if isinstance(hyperparams, dict):
+                for param, value in hyperparams.items():
+                    context_parts.append(f"- **{param}:** {value}\n")
+                    # Add explanations for common hyperparameters
+                    if param == 'learning_rate':
+                        context_parts.append(f"  - Controls step size in gradient descent (lower = more stable, slower)\n")
+                    elif param == 'dropout':
+                        context_parts.append(f"  - Regularization to prevent overfitting (0-1, higher = more regularization)\n")
+                    elif param == 'batch_size':
+                        context_parts.append(f"  - Number of samples per training iteration (affects memory and speed)\n")
+                    elif param == 'epochs':
+                        context_parts.append(f"  - Number of complete passes through training data\n")
+        
+        # Model performance comparison (if available)
+        if forecast_result.model_details and 'alternative_models_performance' in forecast_result.model_details:
+            alt_models = forecast_result.model_details['alternative_models_performance']
+            context_parts.append(f"\n**Model Performance Comparison:**\n")
+            if isinstance(alt_models, dict):
+                sorted_models = sorted(alt_models.items(), key=lambda x: x[1].get('rmse', float('inf')) if isinstance(x[1], dict) else float('inf'))
+                context_parts.append(f"- **Models Tested and Their Performance:**\n")
+                for model_name, metrics in sorted_models:
+                    if isinstance(metrics, dict):
+                        rmse = metrics.get('rmse', 'N/A')
+                        mae = metrics.get('mae', 'N/A')
+                        context_parts.append(f"  - {model_name.upper()}: RMSE={rmse}, MAE={mae}\n")
+                    else:
+                        context_parts.append(f"  - {model_name.upper()}: {metrics}\n")
+                context_parts.append(f"- **Selected Model:** {method.upper()} (best performance)\n")
+        
+        # Cross-validation results (if available)
+        if forecast_result.model_details and 'cross_validation_results' in forecast_result.model_details:
+            cv_results = forecast_result.model_details['cross_validation_results']
+            context_parts.append(f"\n**Cross-Validation Results:**\n")
+            if isinstance(cv_results, dict):
+                if 'mean_rmse' in cv_results:
+                    context_parts.append(f"- **Mean RMSE:** {cv_results['mean_rmse']:.2f}\n")
+                if 'std_rmse' in cv_results:
+                    context_parts.append(f"- **Std RMSE:** {cv_results['std_rmse']:.2f}\n")
+                if 'mean_mae' in cv_results:
+                    context_parts.append(f"- **Mean MAE:** {cv_results['mean_mae']:.2f}\n")
+                if 'folds' in cv_results:
+                    context_parts.append(f"- **Number of Folds:** {cv_results['folds']}\n")
+                context_parts.append(f"  - Cross-validation ensures model generalizes well to unseen data\n")
+        
+        # Training convergence details (if available)
+        if forecast_result.model_details and 'training_convergence' in forecast_result.model_details:
+            convergence = forecast_result.model_details['training_convergence']
+            context_parts.append(f"\n**Training Convergence:**\n")
+            if isinstance(convergence, dict):
+                if 'converged' in convergence:
+                    context_parts.append(f"- **Converged:** {convergence['converged']}\n")
+                if 'iterations_to_convergence' in convergence:
+                    context_parts.append(f"- **Iterations to Convergence:** {convergence['iterations_to_convergence']}\n")
+                if 'final_loss' in convergence:
+                    context_parts.append(f"- **Final Loss:** {convergence['final_loss']:.6f}\n")
+        
+        # Computational details
+        if forecast_result.model_details:
+            if 'training_time' in forecast_result.model_details:
+                train_time = forecast_result.model_details['training_time']
+                context_parts.append(f"\n**Computational Details:**\n")
+                context_parts.append(f"- **Training Time:** {train_time:.2f} seconds\n")
+            if 'prediction_time' in forecast_result.model_details:
+                pred_time = forecast_result.model_details['prediction_time']
+                context_parts.append(f"- **Prediction Time:** {pred_time:.4f} seconds\n")
+            if 'model_size' in forecast_result.model_details:
+                model_size = forecast_result.model_details['model_size']
+                context_parts.append(f"- **Model Size:** {model_size}\n")
+            if 'parameters_count' in forecast_result.model_details:
+                params = forecast_result.model_details['parameters_count']
+                context_parts.append(f"- **Total Parameters:** {params:,}\n")
+        
+        return "".join(context_parts)
+    except Exception as e:
+        LOGGER.debug(f"Explainability context failed: {e}")
+        return ""
+
+
+def _build_uncertainty_context(
+    forecast_result: Any,
+    ml_forecaster: Any,
+    ts: Optional[Any]  # Optional[pd.Series]
+) -> str:
+    """
+    Build enhanced uncertainty quantification context.
+    """
+    try:
+        context_parts = []
+        
+        if not ml_forecaster.uncertainty_quantifier:
+            return ""
+        
+        try:
+            # Calculate residuals from historical data if available
+            residuals = None
+            if ts is not None and len(ts) >= 3:
+                try:
+                    import numpy as np
+                    # Simple residual calculation: use historical volatility as proxy
+                    historical_values = ts.values
+                    if len(historical_values) >= 3:
+                        pct_changes = np.diff(historical_values) / historical_values[:-1]
+                        residuals = (pct_changes - np.mean(pct_changes)).tolist()
+                except Exception:
+                    pass
+            
+            uncertainty_metrics = ml_forecaster.uncertainty_quantifier.calculate_uncertainty_metrics(
+                forecast_result.predicted_values,
+                residuals=residuals,
+                ensemble_predictions=None
+            )
+            
+            context_parts.append(f"\n📈 UNCERTAINTY QUANTIFICATION:\n")
+            context_parts.append(f"- Uncertainty Score: {uncertainty_metrics.uncertainty_score:.2f} (0=low, 1=high)\n")
+            
+            if uncertainty_metrics.forecast_distribution:
+                mean_val = uncertainty_metrics.forecast_distribution.get('mean')
+                std_val = uncertainty_metrics.forecast_distribution.get('std')
+                if mean_val is not None:
+                    context_parts.append(f"- Forecast Distribution Mean: {mean_val:.2f}\n")
+                if std_val is not None:
+                    context_parts.append(f"- Forecast Distribution Std: {std_val:.2f}\n")
+                    if mean_val and mean_val > 0:
+                        cv = (std_val / mean_val) * 100
+                        context_parts.append(f"- Coefficient of Variation: {cv:.1f}% (measure of relative uncertainty)\n")
+            
+            # Multiple confidence levels
+            if uncertainty_metrics.prediction_intervals:
+                context_parts.append(f"\n**Prediction Intervals (Multiple Confidence Levels):**\n")
+                for level, intervals in uncertainty_metrics.prediction_intervals.items():
+                    if 'low' in intervals and 'high' in intervals and intervals['low'] and intervals['high']:
+                        first_low = intervals['low'][0]
+                        first_high = intervals['high'][0]
+                        first_forecast = forecast_result.predicted_values[0]
+                        
+                        if abs(first_forecast) >= 1_000_000_000:
+                            low_str = f"${first_low / 1_000_000_000:.2f}B"
+                            high_str = f"${first_high / 1_000_000_000:.2f}B"
+                        elif abs(first_forecast) >= 1_000_000:
+                            low_str = f"${first_low / 1_000_000:.2f}M"
+                            high_str = f"${first_high / 1_000_000:.2f}M"
+                        else:
+                            low_str = f"${first_low:,.0f}"
+                            high_str = f"${first_high:,.0f}"
+                        
+                        context_parts.append(f"- {float(level)*100:.0f}% Confidence: {low_str} - {high_str}\n")
+        
+        except Exception as e:
+            LOGGER.debug(f"Uncertainty metrics calculation failed: {e}")
+            # Fallback to basic confidence intervals
+            if forecast_result.confidence_intervals_low and forecast_result.confidence_intervals_high:
+                context_parts.append(f"\n📈 UNCERTAINTY QUANTIFICATION:\n")
+                context_parts.append(f"- 95% Confidence Interval: Provided\n")
+                first_low = forecast_result.confidence_intervals_low[0]
+                first_high = forecast_result.confidence_intervals_high[0]
+                first_forecast = forecast_result.predicted_values[0]
+                
+                if abs(first_forecast) >= 1_000_000_000:
+                    low_str = f"${first_low / 1_000_000_000:.2f}B"
+                    high_str = f"${first_high / 1_000_000_000:.2f}B"
+                elif abs(first_forecast) >= 1_000_000:
+                    low_str = f"${first_low / 1_000_000:.2f}M"
+                    high_str = f"${first_high / 1_000_000:.2f}M"
+                else:
+                    low_str = f"${first_low:,.0f}"
+                    high_str = f"${first_high:,.0f}"
+                
+                context_parts.append(f"- Year 1 Range: {low_str} - {high_str}\n")
+        
+        return "".join(context_parts)
+    except Exception as e:
+        LOGGER.debug(f"Uncertainty context failed: {e}")
+        return ""
+
+
+def _build_actionable_insights(
+    ticker: str,
+    metric: str,
+    forecast_result: Any,
+    ts: Any,  # pd.Series
+    database_path: str
+) -> str:
+    """
+    Build actionable insights and recommendations from forecast.
+    """
+    try:
+        context_parts = []
+        context_parts.append(f"\n💡 ACTIONABLE INSIGHTS & RECOMMENDATIONS:\n")
+        
+        # Forecast interpretation
+        if len(forecast_result.predicted_values) >= 2:
+            first_forecast = forecast_result.predicted_values[0]
+            last_forecast = forecast_result.predicted_values[-1]
+            last_historical = ts.values[-1]
+            
+            # Growth interpretation
+            forecast_growth = ((first_forecast / last_historical) - 1) * 100 if last_historical > 0 else 0
+            multi_year_growth = ((last_forecast / last_historical) ** (1/len(forecast_result.predicted_values)) - 1) * 100 if last_historical > 0 else 0
+            
+            context_parts.append(f"**Forecast Interpretation:**\n")
+            if forecast_growth > 15:
+                context_parts.append(f"- Strong growth trajectory: {forecast_growth:.1f}% growth in Year 1 suggests robust expansion\n")
+            elif forecast_growth > 5:
+                context_parts.append(f"- Moderate growth trajectory: {forecast_growth:.1f}% growth in Year 1 suggests steady expansion\n")
+            elif forecast_growth > 0:
+                context_parts.append(f"- Slow growth trajectory: {forecast_growth:.1f}% growth in Year 1 suggests modest expansion\n")
+            else:
+                context_parts.append(f"- Declining trajectory: {forecast_growth:.1f}% change in Year 1 suggests contraction risk\n")
+            
+            if multi_year_growth > 10:
+                context_parts.append(f"- Multi-year outlook: {multi_year_growth:.1f}% CAGR indicates strong long-term potential\n")
+            elif multi_year_growth > 5:
+                context_parts.append(f"- Multi-year outlook: {multi_year_growth:.1f}% CAGR indicates stable long-term growth\n")
+            else:
+                context_parts.append(f"- Multi-year outlook: {multi_year_growth:.1f}% CAGR indicates modest long-term growth\n")
+        
+        # Key metrics to monitor
+        context_parts.append(f"\n**Key Metrics to Monitor:**\n")
+        if metric == "revenue":
+            context_parts.append(f"- Revenue growth rate vs forecast\n")
+            context_parts.append(f"- Market share trends in key segments\n")
+            context_parts.append(f"- Customer acquisition and retention rates\n")
+        elif metric == "net_income" or metric == "earnings":
+            context_parts.append(f"- Profit margin trends\n")
+            context_parts.append(f"- Operating leverage impact\n")
+            context_parts.append(f"- Tax rate changes\n")
+        elif "cash" in metric.lower():
+            context_parts.append(f"- Operating cash flow generation\n")
+            context_parts.append(f"- Capital expenditure trends\n")
+            context_parts.append(f"- Working capital management\n")
+        
+        # Potential red flags
+        context_parts.append(f"\n**Potential Red Flags:**\n")
+        if forecast_result.confidence < 0.6:
+            context_parts.append(f"- ⚠️ Low model confidence ({forecast_result.confidence:.1%}) - forecast may be unreliable\n")
+        if ts is not None and len(ts) < 10:
+            context_parts.append(f"- ⚠️ Limited historical data ({len(ts)} periods) - forecast based on minimal information\n")
+        if forecast_result.confidence_intervals_low and forecast_result.confidence_intervals_high:
+            first_low = forecast_result.confidence_intervals_low[0]
+            first_high = forecast_result.confidence_intervals_high[0]
+            first_forecast = forecast_result.predicted_values[0]
+            interval_width = ((first_high - first_low) / first_forecast) * 100
+            if interval_width > 50:
+                context_parts.append(f"- ⚠️ Wide confidence intervals ({interval_width:.1f}%) - high forecast uncertainty\n")
+        
+        # Strategic implications
+        context_parts.append(f"\n**Strategic Implications:**\n")
+        if len(forecast_result.predicted_values) >= 3:
+            first_forecast = forecast_result.predicted_values[0]
+            last_forecast = forecast_result.predicted_values[-1]
+            last_historical = ts.values[-1]
+            total_growth = ((last_forecast / last_historical) - 1) * 100 if last_historical > 0 else 0
+            
+            if total_growth > 30:
+                context_parts.append(f"- Strong growth outlook suggests potential for market expansion and investment opportunities\n")
+            elif total_growth > 15:
+                context_parts.append(f"- Solid growth outlook supports continued investment in core business areas\n")
+            elif total_growth > 0:
+                context_parts.append(f"- Modest growth outlook suggests focus on operational efficiency and cost management\n")
+            else:
+                context_parts.append(f"- Declining outlook suggests need for strategic repositioning or cost restructuring\n")
+        
+        return "".join(context_parts)
+    except Exception as e:
+        LOGGER.debug(f"Actionable insights failed: {e}")
+        return ""
+
+
+def _build_model_confidence_context(
+    forecast_result: Any,
+    ts: Optional[Any]  # Optional[pd.Series]
+) -> str:
+    """
+    Build model confidence and limitations context.
+    """
+    try:
+        context_parts = []
+        context_parts.append(f"\n📋 MODEL CONFIDENCE & LIMITATIONS:\n")
+        
+        # Model confidence explanation
+        confidence = forecast_result.confidence
+        context_parts.append(f"- Overall Confidence: {confidence:.1%}\n")
+        if confidence >= 0.8:
+            context_parts.append(f"- Confidence Level: HIGH - Forecast is highly reliable\n")
+        elif confidence >= 0.6:
+            context_parts.append(f"- Confidence Level: MODERATE - Forecast is reasonably reliable\n")
+        else:
+            context_parts.append(f"- Confidence Level: LOW - Forecast should be used with caution\n")
+        
+        # Data limitations
+        if ts is not None:
+            context_parts.append(f"\n**Data Foundation:**\n")
+            context_parts.append(f"- Historical Data Points: {len(ts)} periods\n")
+            if len(ts) >= 10:
+                context_parts.append(f"- Data Quality: EXCELLENT - Sufficient data for reliable forecasting\n")
+            elif len(ts) >= 5:
+                context_parts.append(f"- Data Quality: GOOD - Adequate data for reasonable forecasting\n")
+            else:
+                context_parts.append(f"- Data Quality: LIMITED - Insufficient data may reduce forecast reliability\n")
+            
+            # Data recency
+            if hasattr(ts.index[-1], 'year'):
+                latest_year = ts.index[-1].year
+                current_year = 2024  # Could be dynamic
+                years_since_latest = current_year - latest_year
+                if years_since_latest <= 1:
+                    context_parts.append(f"- Data Recency: CURRENT - Latest data from {latest_year}\n")
+                elif years_since_latest <= 2:
+                    context_parts.append(f"- Data Recency: RECENT - Latest data from {latest_year}\n")
+                else:
+                    context_parts.append(f"- Data Recency: OUTDATED - Latest data from {latest_year} (may affect forecast accuracy)\n")
+        
+        # Model assumptions
+        method = forecast_result.method.lower()
+        context_parts.append(f"\n**Model Assumptions:**\n")
+        if method in ["arima", "prophet", "ets"]:
+            context_parts.append(f"- Assumes historical patterns will continue\n")
+            context_parts.append(f"- Does not account for structural breaks or regime changes\n")
+        elif method in ["lstm", "gru", "transformer"]:
+            context_parts.append(f"- Assumes learned patterns from training data generalize to future\n")
+            context_parts.append(f"- May not capture black swan events or structural changes\n")
+        
+        # When to trust/doubt
+        context_parts.append(f"\n**When to Trust This Forecast:**\n")
+        if confidence >= 0.7 and ts and len(ts) >= 10:
+            context_parts.append(f"- ✅ High confidence with sufficient historical data\n")
+            context_parts.append(f"- ✅ Suitable for strategic planning and investment decisions\n")
+        
+        context_parts.append(f"\n**When to Use Caution:**\n")
+        if confidence < 0.6:
+            context_parts.append(f"- ⚠️ Low confidence score - consider alternative scenarios\n")
+        if ts and len(ts) < 5:
+            context_parts.append(f"- ⚠️ Limited historical data - forecast may not capture long-term patterns\n")
+        if forecast_result.confidence_intervals_low and forecast_result.confidence_intervals_high:
+            first_low = forecast_result.confidence_intervals_low[0]
+            first_high = forecast_result.confidence_intervals_high[0]
+            first_forecast = forecast_result.predicted_values[0]
+            interval_width = ((first_high - first_low) / first_forecast) * 100
+            if interval_width > 40:
+                context_parts.append(f"- ⚠️ Wide confidence intervals - significant uncertainty in forecast\n")
+        
+        return "".join(context_parts)
+    except Exception as e:
+        LOGGER.debug(f"Model confidence context failed: {e}")
+        return ""
+
+
 def _build_enhanced_forecast_context(
     ticker: str,
     metric: str,
     forecast_result: Any,
-    ml_forecaster: Any
+    ml_forecaster: Any,
+    database_path: str,
+    analytics_engine: Optional["AnalyticsEngine"] = None
 ) -> str:
     """
-    Build enhanced forecast context with explainability, regime info, and uncertainty.
+    Build enhanced forecast context with explainability, regime info, uncertainty,
+    historical comparisons, sector analysis, scenarios, and actionable insights.
     
     Args:
         ticker: Company ticker
         metric: Metric name
         forecast_result: MLForecast result
         ml_forecaster: MLForecaster instance
+        database_path: Path to database
+        analytics_engine: Optional analytics engine for historical data
         
     Returns:
         Enhanced context string
@@ -926,10 +2918,11 @@ def _build_enhanced_forecast_context(
     try:
         context_parts = []
         
-        # Get historical data for regime detection and explainability
+        # Get historical data for analysis
         try:
             import pandas as pd
             records = ml_forecaster._fetch_metric_records(ticker, metric)
+            ts = None
             if records:
                 df = pd.DataFrame(records)
                 if 'date' in df.columns:
@@ -939,59 +2932,163 @@ def _build_enhanced_forecast_context(
                 df = df.dropna(subset=['date'])
                 df = df.sort_values('date')
                 ts = pd.Series(data=df['value'].values, index=df['date'], name=f"{ticker}_{metric}")
-                
-                # Regime detection
-                if ml_forecaster.regime_detector:
-                    try:
-                        regime_info = ml_forecaster.regime_detector.detect_regime_simple(ts)
-                        context_parts.append(f"\n📊 MARKET REGIME DETECTION:\n")
-                        context_parts.append(f"- Current Regime: {regime_info.regime_type.upper()}\n")
-                        context_parts.append(f"- Confidence: {regime_info.confidence:.1%}\n")
-                        if regime_info.change_points:
-                            context_parts.append(f"- Recent Change Points: {len(regime_info.change_points)} detected\n")
-                    except Exception as e:
-                        LOGGER.debug(f"Regime detection failed: {e}")
-                
-                # Explainability (if available)
-                if ml_forecaster.model_explainer and forecast_result:
-                    try:
-                        method = forecast_result.method
-                        if method == "prophet" and hasattr(forecast_result, 'model_details'):
-                            # Prophet component analysis
-                            context_parts.append(f"\n🔍 MODEL EXPLAINABILITY:\n")
-                            context_parts.append(f"- Method: {method.upper()}\n")
-                            if 'trend' in str(forecast_result.model_details):
-                                context_parts.append(f"- Trend Component: Significant contributor\n")
-                            if 'seasonal' in str(forecast_result.model_details):
-                                context_parts.append(f"- Seasonal Component: Detected and included\n")
-                        elif method in ["lstm", "transformer"]:
-                            context_parts.append(f"\n🔍 MODEL EXPLAINABILITY:\n")
-                            context_parts.append(f"- Method: {method.upper()}\n")
-                            context_parts.append(f"- Deep learning model with attention mechanisms\n")
-                    except Exception as e:
-                        LOGGER.debug(f"Explainability analysis failed: {e}")
         except Exception as e:
-            LOGGER.debug(f"Failed to get historical data for enhanced context: {e}")
+            LOGGER.debug(f"Failed to get historical data: {e}")
+            ts = None
         
-        # Uncertainty quantification
+        # === 1. HISTORICAL CONTEXT & COMPARISONS ===
+        if ts is not None and len(ts) > 1 and forecast_result:
+            try:
+                historical_context = _build_historical_forecast_comparison(
+                    ticker, metric, ts, forecast_result
+                )
+                if historical_context:
+                    context_parts.append(historical_context)
+            except Exception as e:
+                LOGGER.debug(f"Historical comparison failed: {e}")
+        
+        # === 2. PEER & SECTOR COMPARISONS ===
+        try:
+            sector_context = _build_sector_comparison_context(
+                ticker, metric, forecast_result, database_path
+            )
+            if sector_context:
+                context_parts.append(sector_context)
+        except Exception as e:
+            LOGGER.debug(f"Sector comparison failed: {e}")
+        
+        # === 3. REGIME DETECTION ===
+        if ts is not None and ml_forecaster.regime_detector:
+            try:
+                regime_info = ml_forecaster.regime_detector.detect_regime_simple(ts)
+                context_parts.append(f"\n📊 MARKET REGIME DETECTION:\n")
+                context_parts.append(f"- Current Regime: {regime_info.regime_type.upper()}\n")
+                context_parts.append(f"- Confidence: {regime_info.confidence:.1%}\n")
+                if regime_info.change_points:
+                    context_parts.append(f"- Recent Change Points: {len(regime_info.change_points)} detected\n")
+                # Add regime implications for forecast
+                if regime_info.regime_type == "bull":
+                    context_parts.append(f"- Forecast Context: Bull market conditions may support higher growth\n")
+                elif regime_info.regime_type == "bear":
+                    context_parts.append(f"- Forecast Context: Bear market conditions suggest caution\n")
+                elif regime_info.regime_type == "volatile":
+                    context_parts.append(f"- Forecast Context: High volatility increases forecast uncertainty\n")
+            except Exception as e:
+                LOGGER.debug(f"Regime detection failed: {e}")
+                
+        # === 4. SCENARIO ANALYSIS (BULL/BASE/BEAR) ===
+        if forecast_result:
+            try:
+                scenario_context = _build_scenario_analysis(
+                    forecast_result, ts
+                )
+                if scenario_context:
+                    context_parts.append(scenario_context)
+            except Exception as e:
+                LOGGER.debug(f"Scenario analysis failed: {e}")
+        
+        # === 5. RISK ANALYSIS ===
+        if forecast_result:
+            try:
+                risk_context = _build_risk_analysis(
+                    forecast_result, ts, ml_forecaster
+                )
+                if risk_context:
+                    context_parts.append(risk_context)
+            except Exception as e:
+                LOGGER.debug(f"Risk analysis failed: {e}")
+        
+        # === 6. EXPLAINABILITY (Enhanced with SHAP and Attention Weights) ===
+        if ml_forecaster.model_explainer and forecast_result:
+            try:
+                explainability_context = _build_explainability_context(
+                    forecast_result, ml_forecaster, ts
+                )
+                if explainability_context:
+                    context_parts.append(explainability_context)
+            except Exception as e:
+                LOGGER.debug(f"Explainability analysis failed: {e}")
+        
+        # Add SHAP values and attention weights if available
+        if forecast_result:
+            try:
+                from .ml_forecasting.explainability import ModelExplainer
+                explainer = ModelExplainer()
+                
+                method = forecast_result.method.lower()
+                
+                # Get explainability results based on model type
+                if method == 'transformer':
+                    # Get attention weights from model_details if available
+                    attention_weights = None
+                    if hasattr(forecast_result, 'model_details') and isinstance(forecast_result.model_details, dict):
+                        attention_weights = forecast_result.model_details.get('attention_weights')
+                    
+                    if attention_weights:
+                        explain_result = explainer.explain_transformer(
+                            model=None,  # Model not needed if attention_weights provided
+                            attention_weights=attention_weights
+                        )
+                        
+                        if explain_result and explain_result.attention_weights:
+                            context_parts.append(f"\n**🔍 ATTENTION WEIGHTS ANALYSIS:**\n")
+                            context_parts.append(f"- **Attention Mechanism:** Shows which historical time steps the model focuses on\n")
+                            context_parts.append(f"- **Attention Weights Available:** {len(explain_result.attention_weights)} time steps analyzed\n")
+                            
+                            # Show top attended time steps
+                            if explain_result.feature_importance:
+                                sorted_attention = sorted(
+                                    explain_result.feature_importance.items(),
+                                    key=lambda x: x[1],
+                                    reverse=True
+                                )[:5]
+                                context_parts.append(f"- **Top Attended Time Steps:**\n")
+                                for time_step, importance in sorted_attention:
+                                    context_parts.append(f"  - {time_step}: {importance:.4f} (model focuses {importance*100:.1f}% attention here)\n")
+                
+                elif method in ['lstm', 'gru']:
+                    # For LSTM/GRU, note that SHAP can be computed
+                    context_parts.append(f"\n**🔍 FEATURE IMPORTANCE (SHAP Available):**\n")
+                    context_parts.append(f"- **SHAP Values:** Can be computed to show feature importance\n")
+                    context_parts.append(f"- **Method:** DeepExplainer for neural networks\n")
+                    context_parts.append(f"- **Note:** SHAP computation requires model and input data\n")
+                    context_parts.append(f"- **Use Case:** Shows which features (time steps, engineered features) contribute most to forecast\n")
+                    
+            except Exception as e:
+                LOGGER.debug(f"Enhanced explainability (SHAP/attention) failed: {e}")
+        
+        # === 7. UNCERTAINTY QUANTIFICATION ===
         if ml_forecaster.uncertainty_quantifier and forecast_result:
             try:
-                # Use prediction intervals from forecast
-                intervals = forecast_result.confidence_intervals_low
-                if intervals:
-                    uncertainty_metrics = ml_forecaster.uncertainty_quantifier.calculate_uncertainty_metrics(
-                        forecast_result.predicted_values,
-                        residuals=None,  # Could calculate from historical errors
-                        ensemble_predictions=None
-                    )
-                    
-                    context_parts.append(f"\n📈 UNCERTAINTY QUANTIFICATION:\n")
-                    context_parts.append(f"- Confidence Interval (95%): Provided\n")
-                    context_parts.append(f"- Uncertainty Score: {uncertainty_metrics.uncertainty_score:.2f}\n")
-                    context_parts.append(f"- Forecast Distribution Mean: {uncertainty_metrics.forecast_distribution.get('mean', 'N/A'):.2f}\n")
-                    context_parts.append(f"- Forecast Distribution Std: {uncertainty_metrics.forecast_distribution.get('std', 'N/A'):.2f}\n")
+                uncertainty_context = _build_uncertainty_context(
+                    forecast_result, ml_forecaster, ts
+                )
+                if uncertainty_context:
+                    context_parts.append(uncertainty_context)
             except Exception as e:
                 LOGGER.debug(f"Uncertainty quantification failed: {e}")
+        
+        # === 8. ACTIONABLE INSIGHTS ===
+        if forecast_result and ts is not None:
+            try:
+                insights_context = _build_actionable_insights(
+                    ticker, metric, forecast_result, ts, database_path
+                )
+                if insights_context:
+                    context_parts.append(insights_context)
+            except Exception as e:
+                LOGGER.debug(f"Actionable insights failed: {e}")
+        
+        # === 9. MODEL CONFIDENCE & LIMITATIONS ===
+        if forecast_result:
+            try:
+                confidence_context = _build_model_confidence_context(
+                    forecast_result, ts
+                )
+                if confidence_context:
+                    context_parts.append(confidence_context)
+            except Exception as e:
+                LOGGER.debug(f"Model confidence context failed: {e}")
         
         if context_parts:
             return "\n".join(context_parts)
@@ -1313,6 +3410,9 @@ def build_financial_context(
                 # Add ML forecasting context FIRST if this is a forecasting query (prioritize it)
                 if is_forecasting and forecast_metric:
                     LOGGER.info(f"Building ML forecast context for {ticker} {forecast_metric} using {forecast_method}")
+                    LOGGER.info(f"  - Ticker: {ticker}")
+                    LOGGER.info(f"  - Metric: {forecast_metric}")
+                    LOGGER.info(f"  - Method: {forecast_method}")
                     ml_forecast_context, forecast_result = _build_ml_forecast_context(
                         ticker=ticker,
                         metric=forecast_metric,
@@ -1321,38 +3421,35 @@ def build_financial_context(
                         method=forecast_method
                     )
                     if ml_forecast_context:
-                        # Add forecast context FIRST (before historical data) so LLM prioritizes it
-                        # This ensures the LLM sees the forecast FIRST, before any snapshot data
+                        # CRITICAL: For forecasting queries, ONLY include ML forecast context
+                        # DO NOT include historical snapshot data - it will confuse the LLM
+                        # The forecast IS the answer, not historical data
                         context_parts.insert(0, ml_forecast_context)
                         LOGGER.info(f"ML forecast context generated and inserted at top of context for {ticker} {forecast_metric}")
-                        
-                        # Add enhanced context (explainability, regime, uncertainty)
-                        try:
-                            from .ml_forecasting.ml_forecaster import MLForecaster
-                            ml_forecaster = MLForecaster(database_path)
-                            enhanced_context = _build_enhanced_forecast_context(
-                                ticker,
-                                forecast_metric,
-                                forecast_result,
-                                ml_forecaster
-                            )
-                            if enhanced_context:
-                                context_parts.append(enhanced_context)
-                        except Exception as e:
-                            LOGGER.debug(f"Failed to add enhanced forecast context: {e}")
+                        LOGGER.info(f"  - Context length: {len(ml_forecast_context)} characters")
+                        LOGGER.info(f"  - Contains 'ML FORECAST': {'ML FORECAST' in ml_forecast_context or 'CRITICAL: THIS IS THE PRIMARY ANSWER' in ml_forecast_context}")
                     else:
                         LOGGER.warning(f"ML forecast context generation returned None for {ticker} {forecast_metric} using {forecast_method}")
-                        # Even if forecast generation failed, add a helpful error message to context
-                        # This ensures the LLM knows this is a forecasting query and should respond accordingly
-                        error_context = f"\n{'='*80}\n⚠️ ML FORECAST UNAVAILABLE - {ticker} {forecast_metric.upper() if forecast_metric else 'METRIC'}\n{'='*80}\n"
-                        error_context += f"**Reason:** ML forecast generation failed or returned no results.\n"
+                        LOGGER.warning(f"  - This might be because ML forecasting dependencies are missing or forecast generation failed")
+                        # Even if forecast generation failed, we should still try to provide some context
+                        # Add an error context explaining what happened
+                        error_context = f"\n{'='*80}\n⚠️ ML FORECAST UNAVAILABLE - {ticker} {forecast_metric.upper()}\n{'='*80}\n"
+                        error_context += f"**Query:** Forecast {ticker} {forecast_metric} using {forecast_method}\n"
+                        error_context += f"**Issue:** ML forecast generation failed or returned no results.\n"
                         error_context += f"**Possible causes:**\n"
+                        error_context += f"  - ML forecasting dependencies missing (TensorFlow for LSTM, PyTorch for Transformer)\n"
                         error_context += f"  - Insufficient historical data (need at least 5-10 periods)\n"
-                        error_context += f"  - Model dependencies missing (TensorFlow for LSTM, PyTorch for Transformer)\n"
                         error_context += f"  - Model training/forecasting errors\n"
-                        error_context += f"**Recommendation:** Please try a different method or ensure data is available for this ticker and metric.\n"
+                        error_context += f"**Recommendation:** Try using a different method (ARIMA, Prophet, ETS) or ensure data is available.\n"
                         error_context += f"{'='*80}\n"
                         context_parts.insert(0, error_context)
+                        LOGGER.info(f"Added error context for failed forecast generation")
+                        
+                        # CRITICAL: For forecasting queries, skip adding historical ticker context
+                        # The forecast context (even if it's an error) is sufficient - historical data would confuse the LLM
+                        # Skip the rest of the ticker context building for forecasting queries
+                        LOGGER.info(f"Skipping historical ticker context for forecasting query - using ML forecast error context only")
+                        continue  # Skip to next ticker or end of loop
                 
                 context_parts.append(ticker_context)
                 
