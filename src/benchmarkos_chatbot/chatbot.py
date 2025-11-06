@@ -2058,6 +2058,8 @@ class BenchmarkOSChatbot:
                 sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
                 
                 filter_query_patterns = [
+                    # "Analyze the [sector] sector: which companies..." (sector mentioned earlier in sentence)
+                    rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
                     # "Show/List/Find [sector] companies"
                     rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
                     # "Which [sector] company"
@@ -2067,7 +2069,9 @@ class BenchmarkOSChatbot:
                     # "Companies in [sector] sector/industry"
                     rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
                     # "[Sector] sector companies"
-                    rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
+                    rf'\b(?:{sector_pattern})\s+(?:sector|industry).*\b(?:companies|stocks|firms)',
+                    # "In the [sector] sector, which companies..."
+                    rf'\bin\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
                     # Revenue/sales filters
                     r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
                     # Growth filters
@@ -2075,6 +2079,10 @@ class BenchmarkOSChatbot:
                     r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
                     # Market cap filters
                     r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+                    # Profit margin filters with conditions
+                    r'\b(?:companies|stocks|firms)\s+(?:have|with)?\s+(?:profit\s+)?margins?\s+(?:above|over|greater than|>)',
+                    # Multiple criteria (growth AND margin AND cash flow)
+                    r'\b(?:companies|stocks|firms).*(?:margins?|growth|cash flow).*(?:above|over|>).*(?:and|,)',
                 ]
                 is_filter_query = any(re.search(pattern, lowered_input) for pattern in filter_query_patterns)
                 
@@ -2392,15 +2400,31 @@ class BenchmarkOSChatbot:
         sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
         
         filter_query_patterns = [
+            # "Analyze the [sector] sector: which companies..." (sector mentioned earlier)
+            rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
+            # "Show/List/Find [sector] companies"
             rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
+            # "Which [sector] company"
             rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
+            # "Which companies in [sector]"
             rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
+            # "Companies in [sector] sector/industry"
             rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
-            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
+            # "[Sector] sector companies"
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry).*\b(?:companies|stocks|firms)',
+            # "In the [sector] sector, which companies..."
+            rf'\bin\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
+            # Revenue/sales filters
             r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
+            # Growth filters
             r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
             r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+            # Market cap filters
             r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+            # Profit margin filters with conditions
+            r'\b(?:companies|stocks|firms)\s+(?:have|with)?\s+(?:profit\s+)?margins?\s+(?:above|over|greater than|>)',
+            # Multiple criteria (growth AND margin AND cash flow)
+            r'\b(?:companies|stocks|firms).*(?:margins?|growth|cash flow).*(?:above|over|>).*(?:and|,)',
         ]
         is_filter_query = any(re.search(pattern, lowered) for pattern in filter_query_patterns)
         
@@ -4365,15 +4389,31 @@ class BenchmarkOSChatbot:
         sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
         
         filter_patterns = [
+            # "Analyze the [sector] sector: which companies..." (sector mentioned earlier)
+            rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
+            # "Show/List/Find [sector] companies"
             rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
+            # "Which [sector] company"
             rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
+            # "Which companies in [sector]"
             rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
+            # "Companies in [sector] sector/industry"
             rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
-            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
+            # "[Sector] sector companies"
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry).*\b(?:companies|stocks|firms)',
+            # "In the [sector] sector, which companies..."
+            rf'\bin\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
+            # Revenue/sales filters
             r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
+            # Growth filters
             r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
             r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+            # Market cap filters
             r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+            # Profit margin filters with conditions
+            r'\b(?:companies|stocks|firms)\s+(?:have|with)?\s+(?:profit\s+)?margins?\s+(?:above|over|greater than|>)',
+            # Multiple criteria (growth AND margin AND cash flow)
+            r'\b(?:companies|stocks|firms).*(?:margins?|growth|cash flow).*(?:above|over|>).*(?:and|,)',
         ]
         
         is_filter_query = any(re.search(pattern, lowered) for pattern in filter_patterns)
