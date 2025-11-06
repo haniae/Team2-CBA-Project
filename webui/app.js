@@ -1,6 +1,7 @@
 const API_BASE = window.API_BASE || "";
 const STORAGE_KEY = "benchmarkos.chatHistory.v2";
 const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
+const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
 
 // Initialize theme from localStorage
 (function initializeTheme() {
@@ -6269,17 +6270,30 @@ function setSending(state) {
 function loadStoredConversations() {
   try {
     if (!window.localStorage) {
+      console.warn("localStorage not available");
       return [];
     }
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
+      console.log("No conversations found in localStorage");
       return [];
     }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
+    
+    // Handle both array and object formats (for backward compatibility)
+    let conversationsArray = [];
+    if (Array.isArray(parsed)) {
+      conversationsArray = parsed;
+    } else if (typeof parsed === 'object' && parsed !== null) {
+      // Convert object format to array
+      conversationsArray = Object.values(parsed);
+    } else {
+      console.warn("Invalid conversations format in localStorage");
       return [];
     }
-    return parsed
+    
+    console.log("Conversations loaded:", conversationsArray.length, "conversations");
+    return conversationsArray
       .filter((entry) => entry && entry.id)
       .map((entry) => ({
         id: entry.id,
@@ -6326,12 +6340,15 @@ function loadStoredConversations() {
 function saveConversations() {
   try {
     if (!window.localStorage) {
+      console.warn("localStorage not available");
       return;
     }
     
     // Clean up conversations before saving to prevent quota issues
     const cleanedConversations = cleanupConversationsForStorage();
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanedConversations));
+    const jsonData = JSON.stringify(cleanedConversations);
+    window.localStorage.setItem(STORAGE_KEY, jsonData);
+    console.log("Conversations saved:", cleanedConversations.length, "conversations");
   } catch (error) {
     if (error.name === 'QuotaExceededError') {
       console.warn("Storage quota exceeded. Clearing old conversations...");
@@ -6354,47 +6371,47 @@ function cleanupConversationsForStorage() {
   const MAX_CONVERSATIONS = 20;
   const MAX_MESSAGES_PER_CONVERSATION = 50;
   
+  // Ensure conversations is an array
+  const convsArray = Array.isArray(conversations) ? conversations : Object.values(conversations);
+  
   // Sort conversations by timestamp (most recent first)
-  const sortedConvs = Object.entries(conversations)
+  const sortedConvs = convsArray
     .sort((a, b) => {
-      const aTime = a[1].messages[a[1].messages.length - 1]?.timestamp || 0;
-      const bTime = b[1].messages[b[1].messages.length - 1]?.timestamp || 0;
+      const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
       return bTime - aTime;
     });
   
   // Keep only recent conversations
   const recentConvs = sortedConvs.slice(0, MAX_CONVERSATIONS);
   
-  // Limit messages per conversation
-  const cleaned = {};
-  recentConvs.forEach(([id, conv]) => {
-    cleaned[id] = {
-      ...conv,
-      messages: conv.messages.slice(-MAX_MESSAGES_PER_CONVERSATION)
-    };
-  });
+  // Limit messages per conversation and return as array
+  const cleaned = recentConvs.map(conv => ({
+    ...conv,
+    messages: (conv.messages || []).slice(-MAX_MESSAGES_PER_CONVERSATION)
+  }));
   
   return cleaned;
 }
 
 function keepOnlyRecentConversations(count) {
-  const sortedConvs = Object.entries(conversations)
+  // Ensure conversations is an array
+  const convsArray = Array.isArray(conversations) ? conversations : Object.values(conversations);
+  
+  const sortedConvs = convsArray
     .sort((a, b) => {
-      const aTime = a[1].messages[a[1].messages.length - 1]?.timestamp || 0;
-      const bTime = b[1].messages[b[1].messages.length - 1]?.timestamp || 0;
+      const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
       return bTime - aTime;
     })
     .slice(0, count);
   
-  const recent = {};
-  sortedConvs.forEach(([id, conv]) => {
-    recent[id] = {
-      ...conv,
-      messages: conv.messages.slice(-20) // Keep only last 20 messages
-    };
-  });
+  const recent = sortedConvs.map(conv => ({
+    ...conv,
+    messages: (conv.messages || []).slice(-20) // Keep only last 20 messages
+  }));
   
-  // Update global conversations object
+  // Update global conversations array
   conversations = recent;
   return recent;
 }
@@ -6733,6 +6750,7 @@ function ensureActiveConversation() {
     projectName: "",
     share: { isPublic: false, token: null },
   };
+  saveActiveConversationId(activeConversation.id);
   return activeConversation;
 }
 
@@ -7000,12 +7018,38 @@ function formatExportTimestamp(isoString) {
   return date.toLocaleString();
 }
 
+function saveActiveConversationId(conversationId) {
+  try {
+    if (window.localStorage) {
+      if (conversationId) {
+        window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, conversationId);
+      } else {
+        window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to save active conversation ID", error);
+  }
+}
+
+function getActiveConversationId() {
+  try {
+    if (window.localStorage) {
+      return window.localStorage.getItem(ACTIVE_CONVERSATION_KEY);
+    }
+  } catch (error) {
+    console.warn("Failed to get active conversation ID", error);
+  }
+  return null;
+}
+
 function loadConversation(conversationId) {
   const conversation = conversations.find((entry) => entry.id === conversationId);
   if (!conversation) {
     return;
   }
   activeConversation = conversation;
+  saveActiveConversationId(conversationId);
 
   closeReportMenu();
 
@@ -7049,6 +7093,7 @@ function loadConversation(conversationId) {
 
 function startNewConversation({ focusInput = true } = {}) {
   activeConversation = null;
+  saveActiveConversationId(null);
   if (currentUtilityKey) {
     closeUtilityPanel();
     resetNavActive();
@@ -8007,7 +8052,19 @@ function removeToast(toast) {
 
 renderConversationList();
 
-if (conversations.length) {
+// Restore active conversation from localStorage, or load the first conversation
+const savedActiveConversationId = getActiveConversationId();
+if (savedActiveConversationId) {
+  const savedConversation = conversations.find((entry) => entry.id === savedActiveConversationId);
+  if (savedConversation) {
+    loadConversation(savedActiveConversationId);
+  } else if (conversations.length) {
+    // If saved conversation not found, load the first conversation
+    loadConversation(conversations[0].id);
+  } else {
+    startNewConversation({ focusInput: false });
+  }
+} else if (conversations.length) {
   loadConversation(conversations[0].id);
 } else {
   startNewConversation({ focusInput: false });

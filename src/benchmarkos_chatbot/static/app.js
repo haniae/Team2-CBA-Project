@@ -1,6 +1,7 @@
 const API_BASE = window.API_BASE || "";
 const STORAGE_KEY = "benchmarkos.chatHistory.v2";
 const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
+const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
 
 (function cleanupLegacyStorage() {
   try {
@@ -2033,6 +2034,7 @@ function buildKpiLibraryHero(data) {
 const API_BASE = window.API_BASE || "";
 const STORAGE_KEY = "benchmarkos.chatHistory.v2";
 const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
+const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
 
 (function cleanupLegacyStorage() {
   try {
@@ -8033,6 +8035,7 @@ function ensureActiveConversation() {
     projectName: "",
     share: { isPublic: false, token: null },
   };
+  saveActiveConversationId(activeConversation.id);
   return activeConversation;
 }
 
@@ -8300,12 +8303,38 @@ function formatExportTimestamp(isoString) {
   return date.toLocaleString();
 }
 
+function saveActiveConversationId(conversationId) {
+  try {
+    if (window.localStorage) {
+      if (conversationId) {
+        window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, conversationId);
+      } else {
+        window.localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to save active conversation ID", error);
+  }
+}
+
+function getActiveConversationId() {
+  try {
+    if (window.localStorage) {
+      return window.localStorage.getItem(ACTIVE_CONVERSATION_KEY);
+    }
+  } catch (error) {
+    console.warn("Failed to get active conversation ID", error);
+  }
+  return null;
+}
+
 function loadConversation(conversationId) {
   const conversation = conversations.find((entry) => entry.id === conversationId);
   if (!conversation) {
     return;
   }
   activeConversation = conversation;
+  saveActiveConversationId(conversationId);
 
   closeReportMenu();
 
@@ -8358,6 +8387,7 @@ function loadConversation(conversationId) {
 
 function startNewConversation({ focusInput = true } = {}) {
   activeConversation = null;
+  saveActiveConversationId(null);
   if (currentUtilityKey) {
     closeUtilityPanel();
     resetNavActive();
@@ -9302,7 +9332,19 @@ function removeToast(toast) {
 
 renderConversationList();
 
-if (conversations.length) {
+// Restore active conversation from localStorage, or load the first conversation
+const savedActiveConversationId = getActiveConversationId();
+if (savedActiveConversationId) {
+  const savedConversation = conversations.find((entry) => entry.id === savedActiveConversationId);
+  if (savedConversation) {
+    loadConversation(savedActiveConversationId);
+  } else if (conversations.length) {
+    // If saved conversation not found, load the first conversation
+    loadConversation(conversations[0].id);
+  } else {
+    startNewConversation({ focusInput: false });
+  }
+} else if (conversations.length) {
   loadConversation(conversations[0].id);
 } else {
   startNewConversation({ focusInput: false });

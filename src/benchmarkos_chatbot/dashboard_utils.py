@@ -1034,16 +1034,40 @@ def build_cfi_dashboard_payload(
             }
         )
 
+    # Collect all series first
     revenue_series = _collect_series(records, "revenue")
     ebitda_series = _collect_series(records, "ebitda")
     net_income_series = _collect_series(records, "net_income")
     net_margin_series = _collect_series(records, "net_margin")
     fcf_series = _collect_series(records, "free_cash_flow")
     enterprise_series = _collect_series(records, "enterprise_value")
+    operating_income_series = _collect_series(records, "operating_income")
+    gross_profit_series = _collect_series(records, "gross_profit")
+    eps_series = _collect_series(records, "eps")
+    total_assets_series = _collect_series(records, "total_assets")
+    total_debt_series = _collect_series(records, "total_debt")
+    shares_series = _collect_series(records, "shares_outstanding")
+    gross_margin_series = _collect_series(records, "gross_margin")
 
-    years_set = set(revenue_series) | set(ebitda_series) | set(net_income_series) | set(fcf_series)
+    # Build years list from ALL metrics that will be displayed
+    # This ensures we only show years where at least some data exists
+    years_set = (
+        set(revenue_series) | 
+        set(ebitda_series) | 
+        set(net_income_series) | 
+        set(fcf_series) |
+        set(operating_income_series) |
+        set(gross_profit_series) |
+        set(eps_series) |
+        set(total_assets_series) |
+        set(total_debt_series) |
+        set(shares_series) |
+        set(gross_margin_series) |
+        set(net_margin_series)
+    )
     if not years_set:
-        years_set = {year for year in net_margin_series}
+        # Fallback: use enterprise_value if nothing else has data
+        years_set = set(enterprise_series)
     years = sorted(years_set)
     if len(years) > 8:
         years = years[-8:]
@@ -1074,15 +1098,6 @@ def build_cfi_dashboard_payload(
             ev_revenue_series[year] = ratio_rev
         if ratio_ebitda is not None:
             ev_ebitda_series[year] = ratio_ebitda
-
-    # Get additional series for extended metrics
-    operating_income_series = _collect_series(records, "operating_income")
-    gross_profit_series = _collect_series(records, "gross_profit")
-    eps_series = _collect_series(records, "eps")
-    total_assets_series = _collect_series(records, "total_assets")
-    total_debt_series = _collect_series(records, "total_debt")
-    shares_series = _collect_series(records, "shares_outstanding")
-    gross_margin_series = _collect_series(records, "gross_margin")
     
     key_financials = {
         "columns": years,
