@@ -465,46 +465,27 @@ _COMPANY_PHRASE_PATTERN = re.compile(
     r"\b(?:[A-Za-z][A-Za-z&.]+(?:\s+[A-Za-z][A-Za-z&.]+){0,3})\b"
 )
 _COMMON_WORDS = {
-    "AND",
-    "OR",
-    "THE",
-    "A",
-    "AN",
-    "OF",
-    "FOR",
-    "WITH",
-    "VS",
-    "VERSUS",
-    "PLEASE",
-    "SHOW",
-    "ME",
-    "TELL",
-    "WHAT",
-    "HOW",
-    "WHY",
-    "IS",
-    "ARE",
-    "ON",
-    "IN",
-    "TO",
-    "HELP",
+    # Common words
+    "AND", "OR", "THE", "A", "AN", "OF", "FOR", "WITH", "VS", "VERSUS",
+    "PLEASE", "SHOW", "ME", "TELL", "ON", "IN", "TO", "HELP",
+    "FROM", "AT", "BY", "AS", "BE", "DO", "IF", "SO", "UP", "NO", "GO",
+    
+    # Question words
+    "WHAT", "HOW", "WHY", "WHEN", "WHERE", "WHICH", "WHO",
+    
+    # Pronouns (CRITICAL - prevent "IT", "THEM" being treated as tickers)
+    "IT", "ITS", "THEY", "THEM", "THEIR", "THEIRS", "THIS", "THAT", "THOSE", "THESE",
+    "HE", "SHE", "WE", "US", "OUR", "OURS",
+    
+    # Verbs
+    "IS", "ARE", "WAS", "WERE", "AM", "BEEN", "BEING",
+    "HAS", "HAVE", "HAD", "CAN", "COULD", "WOULD", "SHOULD", "WILL",
+    "DID", "DOES", "DO", "DONE", "MAY", "MIGHT", "MUST",
+    "GET", "GOT", "GIVE", "GAVE", "TAKE", "TOOK",
+    
     # Corporate suffixes that shouldn't be treated as tickers
-    "INC",
-    "CORP",
-    "CO",
-    "LTD",
-    "LLC",
-    "LP",
-    "PLC",
-    "SA",
-    "AG",
-    "NV",
-    "GROUP",
-    "CORPORATION",
-    "INCORPORATED",
-    "LIMITED",
-    "COMPANY",
-    "HOLDINGS",
+    "INC", "CORP", "CO", "LTD", "LLC", "LP", "PLC", "SA", "AG", "NV",
+    "GROUP", "CORPORATION", "INCORPORATED", "LIMITED", "COMPANY", "HOLDINGS",
     "HOLDING",
     "SYSTEMS",
     "TECHNOLOGIES",
