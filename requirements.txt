@@ -106,3 +106,12 @@ tensorflow>=2.13.0
 keras>=2.13.0
 # torch>=2.1.0  # Already in requirements.txt
 # transformers>=4.35.0  # Already in requirements.txt
+
+# ML Forecasting (Improvements: Hyperparameter Tuning, Feature Engineering, Preprocessing)
+optuna>=3.0.0  # Bayesian optimization for hyperparameter tuning
+scikit-learn>=1.3.0  # Preprocessing, scaling, outlier detection
+pandas-ta>=0.3.14b0  # Technical indicators (optional, can use manual calculations)
+scipy>=1.11.0  # Statistical functions, box-cox transformation
+# statsmodels>=0.14.0  # Already in requirements.txt (decomposition)
+shap>=0.42.0  # Explainability (SHAP values for feature importance)
+ruptures>=1.1.8  # Change point detection (PELT algorithm for regime detection)

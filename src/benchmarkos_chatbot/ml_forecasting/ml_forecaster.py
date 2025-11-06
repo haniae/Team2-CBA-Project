@@ -14,9 +14,70 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Literal
 import sqlite3
 import pandas as pd
+import numpy as np
 from datetime import datetime
 
 LOGGER = logging.getLogger(__name__)
+
+# Import new modules (with error handling)
+try:
+    from .hyperparameter_tuning import HyperparameterTuner
+    HYPERPARAMETER_TUNING_AVAILABLE = True
+except ImportError:
+    HYPERPARAMETER_TUNING_AVAILABLE = False
+    HyperparameterTuner = None
+
+try:
+    from .technical_indicators import TechnicalIndicators
+    TECHNICAL_INDICATORS_AVAILABLE = True
+except ImportError:
+    TECHNICAL_INDICATORS_AVAILABLE = False
+    TechnicalIndicators = None
+
+try:
+    from .feature_engineering import FeatureEngineering
+    FEATURE_ENGINEERING_AVAILABLE = True
+except ImportError:
+    FEATURE_ENGINEERING_AVAILABLE = False
+    FeatureEngineering = None
+
+try:
+    from .preprocessing import OutlierDetector, MissingDataImputer, DataScaler, TrendDecomposer
+    PREPROCESSING_AVAILABLE = True
+except ImportError:
+    PREPROCESSING_AVAILABLE = False
+    OutlierDetector = None
+    MissingDataImputer = None
+    DataScaler = None
+    TrendDecomposer = None
+
+try:
+    from .external_factors import ExternalFactorsProvider
+    EXTERNAL_FACTORS_AVAILABLE = True
+except ImportError:
+    EXTERNAL_FACTORS_AVAILABLE = False
+    ExternalFactorsProvider = None
+
+try:
+    from .regime_detection import RegimeDetector
+    REGIME_DETECTION_AVAILABLE = True
+except ImportError:
+    REGIME_DETECTION_AVAILABLE = False
+    RegimeDetector = None
+
+try:
+    from .explainability import ModelExplainer
+    EXPLAINABILITY_AVAILABLE = True
+except ImportError:
+    EXPLAINABILITY_AVAILABLE = False
+    ModelExplainer = None
+
+try:
+    from .uncertainty import UncertaintyQuantifier
+    UNCERTAINTY_AVAILABLE = True
+except ImportError:
+    UNCERTAINTY_AVAILABLE = False
+    UncertaintyQuantifier = None
 
 
 @dataclass
@@ -296,6 +357,19 @@ class MLForecaster:
         self.lstm_forecaster = None
         self.transformer_forecaster = None
         
+        # Initialize new modules (with error handling)
+        self.hyperparameter_tuner = None
+        self.technical_indicators = None
+        self.feature_engineering = None
+        self.outlier_detector = None
+        self.missing_data_imputer = None
+        self.data_scaler = None
+        self.trend_decomposer = None
+        self.external_factors_provider = None
+        self.regime_detector = None
+        self.model_explainer = None
+        self.uncertainty_quantifier = None
+        
         try:
             if ARIMA_AVAILABLE:
                 self.arima_forecaster = ARIMAForecaster(db_path)
@@ -325,6 +399,58 @@ class MLForecaster:
                 self.transformer_forecaster = TransformerForecaster(db_path)
         except (ImportError, Exception) as e:
             LOGGER.warning(f"Transformer forecaster not available: {e}")
+        
+        # Initialize new modules
+        try:
+            if HYPERPARAMETER_TUNING_AVAILABLE:
+                self.hyperparameter_tuner = HyperparameterTuner(db_path)
+        except Exception as e:
+            LOGGER.warning(f"Hyperparameter tuner not available: {e}")
+        
+        try:
+            if TECHNICAL_INDICATORS_AVAILABLE:
+                self.technical_indicators = TechnicalIndicators()
+        except Exception as e:
+            LOGGER.warning(f"Technical indicators not available: {e}")
+        
+        try:
+            if FEATURE_ENGINEERING_AVAILABLE:
+                self.feature_engineering = FeatureEngineering()
+        except Exception as e:
+            LOGGER.warning(f"Feature engineering not available: {e}")
+        
+        try:
+            if PREPROCESSING_AVAILABLE:
+                self.outlier_detector = OutlierDetector()
+                self.missing_data_imputer = MissingDataImputer()
+                self.data_scaler = DataScaler()
+                self.trend_decomposer = TrendDecomposer()
+        except Exception as e:
+            LOGGER.warning(f"Preprocessing modules not available: {e}")
+        
+        try:
+            if EXTERNAL_FACTORS_AVAILABLE:
+                self.external_factors_provider = ExternalFactorsProvider()
+        except Exception as e:
+            LOGGER.warning(f"External factors provider not available: {e}")
+        
+        try:
+            if REGIME_DETECTION_AVAILABLE:
+                self.regime_detector = RegimeDetector()
+        except Exception as e:
+            LOGGER.warning(f"Regime detector not available: {e}")
+        
+        try:
+            if EXPLAINABILITY_AVAILABLE:
+                self.model_explainer = ModelExplainer()
+        except Exception as e:
+            LOGGER.warning(f"Model explainer not available: {e}")
+        
+        try:
+            if UNCERTAINTY_AVAILABLE:
+                self.uncertainty_quantifier = UncertaintyQuantifier()
+        except Exception as e:
+            LOGGER.warning(f"Uncertainty quantifier not available: {e}")
     
     def forecast(
         self,
@@ -332,6 +458,10 @@ class MLForecaster:
         metric: str,
         periods: int = 3,
         method: Literal["auto", "arima", "prophet", "ets", "lstm", "gru", "transformer", "ensemble"] = "auto",
+        use_hyperparameter_tuning: bool = False,
+        use_external_factors: bool = False,
+        use_technical_indicators: bool = False,
+        use_preprocessing: bool = True,
         **kwargs
     ) -> Optional[MLForecast]:
         """
@@ -342,6 +472,10 @@ class MLForecaster:
             metric: Metric to forecast (e.g., 'revenue', 'net_income')
             periods: Number of years to forecast
             method: Forecasting method ('auto', 'arima', 'prophet', 'ets', 'lstm', 'gru', 'transformer', 'ensemble')
+            use_hyperparameter_tuning: Whether to use hyperparameter tuning
+            use_external_factors: Whether to use external factors (market indices, economic indicators)
+            use_technical_indicators: Whether to use technical indicators
+            use_preprocessing: Whether to apply preprocessing (outlier detection, missing data, scaling)
             **kwargs: Additional arguments for specific forecasters
             
         Returns:
@@ -350,6 +484,12 @@ class MLForecaster:
         # Auto-select best method if requested
         if method == "auto":
             method = self._select_best_method(ticker, metric)
+        
+        # Store preprocessing and feature engineering flags for use in forecasters
+        kwargs['use_hyperparameter_tuning'] = use_hyperparameter_tuning
+        kwargs['use_external_factors'] = use_external_factors
+        kwargs['use_technical_indicators'] = use_technical_indicators
+        kwargs['use_preprocessing'] = use_preprocessing
         
         # Generate forecast using selected method
         if method == "arima":
@@ -545,8 +685,13 @@ class MLForecaster:
         """
         Forecast using ensemble of multiple models.
         
-        Combines forecasts from available models using weighted average.
+        Supports multiple ensemble methods:
+        - 'weighted': Weight by confidence scores (default)
+        - 'performance': Weight by validation metrics (MAE/RMSE)
+        - 'equal': Equal weights
         """
+        ensemble_method = kwargs.get('ensemble_method', 'weighted')
+        
         forecasts = []
         
         # Get forecasts from all available models
@@ -579,20 +724,19 @@ class MLForecaster:
             LOGGER.error("No forecasts available for ensemble")
             return None
         
-        # Combine forecasts using weighted average (weighted by confidence)
+        # If only one model, return it directly
         if len(forecasts) == 1:
-            # If only one model, return it directly
             result = forecasts[0]
             result.method = "ensemble"
             return result
         
-        # Weight by confidence scores
-        weights = [f.confidence for f in forecasts]
-        total_weight = sum(weights)
-        if total_weight == 0:
+        # Calculate weights based on ensemble method
+        if ensemble_method == "performance":
+            weights = self._calculate_performance_weights(forecasts, ticker, metric)
+        elif ensemble_method == "equal":
             weights = [1.0 / len(forecasts)] * len(forecasts)
-        else:
-            weights = [w / total_weight for w in weights]
+        else:  # 'weighted' or default
+            weights = self._calculate_confidence_weights(forecasts)
         
         # Combine predictions
         ensemble_values = []
@@ -615,6 +759,7 @@ class MLForecaster:
         model_details = {
             "models_used": [f.method for f in forecasts],
             "weights": dict(zip([f.method for f in forecasts], weights)),
+            "ensemble_method": ensemble_method,
             "individual_forecasts": [f.to_dict() for f in forecasts],
         }
         
@@ -630,11 +775,73 @@ class MLForecaster:
             confidence=avg_confidence,
         )
     
+    def _calculate_confidence_weights(self, forecasts: List[MLForecast]) -> List[float]:
+        """Calculate weights based on confidence scores."""
+        weights = [f.confidence for f in forecasts]
+        total_weight = sum(weights)
+        if total_weight == 0:
+            weights = [1.0 / len(forecasts)] * len(forecasts)
+        else:
+            weights = [w / total_weight for w in weights]
+        return weights
+    
+    def _calculate_performance_weights(
+        self,
+        forecasts: List[MLForecast],
+        ticker: str,
+        metric: str
+    ) -> List[float]:
+        """
+        Calculate weights based on validation performance (MAE/RMSE).
+        
+        Uses inverse of validation metrics - lower error = higher weight.
+        """
+        try:
+            from .validation import ModelValidator
+            from .backtesting import BacktestRunner
+            
+            # Run quick backtest to get validation metrics
+            backtest_runner = BacktestRunner(self.db_path)
+            backtest_results = backtest_runner.run_backtest(
+                ticker=ticker,
+                metric=metric,
+                train_periods=5,
+                test_periods=2,
+                models=[f.method for f in forecasts]
+            )
+            
+            # Calculate inverse RMSE weights (lower RMSE = higher weight)
+            inverse_rmse = []
+            for forecast in forecasts:
+                model_name = forecast.method
+                if model_name in backtest_results:
+                    rmse = backtest_results[model_name].metrics.rmse
+                    if rmse > 0:
+                        inverse_rmse.append(1.0 / rmse)
+                    else:
+                        inverse_rmse.append(1.0)
+                else:
+                    # If no backtest result, use confidence as fallback
+                    inverse_rmse.append(forecast.confidence)
+            
+            # Normalize weights
+            total_weight = sum(inverse_rmse)
+            if total_weight > 0:
+                weights = [w / total_weight for w in inverse_rmse]
+            else:
+                weights = [1.0 / len(forecasts)] * len(forecasts)
+            
+            return weights
+            
+        except Exception as e:
+            LOGGER.warning(f"Performance-based weighting failed: {e}, using confidence weights")
+            return self._calculate_confidence_weights(forecasts)
+    
     def _select_best_method(
         self, ticker: str, metric: str
     ) -> Literal["arima", "prophet", "ets", "lstm", "transformer"]:
         """
-        Auto-select best forecasting method based on data characteristics.
+        Auto-select best forecasting method based on cross-validation.
         
         Args:
             ticker: Company ticker symbol
@@ -643,10 +850,112 @@ class MLForecaster:
         Returns:
             Best method name
         """
-        # Simple heuristic: prefer Prophet for seasonality, ARIMA for trends, ETS as fallback
-        # Deep learning models (LSTM/Transformer) require more data
-        # In practice, this could be more sophisticated (e.g., cross-validation)
+        try:
+            from .validation import TimeSeriesCrossValidator, ModelValidator
+            
+            # Get historical data
+            records = self._fetch_metric_records(ticker, metric)
+            if not records or len(records) < 10:
+                # Not enough data for cross-validation, use simple heuristic
+                return self._select_best_method_simple()
+            
+            # Convert to time series
+            df = pd.DataFrame(records)
+            if 'date' in df.columns:
+                df['date'] = pd.to_datetime(df['date'])
+            else:
+                df['date'] = pd.to_datetime(df['period'], errors='coerce')
+            
+            df = df.dropna(subset=['date'])
+            df = df.sort_values('date')
+            
+            ts = pd.Series(
+                data=df['value'].values,
+                index=df['date'].values,
+                name=f"{ticker}_{metric}"
+            )
+            
+            if len(ts) < 10:
+                return self._select_best_method_simple()
+            
+            # Check available methods
+            available_methods = []
+            if self.prophet_forecaster:
+                available_methods.append("prophet")
+            if self.arima_forecaster:
+                available_methods.append("arima")
+            if self.ets_forecaster:
+                available_methods.append("ets")
+            if self.lstm_forecaster and len(ts) >= 20:
+                available_methods.append("lstm")
+            if self.transformer_forecaster and len(ts) >= 20:
+                available_methods.append("transformer")
+            
+            if not available_methods:
+                raise ValueError("No forecasting methods available")
+            
+            # Use walk-forward cross-validation to select best method
+            cv = TimeSeriesCrossValidator()
+            validator = ModelValidator()
+            
+            initial_train_size = max(5, len(ts) // 2)
+            folds = cv.walk_forward_cv(ts, initial_train_size=initial_train_size, step_size=1)
+            
+            if len(folds) < 2:
+                # Not enough folds, use simple heuristic
+                return self._select_best_method_simple()
+            
+            # Test each method on folds
+            method_scores = {}
+            
+            for method in available_methods:
+                scores = []
+                for train_data, test_data in folds[:3]:  # Use first 3 folds for speed
+                    try:
+                        # Generate forecast
+                        forecast = self.forecast(
+                            ticker=ticker,
+                            metric=metric,
+                            periods=len(test_data),
+                            method=method
+                        )
+                        
+                        if forecast and len(forecast.predicted_values) >= len(test_data):
+                            # Calculate RMSE
+                            predicted = forecast.predicted_values[:len(test_data)]
+                            actual = test_data.values
+                            
+                            rmse = validator.calculate_metrics(actual.tolist(), predicted).rmse
+                            scores.append(rmse)
+                    except Exception:
+                        continue
+                
+                if scores:
+                    method_scores[method] = np.mean(scores)
+            
+            if not method_scores:
+                # All methods failed, use simple heuristic
+                return self._select_best_method_simple()
+            
+            # Select method with lowest RMSE
+            best_method = min(method_scores, key=method_scores.get)
+            LOGGER.info(f"Selected best method for {ticker} {metric}: {best_method} (RMSE: {method_scores[best_method]:.2f})")
+            
+            return best_method
+            
+        except Exception as e:
+            LOGGER.warning(f"Cross-validation method selection failed: {e}, using simple heuristic")
+            return self._select_best_method_simple()
+    
+    def _select_best_method_simple(
+        self
+    ) -> Literal["arima", "prophet", "ets", "lstm", "transformer"]:
+        """
+        Simple heuristic method selection (fallback).
         
+        Returns:
+            Best method name based on simple heuristics
+        """
         # Check data availability
         available_methods = []
         if self.prophet_forecaster:
@@ -664,8 +973,6 @@ class MLForecaster:
             raise ValueError("No forecasting methods available")
         
         # Default preference: Prophet > ARIMA > ETS > LSTM > Transformer
-        # Prophet is generally better for financial data with seasonality
-        # Deep learning models are more complex and require more data
         if "prophet" in available_methods:
             return "prophet"
         elif "arima" in available_methods:

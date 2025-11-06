@@ -141,6 +141,61 @@ class ExternalFactorsProvider:
             LOGGER.warning(f"Failed to fetch economic indicator {series_id}: {e}")
             return None
     
+    def get_external_regressors(
+        self,
+        ticker: str,
+        metric: str,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> Optional[pd.DataFrame]:
+        """
+        Get external regressors as DataFrame for Prophet/LSTM.
+        
+        Args:
+            ticker: Company ticker
+            metric: Metric to forecast
+            start_date: Start date for data
+            end_date: End date for data
+            
+        Returns:
+            DataFrame with external regressors, indexed by date, or None if unavailable
+        """
+        try:
+            # Get market indices
+            spy_data = self.get_market_index_data("SPY", start_date, end_date)
+            qqq_data = self.get_market_index_data("QQQ", start_date, end_date)
+            
+            # Combine into DataFrame
+            regressors = pd.DataFrame(index=spy_data.index if spy_data is not None else None)
+            
+            if spy_data is not None:
+                regressors['spy_returns'] = spy_data.values
+            if qqq_data is not None:
+                regressors['qqq_returns'] = qqq_data.values
+            
+            # Get economic indicators if available
+            if self.fred_client:
+                gdp_data = self.get_economic_indicator("GDP", start_date, end_date)
+                if gdp_data is not None:
+                    # Align GDP data with market data dates (quarterly to daily)
+                    gdp_aligned = gdp_data.reindex(regressors.index, method='ffill')
+                    regressors['gdp'] = gdp_aligned.values
+                
+                fedfunds_data = self.get_economic_indicator("FEDFUNDS", start_date, end_date)
+                if fedfunds_data is not None:
+                    # Align interest rate data
+                    fedfunds_aligned = fedfunds_data.reindex(regressors.index, method='ffill')
+                    regressors['interest_rate'] = fedfunds_aligned.values
+            
+            if regressors.empty:
+                return None
+            
+            return regressors
+            
+        except Exception as e:
+            LOGGER.warning(f"Failed to get external regressors: {e}")
+            return None
+    
     def build_external_factors_context(
         self,
         ticker: str,

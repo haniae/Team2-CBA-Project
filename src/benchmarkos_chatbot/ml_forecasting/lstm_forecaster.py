@@ -221,6 +221,11 @@ class LSTMForecaster(BaseForecaster):
         model.add(Dense(1))  # Single output for each forecast step
         
         # Compile
+        # Get hyperparameters from kwargs if available
+        units = kwargs.get('units', layers[0] if layers else 50)
+        dropout = kwargs.get('dropout', 0.2)
+        learning_rate = kwargs.get('learning_rate', learning_rate)
+        
         optimizer = Adam(learning_rate=learning_rate)
         model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
         
@@ -267,7 +272,46 @@ class LSTMForecaster(BaseForecaster):
             if ts is None:
                 return None
             
-            # Normalize data
+            # Check for feature engineering
+            use_technical_indicators = kwargs.get('use_technical_indicators', False)
+            use_external_factors = kwargs.get('use_external_factors', False)
+            
+            # Build feature matrix
+            feature_data = ts.values.reshape(-1, 1)
+            
+            # Add technical indicators if requested
+            if use_technical_indicators:
+                try:
+                    from .technical_indicators import TechnicalIndicators
+                    tech_indicators = TechnicalIndicators()
+                    tech_df = tech_indicators.generate_indicators(ts, include_all=False)
+                    # Add technical indicator features (excluding 'value' column)
+                    tech_features = tech_df.drop(columns=['value'], errors='ignore').values
+                    if tech_features.shape[1] > 0:
+                        feature_data = np.hstack([feature_data, tech_features])
+                except Exception as e:
+                    LOGGER.warning(f"Failed to add technical indicators: {e}")
+            
+            # Add external factors if requested
+            if use_external_factors:
+                try:
+                    from .external_factors import ExternalFactorsProvider
+                    external_provider = ExternalFactorsProvider()
+                    external_regressors = external_provider.get_external_regressors(
+                        ticker, metric,
+                        start_date=ts.index.min(),
+                        end_date=ts.index.max()
+                    )
+                    if external_regressors is not None and not external_regressors.empty:
+                        # Align external regressors with ts dates
+                        external_aligned = external_regressors.reindex(ts.index, method='ffill')
+                        external_features = external_aligned.values
+                        if external_features.shape[1] > 0:
+                            feature_data = np.hstack([feature_data, external_features])
+                except Exception as e:
+                    LOGGER.warning(f"Failed to add external factors: {e}")
+            
+            # Normalize data (now multi-dimensional)
             from sklearn.preprocessing import MinMaxScaler
             
             scaler_key = f"{ticker}_{metric}"
@@ -277,9 +321,8 @@ class LSTMForecaster(BaseForecaster):
             else:
                 scaler = self.scaler_cache[scaler_key]
             
-            # Reshape for scaler
-            data = ts.values.reshape(-1, 1)
-            data_scaled = scaler.fit_transform(data).flatten()
+            # Scale all features
+            data_scaled = scaler.fit_transform(feature_data)
             
             # Prepare sequences
             X, y = self._prepare_sequences(data_scaled, lookback_window, periods)
@@ -288,27 +331,59 @@ class LSTMForecaster(BaseForecaster):
                 LOGGER.error(f"Insufficient data for sequences: need {lookback_window + periods} periods")
                 return None
             
-            # Reshape for LSTM (samples, timesteps, features)
-            X = X.reshape((X.shape[0], X.shape[1], 1))
+            # Update input shape for multi-dimensional features
+            input_shape = (lookback_window, feature_data.shape[1])
             
             # Split train/validation
             split_idx = int(len(X) * (1 - validation_split))
             X_train, X_val = X[:split_idx], X[split_idx:]
             y_train, y_val = y[:split_idx], y[split_idx:]
             
-            # Default layers
-            if layers is None:
-                layers = [64, 32] if len(data_scaled) > 50 else [32, 16]
+            # Check for hyperparameter tuning
+            use_hyperparameter_tuning = kwargs.get('use_hyperparameter_tuning', False)
             
-            # Build model
-            model_key = f"{ticker}_{metric}_{model_type}_{lookback_window}"
+            # Get hyperparameters
+            if use_hyperparameter_tuning:
+                try:
+                    from .hyperparameter_tuning import HyperparameterTuner
+                    tuner = HyperparameterTuner(self.database_path)
+                    best_params = tuner.tune_lstm(ticker, metric, ts)
+                    
+                    if best_params and best_params.params:
+                        units = best_params.params.get('units', 50)
+                        layers_count = best_params.params.get('layers', 2)
+                        dropout = best_params.params.get('dropout', 0.2)
+                        learning_rate = best_params.params.get('learning_rate', 0.001)
+                    else:
+                        units = kwargs.get('units', 50)
+                        layers_count = kwargs.get('layers', 2)
+                        dropout = kwargs.get('dropout', 0.2)
+                        learning_rate = kwargs.get('learning_rate', 0.001)
+                except Exception as e:
+                    LOGGER.warning(f"Hyperparameter tuning failed: {e}, using defaults")
+                    units = kwargs.get('units', 50)
+                    layers_count = kwargs.get('layers', 2)
+                    dropout = kwargs.get('dropout', 0.2)
+                    learning_rate = kwargs.get('learning_rate', 0.001)
+            else:
+                units = kwargs.get('units', 50)
+                layers_count = kwargs.get('layers', 2)
+                dropout = kwargs.get('dropout', 0.2)
+                learning_rate = kwargs.get('learning_rate', 0.001)
+            
+            # Build layers list
+            if layers is None:
+                layers = [units] * layers_count
+            
+            # Build model with updated input shape
+            model_key = f"{ticker}_{metric}_{model_type}_{lookback_window}_{input_shape[1]}"
             if model_key not in self.model_cache:
                 model = self._build_model(
-                    input_shape=(lookback_window, 1),
+                    input_shape=input_shape,  # Multi-dimensional features
                     layers=layers,
                     model_type=model_type,
-                    dropout=0.2,
-                    learning_rate=0.001
+                    dropout=dropout,
+                    learning_rate=learning_rate
                 )
             else:
                 model = self.model_cache[model_key]
@@ -343,8 +418,8 @@ class LSTMForecaster(BaseForecaster):
             self.model_cache[model_key] = model
             
             # Generate forecast
-            # Use last 'lookback_window' periods as input
-            last_sequence = data_scaled[-lookback_window:].reshape(1, lookback_window, 1)
+            # Use last 'lookback_window' periods as input (multi-dimensional)
+            last_sequence = data_scaled[-lookback_window:].reshape(1, lookback_window, input_shape[1])
             
             # Forecast step by step
             forecast_scaled = []
@@ -356,19 +431,33 @@ class LSTMForecaster(BaseForecaster):
                 forecast_scaled.append(next_pred)
                 
                 # Update input sequence (shift window)
+                # For multi-dimensional features, we need to handle differently
                 current_input = np.roll(current_input, -1, axis=1)
+                # For the new timestep, use the prediction for the first feature
+                # and repeat the last values for other features
                 current_input[0, -1, 0] = next_pred
+                if input_shape[1] > 1:
+                    current_input[0, -1, 1:] = last_sequence[0, -1, 1:]
             
-            # Inverse transform
+            # Inverse transform predictions (only inverse transform first feature)
             forecast_scaled = np.array(forecast_scaled).reshape(-1, 1)
-            forecast_values = scaler.inverse_transform(forecast_scaled).flatten()
+            # Create full feature array for inverse transform
+            full_pred = np.zeros((len(forecast_scaled), input_shape[1]))
+            full_pred[:, 0] = forecast_scaled.flatten()
+            # Use last known values for other features (for inverse transform)
+            if input_shape[1] > 1:
+                last_features = feature_data[-1, 1:]
+                for i in range(len(forecast_scaled)):
+                    full_pred[i, 1:] = last_features
+            forecast_values = scaler.inverse_transform(full_pred)[:, 0]  # Extract first feature
             
             # Ensure positive values for financial metrics
             forecast_values = np.maximum(forecast_values, 0)
             
             # Calculate confidence intervals (simplified: use validation error)
             val_loss = history.history.get('val_loss', [history.history['loss']])[-1]
-            std_error = np.sqrt(val_loss) * scaler.scale_[0]
+            # Use scale from first feature (the target metric)
+            std_error = np.sqrt(val_loss) * scaler.scale_[0] if hasattr(scaler, 'scale_') and len(scaler.scale_) > 0 else np.sqrt(val_loss)
             
             # 95% confidence interval (±1.96 * std_error)
             conf_interval = 1.96 * std_error
@@ -380,7 +469,11 @@ class LSTMForecaster(BaseForecaster):
             confidence_intervals_low = np.maximum(confidence_intervals_low, 0)
             
             # Calculate confidence score (inverse of validation loss, normalized)
-            confidence = max(0.0, min(1.0, 1.0 - (val_loss / (np.max(data) - np.min(data)))))
+            data_range = np.max(feature_data[:, 0]) - np.min(feature_data[:, 0])
+            if data_range > 0:
+                confidence = max(0.0, min(1.0, 1.0 - (val_loss / data_range)))
+            else:
+                confidence = 0.5
             
             # Generate periods (years)
             last_date = ts.index[-1]

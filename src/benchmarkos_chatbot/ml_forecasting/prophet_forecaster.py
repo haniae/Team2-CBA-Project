@@ -124,7 +124,10 @@ class ProphetForecaster(BaseForecaster):
             ticker: Company ticker symbol
             metric: Metric to forecast (e.g., "revenue")
             periods: Number of periods to forecast (in years)
-            **kwargs: Additional arguments
+            **kwargs: Additional arguments including:
+                - use_hyperparameter_tuning: Whether to use hyperparameter tuning
+                - use_external_factors: Whether to use external factors as regressors
+                - external_regressors: DataFrame with external regressors (optional)
             
         Returns:
             ProphetForecast with forecast and confidence intervals
@@ -142,15 +145,67 @@ class ProphetForecaster(BaseForecaster):
             # Ensure positive values for financial metrics
             df['y'] = df['y'].clip(lower=0)
             
-            # Initialize and fit Prophet model
-            model = Prophet(
-                yearly_seasonality=True,
-                weekly_seasonality=False,
-                daily_seasonality=False,
-                changepoint_prior_scale=0.05,
-                seasonality_prior_scale=10.0,
-                interval_width=0.95,  # 95% confidence interval
-            )
+            # Check for external regressors
+            use_external_factors = kwargs.get('use_external_factors', False)
+            external_regressors = kwargs.get('external_regressors', None)
+            
+            # Get external regressors if requested
+            if use_external_factors and external_regressors is None:
+                try:
+                    from .external_factors import ExternalFactorsProvider
+                    external_provider = ExternalFactorsProvider()
+                    external_regressors = external_provider.get_external_regressors(
+                        ticker, metric,
+                        start_date=df['ds'].min(),
+                        end_date=df['ds'].max()
+                    )
+                except Exception as e:
+                    LOGGER.warning(f"Failed to get external regressors: {e}")
+                    external_regressors = None
+            
+            # Check for hyperparameter tuning
+            use_hyperparameter_tuning = kwargs.get('use_hyperparameter_tuning', False)
+            
+            # Initialize Prophet model with hyperparameters
+            if use_hyperparameter_tuning:
+                try:
+                    from .hyperparameter_tuning import HyperparameterTuner
+                    tuner = HyperparameterTuner(self.database_path)
+                    best_params = tuner.tune_prophet(ticker, metric, df)
+                    
+                    if best_params and best_params.params:
+                        prophet_params = best_params.params
+                    else:
+                        prophet_params = {}
+                except Exception as e:
+                    LOGGER.warning(f"Hyperparameter tuning failed: {e}, using defaults")
+                    prophet_params = {}
+            else:
+                prophet_params = {}
+            
+            # Initialize Prophet model with parameters
+            model_params = {
+                "yearly_seasonality": prophet_params.get('yearly_seasonality', True),
+                "weekly_seasonality": prophet_params.get('weekly_seasonality', False),
+                "daily_seasonality": False,
+                "changepoint_prior_scale": prophet_params.get('changepoint_prior_scale', 0.05),
+                "seasonality_prior_scale": prophet_params.get('seasonality_prior_scale', 10.0),
+                "holidays_prior_scale": prophet_params.get('holidays_prior_scale', 10.0),
+                "seasonality_mode": prophet_params.get('seasonality_mode', 'additive'),
+                "interval_width": 0.95,  # 95% confidence interval
+            }
+            
+            model = Prophet(**model_params)
+            
+            # Add external regressors if available
+            if external_regressors is not None and not external_regressors.empty:
+                # Align external regressors with df dates
+                external_aligned = external_regressors.reindex(df['ds'], method='ffill')
+                for col in external_aligned.columns:
+                    if col not in ['ds', 'y']:
+                        model.add_regressor(col)
+                        # Add to df for fitting
+                        df[col] = external_aligned[col].values
             
             model.fit(df)
             
@@ -159,6 +214,15 @@ class ProphetForecaster(BaseForecaster):
             # For annual financial data, we'll use 365 days per year
             future_periods = periods * 365
             future = model.make_future_dataframe(periods=future_periods, freq='D')
+            
+            # Add external regressors to future dataframe if used
+            if external_regressors is not None and not external_regressors.empty:
+                # For future periods, forward-fill or forecast external regressors
+                # Simplified: use last known values
+                last_external = external_regressors.iloc[-1]
+                for col in external_regressors.columns:
+                    if col not in ['ds', 'y']:
+                        future[col] = last_external[col]
             
             # Generate forecast
             forecast_df = model.predict(future)

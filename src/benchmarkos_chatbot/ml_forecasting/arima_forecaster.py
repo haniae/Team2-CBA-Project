@@ -135,7 +135,8 @@ class ARIMAForecaster(BaseForecaster):
             ticker: Company ticker symbol
             metric: Metric to forecast (e.g., "revenue")
             periods: Number of periods to forecast
-            **kwargs: Additional arguments
+            **kwargs: Additional arguments including:
+                - use_hyperparameter_tuning: Whether to use hyperparameter tuning
             
         Returns:
             ARIMAForecast with forecast and confidence intervals
@@ -153,31 +154,82 @@ class ARIMAForecaster(BaseForecaster):
             # Ensure positive values for financial metrics
             ts = ts.clip(lower=0)
             
-            # Auto-ARIMA to find best parameters
-            model = auto_arima(
-                ts,
-                start_p=1, start_q=1,
-                max_p=5, max_q=5,
-                m=12,  # Monthly seasonality (adjust as needed)
-                seasonal=True,
-                d=None,  # Let auto_arima determine differencing order
-                D=None,  # Let auto_arima determine seasonal differencing order
-                trace=False,
-                error_action='ignore',
-                suppress_warnings=True,
-                stepwise=True,
-                n_jobs=-1,  # Use all available cores
-            )
+            # Check for hyperparameter tuning
+            use_hyperparameter_tuning = kwargs.get('use_hyperparameter_tuning', False)
+            
+            # Fit ARIMA model using auto_arima or tuned parameters
+            if use_hyperparameter_tuning:
+                try:
+                    from .hyperparameter_tuning import HyperparameterTuner
+                    tuner = HyperparameterTuner(self.database_path)
+                    best_params = tuner.tune_arima(ticker, metric, ts)
+                    
+                    if best_params and best_params.params:
+                        # Use tuned parameters
+                        order = best_params.params.get('order', (1, 1, 1))
+                        seasonal_order = best_params.params.get('seasonal_order', (1, 1, 1, 4))
+                        
+                        from statsmodels.tsa.arima.model import ARIMA
+                        model = ARIMA(ts, order=order, seasonal_order=seasonal_order).fit()
+                    else:
+                        # Fallback to auto_arima
+                        model = auto_arima(
+                            ts,
+                            start_p=1, start_q=1,
+                            max_p=5, max_q=5,
+                            m=4,  # Quarterly seasonality
+                            seasonal=True,
+                            stepwise=True,
+                            suppress_warnings=True,
+                            error_action='ignore',
+                            trace=False,
+                        )
+                except Exception as e:
+                    LOGGER.warning(f"Hyperparameter tuning failed: {e}, using auto_arima")
+                    model = auto_arima(
+                        ts,
+                        start_p=1, start_q=1,
+                        max_p=5, max_q=5,
+                        m=4,
+                        seasonal=True,
+                        stepwise=True,
+                        suppress_warnings=True,
+                        error_action='ignore',
+                        trace=False,
+                    )
+            else:
+                # Use auto_arima
+                model = auto_arima(
+                    ts,
+                    start_p=1, start_q=1,
+                    max_p=5, max_q=5,
+                    m=4,  # Quarterly seasonality for financial data
+                    seasonal=True,
+                    d=None,  # Let auto_arima determine differencing order
+                    D=None,  # Let auto_arima determine seasonal differencing order
+                    trace=False,
+                    error_action='ignore',
+                    suppress_warnings=True,
+                    stepwise=True,
+                    n_jobs=-1,  # Use all available cores
+                )
             
             # Generate forecast
-            forecast_result = model.predict(
-                n_periods=periods,
-                return_conf_int=True,
-                alpha=0.05  # 95% confidence interval
-            )
-            
-            forecast_values = forecast_result[0]
-            conf_int = forecast_result[1]
+            # Handle both auto_arima and statsmodels ARIMA models
+            if hasattr(model, 'predict'):
+                # auto_arima model
+                forecast_result = model.predict(
+                    n_periods=periods,
+                    return_conf_int=True,
+                    alpha=0.05  # 95% confidence interval
+                )
+                forecast_values = forecast_result[0]
+                conf_int = forecast_result[1]
+            else:
+                # statsmodels ARIMA model
+                forecast_result = model.get_forecast(steps=periods)
+                forecast_values = forecast_result.predicted_mean.values
+                conf_int = forecast_result.conf_int().values
             
             # Ensure positive values
             forecast_values = np.maximum(forecast_values, 0)
