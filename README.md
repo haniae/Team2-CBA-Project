@@ -1141,150 +1141,438 @@ On startup database.initialise() applies schema migrations idempotently. When ru
 ```
 Project/
 ├── README.md                          # Main project documentation
-├── pyproject.toml                     # Project metadata and dependencies
-├── requirements.txt                   # Python dependencies
-├── env.example                        # Environment configuration template
-├── run_chatbot.py                     # CLI chatbot entry point
-├── serve_chatbot.py                   # Web server entry point
-├── run_data_ingestion.ps1             # Windows ingestion script
-├── run_data_ingestion.sh              # Unix ingestion script
-├── fill_gaps_summary.json             # Ingestion progress tracking
+├── CHANGELOG.md                       # Project changelog
+├── LICENSE                            # Project license (MIT)
+├── SECURITY.md                        # Security policy
+├── CODE_OF_CONDUCT.md                 # Code of conduct
+├── CONTRIBUTING.md                    # Contribution guidelines
+├── pyproject.toml                     # Project metadata, dependencies, pytest config
+├── requirements.txt                   # Python dependencies lockfile
+├── .env.example                       # Environment configuration template
+├── run_chatbot.py                     # CLI chatbot entry point (REPL)
+├── serve_chatbot.py                   # Web server entry point (FastAPI)
+├── run_data_ingestion.ps1             # Windows PowerShell ingestion script
+├── run_data_ingestion.sh              # Unix/Linux ingestion script
 │
 ├── scripts/
-│   ├── generate_aliases.py            # Regenerate ticker alias universe
-│   ├── ingestion/
+│   ├── generate_aliases.py            # Regenerate ticker alias universe (S&P 500)
+│   │
+│   ├── ingestion/                      # Data ingestion scripts
 │   │   ├── fill_data_gaps.py          # ⭐ Recommended: Smart gap-filling script
-│   │   ├── ingest_20years_sp500.py    # Full historical ingestion
-│   │   ├── batch_ingest.py
-│   │   ├── ingest_companyfacts.py
-│   │   ├── ingest_companyfacts_batch.py
-│   │   ├── ingest_frames.py
-│   │   ├── ingest_from_file.py
-│   │   ├── ingest_universe.py
-│   │   ├── load_prices_stooq.py
-│   │   ├── load_prices_yfinance.py
-│   │   └── load_ticker_cik.py
-│   └── utility/
-│       ├── check_database_simple.py   # Database verification
+│   │   ├── ingest_20years_sp500.py    # Full 20-year historical ingestion
+│   │   ├── batch_ingest.py            # Batch ingestion with retry/backoff
+│   │   ├── ingest_companyfacts.py     # SEC CompanyFacts API ingestion
+│   │   ├── ingest_companyfacts_batch.py # Batch CompanyFacts ingestion
+│   │   ├── ingest_frames.py           # SEC data frames ingestion
+│   │   ├── ingest_from_file.py        # Ingestion from file input
+│   │   ├── ingest_universe.py         # Universe-based ingestion with resume support
+│   │   ├── load_prices_stooq.py       # Stooq price loader (fallback)
+│   │   ├── load_prices_yfinance.py   # Yahoo Finance price loader
+│   │   └── load_ticker_cik.py         # Ticker to CIK mapping loader
+│   │
+│   └── utility/                        # Utility and helper scripts
+│       ├── check_database_simple.py   # Database verification utility
 │       ├── check_ingestion_status.py  # Ingestion status checker
-│       ├── check_kpi_values.py        # KPI validation
-│       ├── monitor_progress.py        # Progress monitoring
+│       ├── check_kpi_values.py        # KPI validation utility
+│       ├── check_braces.py            # Syntax checking utility
+│       ├── check_syntax.py            # Code syntax validation
+│       ├── find_unclosed_brace.py     # Brace matching utility
+│       ├── combine_portfolio_files.py # Portfolio file combiner
+│       ├── chat_terminal.py           # Terminal chat interface
+│       ├── monitor_progress.py        # Progress monitoring utility
 │       ├── quick_status.py            # Quick status check
-│       ├── show_complete_attribution.py
+│       ├── show_complete_attribution.py # Attribution display utility
 │       ├── plotly_demo.py             # Plotly chart examples
-│       ├── chat_metrics.py
-│       ├── data_sources_backup.py
-│       └── main.py
+│       ├── chat_metrics.py            # Chat metrics utility
+│       ├── data_sources_backup.py     # Data sources backup utility
+│       ├── refresh_ticker_catalog.py  # Ticker catalog refresh utility
+│       └── main.py                    # Main utility CLI wrapper
 │
 ├── src/
 │   └── benchmarkos_chatbot/
-│       ├── analytics_engine.py        # Core analytics engine
-│       ├── chatbot.py                 # Chatbot orchestration
-│       ├── config.py                  # Configuration management
-│       ├── data_ingestion.py          # Data ingestion pipeline
-│       ├── data_sources.py            # Data source integrations
-│       ├── database.py                # Database abstraction layer
-│       ├── cfi_ppt_builder.py         # PowerPoint export builder
+│       │
+│       ├── Core Components:
+│       ├── analytics_engine.py        # Core analytics engine (KPI calculations)
+│       ├── chatbot.py                 # Main chatbot orchestration (RAG, LLM integration)
+│       ├── config.py                  # Configuration management (settings loader)
+│       ├── database.py                # Database abstraction layer (SQLite/Postgres)
+│       ├── llm_client.py              # LLM provider abstraction (OpenAI/local echo)
+│       ├── web.py                     # FastAPI web server (REST API endpoints)
+│       │
+│       ├── Data & Ingestion:
+│       ├── data_ingestion.py          # Data ingestion pipeline (SEC, Yahoo, Bloomberg)
+│       ├── data_sources.py            # Data source integrations (SEC EDGAR, Yahoo Finance)
+│       ├── external_data.py          # External data providers (FRED, IMF)
+│       ├── macro_data.py              # Macroeconomic data provider
+│       ├── multi_source_aggregator.py # Multi-source data aggregation
+│       ├── sec_bulk.py                # SEC bulk data access
+│       ├── secdb.py                   # SEC database utilities
+│       │
+│       ├── Context & RAG:
+│       ├── context_builder.py         # Financial context builder for RAG (ML forecasts, portfolio)
+│       ├── ml_response_verifier.py    # ML forecast response verification & enhancement
+│       ├── followup_context.py       # Follow-up question context management
+│       ├── intent_carryover.py       # Intent carryover between conversations
+│       │
+│       ├── Parsing & NLP:
 │       ├── parsing/
-│       │   ├── alias_builder.py       # Ticker alias resolution
-│       │   ├── aliases.json           # Generated ticker aliases
-│       │   ├── ontology.py            # Metric ontology
-│       │   ├── parse.py               # Natural language parser
-│       │   └── time_grammar.py        # Time period parser
-│       ├── llm_client.py              # LLM provider abstraction
-│       ├── table_renderer.py          # ASCII table rendering
+│       │   ├── alias_builder.py       # Ticker alias resolution (S&P 500)
+│       │   ├── aliases.json           # Generated ticker aliases (S&P 500 coverage)
+│       │   ├── ontology.py           # Metric ontology (KPI definitions)
+│       │   ├── parse.py               # Natural language parser (structured intents)
+│       │   ├── time_grammar.py        # Time period parser (FY, quarters, ranges)
+│       │   ├── abbreviations.py       # Abbreviation expansion
+│       │   ├── company_groups.py      # Company group detection
+│       │   ├── comparative.py         # Comparative language parsing
+│       │   ├── conditionals.py        # Conditional statement parsing
+│       │   ├── fuzzy_quantities.py    # Fuzzy quantity parsing
+│       │   ├── metric_inference.py   # Metric inference from context
+│       │   ├── multi_intent.py       # Multi-intent detection
+│       │   ├── natural_filters.py    # Natural language filters
+│       │   ├── negation.py            # Negation handling
+│       │   ├── question_chaining.py   # Question chaining detection
+│       │   ├── sentiment.py          # Sentiment analysis
+│       │   ├── temporal_relationships.py # Temporal relationship parsing
+│       │   └── trends.py              # Trend detection
+│       │
+│       ├── Spelling & Correction:
+│       ├── spelling/
+│       │   ├── company_corrector.py   # Company name spelling correction
+│       │   ├── correction_engine.py  # Main spelling correction engine
+│       │   ├── fuzzy_matcher.py      # Fuzzy string matching
+│       │   └── metric_corrector.py    # Metric name spelling correction
+│       │
+│       ├── Routing:
+│       ├── routing/
+│       │   └── enhanced_router.py     # Enhanced intent routing (dashboard detection)
+│       │
+│       ├── Analytics Modules:
+│       ├── sector_analytics.py        # Sector benchmarking (GICS sectors)
+│       ├── anomaly_detection.py      # Anomaly detection (Z-score analysis)
+│       ├── predictive_analytics.py   # Predictive analytics (regression, CAGR)
+│       ├── advanced_kpis.py           # Advanced KPI calculator (30+ ratios)
+│       │
+│       ├── Portfolio Management:
+│       ├── portfolio.py               # Main portfolio management module (combined)
+│       ├── portfolio_optimizer.py    # Portfolio optimization (mean-variance)
+│       ├── portfolio_risk_metrics.py # Risk metrics (CVaR, VaR, Sharpe, Sortino)
+│       ├── portfolio_attribution.py  # Performance attribution (Brinson-Fachler)
+│       ├── portfolio_scenarios.py    # Scenario analysis & stress testing
+│       ├── portfolio_exposure.py     # Exposure analysis (sector, factor)
+│       ├── portfolio_calculations.py # Portfolio calculation utilities
+│       ├── portfolio_enrichment.py   # Portfolio enrichment with fundamentals
+│       ├── portfolio_enhancements.py # Portfolio enhancement utilities
+│       ├── portfolio_reporting.py    # Portfolio reporting utilities
+│       ├── portfolio_trades.py       # Trade recommendation utilities
+│       ├── portfolio_export.py       # Portfolio export (PowerPoint, PDF, Excel)
+│       └── portfolio_ppt_builder.py   # Portfolio PowerPoint builder
+│       │
+│       ├── ML Forecasting:
+│       ├── ml_forecasting/
+│       │   ├── ml_forecaster.py       # Main ML forecaster (model selection)
+│       │   ├── arima_forecaster.py    # ARIMA model (statistical time series)
+│       │   ├── prophet_forecaster.py # Prophet model (seasonal patterns)
+│       │   ├── ets_forecaster.py     # ETS model (exponential smoothing)
+│       │   ├── lstm_forecaster.py    # LSTM model (deep learning RNN)
+│       │   ├── transformer_forecaster.py # Transformer model (attention-based)
+│       │   ├── preprocessing.py     # Data preprocessing (scaling, normalization)
+│       │   ├── feature_engineering.py # Feature engineering utilities
+│       │   ├── hyperparameter_tuning.py # Hyperparameter optimization (Optuna)
+│       │   ├── backtesting.py        # Model backtesting utilities
+│       │   ├── validation.py          # Model validation utilities
+│       │   ├── explainability.py     # Model explainability (SHAP, attention)
+│       │   ├── uncertainty.py         # Uncertainty quantification
+│       │   ├── regime_detection.py  # Regime detection (market states)
+│       │   ├── technical_indicators.py # Technical indicators for features
+│       │   ├── external_factors.py   # External factor integration
+│       │   └── multivariate_forecaster.py # Multivariate forecasting
+│       │
+│       ├── Export & Presentation:
+│       ├── export_pipeline.py        # Export pipeline (PDF, PPTX, Excel)
+│       ├── cfi_ppt_builder.py         # CFI-style PowerPoint builder (12 slides)
+│       ├── table_renderer.py         # ASCII table rendering
+│       │
+│       ├── Utilities:
 │       ├── tasks.py                   # Task queue management
-│       └── web.py                     # FastAPI web server
+│       ├── help_content.py           # Help content and documentation
+│       ├── dashboard_utils.py        # Dashboard utility functions
+│       ├── document_processor.py     # Document processing utilities
+│       ├── imf_proxy.py              # IMF data proxy
+│       ├── kpi_backfill.py           # KPI backfill utilities
+│       ├── backfill_policy.py        # Backfill policy management
+│       ├── ticker_universe.py        # Ticker universe management
+│       │
+│       └── Static Assets:
+│       └── static/
+│           ├── app.js                 # Frontend application logic (SPA)
+│           ├── styles.css             # UI styling (markdown, progress indicator)
+│           ├── index.html             # Web UI entry point
+│           ├── favicon.svg            # Favicon
+│           ├── cfi_dashboard.html     # CFI dashboard HTML
+│           ├── cfi_dashboard.js       # CFI dashboard JavaScript
+│           ├── cfi_dashboard.css      # CFI dashboard styling
+│           ├── portfolio_dashboard.html # Portfolio dashboard HTML
+│           ├── portfolio_dashboard.js  # Portfolio dashboard JavaScript
+│           └── data/
+│               ├── company_universe.json # Company universe metadata
+│               └── kpi_library.json      # KPI library definitions
 │
 ├── docs/
 │   ├── README.md                      # Documentation index
-│   ├── architecture.md                # System architecture
-│   ├── orchestration_playbook.md      # Deployment guide
-│   ├── product_design_spec.md         # Product specifications
-│   ├── TEAM_SETUP_GUIDE.md            # Team onboarding
-│   ├── INSTALLATION_GUIDE.md          # Installation instructions
-│   ├── SETUP_GUIDE.md                 # Setup guide
-│   ├── README_SETUP.md                # Setup README
-│   ├── README_SP500_INGESTION.md      # S&P 500 ingestion guide
-│   ├── EXPAND_DATA_GUIDE.md           # Data expansion guide
-│   ├── DATA_INGESTION_PLAN.md         # Ingestion planning
-│   ├── PLOTLY_INTEGRATION.md          # Plotly integration docs
-│   ├── PHASE1_ANALYTICS_FEATURES.md   # Phase 1 features
-│   ├── PHASE1_COMPLETION_SUMMARY.md   # Phase 1 summary
-│   ├── ticker_names.md                # Ticker coverage list
-│   ├── ui_design_philosophy.md        # UI design principles
-│   ├── dashboard_interactions.md      # Dashboard UX patterns
-│   ├── chatbot_system_overview_en.md  # System overview
-│   ├── DASHBOARD_SOURCES_INSTRUCTIONS.md
-│   ├── DASHBOARD_IMPROVEMENTS_COMPLETE.md
-│   ├── DASHBOARD_SOURCES_DISPLAY_FIX.md
-│   ├── SOURCES_LOCATION_GUIDE.md
-│   ├── SOURCES_TROUBLESHOOTING.md
-│   ├── SOURCES_DISPLAY_FIXED.md
-│   ├── SOURCES_100_PERCENT_COMPLETE_SUMMARY.md
-│   ├── 100_PERCENT_SOURCE_COMPLETENESS.md
-│   ├── SEC_URLS_FIX_SUMMARY.md
-│   ├── SP500_INGESTION_SYSTEM_COMPLETE.md
-│   ├── duplicate_files_report.md      # Cleanup report
-│   ├── export_pipeline_scope.md
-│   ├── prompt_processing_analysis.md
-│   ├── command_routing_analysis_report.md
-│   ├── DATABASE_DATA_SUMMARY.md
-│   ├── EXTENDED_INGESTION_INFO.md
-│   ├── RAW_SEC_PARSER_IMPLEMENTATION_GUIDE.md
-│   ├── reports/                       # Generated reports
-│   │   └── (various analysis and improvement reports)
-│   └── analysis/                      # Analysis documentation
-│       └── (consolidated analysis reports and documentation)
+│   │
+│   ├── architecture/                    # Architecture documentation
+│   │   ├── architecture.md            # System architecture diagram
+│   │   ├── chatbot_system_overview_en.md # System overview
+│   │   └── product_design_spec.md     # Product design specifications
+│   │
+│   ├── demos/                          # Demo and presentation docs
+│   │   ├── CBA_POSTER_CONDENSED.md    # CBA poster (condensed)
+│   │   ├── CBA_POSTER_CONTENT.md      # CBA poster content
+│   │   ├── CHATBOT_DEMO_GUIDE.md      # Chatbot demo guide
+│   │   └── CLIENT_DEMO_PROMPTS.md     # Client demo prompts
+│   │
+│   ├── guides/                         # User and technical guides
+│   │   ├── ALL_ML_FORECASTING_PROMPTS.md # All ML forecasting prompts
+│   │   ├── ML_FORECASTING_QUICK_REFERENCE.md # ML forecasting quick reference
+│   │   ├── ML_FORECASTING_PROMPTS.md  # ML forecasting prompts guide
+│   │   ├── PORTFOLIO_QUESTIONS_GUIDE.md # Portfolio questions guide
+│   │   ├── FINANCIAL_PROMPTS_GUIDE.md # Financial prompts guide
+│   │   ├── CHATBOT_PROMPT_GUIDE.md    # Chatbot prompt guide
+│   │   ├── COMPREHENSIVE_DATA_SOURCES.md # Data sources guide
+│   │   ├── DASHBOARD_SOURCES_INSTRUCTIONS.md # Dashboard sources guide
+│   │   ├── DATA_INGESTION_PLAN.md     # Data ingestion planning
+│   │   ├── ENABLE_FRED_GUIDE.md       # FRED integration guide
+│   │   ├── EXPAND_DATA_GUIDE.md       # Data expansion guide
+│   │   ├── EXTENDED_INGESTION_INFO.md # Extended ingestion info
+│   │   ├── INSTALLATION_GUIDE.md      # Installation instructions
+│   │   ├── SETUP_GUIDE.md             # Setup guide
+│   │   ├── TEAM_SETUP_GUIDE.md        # Team onboarding guide
+│   │   ├── PLOTLY_INTEGRATION.md      # Plotly integration docs
+│   │   ├── MULTI_TICKER_DASHBOARD_GUIDE.md # Multi-ticker dashboard guide
+│   │   ├── MULTI_TICKER_DASHBOARDS.md # Multi-ticker dashboards guide
+│   │   ├── SOURCES_LOCATION_GUIDE.md  # Sources location guide
+│   │   ├── SOURCES_TROUBLESHOOTING.md # Sources troubleshooting
+│   │   ├── SYSTEM_PROMPT_SIMPLIFIED.md # System prompt guide
+│   │   ├── ENHANCED_ROUTING.md        # Enhanced routing guide
+│   │   ├── RAW_SEC_PARSER_IMPLEMENTATION_GUIDE.md # SEC parser guide
+│   │   ├── export_pipeline_scope.md  # Export pipeline scope
+│   │   ├── orchestration_playbook.md # Deployment orchestration guide
+│   │   ├── ticker_names.md           # Ticker coverage list
+│   │   └── (additional guides)
+│   │
+│   ├── organization/                   # Organization documentation
+│   │   ├── REPOSITORY_ORGANIZATION_2024.md # Repository organization (2024)
+│   │   ├── REPOSITORY_ORGANIZATION_COMPLETE.md # Repository organization (complete)
+│   │   └── COMPLETE_ORGANIZATION_STATUS.md # Organization status
+│   │
+│   ├── enhancements/                  # Enhancement documentation
+│   │   ├── FINANCIAL_PROMPTS_ENHANCEMENT_COMPLETE.md # Financial prompts enhancement
+│   │   ├── MULTI_SOURCE_INTEGRATION.md # Multi-source integration
+│   │   ├── MARKDOWN_FORMATTING_FIX.md # Markdown formatting fix
+│   │   ├── MESSAGE_FORMATTING_IMPROVED.md # Message formatting improvements
+│   │   ├── PDF_ENHANCEMENTS_COMPLETE.md # PDF enhancements
+│   │   ├── PDF_EXPORT_IMPROVEMENTS.md # PDF export improvements
+│   │   ├── PDF_LAYOUT_FIXES_COMPLETE.md # PDF layout fixes
+│   │   ├── PROGRESS_INDICATOR_ENHANCEMENT.md # Progress indicator enhancement
+│   │   ├── QUESTION_DETECTION_FIX.md  # Question detection fix
+│   │   ├── SOURCES_AND_DEPTH_FIX.md  # Sources and depth fix
+│   │   └── INVESTMENT_GRADE_PDF_COMPLETE.md # Investment-grade PDF
+│   │
+│   ├── fixes/                          # Fix documentation
+│   │   ├── FINAL_NAN_FIX_COMPLETE.md  # NaN fix completion
+│   │   ├── JAVASCRIPT_SYNTAX_ERROR_FIX.md # JavaScript syntax fix
+│   │   ├── MULTI_TICKER_DASHBOARD_FIX.md # Multi-ticker dashboard fix
+│   │   ├── MULTI_TICKER_DETECTION_FIX.md # Multi-ticker detection fix
+│   │   ├── MULTI_TICKER_TOOLBAR_REMOVAL.md # Multi-ticker toolbar removal
+│   │   ├── PDF_EXPORT_FIX.md          # PDF export fix
+│   │   ├── PDF_UNICODE_FIX.md        # PDF unicode fix
+│   │   ├── PLOTLY_NAN_ERRORS_FIX.md   # Plotly NaN errors fix
+│   │   ├── SOURCES_PANEL_RESTORED.md  # Sources panel restoration
+│   │   └── SOURCES_PANEL_VISIBILITY_FIX.md # Sources panel visibility fix
+│   │
+│   ├── ui/                             # UI documentation
+│   │   ├── USER_GUIDE.md              # User guide
+│   │   ├── ACCURATE_SOURCE_LINKS_UPDATE.md # Source links update
+│   │   ├── BUTTON_EVENT_HANDLER_FIX.md # Button event handler fix
+│   │   ├── COMPANY_SELECTOR_COMPARISON.md # Company selector comparison
+│   │   ├── COMPANY_SELECTOR_SCALING_FIX.md # Company selector scaling fix
+│   │   ├── COMPREHENSIVE_IMPROVEMENTS_SUMMARY.md # Comprehensive improvements
+│   │   ├── DASHBOARD_IMPROVEMENTS.md  # Dashboard improvements
+│   │   ├── DASHBOARD_LAYOUT_IMPROVEMENTS.md # Dashboard layout improvements
+│   │   ├── DATA_SOURCES_FORMAT.md     # Data sources format
+│   │   ├── FINAL_LAYOUT_SUMMARY.md    # Final layout summary
+│   │   ├── IMPLEMENTATION_COMPLETE.md # Implementation completion
+│   │   ├── LAYOUT_REORGANIZATION.md   # Layout reorganization
+│   │   ├── LINKS_FIX_SUMMARY.md       # Links fix summary
+│   │   └── PLOTLY_NAN_FIX.md          # Plotly NaN fix
+│   │
+│   ├── summaries/                      # Summary documentation
+│   │   └── (28 summary files documenting various features and improvements)
+│   │
+│   ├── analysis/                       # Analysis documentation
+│   │   ├── README.md                   # Analysis documentation index
+│   │   └── (22 analysis reports and documentation files)
+│   │
+│   └── reports/                        # Generated reports
+│       └── (various analysis and improvement reports)
 │
 ├── data/
-│   ├── sample_financials.csv          # Sample data
+│   ├── sample_financials.csv          # Sample financial data
 │   ├── external/
-│   │   └── imf_sector_kpis.json       # IMF sector benchmarks
+│   │   └── imf_sector_kpis.json       # IMF sector KPI benchmarks
 │   ├── sqlite/
-│   │   └── benchmarkos_chatbot.sqlite3 (created on demand)
+│   │   └── benchmarkos_chatbot.sqlite3 # SQLite database (created on demand)
 │   └── tickers/
-│       ├── universe_sp500.txt         # S&P 500 ticker list
-│       ├── sec_top100.txt             # Top 100 companies
+│       ├── universe_sp500.txt         # S&P 500 ticker list (475 companies)
+│       ├── sec_top100.txt             # Top 100 SEC companies
+│       ├── universe_custom.txt        # Custom universe list
 │       └── sample_watchlist.txt       # Sample watchlist
 │
-├── cache/                             # Generated at runtime
-│   └── edgar_tickers.json             # Cached EDGAR ticker data
+├── cache/                              # Generated at runtime (gitignored)
+│   ├── edgar_tickers.json             # Cached EDGAR ticker data
+│   └── progress/
+│       └── fill_gaps_summary.json     # Ingestion progress tracking
 │
-├── analysis/
-│   ├── experiments/                   # Experimental code
-│   │   ├── enhanced_ticker_resolver.py
-│   │   ├── fixed_ticker_resolver.py
-│   │   └── (other experiments)
-│   └── scripts/                       # Analysis scripts
-│       └── (analysis and validation scripts)
+├── analysis/                           # Experimental and analysis code
+│   ├── experiments/                   # Experimental implementations
+│   │   ├── enhanced_ticker_resolver.py # Enhanced ticker resolver experiment
+│   │   ├── fixed_ticker_resolver.py   # Fixed ticker resolver experiment
+│   │   ├── fixed_time_grammar.py      # Fixed time grammar experiment
+│   │   ├── implement_metric_improvements.py # Metric improvements experiment
+│   │   ├── improved_real_world_parse.py # Real-world parsing improvements
+│   │   └── ultimate_failing_cases_fix.py # Failing cases fix experiment
+│   └── scripts/                        # Analysis and validation scripts
+│       └── (20 analysis and validation scripts)
 │
-├── tools/
-│   └── refresh_ticker_catalog.py     # Ticker catalog management
+├── archive/                            # Archived files
+│   └── parsing_development/           # Parsing development archive
+│       └── (15 archived files: 11 markdown, 4 Python)
 │
-├── webui/
-│   ├── index.html                     # Web UI entry point
-│   ├── app.js                         # Frontend application logic
-│   ├── styles.css                     # UI styling
-│   └── static/                        # Static assets
+├── webui/                              # Web UI files
+│   ├── index.html                      # Web UI entry point
+│   ├── app.js                          # Frontend application logic
+│   ├── styles.css                      # UI styling (7432 lines)
+│   ├── package.json                   # Node.js dependencies
+│   ├── service-worker.js              # Service worker for PWA
+│   ├── start_dashboard.js             # Dashboard startup script
+│   ├── favicon.svg                    # Favicon
+│   ├── cfi_dashboard.html             # CFI dashboard HTML
+│   ├── cfi_dashboard.js                # CFI dashboard JavaScript
+│   ├── cfi_dashboard.css              # CFI dashboard styling
+│   ├── cfi_compare.html               # CFI compare view HTML
+│   ├── cfi_compare.js                 # CFI compare view JavaScript
+│   ├── cfi_compare.css                # CFI compare view styling
+│   ├── cfi_dense.html                 # CFI dense view HTML
+│   ├── cfi_dense.js                    # CFI dense view JavaScript
+│   ├── cfi_dense.css                   # CFI dense view styling
+│   ├── cfi_compare_demo.html          # CFI compare demo
+│   ├── cfi_compare_standalone.html    # CFI compare standalone
+│   ├── cfi_dashboard_backup_original.html # Backup files
+│   ├── cfi_dashboard_improved.html    # Improved dashboard
+│   ├── cfi_dashboard_old_backup.html  # Old backup
+│   ├── cfi_dashboard_v2.html          # Dashboard v2
+│   └── data/
+│       └── (2 JSON data files)
 │
-└── tests/
-    ├── README.md                      # Testing documentation
-    ├── test_alias_resolution.py
-    ├── test_analytics.py
-    ├── test_analytics_engine.py
-    ├── test_cli_tables.py
-    ├── test_data_ingestion.py
-    ├── test_database.py
-    ├── test_dashboard_flow.py
-    ├── test_new_analytics.py
-    ├── test_nl_parser.py
-    ├── test_time_grammar.py
-    ├── regression/                    # Regression tests
-    │   ├── test_ticker_resolution.py
-    │   ├── final_comparison_test.py
-    │   └── system_integration_test.py
-    └── (additional test files)
+└── tests/                              # Test files
+    ├── README.md                       # Testing documentation
+    │
+    ├── unit/                           # Unit tests
+    │   ├── test_analytics.py           # Analytics unit tests
+    │   ├── test_analytics_engine.py    # Analytics engine unit tests
+    │   ├── test_cli_tables.py          # CLI table rendering tests
+    │   ├── test_database.py            # Database unit tests
+    │   └── test_data_ingestion.py      # Data ingestion unit tests
+    │
+    ├── integration/                    # Integration tests
+    │   ├── test_chatbot_sec_fix.py    # SEC integration tests
+    │   ├── test_sec_api_fix.py        # SEC API integration tests
+    │   ├── test_new_analytics.py      # New analytics integration tests
+    │   ├── test_dashboard_flow.py     # Dashboard workflow integration tests
+    │   ├── test_fixes.py              # General fixes integration tests
+    │   └── test_enhanced_routing.py   # Enhanced routing integration tests
+    │
+    ├── e2e/                            # End-to-end tests
+    │   ├── test_all_sp500_dashboards.py # Full S&P 500 dashboard test
+    │   ├── test_sample_companies.py   # Sample companies test (10 companies)
+    │   ├── test_single_company.py     # Single company test (Apple)
+    │   ├── test_chatbot_stress_test.py # Chatbot stress test
+    │   ├── test_chatgpt_style.py      # ChatGPT-style test
+    │   ├── test_comprehensive_sources.py # Comprehensive sources test
+    │   ├── PORTFOLIO_STRESS_TEST_SUMMARY.md # Portfolio stress test summary
+    │   └── test_ml_detailed_answers.py # ML detailed answers test
+    │
+    ├── verification/                   # Verification scripts
+    │   ├── verify_metrics.py           # Metric verification
+    │   ├── verify_new_data.py          # New data verification
+    │   ├── verify_100_percent_complete.py # 100% completeness verification
+    │   └── check_sources.py           # Source checking utility
+    │
+    ├── ui/                             # UI test files
+    │   ├── test_dashboard_sources.html # Dashboard sources test
+    │   ├── test_upload_button.html     # Upload button test
+    │   └── VERIFY_MARKDOWN_WORKS.html  # Markdown verification test
+    │
+    ├── regression/                     # Regression tests
+    │   ├── test_ticker_resolution.py   # Ticker resolution regression
+    │   ├── test_time_fixes.py          # Time parsing fixes regression
+    │   └── (additional regression tests)
+    │
+    ├── Parser & NLP Tests:
+    ├── test_alias_resolution.py         # Alias resolution tests
+    ├── test_time_grammar.py            # Time grammar tests
+    ├── test_nl_parser.py               # Natural language parser tests
+    ├── test_abbreviations.py           # Abbreviation tests
+    ├── test_advanced_followups.py     # Advanced follow-up tests
+    ├── test_company_groups.py          # Company group tests
+    ├── test_comparative_language.py    # Comparative language tests
+    ├── test_conditionals.py            # Conditional statement tests
+    ├── test_enhanced_intents.py        # Enhanced intent tests
+    ├── test_enhanced_metric_synonyms.py # Enhanced metric synonym tests
+    ├── test_enhanced_question_patterns.py # Enhanced question pattern tests
+    ├── test_followup_features_unit.py  # Follow-up feature unit tests
+    ├── test_fuzzy_quantities.py        # Fuzzy quantity tests
+    ├── test_metric_inference.py        # Metric inference tests
+    ├── test_multi_intent.py            # Multi-intent tests
+    ├── test_natural_filters.py         # Natural filter tests
+    ├── test_negation_handling.py       # Negation handling tests
+    ├── test_performance_benchmarks.py  # Performance benchmark tests
+    ├── test_period_normalization.py   # Period normalization tests
+    ├── test_pronoun_resolution.py      # Pronoun resolution tests
+    ├── test_question_chaining.py      # Question chaining tests
+    ├── test_sentiment.py               # Sentiment analysis tests
+    ├── test_spelling_correction.py     # Spelling correction tests
+    ├── test_temporal_relationships.py  # Temporal relationship tests
+    ├── test_time_period_enhancement.py # Time period enhancement tests
+    ├── test_trend_direction.py        # Trend direction tests
+    │
+    ├── Portfolio Tests:
+    ├── test_portfolio_detection_working.py # Portfolio detection tests
+    ├── test_portfolio_patterns.py      # Portfolio pattern tests
+    ├── test_portfolio_questions.py     # Portfolio question tests
+    ├── test_portfolio_stress_test.py   # Portfolio stress test
+    │
+    ├── ML Forecasting Tests:
+    ├── test_all_forecast_prompts.py   # All forecast prompt tests
+    ├── test_forecast_detection.py     # Forecast detection tests
+    ├── test_forecast_prompts.py       # Forecast prompt tests
+    ├── test_ml_context_debug.py       # ML context debug tests
+    ├── test_ml_detailed_response.py   # ML detailed response tests
+    │
+    ├── Other Tests:
+    ├── test_terminal_bot.py            # Terminal bot tests
+    ├── test_working_prompts.py         # Working prompt tests
+    ├── test_api_direct.sh             # API direct test script
+    ├── test_dashboard_sources.html     # Dashboard sources HTML test
+    ├── test_integration_e2e.py        # Integration E2E tests
+    ├── test_source_completeness.py    # Source completeness tests
+    ├── test_chatbot_stress_test.py    # Chatbot stress test
+    ├── test_chatgpt_style.py          # ChatGPT-style test
+    ├── portfolio_stress_test_results.json # Portfolio stress test results
+    │
+    ├── cache/                          # Test cache (gitignored)
+    ├── data/                           # Test data fixtures
+    └── outputs/                        # Test outputs (gitignored)
 ```
 
 ## 📝 File Reference
