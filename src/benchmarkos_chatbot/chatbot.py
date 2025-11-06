@@ -465,46 +465,27 @@ _COMPANY_PHRASE_PATTERN = re.compile(
     r"\b(?:[A-Za-z][A-Za-z&.]+(?:\s+[A-Za-z][A-Za-z&.]+){0,3})\b"
 )
 _COMMON_WORDS = {
-    "AND",
-    "OR",
-    "THE",
-    "A",
-    "AN",
-    "OF",
-    "FOR",
-    "WITH",
-    "VS",
-    "VERSUS",
-    "PLEASE",
-    "SHOW",
-    "ME",
-    "TELL",
-    "WHAT",
-    "HOW",
-    "WHY",
-    "IS",
-    "ARE",
-    "ON",
-    "IN",
-    "TO",
-    "HELP",
+    # Common words
+    "AND", "OR", "THE", "A", "AN", "OF", "FOR", "WITH", "VS", "VERSUS",
+    "PLEASE", "SHOW", "ME", "TELL", "ON", "IN", "TO", "HELP",
+    "FROM", "AT", "BY", "AS", "BE", "DO", "IF", "SO", "UP", "NO", "GO",
+    
+    # Question words
+    "WHAT", "HOW", "WHY", "WHEN", "WHERE", "WHICH", "WHO",
+    
+    # Pronouns (CRITICAL - prevent "IT", "THEM" being treated as tickers)
+    "IT", "ITS", "THEY", "THEM", "THEIR", "THEIRS", "THIS", "THAT", "THOSE", "THESE",
+    "HE", "SHE", "WE", "US", "OUR", "OURS",
+    
+    # Verbs
+    "IS", "ARE", "WAS", "WERE", "AM", "BEEN", "BEING",
+    "HAS", "HAVE", "HAD", "CAN", "COULD", "WOULD", "SHOULD", "WILL",
+    "DID", "DOES", "DO", "DONE", "MAY", "MIGHT", "MUST",
+    "GET", "GOT", "GIVE", "GAVE", "TAKE", "TOOK",
+    
     # Corporate suffixes that shouldn't be treated as tickers
-    "INC",
-    "CORP",
-    "CO",
-    "LTD",
-    "LLC",
-    "LP",
-    "PLC",
-    "SA",
-    "AG",
-    "NV",
-    "GROUP",
-    "CORPORATION",
-    "INCORPORATED",
-    "LIMITED",
-    "COMPANY",
-    "HOLDINGS",
+    "INC", "CORP", "CO", "LTD", "LLC", "LP", "PLC", "SA", "AG", "NV",
+    "GROUP", "CORPORATION", "INCORPORATED", "LIMITED", "COMPANY", "HOLDINGS",
     "HOLDING",
     "SYSTEMS",
     "TECHNOLOGIES",
@@ -713,6 +694,48 @@ SYSTEM_PROMPT = (
     "- ### Historical Trends (multi-year data, growth rates)\n"
     "- ### Business Drivers (what's causing the numbers)\n"
     "- ### Future Outlook (implications, catalysts, risks)\n\n"
+    
+    "## Table Formatting - CRITICAL RULES\n\n"
+    "When creating tables in your response:\n\n"
+    "**✅ DO:**\n"
+    "- Use standard markdown table format with THREE separate lines:\n"
+    "  Line 1: Header row with column names\n"
+    "  Line 2: Separator row with dashes (---|---|---)\n"
+    "  Line 3+: Data rows\n"
+    "- Keep ALL cells plain text (no bold within table cells)\n"
+    "- Bold the ANSWER company name ONLY in the text ABOVE the table\n"
+    "- Use proper alignment for numbers (right-align with ---:)\n"
+    "- Include column headers\n"
+    "- Each row MUST end with a pipe (|) character\n\n"
+    
+    "**❌ DON'T:**\n"
+    "- DON'T concatenate the separator row to the header row (e.g., | Header ||---|---|)\n"
+    "- DON'T bold individual cells within the table\n"
+    "- DON'T bold only the first row of data\n"
+    "- DON'T use inconsistent formatting across rows\n"
+    "- DON'T mix bold and non-bold text in table cells\n"
+    "- DON'T forget the newline between header and separator rows\n\n"
+    
+    "**Example CORRECT table (note the separate lines):**\n"
+    "| Company | Profit Margin | Revenue |\n"
+    "| --- | ---: | ---: |\n"
+    "| Apple | 26.92% | $391.8B |\n"
+    "| Microsoft | 35.71% | $222.9B |\n"
+    "| Google | 27.99% | $221.7B |\n\n"
+    
+    "**Example INCORRECT table (separator concatenated to header):**\n"
+    "| Company | Profit Margin | Revenue ||---|---|---|\n"
+    "This is WRONG - the separator must be on its own line!\n\n"
+    
+    "**Example INCORRECT table (DO NOT DO THIS):**\n"
+    "| Company | Profit Margin | Revenue |\n"
+    "| --- | ---: | ---: |\n"
+    "| **Apple** | **26.92%** | **$391.8B** |\n"
+    "| Microsoft | 35.71% | $222.9B |\n"
+    "| Google | 27.99% | $221.7B |\n\n"
+    
+    "If you want to highlight the answer company, mention it in the TEXT above the table,\n"
+    "not by bolding its row in the table.\n\n"
     
     "🚨 **MANDATORY SOURCES REQUIREMENT - EVERY RESPONSE MUST INCLUDE:**\n\n"
     "**CRITICAL: You MUST include a '📊 Sources:' section at the END of EVERY response with clickable links.**\n\n"
@@ -1159,6 +1182,38 @@ class BenchmarkOSChatbot:
         self._context_cache.move_to_end(key)
         while len(self._context_cache) > self._MAX_CACHE_ENTRIES:
             self._context_cache.popitem(last=False)
+
+    def _fix_markdown_tables(self, text: str) -> str:
+        """
+        Fix malformed markdown tables where separator row is concatenated to header row.
+        
+        Example malformed table:
+            | Company | Ticker | Margin ||---|---|---|
+            | Apple | AAPL | 25% |
+        
+        Becomes:
+            | Company | Ticker | Margin |
+            | --- | --- | ---: |
+            | Apple | AAPL | 25% |
+        """
+        import re
+        
+        # Pattern to match malformed tables where separator is concatenated to header
+        # Matches: | Header1 | Header2 | Header3 ||---|---|---|
+        # Group 1: The header row (| Header1 | Header2 | Header3 |)
+        # Group 2: The separator (|---|---|---|)
+        pattern = r'(\|[^|\n]+(?:\|[^|\n]+)+\|)\s*(\|\s*-+\s*(?:\|\s*-+\s*)+\|)'
+        
+        def fix_table_match(match):
+            header_row = match.group(1).strip()
+            separator_row = match.group(2).strip()
+            # Return header and separator on separate lines
+            return f"{header_row}\n{separator_row}"
+        
+        # Fix all malformed tables
+        fixed_text = re.sub(pattern, fix_table_match, text)
+        
+        return fixed_text
 
     def _fetch_metrics_cached(
         self,
@@ -2150,6 +2205,13 @@ class BenchmarkOSChatbot:
                 sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
                 
                 filter_query_patterns = [
+                    # CRITICAL: Sector-to-sector comparison queries (e.g., "How does finance compare to tech?")
+                    rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+                    rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+                    rf'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+                    rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)\s+(?:the\s+)?(?:{sector_pattern})',
+                    # "Analyze the [sector] sector: which companies..." (sector mentioned earlier in sentence)
+                    rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
                     # "Show/List/Find [sector] companies"
                     rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
                     # "Which [sector] company"
@@ -2159,7 +2221,9 @@ class BenchmarkOSChatbot:
                     # "Companies in [sector] sector/industry"
                     rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
                     # "[Sector] sector companies"
-                    rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
+                    rf'\b(?:{sector_pattern})\s+(?:sector|industry).*\b(?:companies|stocks|firms)',
+                    # "In the [sector] sector, which companies..."
+                    rf'\bin\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
                     # Revenue/sales filters
                     r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
                     # Growth filters
@@ -2167,6 +2231,10 @@ class BenchmarkOSChatbot:
                     r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
                     # Market cap filters
                     r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+                    # Profit margin filters with conditions
+                    r'\b(?:companies|stocks|firms)\s+(?:have|with)?\s+(?:profit\s+)?margins?\s+(?:above|over|greater than|>)',
+                    # Multiple criteria (growth AND margin AND cash flow)
+                    r'\b(?:companies|stocks|firms).*(?:margins?|growth|cash flow).*(?:above|over|>).*(?:and|,)',
                 ]
                 is_filter_query = any(re.search(pattern, lowered_input) for pattern in filter_query_patterns)
                 
@@ -2177,6 +2245,13 @@ class BenchmarkOSChatbot:
                     r'\bwhat\'s\s+[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt)',
                 ]
                 is_specific_metric = any(re.search(pattern, lowered_input) for pattern in specific_metric_patterns)
+                
+                # CRITICAL: For filter queries, IMMEDIATELY clear any existing dashboards
+                # This prevents old cached dashboards from being shown
+                if is_filter_query:
+                    self.last_structured_response["dashboard"] = None
+                    self.last_structured_response["summary"] = None
+                    emit("filter_query_dashboard_clear", "Filter query detected - clearing all dashboards")
                 
                 # Only do ticker summary for bare ticker mentions, NOT questions, forecasting, filter queries, or specific metric queries
                 if not is_question and not is_filter_query and not is_specific_metric:
@@ -2415,6 +2490,10 @@ class BenchmarkOSChatbot:
             except ImportError:
                 pass
 
+            # CRITICAL: Fix malformed markdown tables before returning
+            if reply:
+                reply = self._fix_markdown_tables(reply)
+            
             emit("complete", "Response ready")
             return reply
         finally:
@@ -2533,15 +2612,36 @@ class BenchmarkOSChatbot:
         sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
         
         filter_query_patterns = [
+            # CRITICAL: Sector-to-sector comparison queries (e.g., "How does finance compare to tech?")
+            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+            rf'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)\s+(?:the\s+)?(?:{sector_pattern})',
+            # "Analyze the [sector] sector: which companies..." (sector mentioned earlier)
+            rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
+            # "Show/List/Find [sector] companies"
             rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
+            # "Which [sector] company"
             rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
+            # "Which companies in [sector]"
             rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
+            # "Companies in [sector] sector/industry"
             rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
-            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
+            # "[Sector] sector companies"
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry).*\b(?:companies|stocks|firms)',
+            # "In the [sector] sector, which companies..."
+            rf'\bin\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
+            # Revenue/sales filters
             r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
+            # Growth filters
             r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
             r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+            # Market cap filters
             r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+            # Profit margin filters with conditions
+            r'\b(?:companies|stocks|firms)\s+(?:have|with)?\s+(?:profit\s+)?margins?\s+(?:above|over|greater than|>)',
+            # Multiple criteria (growth AND margin AND cash flow)
+            r'\b(?:companies|stocks|firms).*(?:margins?|growth|cash flow).*(?:above|over|>).*(?:and|,)',
         ]
         is_filter_query = any(re.search(pattern, lowered) for pattern in filter_query_patterns)
         
@@ -4506,28 +4606,68 @@ class BenchmarkOSChatbot:
         sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
         
         filter_patterns = [
+            # CRITICAL: Sector-to-sector comparison queries (e.g., "How does finance compare to tech?")
+            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
+            rf'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)\s+(?:the\s+)?(?:{sector_pattern})',
+            # "Analyze the [sector] sector: which companies..." (sector mentioned earlier)
+            rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
+            # "Show/List/Find [sector] companies"
             rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
+            # "Which [sector] company"
             rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
+            # "Which companies in [sector]"
             rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
+            # "Companies in [sector] sector/industry"
             rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
-            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:companies|stocks)',
+            # "[Sector] sector companies"
+            rf'\b(?:{sector_pattern})\s+(?:sector|industry).*\b(?:companies|stocks|firms)',
+            # "In the [sector] sector, which companies..."
+            rf'\bin\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
+            # Revenue/sales filters
             r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
+            # Growth filters
             r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
             r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
+            # Market cap filters
             r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
+            # Profit margin filters with conditions
+            r'\b(?:companies|stocks|firms)\s+(?:have|with)?\s+(?:profit\s+)?margins?\s+(?:above|over|greater than|>)',
+            # Multiple criteria (growth AND margin AND cash flow)
+            r'\b(?:companies|stocks|firms).*(?:margins?|growth|cash flow).*(?:above|over|>).*(?:and|,)',
         ]
         
         is_filter_query = any(re.search(pattern, lowered) for pattern in filter_patterns)
         
         if is_filter_query:
-            # This is a filter query - provide company universe context
+            # CRITICAL: This is a filter query - provide company universe context
+            # Must return early to prevent ticker extraction fallback (which causes hallucinations)
             try:
                 from .context_builder import build_company_universe_context
                 universe_context = build_company_universe_context(self.settings.database_path)
                 if universe_context:
+                    LOGGER.info(f"Filter query detected - returning company universe context ({len(universe_context)} chars)")
                     return universe_context
+                else:
+                    # Even if universe context is empty, return a basic instruction to prevent fallback ticker extraction
+                    LOGGER.warning(f"Filter query detected but universe context is empty - returning basic instruction")
+                    return (
+                        "USER QUERY IS A FILTER/CATEGORY QUERY\n"
+                        "The user is asking to filter companies by sector, metrics, or other criteria.\n"
+                        "Please provide a narrative response explaining that you can help with company filtering,\n"
+                        "but you need the company database to be available to provide specific results.\n"
+                        "Do NOT show company dashboards for filter queries.\n"
+                    )
             except Exception as e:
-                LOGGER.debug(f"Company universe context builder failed: {e}")
+                LOGGER.error(f"Company universe context builder failed for filter query: {e}", exc_info=True)
+                # Return basic instruction to prevent fallback ticker extraction which causes hallucinations
+                return (
+                    "USER QUERY IS A FILTER/CATEGORY QUERY\n"
+                    "The user is asking to filter companies by sector, metrics, or other criteria.\n"
+                    "Please provide a narrative response explaining that you encountered an error loading the company database.\n"
+                    "Do NOT show company dashboards for filter queries.\n"
+                )
         
         # First, try the smart context builder for natural language formatting
         try:
@@ -5003,11 +5143,32 @@ class BenchmarkOSChatbot:
         """Best-effort ticker extraction from user text (tickers + company names)."""
         candidates: List[str] = []
         seen = set()
+        
+        # CRITICAL: Check if this is a sector comparison query
+        # If asking about "tech sector" or "finance sector", don't extract sector names as tickers
+        lowered = text.lower()
+        sector_context_patterns = [
+            r'\b(?:tech|technology|financial?|finance|healthcare|energy)\s+(?:sector|industry|companies)',
+            r'\b(?:the\s+)?(?:tech|technology|financial?|finance|healthcare|energy)\s+(?:sector|industry)',
+            r'\bsector.*compare|compare.*sector',
+            r'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:tech|technology|financial?|finance)\s+(?:sector|industry)\s+compare',
+            r'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:tech|technology|financial?|finance)\s+compare\s+(?:to|with|vs\.?)',
+            r'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:tech|technology|financial?|finance)\s+(?:sector|industry)',
+            r'\b(?:tech|technology|financial?|finance)\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)',
+        ]
+        is_sector_query = any(re.search(pattern, lowered) for pattern in sector_context_patterns)
 
         for token in _TICKER_TOKEN_PATTERN.findall(text.upper()):
             normalized = token.upper()
             if normalized in _COMMON_WORDS:
                 continue
+            
+            # CRITICAL: If this is a sector query, filter out sector names that are also tickers
+            if is_sector_query:
+                sector_names_as_tickers = {"TECH", "IT", "FINANCE", "OIL", "GAS", "RETAIL"}
+                if normalized in sector_names_as_tickers:
+                    continue
+            
             if normalized not in seen:
                 seen.add(normalized)
                 candidates.append(normalized)
