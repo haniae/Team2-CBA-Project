@@ -4480,14 +4480,21 @@ class BenchmarkOSChatbot:
         is_filter_query = any(re.search(pattern, lowered) for pattern in filter_patterns)
         
         if is_filter_query:
-            # This is a filter query - provide company universe context
+            # CRITICAL: This is a filter query - provide company universe context
+            # Must return early to prevent ticker extraction fallback (which causes hallucinations)
             try:
                 from .context_builder import build_company_universe_context
                 universe_context = build_company_universe_context(self.settings.database_path)
                 if universe_context:
                     return universe_context
+                else:
+                    # Even if universe context is empty, return empty to prevent fallback ticker extraction
+                    LOGGER.warning(f"Filter query detected but universe context is empty - returning empty to prevent hallucination")
+                    return ""
             except Exception as e:
-                LOGGER.debug(f"Company universe context builder failed: {e}")
+                LOGGER.error(f"Company universe context builder failed for filter query: {e}")
+                # Return empty to prevent fallback ticker extraction which causes hallucinations
+                return ""
         
         # First, try the smart context builder for natural language formatting
         try:
