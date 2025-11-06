@@ -224,8 +224,9 @@ class BaseForecaster(ABC):
                 
                 # Query metric_snapshots table (which stores metric values)
                 # Try metric_snapshots first, fallback to financial_facts
+                # Note: metric_snapshots has start_year/end_year, not fiscal_year
                 cursor.execute("""
-                    SELECT period, value, updated_at, fiscal_year
+                    SELECT period, value, updated_at, start_year, end_year
                     FROM metric_snapshots
                     WHERE ticker = ? AND metric = ?
                     ORDER BY period ASC
@@ -249,8 +250,24 @@ class BaseForecaster(ABC):
                 
                 records = []
                 for row in rows:
-                    period_str = row['period'] if row['period'] else f"{row.get('fiscal_year', '')}-FY"
-                    fiscal_year = row.get('fiscal_year')
+                    # Handle both metric_snapshots (start_year/end_year) and financial_facts (fiscal_year)
+                    # sqlite3.Row objects use dictionary-style access, not .get()
+                    row_keys = list(row.keys())
+                    if 'fiscal_year' in row_keys:
+                        # From financial_facts table
+                        fiscal_year = row['fiscal_year'] if row['fiscal_year'] is not None else None
+                        period_str = row['period'] if row['period'] else (f"{fiscal_year}-FY" if fiscal_year else None)
+                    else:
+                        # From metric_snapshots table
+                        start_year = row['start_year'] if row['start_year'] is not None else None
+                        end_year = row['end_year'] if row['end_year'] is not None else None
+                        fiscal_year = end_year if end_year else start_year  # Use end_year if available, else start_year
+                        period_str = row['period'] if row['period'] else (f"{fiscal_year}-FY" if fiscal_year else None)
+                    
+                    if not period_str:
+                        # Skip records without period
+                        LOGGER.warning(f"Skipping record without period for {ticker} {metric}")
+                        continue
                     
                     # Normalize period to date format
                     normalized_date = self._normalize_period_to_date(period_str, fiscal_year)
@@ -491,48 +508,109 @@ class MLForecaster:
         kwargs['use_technical_indicators'] = use_technical_indicators
         kwargs['use_preprocessing'] = use_preprocessing
         
-        # Generate forecast using selected method
-        if method == "arima":
-            return self._forecast_arima(ticker, metric, periods, **kwargs)
-        elif method == "prophet":
-            return self._forecast_prophet(ticker, metric, periods, **kwargs)
-        elif method == "ets":
-            return self._forecast_ets(ticker, metric, periods, **kwargs)
-        elif method == "lstm" or method == "gru":
-            if self.lstm_forecaster is None:
-                LOGGER.warning(f"LSTM/GRU not available (TensorFlow missing), falling back to auto-select")
-                # Fall back to auto-select best available method
-                fallback_method = self._select_best_method(ticker, metric)
-                if fallback_method == "arima":
-                    return self._forecast_arima(ticker, metric, periods, **kwargs)
-                elif fallback_method == "prophet":
-                    return self._forecast_prophet(ticker, metric, periods, **kwargs)
-                elif fallback_method == "ets":
-                    return self._forecast_ets(ticker, metric, periods, **kwargs)
-                else:
-                    LOGGER.error(f"Fallback method {fallback_method} also not available")
-                    return None
-            return self._forecast_lstm(ticker, metric, periods, model_type=method, **kwargs)
-        elif method == "transformer":
-            if self.transformer_forecaster is None:
-                LOGGER.warning(f"Transformer not available (PyTorch missing), falling back to auto-select")
-                # Fall back to auto-select best available method
-                fallback_method = self._select_best_method(ticker, metric)
-                if fallback_method == "arima":
-                    return self._forecast_arima(ticker, metric, periods, **kwargs)
-                elif fallback_method == "prophet":
-                    return self._forecast_prophet(ticker, metric, periods, **kwargs)
-                elif fallback_method == "ets":
-                    return self._forecast_ets(ticker, metric, periods, **kwargs)
-                else:
-                    LOGGER.error(f"Fallback method {fallback_method} also not available")
-                    return None
-            return self._forecast_transformer(ticker, metric, periods, **kwargs)
-        elif method == "ensemble":
-            return self._forecast_ensemble(ticker, metric, periods, **kwargs)
-        else:
-            LOGGER.error(f"Unknown forecasting method: {method}")
-            return None
+        # Generate forecast using selected method with graceful degradation
+        try:
+            if method == "arima":
+                result = self._forecast_arima(ticker, metric, periods, **kwargs)
+                if result is None:
+                    return self._try_fallback_forecast(ticker, metric, periods, method, ["prophet", "ets"], **kwargs)
+                return result
+            elif method == "prophet":
+                result = self._forecast_prophet(ticker, metric, periods, **kwargs)
+                if result is None:
+                    return self._try_fallback_forecast(ticker, metric, periods, method, ["arima", "ets"], **kwargs)
+                return result
+            elif method == "ets":
+                result = self._forecast_ets(ticker, metric, periods, **kwargs)
+                if result is None:
+                    return self._try_fallback_forecast(ticker, metric, periods, method, ["arima", "prophet"], **kwargs)
+                return result
+            elif method == "lstm" or method == "gru":
+                if self.lstm_forecaster is None:
+                    LOGGER.warning(f"LSTM/GRU not available (TensorFlow missing), trying fallback methods")
+                    return self._try_fallback_forecast(ticker, metric, periods, method, ["arima", "prophet", "ets"], **kwargs)
+                try:
+                    result = self._forecast_lstm(ticker, metric, periods, model_type=method, **kwargs)
+                    if result is None:
+                        return self._try_fallback_forecast(ticker, metric, periods, method, ["arima", "prophet", "ets"], **kwargs)
+                    return result
+                except Exception as e:
+                    LOGGER.warning(f"LSTM/GRU forecasting failed: {e}, trying fallback methods")
+                    return self._try_fallback_forecast(ticker, metric, periods, method, ["arima", "prophet", "ets"], **kwargs)
+            elif method == "transformer":
+                if self.transformer_forecaster is None:
+                    LOGGER.warning(f"Transformer not available (PyTorch missing), trying fallback methods")
+                    return self._try_fallback_forecast(ticker, metric, periods, method, ["arima", "prophet", "ets"], **kwargs)
+                try:
+                    result = self._forecast_transformer(ticker, metric, periods, **kwargs)
+                    if result is None:
+                        return self._try_fallback_forecast(ticker, metric, periods, method, ["arima", "prophet", "ets"], **kwargs)
+                    return result
+                except Exception as e:
+                    LOGGER.warning(f"Transformer forecasting failed: {e}, trying fallback methods")
+                    return self._try_fallback_forecast(ticker, metric, periods, method, ["arima", "prophet", "ets"], **kwargs)
+            elif method == "ensemble":
+                result = self._forecast_ensemble(ticker, metric, periods, **kwargs)
+                if result is None:
+                    # If ensemble fails, try individual methods
+                    LOGGER.warning(f"Ensemble forecasting failed, trying individual methods")
+                    return self._try_fallback_forecast(ticker, metric, periods, method, ["arima", "prophet", "ets"], **kwargs)
+                return result
+            else:
+                LOGGER.error(f"Unknown forecasting method: {method}")
+                return None
+        except Exception as e:
+            LOGGER.exception(f"Forecast generation failed for {ticker} {metric} using {method}: {e}")
+            # Try fallback methods
+            return self._try_fallback_forecast(ticker, metric, periods, method, ["arima", "prophet", "ets"], **kwargs)
+    
+    def _try_fallback_forecast(
+        self,
+        ticker: str,
+        metric: str,
+        periods: int,
+        failed_method: str,
+        fallback_methods: List[str],
+        **kwargs
+    ) -> Optional[MLForecast]:
+        """
+        Try fallback forecasting methods when primary method fails.
+        
+        Args:
+            ticker: Company ticker
+            metric: Metric to forecast
+            periods: Number of periods to forecast
+            failed_method: Method that failed
+            fallback_methods: List of fallback methods to try in order
+            **kwargs: Additional arguments
+            
+        Returns:
+            MLForecast result from first successful fallback method, or None if all fail
+        """
+        for fallback_method in fallback_methods:
+            try:
+                LOGGER.info(f"Trying fallback method: {fallback_method} (original: {failed_method})")
+                if fallback_method == "arima" and self.arima_forecaster:
+                    result = self._forecast_arima(ticker, metric, periods, **kwargs)
+                    if result:
+                        LOGGER.info(f"Fallback to {fallback_method} succeeded")
+                        return result
+                elif fallback_method == "prophet" and self.prophet_forecaster:
+                    result = self._forecast_prophet(ticker, metric, periods, **kwargs)
+                    if result:
+                        LOGGER.info(f"Fallback to {fallback_method} succeeded")
+                        return result
+                elif fallback_method == "ets" and self.ets_forecaster:
+                    result = self._forecast_ets(ticker, metric, periods, **kwargs)
+                    if result:
+                        LOGGER.info(f"Fallback to {fallback_method} succeeded")
+                        return result
+            except Exception as e:
+                LOGGER.debug(f"Fallback method {fallback_method} also failed: {e}")
+                continue
+        
+        LOGGER.error(f"All forecasting methods failed for {ticker} {metric}")
+        return None
     
     def _forecast_arima(
         self, ticker: str, metric: str, periods: int, **kwargs
@@ -546,6 +624,30 @@ class MLForecaster:
         if forecast is None:
             return None
         
+        # Extract all details from ARIMAForecast
+        model_details = {
+            "model_params": forecast.model_params,
+            "aic": forecast.aic,
+        }
+        # Add all additional details from model_params if they exist
+        if isinstance(forecast.model_params, dict):
+            if "bic" in forecast.model_params:
+                model_details["bic"] = forecast.model_params["bic"]
+            if "log_likelihood" in forecast.model_params:
+                model_details["log_likelihood"] = forecast.model_params["log_likelihood"]
+            if "fit_time" in forecast.model_params:
+                model_details["fit_time"] = forecast.model_params["fit_time"]
+            if "data_points_used" in forecast.model_params:
+                model_details["data_points_used"] = forecast.model_params["data_points_used"]
+            if "ar_order" in forecast.model_params:
+                model_details["ar_order"] = forecast.model_params["ar_order"]
+            if "diff_order" in forecast.model_params:
+                model_details["diff_order"] = forecast.model_params["diff_order"]
+            if "ma_order" in forecast.model_params:
+                model_details["ma_order"] = forecast.model_params["ma_order"]
+            if "is_seasonal" in forecast.model_params:
+                model_details["is_seasonal"] = forecast.model_params["is_seasonal"]
+        
         return MLForecast(
             ticker=forecast.ticker,
             metric=forecast.metric,
@@ -554,10 +656,7 @@ class MLForecaster:
             confidence_intervals_low=forecast.confidence_intervals_low,
             confidence_intervals_high=forecast.confidence_intervals_high,
             method="arima",
-            model_details={
-                "model_params": forecast.model_params,
-                "aic": forecast.aic,
-            },
+            model_details=model_details,
             confidence=forecast.confidence,
         )
     
@@ -573,6 +672,27 @@ class MLForecaster:
         if forecast is None:
             return None
         
+        # Extract all details from ProphetForecast
+        model_details = {
+            "seasonality_detected": {
+                k: v for k, v in forecast.seasonality_detected.items() 
+                if k in ["yearly", "weekly", "daily"]
+            },
+            "changepoints": forecast.changepoints,
+        }
+        # Add all additional details from seasonality_detected if they exist
+        if isinstance(forecast.seasonality_detected, dict):
+            if "fit_time" in forecast.seasonality_detected:
+                model_details["fit_time"] = forecast.seasonality_detected["fit_time"]
+            if "data_points_used" in forecast.seasonality_detected:
+                model_details["data_points_used"] = forecast.seasonality_detected["data_points_used"]
+            if "hyperparameters" in forecast.seasonality_detected:
+                model_details["hyperparameters"] = forecast.seasonality_detected["hyperparameters"]
+            if "changepoint_count" in forecast.seasonality_detected:
+                model_details["changepoint_count"] = forecast.seasonality_detected["changepoint_count"]
+            if "growth_model" in forecast.seasonality_detected:
+                model_details["growth_model"] = forecast.seasonality_detected["growth_model"]
+        
         return MLForecast(
             ticker=forecast.ticker,
             metric=forecast.metric,
@@ -581,10 +701,7 @@ class MLForecaster:
             confidence_intervals_low=forecast.confidence_intervals_low,
             confidence_intervals_high=forecast.confidence_intervals_high,
             method="prophet",
-            model_details={
-                "seasonality_detected": forecast.seasonality_detected,
-                "changepoints": forecast.changepoints,
-            },
+            model_details=model_details,
             confidence=forecast.confidence,
         )
     
@@ -600,6 +717,15 @@ class MLForecaster:
         if forecast is None:
             return None
         
+        # Extract all details from ETSForecast
+        model_details = {
+            "model_type": forecast.model_type,
+            "seasonal_periods": forecast.seasonal_periods,
+        }
+        # Add all additional details from model_details if they exist
+        if hasattr(forecast, 'model_details') and isinstance(forecast.model_details, dict):
+            model_details.update(forecast.model_details)
+        
         return MLForecast(
             ticker=forecast.ticker,
             metric=forecast.metric,
@@ -608,10 +734,7 @@ class MLForecaster:
             confidence_intervals_low=forecast.confidence_intervals_low,
             confidence_intervals_high=forecast.confidence_intervals_high,
             method="ets",
-            model_details={
-                "model_type": forecast.model_type,
-                "seasonal_periods": forecast.seasonal_periods,
-            },
+            model_details=model_details,
             confidence=forecast.confidence,
         )
     
@@ -629,6 +752,18 @@ class MLForecaster:
         if forecast is None:
             return None
         
+        # Extract all details from LSTMForecastResult
+        model_details = {
+            "model_type": forecast.model_type,
+            "layers": forecast.layers,
+            "epochs_trained": forecast.epochs_trained,
+            "training_loss": forecast.training_loss,
+            "validation_loss": forecast.validation_loss,
+        }
+        # Add all additional details from model_details if they exist
+        if hasattr(forecast, 'model_details') and isinstance(forecast.model_details, dict):
+            model_details.update(forecast.model_details)
+        
         return MLForecast(
             ticker=forecast.ticker,
             metric=forecast.metric,
@@ -637,13 +772,7 @@ class MLForecaster:
             confidence_intervals_low=forecast.confidence_intervals_low,
             confidence_intervals_high=forecast.confidence_intervals_high,
             method=model_type.upper(),
-            model_details={
-                "model_type": forecast.model_type,
-                "layers": forecast.layers,
-                "epochs_trained": forecast.epochs_trained,
-                "training_loss": forecast.training_loss,
-                "validation_loss": forecast.validation_loss,
-            },
+            model_details=model_details,
             confidence=forecast.confidence,
         )
     
@@ -659,6 +788,20 @@ class MLForecaster:
         if forecast is None:
             return None
         
+        # Extract all details from TransformerForecastResult
+        model_details = {
+            "model_name": forecast.model_name,
+            "num_layers": forecast.num_layers,
+            "num_heads": forecast.num_heads,
+            "d_model": forecast.d_model,
+            "epochs_trained": forecast.epochs_trained,
+            "training_loss": forecast.training_loss,
+            "validation_loss": forecast.validation_loss,
+        }
+        # Add all additional details from model_details if they exist
+        if hasattr(forecast, 'model_details') and isinstance(forecast.model_details, dict):
+            model_details.update(forecast.model_details)
+        
         return MLForecast(
             ticker=forecast.ticker,
             metric=forecast.metric,
@@ -667,15 +810,7 @@ class MLForecaster:
             confidence_intervals_low=forecast.confidence_intervals_low,
             confidence_intervals_high=forecast.confidence_intervals_high,
             method="TRANSFORMER",
-            model_details={
-                "model_name": forecast.model_name,
-                "num_layers": forecast.num_layers,
-                "num_heads": forecast.num_heads,
-                "d_model": forecast.d_model,
-                "epochs_trained": forecast.epochs_trained,
-                "training_loss": forecast.training_loss,
-                "validation_loss": forecast.validation_loss,
-            },
+            model_details=model_details,
             confidence=forecast.confidence,
         )
     
@@ -776,13 +911,21 @@ class MLForecaster:
         )
     
     def _calculate_confidence_weights(self, forecasts: List[MLForecast]) -> List[float]:
-        """Calculate weights based on confidence scores."""
-        weights = [f.confidence for f in forecasts]
-        total_weight = sum(weights)
-        if total_weight == 0:
-            weights = [1.0 / len(forecasts)] * len(forecasts)
+        """Calculate weights based on confidence scores (enhanced with normalization)."""
+        if not forecasts:
+            return []
+        
+        # Get confidence scores
+        confidences = [f.confidence for f in forecasts]
+        
+        # Normalize to sum to 1
+        total = sum(confidences)
+        if total > 0:
+            weights = [c / total for c in confidences]
         else:
-            weights = [w / total_weight for w in weights]
+            # Equal weights if all confidences are 0
+            weights = [1.0 / len(forecasts)] * len(forecasts)
+        
         return weights
     
     def _calculate_performance_weights(
@@ -794,33 +937,54 @@ class MLForecaster:
         """
         Calculate weights based on validation performance (MAE/RMSE).
         
+        Uses cached validation metrics when available to avoid slow backtests.
         Uses inverse of validation metrics - lower error = higher weight.
         """
+        # Initialize cache if not exists
+        if not hasattr(self, '_validation_metrics_cache'):
+            self._validation_metrics_cache = {}
+        
+        # Check cache first
+        cache_key = f"{ticker}_{metric}"
+        cached_metrics = self._validation_metrics_cache.get(cache_key)
+        
         try:
             from .validation import ModelValidator
             from .backtesting import BacktestRunner
             
-            # Run quick backtest to get validation metrics
-            backtest_runner = BacktestRunner(self.db_path)
-            backtest_results = backtest_runner.run_backtest(
-                ticker=ticker,
-                metric=metric,
-                train_periods=5,
-                test_periods=2,
-                models=[f.method for f in forecasts]
-            )
+            # Use cached metrics if available, otherwise run backtest
+            if cached_metrics:
+                LOGGER.debug(f"Using cached validation metrics for {cache_key}")
+                backtest_results = cached_metrics
+            else:
+                # Run quick backtest to get validation metrics
+                LOGGER.debug(f"Running backtest for {cache_key} to get validation metrics")
+                backtest_runner = BacktestRunner(self.db_path)
+                backtest_results = backtest_runner.run_backtest(
+                    ticker=ticker,
+                    metric=metric,
+                    train_periods=5,
+                    test_periods=2,
+                    models=[f.method for f in forecasts]
+                )
+                # Cache results (with TTL - could expire after some time)
+                self._validation_metrics_cache[cache_key] = backtest_results
             
             # Calculate inverse RMSE weights (lower RMSE = higher weight)
             inverse_rmse = []
             for forecast in forecasts:
-                model_name = forecast.method
-                if model_name in backtest_results:
-                    rmse = backtest_results[model_name].metrics.rmse
-                    if rmse > 0:
-                        inverse_rmse.append(1.0 / rmse)
-                    else:
-                        inverse_rmse.append(1.0)
-                else:
+                model_name = forecast.method.lower()
+                # Try to find matching model in backtest results
+                found = False
+                for result_key, result in backtest_results.items():
+                    if result_key.lower() == model_name or model_name in result_key.lower():
+                        rmse = result.metrics.rmse if hasattr(result.metrics, 'rmse') else result.metrics.get('rmse', None)
+                        if rmse and rmse > 0:
+                            inverse_rmse.append(1.0 / rmse)
+                            found = True
+                            break
+                
+                if not found:
                     # If no backtest result, use confidence as fallback
                     inverse_rmse.append(forecast.confidence)
             

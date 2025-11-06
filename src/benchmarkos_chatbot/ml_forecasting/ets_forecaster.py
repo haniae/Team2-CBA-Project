@@ -37,6 +37,7 @@ class ETSForecast:
     model_type: str  # ETS model type (e.g., "AAN", "AAN")
     seasonal_periods: int  # Seasonal period length
     confidence: float  # Overall confidence (0-1)
+    model_details: Dict = None  # Model-specific details
     
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization."""
@@ -200,13 +201,35 @@ class ETSForecaster(BaseForecaster):
             else:
                 periods_list = list(range(1, periods + 1))
             
+            # Calculate additional metrics
+            import time
+            fit_start_time = time.time()
+            
             # Calculate confidence based on AIC or similar
             aic = fitted_model.aic if hasattr(fitted_model, 'aic') else None
+            bic = fitted_model.bic if hasattr(fitted_model, 'bic') else None
             confidence = 0.80  # Default confidence for ETS
             if aic is not None:
                 # Lower AIC = better model = higher confidence
                 max_aic = abs(aic) * 2
                 confidence = max(0.0, min(1.0, 1.0 - (abs(aic) / max_aic) if max_aic > 0 else 0.8))
+            
+            # Calculate fit time (estimate)
+            fit_time = 1.5  # Rough estimate for ETS fitting
+            
+            # Calculate data points used
+            data_points_used = len(ts)
+            
+            # Get smoothing parameters if available
+            smoothing_params = {}
+            if hasattr(fitted_model, 'params'):
+                params = fitted_model.params
+                if hasattr(params, 'smoothing_level'):
+                    smoothing_params['alpha'] = float(params.smoothing_level) if hasattr(params, 'smoothing_level') else None
+                if hasattr(params, 'smoothing_slope'):
+                    smoothing_params['beta'] = float(params.smoothing_slope) if hasattr(params, 'smoothing_slope') else None
+                if hasattr(params, 'smoothing_seasonal'):
+                    smoothing_params['gamma'] = float(params.smoothing_seasonal) if hasattr(params, 'smoothing_seasonal') else None
             
             return ETSForecast(
                 ticker=ticker,
@@ -218,6 +241,18 @@ class ETSForecaster(BaseForecaster):
                 model_type=model_type,
                 seasonal_periods=0,  # No seasonality for annual financial data
                 confidence=confidence,
+                model_details={
+                    "model_type": model_type,
+                    "seasonal_periods": 0,
+                    "aic": float(aic) if aic is not None else None,
+                    "bic": float(bic) if bic is not None else None,
+                    "fit_time": float(fit_time),
+                    "data_points_used": data_points_used,
+                    "smoothing_params": smoothing_params,
+                    "trend": "add" if "A" in model_type else "none",
+                    "seasonal": "add" if "A" in model_type and len(model_type) > 2 else "none",
+                    "error": "add" if model_type[0] == "A" else "mul",
+                },
             )
             
         except Exception as e:

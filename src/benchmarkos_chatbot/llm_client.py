@@ -24,7 +24,13 @@ except ImportError:  # pragma: no cover - optional dependency
 class LLMClient(Protocol):
     """Minimal protocol every language-model client must satisfy."""
 
-    def generate_reply(self, messages: Iterable[Mapping[str, str]]) -> str:
+    def generate_reply(
+        self, 
+        messages: Iterable[Mapping[str, str]], 
+        *,
+        temperature: float = 0.7,
+        max_tokens: int = None,
+    ) -> str:
         """Return a response for the supplied chat messages."""
 
 
@@ -36,7 +42,13 @@ class LocalEchoLLM:
     network calls.
     """
 
-    def generate_reply(self, messages: Iterable[Mapping[str, str]]) -> str:
+    def generate_reply(
+        self, 
+        messages: Iterable[Mapping[str, str]], 
+        *,
+        temperature: float = 0.7,
+        max_tokens: int = None,
+    ) -> str:
         """Generate a reply using the configured language model backend."""
         last_user_message = ""
         for message in messages:
@@ -110,12 +122,22 @@ class OpenAILLMClient:
         self._client = OpenAI(api_key=resolved_key)
         self._model = model
 
-    def generate_reply(self, messages: Iterable[Mapping[str, str]]) -> str:
+    def generate_reply(
+        self, 
+        messages: Iterable[Mapping[str, str]], 
+        *,
+        temperature: float = 0.7,
+        max_tokens: int = None,
+    ) -> str:
         """Generate a reply using the configured language model backend."""
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=list(messages),
-        )
+        params = {
+            "model": self._model,
+            "messages": list(messages),
+            "temperature": temperature,
+        }
+        if max_tokens is not None:
+            params["max_tokens"] = max_tokens
+        response = self._client.chat.completions.create(**params)
         return response.choices[0].message.content or ""
 
 

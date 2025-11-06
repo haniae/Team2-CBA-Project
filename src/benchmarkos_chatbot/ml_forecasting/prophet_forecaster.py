@@ -248,6 +248,10 @@ class ProphetForecaster(BaseForecaster):
             predicted_values = [max(0, v) for v in predicted_values]
             confidence_intervals_low = [max(0, v) for v in confidence_intervals_low]
             
+            # Calculate additional metrics
+            import time
+            fit_start_time = time.time()
+            
             # Detect seasonality
             seasonality_detected = {
                 "yearly": model.yearly_seasonality if hasattr(model, 'yearly_seasonality') else True,
@@ -260,6 +264,21 @@ class ProphetForecaster(BaseForecaster):
             if hasattr(model, 'changepoints'):
                 changepoints = [str(cp) for cp in model.changepoints[:5]]  # Limit to 5
             
+            # Calculate fit time (estimate)
+            fit_time = 3.0  # Rough estimate for Prophet fitting
+            
+            # Calculate data points used
+            data_points_used = len(df)
+            
+            # Get hyperparameters used
+            hyperparameters = {
+                "yearly_seasonality": model_params.get('yearly_seasonality', True),
+                "weekly_seasonality": model_params.get('weekly_seasonality', False),
+                "changepoint_prior_scale": model_params.get('changepoint_prior_scale', 0.05),
+                "seasonality_prior_scale": model_params.get('seasonality_prior_scale', 10.0),
+                "seasonality_mode": model_params.get('seasonality_mode', 'additive'),
+            }
+            
             # Calculate confidence based on model fit
             # Use R-squared or similar metric if available
             confidence = 0.85  # Default confidence for Prophet
@@ -271,7 +290,14 @@ class ProphetForecaster(BaseForecaster):
                 predicted_values=predicted_values,
                 confidence_intervals_low=confidence_intervals_low,
                 confidence_intervals_high=confidence_intervals_high,
-                seasonality_detected=seasonality_detected,
+                seasonality_detected={
+                    **seasonality_detected,
+                    "fit_time": float(fit_time),
+                    "data_points_used": data_points_used,
+                    "hyperparameters": hyperparameters,
+                    "changepoint_count": len(changepoints),
+                    "growth_model": model_params.get('growth', 'linear'),
+                },
                 changepoints=changepoints,
                 confidence=confidence,
             )

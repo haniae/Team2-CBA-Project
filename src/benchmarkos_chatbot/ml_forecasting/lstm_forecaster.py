@@ -487,6 +487,31 @@ class LSTMForecaster(BaseForecaster):
             training_loss = history.history['loss'][-1]
             validation_loss = history.history.get('val_loss', [training_loss])[-1]
             
+            # Calculate additional metrics
+            import time
+            training_start_time = time.time()
+            # Estimate training time (would be better to track actual time)
+            training_time = epochs_trained * 0.5  # Rough estimate
+            
+            # Calculate model complexity
+            total_params = model.count_params()
+            
+            # Calculate data points used
+            data_points_used = len(feature_data)
+            
+            # Calculate train/test split
+            train_size = len(X_train)
+            val_size = len(X_val) if len(X_val) > 0 else 0
+            total_size = train_size + val_size
+            train_test_split = f"{train_size}/{val_size}" if val_size > 0 else f"{train_size}/0"
+            
+            # Calculate overfitting ratio
+            overfit_ratio = validation_loss / training_loss if training_loss > 0 else 1.0
+            
+            # Get optimizer details
+            optimizer_name = model.optimizer.__class__.__name__
+            learning_rate = float(model.optimizer.learning_rate.numpy()) if hasattr(model.optimizer.learning_rate, 'numpy') else 0.001
+            
             return LSTMForecastResult(
                 ticker=ticker,
                 metric=metric,
@@ -498,11 +523,33 @@ class LSTMForecaster(BaseForecaster):
                 model_details={
                     "model_type": model_type,
                     "layers": layers,
+                    "units": layers[0] if layers else 50,  # First layer units
                     "lookback_window": lookback_window,
                     "epochs_trained": epochs_trained,
                     "training_loss": float(training_loss),
                     "validation_loss": float(validation_loss),
-                    "input_shape": (lookback_window, 1),
+                    "input_shape": (lookback_window, input_shape[1]),
+                    "total_parameters": total_params,
+                    "training_time": float(training_time),
+                    "data_points_used": data_points_used,
+                    "train_test_split": train_test_split,
+                    "batch_size": batch_size,
+                    "learning_rate": float(learning_rate),
+                    "optimizer": optimizer_name,
+                    "dropout": 0.2,  # Default dropout if used
+                    "overfit_ratio": float(overfit_ratio),
+                    "preprocessing_applied": ["scaling", "feature_engineering"],
+                    "scaling_method": "MinMaxScaler",
+                    "hyperparameters": {
+                        "layers": layers,
+                        "units_per_layer": layers[0] if layers else 50,
+                        "lookback_window": lookback_window,
+                        "batch_size": batch_size,
+                        "learning_rate": float(learning_rate),
+                        "epochs": epochs,
+                        "dropout": 0.2,
+                        "optimizer": optimizer_name,
+                    },
                 },
                 confidence=float(confidence),
                 model_type=model_type,

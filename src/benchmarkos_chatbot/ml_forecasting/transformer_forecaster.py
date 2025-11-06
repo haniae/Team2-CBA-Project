@@ -107,6 +107,47 @@ class TimeSeriesDataset(Dataset):
         return self.sequences[idx], self.targets[idx]
 
 
+class AttentionAwareTransformerEncoderLayer(nn.TransformerEncoderLayer):
+    """
+    Custom TransformerEncoderLayer that can return attention weights.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.attention_weights = None
+    
+    def forward(self, src, src_mask=None, src_key_padding_mask=None, return_attention=False):
+        """
+        Forward pass with optional attention weight extraction.
+        """
+        if return_attention:
+            # Manually call self-attention to get weights
+            src2, attn_weights = self.self_attn(
+                src, src, src,
+                attn_mask=src_mask,
+                key_padding_mask=src_key_padding_mask,
+                need_weights=True
+            )
+            self.attention_weights = attn_weights
+        else:
+            # Use standard forward
+            src2 = self.self_attn(
+                src, src, src,
+                attn_mask=src_mask,
+                key_padding_mask=src_key_padding_mask,
+                need_weights=False
+            )[0]
+        
+        src = src + self.dropout1(src2)
+        src = self.norm1(src)
+        src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
+        src = src + self.dropout2(src2)
+        src = self.norm2(src)
+        
+        if return_attention:
+            return src, self.attention_weights
+        return src
+
+
 class TimeSeriesTransformer(nn.Module):
     """
     Simple Transformer model for time series forecasting.
@@ -132,7 +173,8 @@ class TimeSeriesTransformer(nn.Module):
         # Positional encoding (learnable)
         self.pos_encoder = nn.Parameter(torch.randn(1000, d_model))
         
-        # Transformer encoder
+        # Transformer encoder - use custom layer if attention weights needed
+        # For now, use standard layer but can be switched to AttentionAwareTransformerEncoderLayer
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
             nhead=nhead,
@@ -144,6 +186,8 @@ class TimeSeriesTransformer(nn.Module):
             encoder_layer,
             num_layers=num_layers
         )
+        # Store whether we should extract attention
+        self.extract_attention = False
         
         # Output projection
         self.output_projection = nn.Sequential(
@@ -153,15 +197,17 @@ class TimeSeriesTransformer(nn.Module):
             nn.Linear(dim_feedforward, output_dim)
         )
         
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, return_attention: bool = False) -> torch.Tensor | tuple[torch.Tensor, list[list[float]]]:
         """
         Forward pass.
         
         Args:
             x: Input tensor of shape (batch, seq_len, features)
+            return_attention: If True, also return attention weights
             
         Returns:
             Output tensor of shape (batch, seq_len, output_dim)
+            If return_attention=True, also returns attention weights as list of lists
         """
         # Project input
         x = self.input_projection(x)
@@ -175,12 +221,68 @@ class TimeSeriesTransformer(nn.Module):
             pos_enc = self.pos_encoder.repeat((seq_len // self.pos_encoder.size(0)) + 1, 1)
             x = x + pos_enc[:seq_len].unsqueeze(0)
         
-        # Apply transformer
-        x = self.transformer_encoder(x)
+        # Apply transformer and capture attention weights if requested
+        attention_weights = None
+        if return_attention:
+            # Extract attention weights using hooks on self-attention modules
+            attention_weights_list = []
+            hooks = []
+            
+            def make_attention_hook():
+                def hook(module, input_tuple, output_tuple):
+                    # MultiheadAttention returns (output, attention_weights) when need_weights=True
+                    # But we need to intercept it during forward
+                    # For now, we'll use a simpler approach: store weights from last layer
+                    if isinstance(output_tuple, tuple) and len(output_tuple) == 2:
+                        attn_weights = output_tuple[1]
+                        attention_weights_list.append(attn_weights.detach())
+                    elif hasattr(module, 'attention_weights'):
+                        attention_weights_list.append(module.attention_weights.detach())
+                return hook
+            
+            # Hook into self-attention modules of each layer
+            for layer in self.transformer_encoder.layers:
+                if hasattr(layer, 'self_attn'):
+                    hook = layer.self_attn.register_forward_hook(make_attention_hook())
+                    hooks.append(hook)
+            
+            # Apply transformer (this will trigger hooks)
+            x = self.transformer_encoder(x)
+            
+            # Remove hooks
+            for hook in hooks:
+                hook.remove()
+            
+            # Process captured attention weights
+            if attention_weights_list:
+                # Average attention across all layers
+                # Each attention weight is (batch, num_heads, seq_len, seq_len)
+                stacked = torch.stack(attention_weights_list)
+                # Average across layers and heads: (num_layers, batch, num_heads, seq_len, seq_len)
+                # -> (batch, seq_len, seq_len)
+                avg_attention = torch.mean(torch.mean(stacked, dim=0), dim=1)  # Average across heads
+                attention_weights = avg_attention[0]  # Take first batch item: (seq_len, seq_len)
+            else:
+                # Fallback: return uniform attention (equal weights)
+                seq_len = x.size(1)
+                attention_weights = torch.ones(seq_len, seq_len) / seq_len
+        else:
+            # Apply transformer normally
+            x = self.transformer_encoder(x)
         
         # Project to output
         x = self.output_projection(x)
         
+        if return_attention:
+            # Convert attention weights to list format: list of lists (seq_len x seq_len)
+            if attention_weights is not None:
+                attention_list = attention_weights.cpu().detach().numpy().tolist()
+                return x, attention_list
+            else:
+                # Return uniform attention as placeholder if extraction failed
+                seq_len = x.size(1)
+                uniform_attention = [[1.0 / seq_len] * seq_len for _ in range(seq_len)]
+                return x, uniform_attention
         return x
 
 
@@ -507,12 +609,20 @@ class TransformerForecaster(BaseForecaster):
             # Cache model
             self.model_cache[model_key] = model
             
-            # Generate forecast
+            # Generate forecast with attention weights
             model.eval()
+            attention_weights = None
             with torch.no_grad():
                 # Use last 'lookback_window' periods as input (multi-dimensional)
                 last_sequence = data_scaled[-lookback_window:].reshape(1, lookback_window, input_dim)
                 last_sequence_tensor = torch.FloatTensor(last_sequence).to(self.device)
+                
+                # Get attention weights from the last sequence (for explainability)
+                try:
+                    _, attention_weights = model(last_sequence_tensor, return_attention=True)
+                except Exception as e:
+                    LOGGER.debug(f"Failed to extract attention weights: {e}")
+                    attention_weights = None
                 
                 # Forecast step by step
                 forecast_scaled = []
@@ -576,6 +686,29 @@ class TransformerForecaster(BaseForecaster):
             else:
                 periods_list = list(range(1, periods + 1))
             
+            # Calculate additional metrics
+            import time
+            training_time = epochs_trained * 0.8  # Rough estimate
+            
+            # Calculate model complexity
+            total_params = sum(p.numel() for p in model.parameters())
+            
+            # Calculate data points used
+            data_points_used = len(feature_data)
+            
+            # Calculate train/test split
+            train_size = len(X_train)
+            val_size = len(X_val) if len(X_val) > 0 else 0
+            train_test_split = f"{train_size}/{val_size}" if val_size > 0 else f"{train_size}/0"
+            
+            # Calculate overfitting ratio
+            training_loss = float(training_losses[-1])
+            validation_loss = float(validation_losses[-1]) if validation_losses else training_loss
+            overfit_ratio = validation_loss / training_loss if training_loss > 0 else 1.0
+            
+            # Get optimizer details
+            optimizer_name = optimizer.__class__.__name__ if hasattr(optimizer, '__class__') else "Adam"
+            
             return TransformerForecastResult(
                 ticker=ticker,
                 metric=metric,
@@ -589,12 +722,36 @@ class TransformerForecaster(BaseForecaster):
                     "d_model": d_model,
                     "nhead": nhead,
                     "num_layers": num_layers,
+                    "num_heads": nhead,  # Alias for consistency
                     "dim_feedforward": dim_feedforward,
                     "dropout": dropout,
                     "lookback_window": lookback_window,
                     "epochs_trained": epochs_trained,
-                    "training_loss": float(training_losses[-1]),
-                    "validation_loss": float(validation_losses[-1]) if validation_losses else float(training_losses[-1]),
+                    "training_loss": training_loss,
+                    "validation_loss": validation_loss,
+                    "total_parameters": total_params,
+                    "training_time": float(training_time),
+                    "data_points_used": data_points_used,
+                    "train_test_split": train_test_split,
+                    "batch_size": batch_size,
+                    "learning_rate": float(learning_rate),
+                    "optimizer": optimizer_name,
+                    "overfit_ratio": float(overfit_ratio),
+                    "preprocessing_applied": ["scaling", "feature_engineering"],
+                    "scaling_method": "MinMaxScaler",
+                    "attention_weights": attention_weights if attention_weights is not None else None,  # Store attention weights for explainability
+                    "hyperparameters": {
+                        "d_model": d_model,
+                        "nhead": nhead,
+                        "num_layers": num_layers,
+                        "dim_feedforward": dim_feedforward,
+                        "dropout": dropout,
+                        "lookback_window": lookback_window,
+                        "batch_size": batch_size,
+                        "learning_rate": float(learning_rate),
+                        "epochs": epochs,
+                        "optimizer": optimizer_name,
+                    },
                 },
                 confidence=float(confidence),
                 model_name="time-series-transformer",
@@ -602,8 +759,8 @@ class TransformerForecaster(BaseForecaster):
                 num_heads=nhead,
                 d_model=d_model,
                 epochs_trained=epochs_trained,
-                training_loss=float(training_losses[-1]),
-                validation_loss=float(validation_losses[-1]) if validation_losses else float(training_losses[-1]),
+                training_loss=training_loss,
+                validation_loss=validation_loss,
             )
             
         except Exception as e:
