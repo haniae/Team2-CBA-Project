@@ -747,7 +747,9 @@ SYSTEM_PROMPT = (
     "- DON'T bold only the first row of data\n"
     "- DON'T use inconsistent formatting across rows\n"
     "- DON'T mix bold and non-bold text in table cells\n"
-    "- DON'T forget the newline between header and separator rows\n\n"
+    "- DON'T forget the newline between header and separator rows\n"
+    "- 🚨 DON'T create fake tables with bullet points and pipes (e.g., '**Apple:** 26% | $100B | ...')\n"
+    "- 🚨 DON'T use lists instead of tables - if comparing multiple items, ALWAYS use proper markdown table format\n\n"
     
     "**Example CORRECT table (note the separate lines):**\n"
     "| Company | Profit Margin | Revenue |\n"
@@ -760,12 +762,18 @@ SYSTEM_PROMPT = (
     "| Company | Profit Margin | Revenue ||---|---|---|\n"
     "This is WRONG - the separator must be on its own line!\n\n"
     
-    "**Example INCORRECT table (DO NOT DO THIS):**\n"
+    "**Example INCORRECT table (bold in cells - DON'T DO THIS):**\n"
     "| Company | Profit Margin | Revenue |\n"
     "| --- | ---: | ---: |\n"
     "| **Apple** | **26.92%** | **$391.8B** |\n"
     "| Microsoft | 35.71% | $222.9B |\n"
     "| Google | 27.99% | $221.7B |\n\n"
+    
+    "**Example INCORRECT (fake table with bullets - NEVER DO THIS):**\n"
+    "- **Apple (AAPL):** 26.92% | $105.5B | $391.04B\n"
+    "- **Meta Platforms (META):** 24.98% | $36.9B | $147.02B\n"
+    "- **Alphabet (GOOGL):** 22.00% | $65.1B | $295.73B\n"
+    "This is NOT a table! Use proper markdown table format instead.\n\n"
     
     "If you want to highlight the answer company, mention it in the TEXT above the table,\n"
     "not by bolding its row in the table.\n\n"
