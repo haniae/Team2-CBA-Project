@@ -644,11 +644,11 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             pdf.cell(value_width, 7, str(col), border=1, align="C", fill=True)
         pdf.ln()
         
-        # Table rows
+        # Table rows - show ALL rows with proper page breaks
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*COLOR_TEXT)
         
-        for idx, entry in enumerate(rows[:15]):  # Limit to 15 rows to fit on page
+        for idx, entry in enumerate(rows):  # Show all rows, not limited to 15
             if idx % 2 == 0:
                 pdf.set_fill_color(*COLOR_LIGHT_GRAY)
             else:
@@ -656,12 +656,32 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             
             y_pos = pdf.get_y()
             
-            # Check if we need a new page
+            # Check if we need a new page (with buffer for header and row)
             if y_pos > 260:
                 page_num += 1
                 pdf.add_page()
                 _add_page_header(pdf, company, ticker, COLOR_PRIMARY, COLOR_TEXT, page_num)
-                y_pos = 42
+                # Re-draw table header on new page
+                pdf.set_y(42)
+                pdf.set_font("Helvetica", "B", 18)
+                pdf.set_text_color(*COLOR_PRIMARY)
+                pdf.cell(0, 10, "Key Financial Highlights", ln=1)
+                pdf.set_draw_color(*COLOR_PRIMARY)
+                pdf.set_line_width(0.8)
+                pdf.line(20, 54, 190, 54)
+                pdf.ln(8)
+                # Re-draw table header row
+                pdf.set_fill_color(*COLOR_PRIMARY)
+                pdf.set_text_color(255, 255, 255)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_xy(x_start, pdf.get_y())
+                pdf.cell(label_width, 7, "Metric", border=1, align="L", fill=True)
+                for col in columns:
+                    pdf.cell(value_width, 7, str(col), border=1, align="C", fill=True)
+                pdf.ln()
+                pdf.set_font("Helvetica", "", 9)
+                pdf.set_text_color(*COLOR_TEXT)
+                y_pos = pdf.get_y()
             
             pdf.set_xy(x_start, y_pos)
             raw_label = entry.get('label', 'N/A')
@@ -670,10 +690,22 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
             pdf.cell(label_width, 6, label, border=1, align="L", fill=True)
             
             values = entry.get("values") or []
+            row_type = entry.get("type")  # Get type from row (percent, multiple, currency, etc.)
             for value in values:
                 if isinstance(value, (int, float)):
-                    # Use currency formatting with 2 decimal places and abbreviations
-                    formatted = _format_currency(value)
+                    # Format based on row type with 2 decimal places
+                    if row_type == "percent":
+                        formatted = _format_percent(value)
+                    elif row_type == "multiple":
+                        formatted = _format_multiple(value)
+                    elif row_type == "currency":
+                        formatted = _format_currency(value)
+                    elif row_type == "integer":
+                        # For integers, show as whole number but still format consistently
+                        formatted = f"{int(value):,}"
+                    else:
+                        # Default: format as currency with 2 decimal places
+                        formatted = _format_currency(value)
                 else:
                     formatted = _sanitize_text_for_pdf(str(value or "N/A")[:12])
                 pdf.cell(value_width, 6, formatted, border=1, align="R", fill=True)
