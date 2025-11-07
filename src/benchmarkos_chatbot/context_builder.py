@@ -746,6 +746,67 @@ def _extract_forecast_method(query: str) -> str:
     return "auto"
 
 
+def _build_mandatory_data_block(ticker: str, latest_records: dict, period_label: str) -> str:
+    """
+    Build a prominent mandatory data block that LLM MUST use.
+    This prevents LLM from using training data instead of database values.
+    """
+    lines = [
+        "\n" + "="*80,
+        f"🚨 CRITICAL: USE THESE EXACT VALUES FOR {ticker} - DO NOT USE TRAINING DATA 🚨",
+        "="*80,
+        "",
+        f"**MANDATORY DATA - Period: {period_label}**",
+        "**⚠️ YOU MUST USE ONLY THESE VALUES IN YOUR RESPONSE ⚠️**",
+        ""
+    ]
+    
+    # Add key metrics with exact values
+    priority_metrics = [
+        ('revenue', 'Revenue'),
+        ('net_income', 'Net Income'),
+        ('gross_margin', 'Gross Margin'),
+        ('operating_margin', 'Operating Margin'),
+        ('net_margin', 'Net Margin'),
+        ('total_assets', 'Total Assets'),
+        ('shareholders_equity', 'Shareholders Equity'),
+        ('free_cash_flow', 'Free Cash Flow'),
+    ]
+    
+    for metric_key, metric_label in priority_metrics:
+        if metric_key in latest_records:
+            record = latest_records[metric_key]
+            value = record.value
+            
+            # Format based on metric type
+            if value is None:
+                continue
+            elif abs(value) > 1_000_000_000:
+                # Currency in billions
+                formatted = f"${value / 1_000_000_000:.1f}B"
+            elif abs(value) < 1 and metric_key in ['gross_margin', 'operating_margin', 'net_margin', 'roe', 'roic', 'roa']:
+                # Decimal percentage
+                formatted = f"{value * 100:.1f}%"
+            elif 'margin' in metric_key or metric_key in ['roe', 'roic', 'roa']:
+                # Already percentage
+                formatted = f"{value:.1f}%"
+            else:
+                formatted = f"{value:.2f}"
+            
+            lines.append(f"  • {metric_label}: {formatted} ({period_label})")
+    
+    lines.extend([
+        "",
+        "⚠️ WARNING: DO NOT use FY2024 or older data from your training",
+        f"⚠️ WARNING: USE ONLY the {period_label} values listed above",
+        f"⚠️ WARNING: Always include '{period_label}' when mentioning these values",
+        "="*80,
+        ""
+    ])
+    
+    return "\n".join(lines)
+
+
 def _build_ml_forecast_context(
     ticker: str,
     metric: str,
@@ -3296,8 +3357,12 @@ def build_financial_context(
                     elif fy:
                         source_citation = f" (per {form_type} FY{fy})"
                 
+                # Build mandatory data block FIRST - this is critical for accuracy
+                mandatory_block = _build_mandatory_data_block(ticker, latest_records, period_label)
+                
                 # Build comprehensive ticker context with SEC URLs prominently displayed
-                ticker_context = f"{'='*80}\n"
+                ticker_context = mandatory_block  # Start with mandatory block
+                ticker_context += f"\n{'='*80}\n"
                 ticker_context += f"{company_name} ({ticker}) - {period_label}{source_citation}\n"
                 ticker_context += f"{'='*80}\n\n"
                 

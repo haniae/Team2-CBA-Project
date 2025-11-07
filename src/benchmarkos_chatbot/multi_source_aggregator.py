@@ -621,11 +621,14 @@ class MultiSourceAggregator:
         return "\n".join(lines)
     
     def _format_fred_section(self, data: Dict[str, Any]) -> str:
-        """Format FRED economic data for LLM context."""
+        """Format FRED economic data for LLM context with proper unit conversions."""
         lines = [
             "=" * 80,
             "FRED ECONOMIC INDICATORS",
             "=" * 80,
+            "",
+            "⚠️ CRITICAL: These are economic indicators, NOT company metrics",
+            "⚠️ Use these values EXACTLY as shown below (already properly formatted)",
             ""
         ]
         
@@ -637,15 +640,88 @@ class MultiSourceAggregator:
                 units = info.get('units', '')
                 date = info.get('date')
                 
-                line = f"  • {title}: {value:.2f}"
-                if units:
-                    line += f" {units}"
+                # Format value based on indicator type
+                formatted_value = self._format_fred_value(series_id, value, units, title)
+                
+                line = f"  • {title}: {formatted_value}"
                 if date:
                     line += f" (as of {date.strftime('%Y-%m-%d')})"
                 lines.append(line)
             lines.append("")
         
         return "\n".join(lines)
+    
+    def _format_fred_value(self, series_id: str, value: float, units: str, title: str) -> str:
+        """Format FRED value with proper unit conversion."""
+        if value is None:
+            return "N/A"
+        
+        # Percentage indicators (already in % or should be shown as %)
+        percentage_series = {
+            'DFF', 'FEDFUNDS',  # Federal Funds Rate
+            'DGS10', 'DGS2', 'DGS5', 'DGS30',  # Treasury rates
+            'T10Y2Y',  # Treasury spread
+            'UNRATE',  # Unemployment rate
+            'MORTGAGE30US',  # Mortgage rates
+        }
+        
+        # Growth rate indicators (should be shown as %)
+        growth_rate_series = {
+            'A191RL1Q225SBEA',  # GDP Growth Rate
+            'CPILFESL', 'CPIAUCSL', 'PCEPI',  # Inflation rates (if measuring change)
+        }
+        
+        # Index values (show as index points)
+        index_series = {
+            'CPIAUCSL', 'CPILFESL', 'PCEPI',  # CPI indices
+            'SP500',  # S&P 500
+            'VIXCLS',  # VIX
+            'INDPRO',  # Industrial Production
+        }
+        
+        # Dollar amounts (convert to billions)
+        dollar_series = {
+            'GDP',  # GDP in billions
+            'M2SL',  # Money supply
+            'TOTALSL',  # Consumer credit
+            'CORPPCRP',  # Corporate profits
+            'RSXFS',  # Retail sales
+        }
+        
+        # Determine formatting
+        if series_id in percentage_series or 'Rate' in title or 'rate' in units.lower():
+            # Already a percentage or should be shown as one
+            return f"{value:.2f}%"
+        
+        elif series_id in growth_rate_series or 'growth' in title.lower():
+            # Growth rates - likely already in percent
+            if value > 100:
+                # Probably stored wrong, convert
+                return f"{value / 1_000_000_000:.2f}%"
+            else:
+                return f"{value:.2f}%"
+        
+        elif series_id in dollar_series or 'Billions of Dollars' in units:
+            # Dollar amounts - convert to readable format
+            if value > 1_000_000_000:
+                # Stored in raw dollars, convert to billions
+                return f"${value / 1_000_000_000:.1f}B"
+            elif value > 1_000:
+                # Already in billions
+                return f"${value:.1f}B"
+            else:
+                return f"${value:.2f}B"
+        
+        elif series_id in index_series or 'Index' in title:
+            # Index values - show as points
+            return f"{value:.2f} (index)"
+        
+        else:
+            # Default formatting
+            if units:
+                return f"{value:.2f} {units}"
+            else:
+                return f"{value:.2f}"
     
     def _format_imf_section(self, data: Dict[str, Any]) -> str:
         """Format IMF data for LLM context."""

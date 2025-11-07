@@ -801,14 +801,31 @@ SYSTEM_PROMPT = (
     "- Real URLs (not placeholders like 'url' or 'https://example.com')\n"
     "- If context provides source URLs, you MUST use them - no excuses\n\n"
     
+    "## CRITICAL: Use Database Values ONLY - DO NOT Use Training Data\n\n"
+    "🚨 **MANDATORY: When financial data is provided in the context:**\n\n"
+    "1. **USE EXACT VALUES FROM CONTEXT** - If context says revenue is $296.1B (FY2025), you MUST write $296.1B (FY2025)\n"
+    "2. **DO NOT use your training data** - Even if you remember Apple's FY2024 revenue was $391B, use the context values\n"
+    "3. **INCLUDE THE PERIOD** - Always specify which fiscal year/quarter (FY2025, Q3 2024, etc.)\n"
+    "4. **VERIFY YOUR NUMBERS** - Before responding, check your values match the 'FINANCIAL DATA' section\n"
+    "5. **NO HALLUCINATION** - If you write a number not in the context, the response will fail verification\n"
+    "6. **CRITICAL:** When you see '🚨 MANDATORY DATA' or '🚨 USE THESE EXACT VALUES' sections, those are the ONLY values you should use\n\n"
+    
+    "**⚠️ COMMON MISTAKES TO AVOID:**\n"
+    "- ❌ Using FY2024 data when context provides FY2025\n"
+    "- ❌ Using values from your training data instead of context\n"
+    "- ❌ Confusing company metrics with economic indicators\n"
+    "- ❌ Writing $245B for GDP growth (GDP growth is 2.5%, not billions!)\n"
+    "- ❌ Forgetting to specify the period (FY2025, not just 'this year')\n\n"
+    
     "## Data Integration - Use Everything\n\n"
     "Your context includes multiple data sources. **USE THEM ALL:**\n\n"
     
-    "**SEC Filings:**\n"
+    "**SEC Filings (PRIMARY SOURCE - Use These Values!):**\n"
     "- Financial statements (revenue, earnings, margins, cash flow)\n"
     "- Multi-year trends (3-5 year history)\n"
     "- Segment breakdowns, geographic data\n"
-    "- Management commentary from MD&A\n\n"
+    "- Management commentary from MD&A\n"
+    "- **⚠️ CRITICAL: Use the EXACT VALUES and PERIODS shown in the context**\n\n"
     
     "**Yahoo Finance:**\n"
     "- Current price, market cap, P/E ratio, valuation multiples\n"
@@ -821,11 +838,12 @@ SYSTEM_PROMPT = (
     "- ESG scores (if available)\n"
     "- Recent news headlines (5-10 articles)\n\n"
     
-    "**Macro Economic Context (CRITICAL - Use This!):**\n"
-    "- GDP growth rate - contextualize company growth vs. economic expansion\n"
-    "- Interest rates (Fed Funds) - impact on borrowing costs, valuations\n"
-    "- Inflation (CPI) - pricing power, input cost pressures\n"
-    "- Unemployment rate - consumer spending strength, labor market tightness\n"
+    "**Macro Economic Context (Use Correctly - These Are PERCENTAGES!):**\n"
+    "- GDP growth rate (e.g., 2.5%) - NOT billions of dollars!\n"
+    "- Interest rates (e.g., Fed Funds 4.5%) - These are percentages!\n"
+    "- Inflation (e.g., CPI 3.2%) - This is a percentage!\n"
+    "- Unemployment rate (e.g., 3.8%) - This is a percentage!\n"
+    "- ⚠️ **NEVER write 'GDP: $245B' or 'Fed Rate: $281B' - these are PERCENTAGES not company revenue!**\n"
     "- **SECTOR BENCHMARKS** - compare company metrics to sector averages:\n"
     "  * Revenue CAGR vs. sector\n"
     "  * Margin performance vs. sector benchmarks\n"
@@ -2517,6 +2535,92 @@ class BenchmarkOSChatbot:
                         LOGGER.debug("ML response verifier not available, skipping verification")
                     except Exception as e:
                         LOGGER.debug(f"ML response verification failed: {e}")
+                
+                # NEW: Verify response accuracy (for all responses, not just ML forecasts)
+                if reply and self.settings.verification_enabled:
+                    try:
+                        from .response_verifier import verify_response
+                        from .confidence_scorer import calculate_confidence, add_confidence_footer
+                        from .source_verifier import verify_all_sources
+                        from .response_corrector import correct_response, add_verification_footer
+                        from .data_validator import validate_context_data
+                        
+                        emit("verification_start", "Verifying response accuracy")
+                        
+                        # Verify response (pass ticker resolver for better company name resolution)
+                        verification_result = verify_response(
+                            reply,
+                            context or "",
+                            user_input,
+                            self.analytics_engine,
+                            str(self.settings.database_path),
+                            ticker_resolver=self._name_to_ticker if hasattr(self, '_name_to_ticker') else None
+                        )
+                        
+                        # Cross-validate data
+                        validation_issues = []
+                        if self.settings.cross_validation_enabled:
+                            try:
+                                validation_issues = validate_context_data(
+                                    context or "",
+                                    self.analytics_engine,
+                                    str(self.settings.database_path)
+                                )
+                            except Exception as e:
+                                LOGGER.debug(f"Cross-validation failed: {e}")
+                        
+                        # Verify sources
+                        source_issues = []
+                        try:
+                            source_issues = verify_all_sources(
+                                reply,
+                                verification_result.facts,
+                                str(self.settings.database_path)
+                            )
+                        except Exception as e:
+                            LOGGER.debug(f"Source verification failed: {e}")
+                        
+                        # Count sources in response
+                        source_count = len(re.findall(r'\[([^\]]+)\]\(([^)]+)\)', reply))
+                        
+                        # Calculate confidence
+                        confidence = calculate_confidence(
+                            reply,
+                            verification_result.results,
+                            source_count=source_count
+                        )
+                        
+                        # Correct if needed
+                        if verification_result.has_errors and self.settings.auto_correct_enabled:
+                            reply = correct_response(reply, verification_result.results)
+                            emit("verification_correct", f"Applied {len([r for r in verification_result.results if not r.is_correct])} corrections")
+                        
+                        # Add confidence footer
+                        if confidence.score < self.settings.min_confidence_threshold:
+                            LOGGER.warning(f"Response confidence {confidence.score*100:.1f}% below threshold {self.settings.min_confidence_threshold*100:.1f}%")
+                            if self.settings.verification_strict_mode:
+                                # In strict mode, reject low-confidence responses
+                                reply = f"I apologize, but I cannot provide a response with sufficient confidence ({confidence.score*100:.1f}%). Please try rephrasing your query or asking about a different company."
+                                emit("verification_reject", "Response rejected due to low confidence")
+                            else:
+                                # Add warning footer
+                                reply = add_confidence_footer(reply, confidence, include_details=True)
+                                emit("verification_warning", f"Low confidence: {confidence.score*100:.1f}%")
+                        else:
+                            # Add confidence footer
+                            reply = add_confidence_footer(reply, confidence, include_details=False)
+                            emit("verification_complete", f"Verified: {verification_result.correct_facts}/{verification_result.total_facts} facts, {confidence.score*100:.1f}% confidence")
+                        
+                        # Log verification results
+                        LOGGER.info(
+                            f"Response verification: {confidence.score*100:.1f}% confidence, "
+                            f"{verification_result.correct_facts}/{verification_result.total_facts} facts verified, "
+                            f"{len(source_issues)} source issues, {len(validation_issues)} validation issues"
+                        )
+                    except ImportError as e:
+                        LOGGER.debug(f"Response verification modules not available: {e}")
+                    except Exception as e:
+                        LOGGER.warning(f"Response verification failed: {e}", exc_info=True)
 
             if reply is None:
                 # CRITICAL: Final check before fallback - ensure forecasting queries never get fallback snapshots

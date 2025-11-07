@@ -1,0 +1,362 @@
+{
+  "total_companies": 50,
+  "successful": 50,
+  "failed": 0,
+  "total_facts": 50,
+  "verified_facts": 39,
+  "confidence_scores": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.85,
+    0.85,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.85,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.85,
+    0.85,
+    0.6499999999999999,
+    0.85,
+    0.85,
+    0.85,
+    1.0,
+    0.85,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.85,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "errors": [],
+  "companies_tested": [
+    {
+      "ticker": "AAPL",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ABBV",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ABNB",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ABT",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ACGL",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ACGLN",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.85
+    },
+    {
+      "ticker": "ACGLO",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.85
+    },
+    {
+      "ticker": "ACN",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ADBE",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ADI",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ADM",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ADP",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ADSK",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AEP",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AES",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AFL",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AIG",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AIZ",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AIZN",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.85
+    },
+    {
+      "ticker": "AJG",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AKAM",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ALB",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ALB-PA",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ALGN",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ALL",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.85
+    },
+    {
+      "ticker": "ALL-PB",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.85
+    },
+    {
+      "ticker": "ALL-PH",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.6499999999999999
+    },
+    {
+      "ticker": "ALL-PI",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.85
+    },
+    {
+      "ticker": "ALL-PJ",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.85
+    },
+    {
+      "ticker": "ALP",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.85
+    },
+    {
+      "ticker": "AMAT",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AMCCF",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.85
+    },
+    {
+      "ticker": "AMCR",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AMD",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AME",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AMGN",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AMJB",
+      "facts": 1,
+      "verified": 0,
+      "confidence": 0.85
+    },
+    {
+      "ticker": "AMP",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AMT",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AMZN",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ANET",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AON",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AOS",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "APD",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "APH",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "APTV",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "ATO",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AVB",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AVGO",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    },
+    {
+      "ticker": "AVY",
+      "facts": 1,
+      "verified": 1,
+      "confidence": 1.0
+    }
+  ]
+}

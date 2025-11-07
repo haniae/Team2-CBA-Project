@@ -110,6 +110,12 @@ class Settings:
     ingestion_year_buffer: int = 2
     enable_enhanced_routing: bool = False
     prefer_conversational_mode: bool = True
+    verification_enabled: bool = True
+    verification_strict_mode: bool = False  # Reject responses with unverified facts
+    max_allowed_deviation: float = 0.05  # 5% tolerance
+    min_confidence_threshold: float = 0.85  # 85% minimum confidence
+    cross_validation_enabled: bool = True
+    auto_correct_enabled: bool = True
 
     @property
     def sqlite_uri(self) -> str:
@@ -154,6 +160,17 @@ def _env_flag(name: str, *, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _parse_float_env(name: str, *, default: float) -> float:
+    """Parse a float from an environment variable."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a float (received {value!r}).") from exc
 
 
 def load_settings() -> Settings:
@@ -328,6 +345,12 @@ def load_settings() -> Settings:
         ingestion_year_buffer=ingestion_year_buffer,
         enable_enhanced_routing=_env_flag("ENABLE_ENHANCED_ROUTING", default=False),
         prefer_conversational_mode=_env_flag("PREFER_CONVERSATIONAL_MODE", default=True),
+        verification_enabled=_env_flag("VERIFICATION_ENABLED", default=True),
+        verification_strict_mode=_env_flag("VERIFICATION_STRICT_MODE", default=False),
+        max_allowed_deviation=_parse_float_env("MAX_ALLOWED_DEVIATION", default=0.05),
+        min_confidence_threshold=_parse_float_env("MIN_CONFIDENCE_THRESHOLD", default=0.85),
+        cross_validation_enabled=_env_flag("CROSS_VALIDATION_ENABLED", default=True),
+        auto_correct_enabled=_env_flag("AUTO_CORRECT_ENABLED", default=True),
     )
 
 

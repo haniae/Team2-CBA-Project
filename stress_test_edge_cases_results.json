@@ -1,0 +1,75 @@
+{
+  "total_cases": 8,
+  "passed": 6,
+  "failed": 2,
+  "details": [
+    {
+      "name": "Multiple companies in one response",
+      "passed": false,
+      "facts_extracted": 3,
+      "facts_verified": 0,
+      "confidence": 0.14999999999999994,
+      "issues": [
+        "Expected tickers {'AAPL', 'MSFT'}, got {'AAPL'}"
+      ]
+    },
+    {
+      "name": "Mixed metrics (revenue + margins + ratios)",
+      "passed": false,
+      "facts_extracted": 3,
+      "facts_verified": 0,
+      "confidence": 0.14999999999999994,
+      "issues": [
+        "Missing metrics: {'pe_ratio'}"
+      ]
+    },
+    {
+      "name": "No sources cited",
+      "passed": true,
+      "facts_extracted": 1,
+      "facts_verified": 0,
+      "confidence": 0.5499999999999999,
+      "issues": []
+    },
+    {
+      "name": "Malformed numbers with commas",
+      "passed": true,
+      "facts_extracted": 1,
+      "facts_verified": 0,
+      "confidence": 0.5499999999999999,
+      "issues": []
+    },
+    {
+      "name": "Very large numbers (trillions)",
+      "passed": true,
+      "facts_extracted": 1,
+      "facts_verified": 0,
+      "confidence": 0.75,
+      "issues": []
+    },
+    {
+      "name": "Very small percentages",
+      "passed": true,
+      "facts_extracted": 1,
+      "facts_verified": 0,
+      "confidence": 0.75,
+      "issues": []
+    },
+    {
+      "name": "Multiple periods mentioned",
+      "passed": true,
+      "facts_extracted": 2,
+      "facts_verified": 2,
+      "confidence": 1.0,
+      "issues": []
+    },
+    {
+      "name": "Ambiguous metric (margin without qualifier)",
+      "passed": true,
+      "facts_extracted": 1,
+      "facts_verified": 0,
+      "confidence": 0.75,
+      "issues": []
+    }
+  ]
+}
