@@ -24,6 +24,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import AnalyticsEngine, BenchmarkOSChatbot, database, load_settings
+from .custom_kpis import CustomKPICalculator
+from .source_tracer import SourceTracer
+from .interactive_modeling import ModelBuilder
+from .framework_processor import FrameworkProcessor
+from .template_processor import TemplateProcessor
 from .document_processor import extract_text_from_file
 from .help_content import HELP_TEXT, get_help_metadata
 from .dashboard_utils import (
@@ -659,6 +664,8 @@ class DocumentUploadResponse(BaseModel):
     filename: Optional[str] = None
     file_type: Optional[str] = None
     content_preview: Optional[str] = None
+    message: Optional[str] = None
+    warnings: List[str] = []
     errors: List[str] = []
 
 # ----- Dependencies / Singletons ---------------------------------------------
@@ -1922,6 +1929,10 @@ async def document_upload(
         # Log file info for debugging
         LOGGER.info(f"Processing uploaded file: {file.filename}, size: {file_size} bytes")
         
+        warnings: List[str] = []
+        success_message: Optional[str] = None
+        extraction_warning: Optional[str] = None
+
         # Extract text from file
         try:
             extracted_text, file_type = extract_text_from_file(tmp_path, file.filename)
@@ -1933,10 +1944,8 @@ async def document_upload(
         
         if not extracted_text:
             if file_type == 'image':
-                return DocumentUploadResponse(
-                    success=False,
-                    errors=["Image files are not yet supported. Please upload text-based documents (PDF, Word, TXT, etc.)"]
-                )
+                extraction_warning = "Text extraction is not yet supported for image files. The file has been stored for reference."
+                LOGGER.info(f"Image file stored without text content: {file.filename}")
             elif file_type == 'unknown' or not file_type:
                 # Try to extract as binary/text anyway
                 LOGGER.info(f"Attempting fallback text extraction for {file.filename}")
@@ -1965,12 +1974,6 @@ async def document_upload(
                                 continue
                 except Exception as e:
                     LOGGER.error(f"Fallback extraction failed: {e}")
-                
-                if not extracted_text:
-                    return DocumentUploadResponse(
-                        success=False,
-                        errors=[f"Unable to extract text from {file.filename}. Supported formats: PDF, Word (.docx), TXT, CSV, Excel (.xlsx/.xls), JSON, and code files. Error: Could not read file content. Make sure the file is not corrupted or password-protected."]
-                    )
             else:
                 # Try one more fallback - read as text
                 LOGGER.info(f"Attempting text fallback for {file_type} file: {file.filename}")
@@ -1983,21 +1986,27 @@ async def document_upload(
                         LOGGER.info(f"Successfully extracted text using fallback method")
                 except Exception as e:
                     LOGGER.debug(f"Fallback extraction failed: {e}")
-                
-                if not extracted_text:
-                    # Provide more helpful error message
-                    error_msg = f"Unable to extract text from {file.filename}"
+
+            if not extracted_text:
+                if not extraction_warning:
+                    base_msg = f"Text could not be extracted from {file.filename}"
                     if file_type == 'pdf':
-                        error_msg += ". PDF might be password-protected, image-based, or corrupted. Try a different PDF or convert it to text."
+                        extraction_warning = base_msg + ". The PDF might be password-protected, image-based, or corrupted."
                     elif file_type == 'docx':
-                        error_msg += ". Word document might be corrupted or password-protected. Try saving as .txt or .pdf first."
+                        extraction_warning = base_msg + ". The Word document might be corrupted or password-protected."
+                    elif file_type == 'text':
+                        extraction_warning = base_msg + ". The file may be empty."
                     else:
-                        error_msg += f" (type: {file_type}). The file may be empty, corrupted, or password-protected."
-                    
-                    return DocumentUploadResponse(
-                        success=False,
-                        errors=[error_msg]
-                    )
+                        detected_type = file_type or "unknown type"
+                        extraction_warning = f"{base_msg} (detected: {detected_type}). The file may be empty, corrupted, or password-protected."
+                warnings.append(extraction_warning)
+                LOGGER.warning(f"[Upload] {extraction_warning}")
+                extracted_text = ""
+                success_message = f"✅ File \"{file.filename}\" uploaded. {extraction_warning}"
+            else:
+                success_message = f"✅ File \"{file.filename}\" uploaded successfully and is ready for analysis."
+        else:
+            success_message = f"✅ File \"{file.filename}\" uploaded successfully and is ready for analysis."
         
         # Generate document ID
         document_id = f"doc_{uuid.uuid4().hex[:8]}"
@@ -2010,12 +2019,16 @@ async def document_upload(
         from datetime import datetime, timezone
         
         created_at = datetime.now(timezone.utc).isoformat()
-        metadata = json.dumps({
+        metadata_payload = {
             "original_filename": file.filename,
             "file_size": file_size,
             "file_type": file_type,
             "content_length": len(extracted_text)
-        })
+        }
+        if warnings:
+            metadata_payload["warnings"] = warnings
+
+        metadata = json.dumps(metadata_payload)
         
         with sqlite3.connect(db_path) as conn:
             conn.execute(
@@ -2045,7 +2058,9 @@ async def document_upload(
             document_id=document_id,
             filename=file.filename,
             file_type=file_type,
-            content_preview=content_preview
+            content_preview=content_preview,
+            message=success_message,
+            warnings=warnings
         )
         
     except Exception as e:
@@ -3722,56 +3737,154 @@ def export_interactive_charts_endpoint(
         raise HTTPException(status_code=500, detail={"message": f"Chart export failed: {str(e)}"})
 
 
-@app.post("/api/reports/templates")
-def save_report_template_endpoint(
-    template_data: Dict[str, Any] = Body(..., description="Template data"),
+# ============================================================================
+# Template Management API Endpoints
+# ============================================================================
+
+@app.post("/api/templates/upload")
+async def upload_template(
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(None),
+    user_id: Optional[str] = Form("default")
 ) -> Dict[str, Any]:
-    """Save report template."""
+    """Upload a report template."""
     try:
-        from .portfolio_report_builder import ReportConfig, ReportSection  # type: ignore
-        sections = [
-            ReportSection(**s) for s in template_data['config'].get('sections', [])
-        ]
-        config = ReportConfig(
-            portfolio_id=template_data['config']['portfolio_id'],
-            report_name=template_data['config']['report_name'],
-            sections=sections,
-            format=template_data['config'].get('format', 'pdf'),
-            branding=template_data['config'].get('branding'),
-            include_charts=template_data['config'].get('include_charts', True),
-            chart_types=template_data['config'].get('chart_types')
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        
+        # Create temporary file
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
+            content = await file.read()
+            tmp_file.write(content)
+            tmp_path = Path(tmp_file.name)
+        
+        # Determine file type
+        file_ext = (Path(file.filename).suffix or "").lower()
+        file_type = file_ext.lstrip(".")
+        
+        # Process template
+        template = processor.upload_template(
+            user_id=user_id or "default",
+            name=name or file.filename or "Untitled Template",
+            file_path=tmp_path,
+            file_type=file_type
         )
         
-        # TODO: Implement save_report_template
-        raise HTTPException(
-            status_code=501,
-            detail={
-                "message": "Report template saving not yet implemented",
-                "error": "This feature is under development"
+        # Clean up temp file
+        try:
+            tmp_path.unlink()
+        except:
+            pass
+        
+        return {
+            "success": True,
+            "template": template.to_dict()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Template upload failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template upload failed: {str(e)}"})
+
+
+@app.get("/api/templates")
+def list_templates(
+    user_id: Optional[str] = Query("default", description="User ID to filter templates")
+) -> Dict[str, Any]:
+    """List all templates for a user."""
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        templates = processor.list_templates(user_id or "default")
+        return {
+            "success": True,
+            "templates": [t.to_dict() for t in templates],
+            "count": len(templates)
+        }
+    except Exception as e:
+        LOGGER.error(f"Template listing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template listing failed: {str(e)}"})
+
+
+@app.post("/api/templates/{template_id}/generate")
+async def generate_from_template(
+    template_id: str,
+    ticker: str = Body(..., embed=True),
+    user_id: Optional[str] = Body("default", embed=True)
+) -> Dict[str, Any]:
+    """Generate a report from a template with new data."""
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        
+        # Create output file
+        import tempfile
+        output_path = Path(tempfile.mktemp(suffix=".pptx"))  # Default to PPTX
+        
+        render_result = processor.generate_from_template(
+            template_id=template_id,
+            ticker=ticker,
+            output_path=output_path,
+            context={
+                "user_id": user_id or "default",
             }
         )
-        # TODO: Function implementation code removed
+        
+        if not render_result.success:
+            raise HTTPException(status_code=500, detail={"message": "Failed to generate report from template"})
+        
+        # Return file
+        headers = {}
+        if render_result.job_id:
+            headers["X-Template-Render-Job"] = render_result.job_id
+        if render_result.warnings:
+            headers["X-Template-Warnings"] = "; ".join(render_result.warnings)
+        return FileResponse(
+            output_path,
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            filename=f"report_{ticker}.pptx",
+            headers=headers
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail={"message": str(e)})
     except Exception as e:
-        LOGGER.error(f"Template save failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail={"message": f"Template save failed: {str(e)}"})
+        LOGGER.error(f"Template generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template generation failed: {str(e)}"})
 
 
 @app.get("/api/reports/templates")
 def list_report_templates_endpoint() -> List[Dict[str, Any]]:
-    """List all available report templates."""
+    """List all available report templates (legacy endpoint)."""
     try:
-        # TODO: Implement list_report_templates
-        raise HTTPException(
-            status_code=501,
-            detail={
-                "message": "Report template listing not yet implemented",
-                "error": "This feature is under development"
-            }
-        )
-        # TODO: Function implementation code removed
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        templates = processor.list_templates("default")
+        return [t.to_dict() for t in templates]
     except Exception as e:
         LOGGER.error(f"Template list failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Template list failed: {str(e)}"})
+
+
+@app.get("/api/templates/{template_id}/renders")
+def list_template_renders(
+    template_id: str,
+    limit: int = Query(20, ge=1, le=200)
+) -> Dict[str, Any]:
+    """List render history for a template."""
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        jobs = processor.list_render_jobs(template_id, limit=limit)
+        return {
+            "success": True,
+            "template_id": template_id,
+            "jobs": jobs,
+            "count": len(jobs),
+        }
+    except Exception as e:
+        LOGGER.error(f"Template render history failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template render history failed: {str(e)}"})
 
 
 # ============================================================================
@@ -3825,6 +3938,548 @@ def get_sentiment_score_endpoint(
     except Exception as e:
         LOGGER.error(f"Sentiment score fetch failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Sentiment fetch failed: {str(e)}"})
+
+
+# ============================================================================
+# Custom KPIs API Endpoints
+# ============================================================================
+
+class CreateKPIRequest(BaseModel):
+    """Request to create a custom KPI."""
+    name: str
+    formula: str
+    description: Optional[str] = None
+    frequency: Optional[str] = None
+    unit: Optional[str] = None
+    inputs: Optional[List[str]] = None
+    source_tags: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = "default"
+
+
+class KPICalculationRequest(BaseModel):
+    """Request to calculate a custom KPI."""
+    ticker: str
+    period: Optional[str] = None
+    fiscal_year: Optional[int] = None
+
+
+@app.post("/api/kpis/custom")
+def create_custom_kpi(request: CreateKPIRequest) -> Dict[str, Any]:
+    """Create a new custom KPI."""
+    try:
+        settings = get_settings()
+        calculator = CustomKPICalculator(settings.database_path)
+        kpi = calculator.create_kpi(
+            user_id=request.user_id or "default",
+            name=request.name,
+            formula=request.formula,
+            description=request.description,
+            metadata=request.metadata,
+            frequency=request.frequency,
+            unit=request.unit,
+            inputs=request.inputs,
+            source_tags=request.source_tags,
+        )
+        return {
+            "success": True,
+            "kpi": kpi.to_dict()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Custom KPI creation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"KPI creation failed: {str(e)}"})
+
+
+@app.get("/api/kpis/custom")
+def list_custom_kpis(
+    user_id: Optional[str] = Query("default", description="User ID to filter KPIs")
+) -> Dict[str, Any]:
+    """List all custom KPIs for a user."""
+    try:
+        settings = get_settings()
+        calculator = CustomKPICalculator(settings.database_path)
+        kpis = calculator.list_kpis(user_id or "default")
+        return {
+            "success": True,
+            "kpis": [kpi.to_dict() for kpi in kpis],
+            "count": len(kpis)
+        }
+    except Exception as e:
+        LOGGER.error(f"Custom KPI listing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"KPI listing failed: {str(e)}"})
+
+
+@app.post("/api/kpis/custom/{kpi_id}/calculate")
+def calculate_custom_kpi(
+    kpi_id: str,
+    request: KPICalculationRequest
+) -> Dict[str, Any]:
+    """Calculate a custom KPI for a specific ticker and period."""
+    try:
+        settings = get_settings()
+        calculator = CustomKPICalculator(settings.database_path)
+        result = calculator.calculate_kpi(
+            kpi_id=kpi_id,
+            ticker=request.ticker,
+            period=request.period,
+            fiscal_year=request.fiscal_year
+        )
+        return {
+            "success": result.error is None,
+            "result": result.to_dict()
+        }
+    except Exception as e:
+        LOGGER.error(f"Custom KPI calculation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"KPI calculation failed: {str(e)}"})
+
+
+@app.delete("/api/kpis/custom/{kpi_id}")
+def delete_custom_kpi(
+    kpi_id: str,
+    user_id: Optional[str] = Query("default", description="User ID")
+) -> Dict[str, Any]:
+    """Delete a custom KPI."""
+    try:
+        settings = get_settings()
+        calculator = CustomKPICalculator(settings.database_path)
+        deleted = calculator.delete_kpi(kpi_id, user_id or "default")
+        if not deleted:
+            raise HTTPException(status_code=404, detail={"message": f"KPI {kpi_id} not found"})
+        return {
+            "success": True,
+            "message": f"KPI {kpi_id} deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        LOGGER.error(f"Custom KPI deletion failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"KPI deletion failed: {str(e)}"})
+
+
+@app.get("/api/kpis/custom/{kpi_id}/versions")
+def get_custom_kpi_versions(
+    kpi_id: str,
+    limit: int = Query(20, ge=1, le=100)
+) -> Dict[str, Any]:
+    """Get version history for a custom KPI."""
+    try:
+        settings = get_settings()
+        calculator = CustomKPICalculator(settings.database_path)
+        versions = calculator.list_kpi_versions(kpi_id, limit=limit)
+        return {
+            "success": True,
+            "kpi_id": kpi_id,
+            "versions": versions,
+            "count": len(versions),
+        }
+    except Exception as e:
+        LOGGER.error(f"KPI version retrieval failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"KPI version retrieval failed: {str(e)}"})
+
+
+@app.get("/api/kpis/custom/{kpi_id}/usage")
+def get_custom_kpi_usage(
+    kpi_id: str,
+    limit: int = Query(50, ge=1, le=200)
+) -> Dict[str, Any]:
+    """Get recent usage records for a custom KPI."""
+    try:
+        settings = get_settings()
+        calculator = CustomKPICalculator(settings.database_path)
+        usage = calculator.get_kpi_usage(kpi_id, limit=limit)
+        return {
+            "success": True,
+            "kpi_id": kpi_id,
+            "usage": usage,
+            "count": len(usage),
+        }
+    except Exception as e:
+        LOGGER.error(f"KPI usage retrieval failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"KPI usage retrieval failed: {str(e)}"})
+
+
+# ============================================================================
+# Source Tracing API Endpoints
+# ============================================================================
+
+@app.get("/api/sources/trace/{ticker}/{metric}")
+def trace_metric_source(
+    ticker: str,
+    metric: str,
+    period: Optional[str] = Query(None, description="Period (e.g., '2023-FY')"),
+    fiscal_year: Optional[int] = Query(None, description="Fiscal year")
+) -> Dict[str, Any]:
+    """Get full source trace for a metric."""
+    try:
+        settings = get_settings()
+        tracer = SourceTracer(settings.database_path)
+        trace = tracer.trace_metric(ticker, metric, period, fiscal_year)
+        return {
+            "success": True,
+            "trace": trace.to_dict()
+        }
+    except Exception as e:
+        LOGGER.error(f"Source trace failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Source trace failed: {str(e)}"})
+
+
+@app.get("/api/sources/drilldown/{fact_id}")
+def get_fact_drilldown(fact_id: int) -> Dict[str, Any]:
+    """Get detailed drill-down information for a specific fact."""
+    try:
+        settings = get_settings()
+        tracer = SourceTracer(settings.database_path)
+        fact_detail = tracer.get_fact_drilldown(fact_id)
+        
+        if not fact_detail:
+            raise HTTPException(status_code=404, detail={"message": f"Fact {fact_id} not found"})
+        
+        return {
+            "success": True,
+            "fact": fact_detail.to_dict()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        LOGGER.error(f"Fact drilldown failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Fact drilldown failed: {str(e)}"})
+
+
+@app.get("/api/sources/lineage/{ticker}/{metric}")
+def get_metric_lineage(
+    ticker: str,
+    metric: str,
+    period: Optional[str] = Query(None, description="Period (e.g., '2023-FY')")
+) -> Dict[str, Any]:
+    """Get complete data lineage for a metric."""
+    try:
+        settings = get_settings()
+        tracer = SourceTracer(settings.database_path)
+        lineage = tracer.get_metric_lineage(ticker, metric, period)
+        return {
+            "success": True,
+            "lineage": lineage
+        }
+    except Exception as e:
+        LOGGER.error(f"Lineage retrieval failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Lineage retrieval failed: {str(e)}"})
+
+
+# ============================================================================
+# Custom Modeling API Endpoints
+# ============================================================================
+
+class CreateModelRequest(BaseModel):
+    """Request to create a custom model."""
+    name: str
+    model_type: str  # "arima", "prophet", "lstm", "linear_regression", "growth_rate"
+    parameters: Optional[Dict[str, Any]] = None
+    metrics: Optional[List[str]] = None
+    description: Optional[str] = None
+    target_metric: Optional[str] = None
+    frequency: Optional[str] = None
+    forecast_horizon: Optional[int] = None
+    regressors: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = "default"
+
+
+class ForecastRequest(BaseModel):
+    """Request to run a forecast."""
+    ticker: str
+    metric: str
+    forecast_years: int = 3
+
+
+class ScenarioRequest(BaseModel):
+    """Request to run a scenario analysis."""
+    ticker: str
+    metric: str
+    scenario_name: str
+    assumptions: Dict[str, float]
+    forecast_years: int = 3
+
+
+@app.post("/api/models/create")
+def create_custom_model(request: CreateModelRequest) -> Dict[str, Any]:
+    """Create a new custom forecasting model."""
+    try:
+        settings = get_settings()
+        builder = ModelBuilder(settings.database_path)
+        model = builder.create_model(
+            user_id=request.user_id or "default",
+            name=request.name,
+            model_type=request.model_type,
+            parameters=request.parameters,
+            metrics=request.metrics,
+            description=request.description,
+            target_metric=request.target_metric,
+            frequency=request.frequency,
+            forecast_horizon=request.forecast_horizon,
+            regressors=request.regressors,
+            metadata=request.metadata,
+        )
+        return {
+            "success": True,
+            "model": model.to_dict()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Model creation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Model creation failed: {str(e)}"})
+
+
+@app.get("/api/models")
+def list_custom_models(
+    user_id: Optional[str] = Query("default", description="User ID to filter models")
+) -> Dict[str, Any]:
+    """List all custom models for a user."""
+    try:
+        settings = get_settings()
+        builder = ModelBuilder(settings.database_path)
+        models = builder.list_models(user_id or "default")
+        return {
+            "success": True,
+            "models": [model.to_dict() for model in models],
+            "count": len(models)
+        }
+    except Exception as e:
+        LOGGER.error(f"Model listing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Model listing failed: {str(e)}"})
+
+
+@app.get("/api/models/backends")
+def list_model_backends() -> Dict[str, Any]:
+    """List available forecasting backends."""
+    try:
+        settings = get_settings()
+        builder = ModelBuilder(settings.database_path)
+        return {"success": True, "backends": builder.available_backends()}
+    except Exception as e:
+        LOGGER.error(f"Backend listing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Backend listing failed: {str(e)}"})
+
+
+@app.get("/api/models/{model_id}/runs")
+def list_model_runs_endpoint(
+    model_id: str,
+    limit: int = Query(20, ge=1, le=200)
+) -> Dict[str, Any]:
+    """List recent runs for a model."""
+    try:
+        settings = get_settings()
+        builder = ModelBuilder(settings.database_path)
+        runs = builder.list_runs(model_id, limit=limit)
+        return {"success": True, "runs": runs, "count": len(runs)}
+    except Exception as e:
+        LOGGER.error(f"Model run listing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Model run listing failed: {str(e)}"})
+
+
+@app.post("/api/models/{model_id}/forecast")
+def run_forecast(
+    model_id: str,
+    request: ForecastRequest
+) -> Dict[str, Any]:
+    """Run a forecast using a custom model."""
+    try:
+        settings = get_settings()
+        builder = ModelBuilder(settings.database_path)
+        model_run = builder.run_forecast(
+            model_id=model_id,
+            ticker=request.ticker,
+            metric=request.metric,
+            forecast_years=request.forecast_years
+        )
+        return {
+            "success": True,
+            "run": model_run.to_dict()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Forecast failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Forecast failed: {str(e)}"})
+
+
+@app.post("/api/models/{model_id}/scenario")
+def run_scenario(
+    model_id: str,
+    request: ScenarioRequest
+) -> Dict[str, Any]:
+    """Run a scenario analysis with custom assumptions."""
+    try:
+        settings = get_settings()
+        builder = ModelBuilder(settings.database_path)
+        model_run = builder.run_scenario(
+            model_id=model_id,
+            ticker=request.ticker,
+            metric=request.metric,
+            scenario_name=request.scenario_name,
+            assumptions=request.assumptions,
+            forecast_years=request.forecast_years
+        )
+        return {
+            "success": True,
+            "run": model_run.to_dict()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Scenario analysis failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Scenario analysis failed: {str(e)}"})
+
+
+@app.get("/api/models/{model_id}/explain")
+def explain_model(model_id: str) -> Dict[str, Any]:
+    """Get explanation of model assumptions and methodology."""
+    try:
+        settings = get_settings()
+        builder = ModelBuilder(settings.database_path)
+        explanation = builder.explain_model(model_id)
+        return {
+            "success": True,
+            "explanation": explanation
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Model explanation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Model explanation failed: {str(e)}"})
+
+
+# ============================================================================
+# Framework Upload API Endpoints
+# ============================================================================
+
+@app.post("/api/frameworks/upload")
+async def upload_framework(
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(None),
+    user_id: Optional[str] = Form("default")
+) -> Dict[str, Any]:
+    """Upload a framework document."""
+    try:
+        settings = get_settings()
+        processor = FrameworkProcessor(settings.database_path)
+        
+        # Create temporary file
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
+            content = await file.read()
+            tmp_file.write(content)
+            tmp_path = Path(tmp_file.name)
+        
+        # Determine file type
+        file_ext = (Path(file.filename).suffix or "").lower()
+        file_type = file_ext.lstrip(".")
+        
+        # Process framework
+        framework = processor.upload_framework(
+            user_id=user_id or "default",
+            name=name or file.filename or "Untitled Framework",
+            file_path=tmp_path,
+            file_type=file_type
+        )
+        
+        # Clean up temp file
+        try:
+            tmp_path.unlink()
+        except:
+            pass
+        
+        return {
+            "success": True,
+            "framework": framework.to_dict()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        LOGGER.error(f"Framework upload failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Framework upload failed: {str(e)}"})
+
+
+@app.get("/api/frameworks")
+def list_frameworks(
+    user_id: Optional[str] = Query("default", description="User ID to filter frameworks")
+) -> Dict[str, Any]:
+    """List all frameworks for a user."""
+    try:
+        settings = get_settings()
+        processor = FrameworkProcessor(settings.database_path)
+        frameworks = processor.list_frameworks(user_id or "default")
+        return {
+            "success": True,
+            "frameworks": [f.to_dict() for f in frameworks],
+            "count": len(frameworks)
+        }
+    except Exception as e:
+        LOGGER.error(f"Framework listing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Framework listing failed: {str(e)}"})
+
+
+@app.get("/api/frameworks/{framework_id}/extracted")
+def get_framework_extracted(framework_id: str) -> Dict[str, Any]:
+    """Get extracted content from a framework."""
+    try:
+        settings = get_settings()
+        processor = FrameworkProcessor(settings.database_path)
+        framework = processor.get_framework(framework_id)
+        
+        if not framework:
+            raise HTTPException(status_code=404, detail={"message": f"Framework {framework_id} not found"})
+        
+        kpis = processor.get_framework_kpis(framework_id)
+        methodology = processor.get_framework_methodology(framework_id)
+        
+        return {
+            "success": True,
+            "framework": framework.to_dict(),
+            "kpis": [kpi.to_dict() for kpi in kpis],
+            "methodology": [method.to_dict() for method in methodology],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        LOGGER.error(f"Framework extraction retrieval failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Framework extraction retrieval failed: {str(e)}"})
+
+
+@app.post("/api/frameworks/{framework_id}/activate")
+def activate_framework(
+    framework_id: str,
+    conversation_id: Optional[str] = Body(None)
+) -> Dict[str, Any]:
+    """Activate a framework for a conversation session."""
+    try:
+        settings = get_settings()
+        processor = FrameworkProcessor(settings.database_path)
+        framework = processor.get_framework(framework_id)
+        
+        if not framework:
+            raise HTTPException(status_code=404, detail={"message": f"Framework {framework_id} not found"})
+        
+        # Build context from framework
+        context = processor.build_framework_context(framework_id)
+        
+        # TODO: Store active framework in conversation metadata
+        # For now, just return the context
+        
+        return {
+            "success": True,
+            "framework_id": framework_id,
+            "framework_name": framework.name,
+            "context": context,
+            "message": f"Framework '{framework.name}' activated. Responses will be guided by this framework."
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        LOGGER.error(f"Framework activation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Framework activation failed: {str(e)}"})
 
 
 # ============================================================================

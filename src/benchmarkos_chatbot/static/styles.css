@@ -5544,6 +5544,7 @@ img {
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
   position: relative;
   overflow: hidden;
+  pointer-events: auto;
 }
 
 .chat-file-upload-btn:hover {
@@ -5562,14 +5563,6 @@ img {
   height: 16px;
   stroke: #ffffff;
   stroke-width: 2;
-}
-
-.chat-file-upload-btn input[type="file"] {
-  position: absolute;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
 }
 
 #stop-button {

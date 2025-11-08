@@ -39,6 +39,11 @@ from .dashboard_utils import (
 )
 from .routing import enhance_structured_parse, should_build_dashboard, EnhancedIntent
 from .context_builder import build_financial_context
+from .custom_kpis import CustomKPICalculator, KPIIntentParser, CustomKPIDefinition
+from .interactive_modeling import ModelBuilder
+from .source_tracer import SourceTracer
+from .framework_processor import FrameworkProcessor
+from .template_processor import TemplateProcessor
 
 # Portfolio module imports (combined portfolio.py)
 from .portfolio import (
@@ -1357,6 +1362,7 @@ class BenchmarkOSChatbot:
     conversation: Conversation = field(default_factory=Conversation)
     # new: SEC-backed index
     name_index: _CompanyNameIndex = field(default_factory=_CompanyNameIndex)
+    kpi_intent_parser: KPIIntentParser = field(default_factory=KPIIntentParser)
     ticker_sector_map: Dict[str, Dict[str, Optional[str]]] = field(default_factory=dict)
     last_structured_response: Dict[str, Any] = field(default_factory=dict, init=False)
     _reply_cache: "OrderedDict[str, _CachedReply]" = field(default_factory=OrderedDict, init=False, repr=False)
@@ -1911,6 +1917,392 @@ class BenchmarkOSChatbot:
                     best_len = alias_len
         return best_match
 
+    def _detect_custom_kpi_intent(self, text: str) -> Optional[Dict[str, Any]]:
+        """Detect if the prompt is about creating or using custom KPIs."""
+        intent = self.kpi_intent_parser.detect(text)
+        if intent and intent.get("action") == "create":
+            intent["raw_prompt"] = text
+        return intent
+
+    def _handle_custom_kpi_intent(self, intent: Dict[str, Any]) -> Optional[str]:
+        """Handle custom KPI intents."""
+        calculator = CustomKPICalculator(self.settings.database_path)
+        user_id = "default"  # TODO: Get from session/user context
+        
+        if intent["action"] == "create":
+            try:
+                definition: CustomKPIDefinition = intent.get("definition")  # type: ignore[assignment]
+                if not definition:
+                    name = intent.get("raw_name", "").strip()
+                    formula = intent.get("raw_formula", "").strip()
+                    if not name or not formula:
+                        return (
+                            "Please provide both a name and a formula for the custom KPI. "
+                            "Example: 'Create a KPI called Contribution Margin = (Revenue - Cost of Revenue) / Revenue'"
+                        )
+                    definition = self.kpi_intent_parser._definition_from_text(intent.get("raw_prompt", ""), name, formula)
+
+                kpi = calculator.upsert_kpi(user_id, definition)
+                details = kpi.metadata or {}
+                extras = []
+                if kpi.frequency:
+                    extras.append(f"**Frequency:** {kpi.frequency}")
+                if kpi.unit:
+                    extras.append(f"**Unit:** {kpi.unit}")
+                if kpi.inputs:
+                    extras.append(f"**Inputs:** {', '.join(sorted(set(kpi.inputs)))}")
+                if kpi.source_tags:
+                    extras.append(f"**Source Tags:** {', '.join(sorted(set(kpi.source_tags)))}")
+                meta_text = "\n".join(extras) if extras else ""
+
+                return (
+                    f"✅ Saved custom KPI **{kpi.name}**\n\n"
+                    f"**Formula:** `{kpi.formula}`\n"
+                    + (meta_text + "\n\n" if meta_text else "\n")
+                    + "You can calculate it with `Calculate {kpi.name} for AAPL`."
+                )
+            except ValueError as e:
+                return f"❌ Error creating custom KPI: {str(e)}"
+            except Exception as e:
+                LOGGER.exception(f"Error creating custom KPI: {e}")
+                return f"❌ Error creating custom KPI: {str(e)}"
+        
+        elif intent["action"] == "calculate":
+            kpi_name = intent.get("kpi_name", "").strip()
+            ticker = intent.get("ticker", "").strip().upper()
+            
+            if not kpi_name or not ticker:
+                return "Please provide both a KPI name and ticker. Example: 'Calculate Contribution Margin for AAPL'"
+            
+            # Find KPI by name
+            kpis = calculator.list_kpis(user_id)
+            matching_kpi = None
+            for kpi in kpis:
+                if kpi.name.lower() == kpi_name.lower():
+                    matching_kpi = kpi
+                    break
+            
+            if not matching_kpi:
+                return f"❌ Custom KPI '{kpi_name}' not found. Use 'List my custom KPIs' to see available KPIs."
+            
+            # Calculate
+            result = calculator.calculate_kpi(matching_kpi.kpi_id, ticker)
+            
+            if result.error:
+                return f"❌ Error calculating {result.kpi_name} for {result.ticker}: {result.error}"
+            
+            # Format response
+            value_label = result.formatted_value if result.formatted_value is not None else f"{result.value:,.2f}" if result.value is not None else "N/A"
+            response = f"**{result.kpi_name}** for {result.ticker} ({result.period}):\n\n"
+            response += f"**Value:** {value_label}\n\n"
+            if result.metadata:
+                if result.metadata.get("frequency"):
+                    response += f"- Frequency: {result.metadata['frequency']}\n"
+                if result.metadata.get("unit"):
+                    response += f"- Unit: {result.metadata['unit']}\n"
+                inputs = result.metadata.get("inputs") or []
+                if inputs:
+                    response += f"- Inputs: {', '.join(inputs)}\n"
+            
+            if result.calculation_steps:
+                response += "**Calculation Steps:**\n"
+                for step in result.calculation_steps:
+                    if "step" in step:
+                        response += f"- {step['step']}: {step.get('value', 'N/A')}\n"
+
+            if result.sources:
+                response += "\n**Source Trace:**\n"
+                for source in result.sources:
+                    label_parts = [
+                        source.get("metric"),
+                        str(source.get("period") or source.get("fiscal_year") or ""),
+                    ]
+                    label = " ".join(part for part in label_parts if part).strip()
+                    source_label = source.get("source") or "database"
+                    response += f"- {label} → {source_label}"
+                    if source.get("source_ref"):
+                        response += f" ({source['source_ref']})"
+                    response += "\n"
+
+            if result.dependencies:
+                response += f"\n**Dependencies:** {', '.join(result.dependencies)}\n"
+            
+            return response
+        
+        elif intent["action"] == "list":
+            kpis = calculator.list_kpis(user_id)
+            if not kpis:
+                return "You don't have any custom KPIs yet. Create one with: 'Create a KPI called [name] = [formula]'"
+            
+            response = f"**Your Custom KPIs ({len(kpis)}):**\n\n"
+            for kpi in kpis:
+                response += f"- **{kpi.name}**: {kpi.formula}\n"
+                meta_bits = []
+                if kpi.frequency:
+                    meta_bits.append(f"freq={kpi.frequency}")
+                if kpi.unit:
+                    meta_bits.append(f"unit={kpi.unit}")
+                if kpi.inputs:
+                    meta_bits.append(f"inputs={', '.join(kpi.inputs)}")
+                if meta_bits:
+                    meta_summary = " | ".join(meta_bits)
+                    response += f"  _({meta_summary})_\n"
+                if kpi.description:
+                    response += f"  _{kpi.description}_\n"
+            
+            return response
+        
+        return None
+
+    def _detect_modeling_intent(self, text: str) -> Optional[Dict[str, Any]]:
+        """Detect if the prompt is about creating or using custom models."""
+        lowered = text.lower()
+        
+        # Patterns for creating models
+        create_patterns = [
+            r'create\s+(?:a\s+)?(?:custom\s+)?model\s+(?:called|named)?\s*["\']?([^"\']+)["\']?\s+(?:using|with|type)\s+(\w+)',
+            r'define\s+(?:a\s+)?(?:custom\s+)?model\s+(?:called|named)?\s*["\']?([^"\']+)["\']?\s+(?:using|with|type)\s+(\w+)',
+            r'create\s+(?:a\s+)?(\w+)\s+model\s+(?:called|named)?\s*["\']?([^"\']+)["\']?',
+        ]
+        
+        for pattern in create_patterns:
+            match = re.search(pattern, lowered)
+            if match:
+                if len(match.groups()) == 2:
+                    if 'model' in match.group(0).lower():
+                        name = match.group(1).strip()
+                        model_type = match.group(2).strip()
+                    else:
+                        model_type = match.group(1).strip()
+                        name = match.group(2).strip()
+                    return {"action": "create", "name": name, "model_type": model_type}
+        
+        # Patterns for running forecasts
+        forecast_patterns = [
+            r'forecast\s+(\w+)\'?s?\s+(\w+)\s+(?:using|with)\s+(?:my\s+)?(?:model\s+)?["\']?([^"\']+)["\']?',
+            r'run\s+(?:a\s+)?forecast\s+(?:for|of)\s+(\w+)\s+(\w+)\s+(?:using|with)\s+(?:my\s+)?(?:model\s+)?["\']?([^"\']+)["\']?',
+            r'predict\s+(\w+)\'?s?\s+(\w+)\s+(?:using|with)\s+(?:my\s+)?(?:model\s+)?["\']?([^"\']+)["\']?',
+        ]
+        
+        for pattern in forecast_patterns:
+            match = re.search(pattern, lowered)
+            if match:
+                ticker = match.group(1).strip().upper()
+                metric = match.group(2).strip()
+                model_name = match.group(3).strip() if len(match.groups()) > 2 else None
+                return {"action": "forecast", "ticker": ticker, "metric": metric, "model_name": model_name}
+        
+        # Patterns for scenario analysis
+        scenario_patterns = [
+            r'what\s+if\s+(\w+)\'?s?\s+(\w+)\s+(?:grows|increases|decreases|changes)\s+(?:at|by)\s+([\d.]+)\s*%',
+            r'scenario\s+(?:where|if)\s+(\w+)\'?s?\s+(\w+)\s+(?:grows|increases|decreases|changes)\s+(?:at|by)\s+([\d.]+)\s*%',
+            r'run\s+(?:a\s+)?(?:scenario|what-if)\s+(?:for|on)\s+(\w+)\s+(\w+)\s+(?:with|at)\s+([\d.]+)\s*%',
+        ]
+        
+        for pattern in scenario_patterns:
+            match = re.search(pattern, lowered)
+            if match:
+                ticker = match.group(1).strip().upper()
+                metric = match.group(2).strip()
+                growth_rate = float(match.group(3).strip())
+                return {"action": "scenario", "ticker": ticker, "metric": metric, "growth_rate": growth_rate}
+        
+        # Pattern for listing models
+        if re.search(r'list\s+(?:my\s+)?(?:custom\s+)?models?', lowered):
+            return {"action": "list"}
+        
+        # Pattern for explaining models
+        explain_pattern = r'explain\s+(?:my\s+)?(?:model\s+)?["\']?([^"\']+)["\']?'
+        match = re.search(explain_pattern, lowered)
+        if match:
+            return {"action": "explain", "model_name": match.group(1).strip()}
+        
+        return None
+
+    def _detect_source_trace_intent(self, text: str) -> Optional[Dict[str, Any]]:
+        """Detect if the prompt is about tracing data sources."""
+        lowered = text.lower()
+        
+        # Patterns for source tracing
+        trace_patterns = [
+            r'(?:show\s+me|where|trace|source)\s+(?:where\s+)?(?:did|does|is)\s+(\w+)\'?s?\s+(\w+)\s+(?:come\s+from|originate|source)',
+            r'(?:show\s+me|trace)\s+(?:the\s+)?source\s+(?:of|for)\s+(\w+)\'?s?\s+(\w+)',
+            r'where\s+(?:is|does)\s+(\w+)\'?s?\s+(\w+)\s+(?:from|come from)',
+        ]
+        
+        for pattern in trace_patterns:
+            match = re.search(pattern, lowered)
+            if match:
+                ticker = match.group(1).strip().upper()
+                metric = match.group(2).strip()
+                return {"action": "trace", "ticker": ticker, "metric": metric}
+        
+        return None
+
+    def _handle_modeling_intent(self, intent: Dict[str, Any]) -> Optional[str]:
+        """Handle modeling intents."""
+        builder = ModelBuilder(self.settings.database_path)
+        user_id = "default"
+        
+        if intent["action"] == "create":
+            try:
+                name = intent.get("name", "").strip()
+                model_type = intent.get("model_type", "").strip().lower()
+                
+                if not name or not model_type:
+                    return "Please provide both a model name and type. Example: 'Create a model called Revenue Forecast using growth_rate'"
+                
+                model = builder.create_model(user_id, name, model_type)
+                return f"✅ Created model '{model.name}' with type: {model.model_type}\n\nYou can now use this model by asking: 'Forecast [ticker]'s [metric] using {model.name}'"
+            except ValueError as e:
+                return f"❌ Error creating model: {str(e)}"
+            except Exception as e:
+                LOGGER.exception(f"Error creating model: {e}")
+                return f"❌ Error creating model: {str(e)}"
+        
+        elif intent["action"] == "forecast":
+            ticker = intent.get("ticker", "").strip().upper()
+            metric = intent.get("metric", "").strip()
+            model_name = intent.get("model_name")
+            
+            if not ticker or not metric:
+                return "Please provide both a ticker and metric. Example: 'Forecast AAPL's revenue using my Revenue Forecast model'"
+            
+            # Find model by name if provided
+            model_id = None
+            if model_name:
+                models = builder.list_models(user_id)
+                for model in models:
+                    if model.name.lower() == model_name.lower():
+                        model_id = model.model_id
+                        break
+                
+                if not model_id:
+                    return f"❌ Model '{model_name}' not found. Use 'List my models' to see available models."
+            else:
+                # Use default model or create one
+                models = builder.list_models(user_id)
+                if models:
+                    model_id = models[0].model_id
+                else:
+                    # Create a default model
+                    model = builder.create_model(user_id, "Default Forecast", "growth_rate")
+                    model_id = model.model_id
+            
+            # Run forecast
+            model_run = builder.run_forecast(model_id, ticker, metric)
+            
+            if not model_run.results:
+                return f"❌ Error running forecast for {ticker} {metric}"
+            
+            # Format response
+            response = f"**Forecast for {ticker} {metric}:**\n\n"
+            if "forecasts" in model_run.results:
+                for forecast in model_run.results["forecasts"][:3]:  # Show first 3 years
+                    year = forecast.get("fiscal_year", "N/A")
+                    value = forecast.get("predicted_value", 0)
+                    response += f"- {year}: ${value:,.0f}\n"
+            
+            return response
+        
+        elif intent["action"] == "scenario":
+            ticker = intent.get("ticker", "").strip().upper()
+            metric = intent.get("metric", "").strip()
+            growth_rate = intent.get("growth_rate", 0.0)
+            
+            if not ticker or not metric:
+                return "Please provide both a ticker and metric. Example: 'What if AAPL's revenue grows at 15% per year?'"
+            
+            # Get or create a model
+            models = builder.list_models(user_id)
+            model_id = None
+            if models:
+                model_id = models[0].model_id
+            else:
+                model = builder.create_model(user_id, "Scenario Model", "growth_rate")
+                model_id = model.model_id
+            
+            # Run scenario
+            model_run = builder.run_scenario(
+                model_id, ticker, metric, "custom", {"growth_rate": growth_rate}
+            )
+            
+            # Format response
+            response = f"**Scenario Analysis for {ticker} {metric} ({growth_rate}% growth):**\n\n"
+            if "forecasts" in model_run.results:
+                for forecast in model_run.results["forecasts"][:3]:
+                    year = forecast.get("fiscal_year", "N/A")
+                    value = forecast.get("predicted_value", 0)
+                    response += f"- {year}: ${value:,.0f}\n"
+            
+            return response
+        
+        elif intent["action"] == "list":
+            models = builder.list_models(user_id)
+            if not models:
+                return "You don't have any custom models yet. Create one with: 'Create a model called [name] using [type]'"
+            
+            response = f"**Your Custom Models ({len(models)}):**\n\n"
+            for model in models:
+                response += f"- **{model.name}**: {model.model_type}\n"
+            
+            return response
+        
+        elif intent["action"] == "explain":
+            model_name = intent.get("model_name", "").strip()
+            if not model_name:
+                return "Please provide a model name. Example: 'Explain my Revenue Forecast model'"
+            
+            models = builder.list_models(user_id)
+            matching_model = None
+            for model in models:
+                if model.name.lower() == model_name.lower():
+                    matching_model = model
+                    break
+            
+            if not matching_model:
+                return f"❌ Model '{model_name}' not found."
+            
+            explanation = builder.explain_model(matching_model.model_id)
+            
+            response = f"**Model: {explanation['model_name']}**\n\n"
+            response += f"**Type:** {explanation['model_type']}\n\n"
+            response += f"**Explanation:**\n{explanation['explanation']}\n"
+            
+            return response
+        
+        return None
+
+    def _handle_source_trace_intent(self, intent: Dict[str, Any]) -> Optional[str]:
+        """Handle source tracing intents."""
+        tracer = SourceTracer(self.settings.database_path)
+        
+        ticker = intent.get("ticker", "").strip().upper()
+        metric = intent.get("metric", "").strip()
+        
+        if not ticker or not metric:
+            return "Please provide both a ticker and metric. Example: 'Show me where AAPL's revenue came from'"
+        
+        # Trace source
+        trace = tracer.trace_metric(ticker, metric)
+        
+        # Format response
+        response = f"**Source Trace for {ticker} {metric}:**\n\n"
+        response += f"**Value:** {trace.value:,.2f if trace.value else 'N/A'}\n\n"
+        
+        if trace.sources:
+            response += "**Sources:**\n"
+            for i, source in enumerate(trace.sources[:5], 1):  # Show first 5 sources
+                if isinstance(source, dict):
+                    filing = source.get("form_type", "Unknown")
+                    sec_url = source.get("sec_url", "")
+                    if sec_url:
+                        response += f"{i}. {filing} - [View Filing]({sec_url})\n"
+                    else:
+                        response += f"{i}. {filing}\n"
+        
+        return response
+
     def _normalize_nl_to_command(self, text: str) -> Optional[str]:
         """Turn flexible NL prompts into the strict CLI-style commands this class handles."""
         t = text.strip()
@@ -2430,7 +2822,27 @@ class BenchmarkOSChatbot:
                     except ImportError:
                         pass
                     
-                    if is_forecasting:
+                    # Check for custom KPI intent first
+                    custom_kpi_intent = self._detect_custom_kpi_intent(user_input)
+                    if custom_kpi_intent:
+                        emit("intent_custom_kpi", f"Custom KPI intent detected: {custom_kpi_intent['action']}")
+                        reply = self._handle_custom_kpi_intent(custom_kpi_intent)
+                        attempted_intent = True
+                    # Check for modeling intent
+                    elif not attempted_intent:
+                        modeling_intent = self._detect_modeling_intent(user_input)
+                        if modeling_intent:
+                            emit("intent_modeling", f"Modeling intent detected: {modeling_intent['action']}")
+                            reply = self._handle_modeling_intent(modeling_intent)
+                            attempted_intent = True
+                        # Check for source trace intent
+                        elif not attempted_intent:
+                            source_trace_intent = self._detect_source_trace_intent(user_input)
+                            if source_trace_intent:
+                                emit("intent_source_trace", f"Source trace intent detected")
+                                reply = self._handle_source_trace_intent(source_trace_intent)
+                                attempted_intent = True
+                    elif is_forecasting:
                         # Skip structured parsing for forecasting queries - always use LLM
                         emit("intent_forecasting", "Forecasting query detected - skipping structured parsing, routing to LLM")
                         reply = None

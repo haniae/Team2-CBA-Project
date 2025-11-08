@@ -1,7 +1,115 @@
+// ============================================
+// FILE UPLOAD INITIALIZATION - RUNS IMMEDIATELY
+// ============================================
+console.log("🚀🚀🚀 [Upload] SCRIPT LOADED - FILE UPLOAD CODE IS RUNNING! 🚀🚀🚀");
+
 const API_BASE = window.API_BASE || "";
 const STORAGE_KEY = "benchmarkos.chatHistory.v2";
 const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
 const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
+const CHAT_FILE_INPUT_ID = "chat-file-upload";
+const CHAT_FILE_BUTTON_ID = "chat-file-upload-btn";
+const LEGACY_FILE_INPUT_ID = "file-input";
+const LEGACY_BUTTON_ID = "upload-button";
+
+let chatUploadHandlersBound = false;
+
+function normaliseChatUploadElements() {
+  let button =
+    document.getElementById(CHAT_FILE_BUTTON_ID) ||
+    document.getElementById(LEGACY_BUTTON_ID) ||
+    document.querySelector(".chat-file-upload-btn");
+
+  if (button && button.id !== CHAT_FILE_BUTTON_ID) {
+    console.log("[Upload] Normalising upload button ID from", button.id);
+    button.id = CHAT_FILE_BUTTON_ID;
+  }
+
+  let input =
+    document.getElementById(CHAT_FILE_INPUT_ID) ||
+    document.getElementById(LEGACY_FILE_INPUT_ID) ||
+    (button ? button.querySelector('input[type="file"]') : null) ||
+    document.querySelector('.chat-form input[type="file"]');
+
+  if (input && input.id !== CHAT_FILE_INPUT_ID) {
+    console.log("[Upload] Normalising file input ID from", input.id);
+    input.id = CHAT_FILE_INPUT_ID;
+  }
+
+  if (input) {
+    input.style.display = "none";
+    if (input.accept !== "*/*") {
+      input.setAttribute("accept", "*/*");
+    }
+  }
+
+  return { input, button };
+}
+
+function getChatUploadElements() {
+  const elements = normaliseChatUploadElements();
+  return elements;
+}
+
+function bindChatUploadHandlers(reason = "unspecified") {
+  if (chatUploadHandlersBound) {
+    return true;
+  }
+
+  const { input, button } = getChatUploadElements();
+
+  if (!input || !button) {
+    console.warn("[Upload] Chat upload elements missing during bind", {
+      reason,
+      inputFound: !!input,
+      buttonFound: !!button,
+    });
+    return false;
+  }
+
+  const triggerPicker = (event) => {
+    if (!input) {
+      console.error("[Upload] Cannot trigger file picker: input not available");
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    console.log("[Upload] Upload control activated", {
+      type: event.type,
+      key: event.key,
+    });
+    try {
+      input.click();
+      console.log("[Upload] File picker opened successfully");
+    } catch (error) {
+      console.error("[Upload] Failed to open file picker", error);
+    }
+  };
+
+  const handleButtonKeydown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      triggerPicker(event);
+    }
+  };
+
+  button.addEventListener("click", triggerPicker);
+  button.addEventListener("keydown", handleButtonKeydown);
+
+  console.log("[Upload] Chat upload handlers bound", { reason });
+  chatUploadHandlersBound = true;
+  return true;
+}
+
+// Attempt to bind immediately so pointer events work even before DOMContentLoaded
+if (!bindChatUploadHandlers("initial")) {
+  const retryBind = (reason) => bindChatUploadHandlers(reason);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => retryBind("domcontentloaded"));
+  } else {
+    setTimeout(() => retryBind("post-timeout"), 100);
+  }
+  window.addEventListener("load", () => retryBind("window-load"));
+}
 
 (function cleanupLegacyStorage() {
   try {
@@ -2031,10 +2139,77 @@ function buildKpiLibraryHero(data) {
   const metaList = document.createElement("ul");
   metaList.className = "kpi-library__meta";
 
+// ============================================
+// FILE UPLOAD INITIALIZATION - RUNS IMMEDIATELY
+// ============================================
+console.log("🚀🚀🚀 [Upload] SCRIPT LOADED - FILE UPLOAD CODE IS RUNNING! 🚀🚀🚀");
+
 const API_BASE = window.API_BASE || "";
 const STORAGE_KEY = "benchmarkos.chatHistory.v2";
 const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
 const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
+
+// Initialize file upload handler immediately - run at top level
+(function initFileUploadImmediate() {
+  console.log("🚀 [Upload] TOP LEVEL: Starting file upload initialization...");
+  console.log("🚀 [Upload] TOP LEVEL: Document ready state:", document.readyState);
+  
+  function tryInit() {
+    const input = document.getElementById("chat-file-upload");
+    const button = document.getElementById("chat-file-upload-btn");
+    console.log("🚀 [Upload] TOP LEVEL: Element check:", {
+      input: !!input,
+      button: !!button,
+      inputEl: input,
+      buttonEl: button
+    });
+    
+    if (input && button) {
+      console.log("🚀 [Upload] TOP LEVEL: ✅ Elements found! Setting up click handler...");
+      button.addEventListener("click", function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("🚀 [Upload] TOP LEVEL: Button clicked!");
+        try {
+          input.click();
+          console.log("🚀 [Upload] TOP LEVEL: Input click triggered!");
+        } catch (err) {
+          console.error("🚀 [Upload] TOP LEVEL: Error:", err);
+        }
+      });
+      
+      input.addEventListener("change", function(e) {
+        console.log("🚀 [Upload] TOP LEVEL: File selected:", e.target.files?.[0]?.name);
+        // The main handler will process this
+      });
+      
+      return true;
+    }
+    return false;
+  }
+  
+  // Try immediately
+  if (!tryInit()) {
+    // Retry on DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log("🚀 [Upload] TOP LEVEL: DOMContentLoaded, retrying...");
+        tryInit();
+      });
+    } else {
+      setTimeout(function() {
+        console.log("🚀 [Upload] TOP LEVEL: Retrying after delay...");
+        tryInit();
+      }, 100);
+    }
+  }
+  
+  // Also try on window load
+  window.addEventListener('load', function() {
+    console.log("🚀 [Upload] TOP LEVEL: Window load, retrying...");
+    tryInit();
+  });
+})();
 
 (function cleanupLegacyStorage() {
   try {
@@ -9039,6 +9214,205 @@ async function sendPrompt(prompt, requestId) {
   }
   return data;
 }
+
+// File upload handling - initialize after DOM is ready
+function initializeFileUpload() {
+  console.log("[Upload] Initializing file upload handler...");
+
+  const { input: chatFileUpload, button: chatFileUploadBtn } = getChatUploadElements();
+
+  if (!chatFileUpload) {
+    console.error("[Upload] File upload input not found in DOM");
+    return;
+  }
+
+  if (!chatFileUploadBtn) {
+    console.error("[Upload] File upload button not found in DOM");
+    return;
+  }
+
+  bindChatUploadHandlers("initialize");
+
+  console.log("[Upload] File upload elements ready", {
+    inputPresent: true,
+    buttonPresent: true,
+    inputVisible: chatFileUpload.offsetParent !== null,
+    buttonVisible: chatFileUploadBtn.offsetParent !== null,
+  });
+
+  if (!chatFileUpload.dataset.chatUploadChangeBound) {
+    chatFileUpload.addEventListener("change", onChatFileSelected);
+    chatFileUpload.dataset.chatUploadChangeBound = "true";
+    chatFileUpload.addEventListener("click", (event) => {
+      console.log("[Upload] File input clicked directly", {
+        target: event.target,
+        files: event.target.files?.length || 0,
+      });
+    });
+  }
+}
+
+async function onChatFileSelected(event) {
+  console.log("[Upload] File selection changed", {
+    fileCount: event.target.files?.length || 0,
+    fileName: event.target.files?.[0]?.name || "none",
+  });
+
+  const file = event.target.files[0];
+  if (!file) {
+    console.warn("[Upload] No file selected");
+    return;
+  }
+
+  console.log("[Upload] Starting file upload", {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type || "unknown",
+  });
+
+  const uploadingMsgWrapper = appendMessage("user", `📎 Uploading ${file.name}...`, { forceScroll: true });
+  setSending(true);
+
+  try {
+    console.log("[Upload] Creating FormData and preparing upload...");
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const conversationId = getActiveConversationId();
+    if (conversationId) {
+      formData.append("conversation_id", conversationId);
+    }
+
+    const response = await fetch(`${API_BASE}/api/documents/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: "Upload failed" }));
+      throw new Error(error.message || "Upload failed");
+    }
+
+    const result = await response.json();
+    console.log("[Upload] Upload response received", { success: result.success, result });
+
+    if (result.success) {
+      console.log("[Upload] Upload successful!");
+      if (uploadingMsgWrapper) {
+        const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
+        if (bodyEl) {
+          bodyEl.textContent = `📎 Uploaded ${file.name} successfully`;
+          uploadingMsgWrapper.classList.add("upload-success");
+        }
+      }
+
+      const assistantMsg = result.message
+        ? result.message
+        : `✅ File "${file.name}" uploaded successfully. The document has been processed and is now available for analysis. You can ask questions about it or use it as a framework/template.`;
+      recordMessage("assistant", assistantMsg);
+      appendMessage("assistant", assistantMsg, { forceScroll: true });
+    } else {
+      console.error("[Upload] Upload failed:", result.errors);
+      throw new Error(result.errors?.[0] || "Upload failed");
+    }
+  } catch (error) {
+    console.error("[Upload] File upload error:", error);
+    if (uploadingMsgWrapper) {
+      const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
+      if (bodyEl) {
+        bodyEl.textContent = `❌ Upload failed: ${error.message}`;
+        uploadingMsgWrapper.classList.add("upload-error");
+      }
+    }
+
+    const errorMsg = `❌ Failed to upload ${file.name}: ${error.message}`;
+    recordMessage("system", errorMsg);
+    appendMessage("system", errorMsg, { forceScroll: true });
+  } finally {
+    setSending(false);
+    event.target.value = "";
+  }
+}
+
+// Initialize file upload - try multiple times with aggressive retry
+let uploadInitAttempts = 0;
+const MAX_UPLOAD_INIT_ATTEMPTS = 50;
+
+function tryInitializeFileUpload() {
+  uploadInitAttempts++;
+  console.log(`[Upload] Attempt ${uploadInitAttempts} to initialize file upload...`);
+  
+  const chatFileUpload = document.getElementById("chat-file-upload");
+  const chatFileUploadBtn = document.getElementById("chat-file-upload-btn");
+  
+  console.log(`[Upload] Element check:`, {
+    input: !!chatFileUpload,
+    button: !!chatFileUploadBtn,
+    inputElement: chatFileUpload,
+    buttonElement: chatFileUploadBtn
+  });
+  
+  if (chatFileUpload && chatFileUploadBtn) {
+    console.log("[Upload] ✅ Elements found, initializing...");
+    initializeFileUpload();
+    return true;
+  } else {
+    if (uploadInitAttempts < MAX_UPLOAD_INIT_ATTEMPTS) {
+      console.log(`[Upload] ⏳ Elements not found yet, retrying in 100ms... (attempt ${uploadInitAttempts}/${MAX_UPLOAD_INIT_ATTEMPTS})`);
+      setTimeout(tryInitializeFileUpload, 100);
+    } else {
+      console.error("[Upload] ❌ Failed to find elements after", MAX_UPLOAD_INIT_ATTEMPTS, "attempts");
+      console.error("[Upload] Input element:", chatFileUpload);
+      console.error("[Upload] Button element:", chatFileUploadBtn);
+    }
+    return false;
+  }
+}
+
+// Try immediately
+console.log("[Upload] Starting file upload initialization...");
+console.log("[Upload] Document ready state:", document.readyState);
+
+if (document.readyState === 'loading') {
+  console.log("[Upload] Document is loading, waiting for DOMContentLoaded...");
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log("[Upload] DOMContentLoaded fired, initializing...");
+    tryInitializeFileUpload();
+  });
+} else {
+  console.log("[Upload] Document already ready, initializing immediately...");
+  tryInitializeFileUpload();
+}
+
+// Also try on window load as fallback
+window.addEventListener('load', () => {
+  console.log("[Upload] Window load event fired, checking elements...");
+  const chatFileUpload = document.getElementById("chat-file-upload");
+  const chatFileUploadBtn = document.getElementById("chat-file-upload-btn");
+  console.log("[Upload] Window load check:", {
+    input: !!chatFileUpload,
+    button: !!chatFileUploadBtn
+  });
+  if (chatFileUpload && chatFileUploadBtn) {
+    console.log("[Upload] ✅ Re-initializing on window load...");
+    initializeFileUpload();
+  } else {
+    console.error("[Upload] ❌ Elements still not found on window load");
+  }
+});
+
+// Final fallback - try after a longer delay
+setTimeout(() => {
+  console.log("[Upload] Final fallback check after 2 seconds...");
+  const chatFileUpload = document.getElementById("chat-file-upload");
+  const chatFileUploadBtn = document.getElementById("chat-file-upload-btn");
+  if (chatFileUpload && chatFileUploadBtn) {
+    console.log("[Upload] ✅ Final fallback: initializing...");
+    initializeFileUpload();
+  } else {
+    console.error("[Upload] ❌ Final fallback: elements still not found");
+  }
+}, 2000);
 
 chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();

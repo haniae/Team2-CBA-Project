@@ -336,6 +336,76 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
         _ensure_column(connection, "metric_snapshots", "source", "TEXT NOT NULL DEFAULT 'edgar'")
         _ensure_column(connection, "metric_snapshots", "updated_at", "TEXT")
 
+    if "custom_kpis" in tables:
+        _ensure_column(connection, "custom_kpis", "frequency", "TEXT")
+        _ensure_column(connection, "custom_kpis", "unit", "TEXT")
+        _ensure_column(connection, "custom_kpis", "inputs", "TEXT NOT NULL DEFAULT '[]'")
+        _ensure_column(connection, "custom_kpis", "source_tags", "TEXT NOT NULL DEFAULT '[]'")
+        _ensure_column(connection, "custom_kpis", "metadata", "TEXT NOT NULL DEFAULT '{}'")
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS custom_kpi_versions (
+                version_id TEXT PRIMARY KEY,
+                kpi_id TEXT NOT NULL,
+                version_number INTEGER NOT NULL,
+                formula TEXT NOT NULL,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                FOREIGN KEY (kpi_id) REFERENCES custom_kpis(kpi_id)
+            )
+            """
+        )
+
+    if "custom_models" in tables:
+        _ensure_column(connection, "custom_models", "description", "TEXT")
+        _ensure_column(connection, "custom_models", "target_metric", "TEXT")
+        _ensure_column(connection, "custom_models", "frequency", "TEXT")
+        _ensure_column(connection, "custom_models", "forecast_horizon", "INTEGER")
+        _ensure_column(connection, "custom_models", "status", "TEXT NOT NULL DEFAULT 'configured'")
+        _ensure_column(connection, "custom_models", "regressors", "TEXT NOT NULL DEFAULT '[]'")
+        _ensure_column(connection, "custom_models", "metadata", "TEXT NOT NULL DEFAULT '{}'")
+
+    if "model_runs" in tables:
+        _ensure_column(connection, "model_runs", "assumptions", "TEXT NOT NULL DEFAULT '{}'")
+        _ensure_column(connection, "model_runs", "driver_explanations", "TEXT NOT NULL DEFAULT '[]'")
+        _ensure_column(connection, "model_runs", "artifacts", "TEXT NOT NULL DEFAULT '[]'")
+
+    if "model_artifacts" not in tables:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_artifacts (
+                artifact_id TEXT PRIMARY KEY,
+                model_id TEXT NOT NULL,
+                run_id TEXT,
+                artifact_type TEXT NOT NULL,
+                location TEXT,
+                data BLOB,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (model_id) REFERENCES custom_models(model_id),
+                FOREIGN KEY (run_id) REFERENCES model_runs(run_id)
+            )
+            """
+        )
+
+    if "template_render_jobs" not in tables:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS template_render_jobs (
+                job_id TEXT PRIMARY KEY,
+                template_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                ticker TEXT,
+                context TEXT NOT NULL DEFAULT '{}',
+                audit_log TEXT NOT NULL DEFAULT '[]',
+                output_path TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (template_id) REFERENCES report_templates(template_id)
+            )
+            """
+        )
+
     # kpi_values provenance upgrades
     if "kpi_values" in tables:
         _ensure_column(connection, "kpi_values", "unit", "TEXT")
@@ -646,6 +716,219 @@ def initialise(database_path: Path) -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS custom_kpis (
+                kpi_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                name TEXT NOT NULL,
+                formula TEXT NOT NULL,
+                description TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                frequency TEXT,
+                unit TEXT,
+                inputs TEXT NOT NULL DEFAULT '[]',
+                source_tags TEXT NOT NULL DEFAULT '[]',
+                metadata TEXT NOT NULL DEFAULT '{}'
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS custom_kpi_usage (
+                usage_id TEXT PRIMARY KEY,
+                kpi_id TEXT NOT NULL,
+                ticker TEXT NOT NULL,
+                period TEXT NOT NULL,
+                value REAL,
+                calculated_at TEXT NOT NULL,
+                FOREIGN KEY (kpi_id) REFERENCES custom_kpis(kpi_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS kpi_dependencies (
+                kpi_id TEXT NOT NULL,
+                metric_name TEXT NOT NULL,
+                dependency_type TEXT NOT NULL DEFAULT 'metric',
+                PRIMARY KEY (kpi_id, metric_name),
+                FOREIGN KEY (kpi_id) REFERENCES custom_kpis(kpi_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS custom_kpi_versions (
+                version_id TEXT PRIMARY KEY,
+                kpi_id TEXT NOT NULL,
+                version_number INTEGER NOT NULL,
+                formula TEXT NOT NULL,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                FOREIGN KEY (kpi_id) REFERENCES custom_kpis(kpi_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS custom_models (
+                model_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                name TEXT NOT NULL,
+                model_type TEXT NOT NULL,
+                parameters TEXT NOT NULL DEFAULT '{}',
+                metrics TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL,
+                description TEXT,
+                target_metric TEXT,
+                frequency TEXT,
+                forecast_horizon INTEGER,
+                status TEXT NOT NULL DEFAULT 'configured',
+                regressors TEXT NOT NULL DEFAULT '[]',
+                metadata TEXT NOT NULL DEFAULT '{}'
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_runs (
+                run_id TEXT PRIMARY KEY,
+                model_id TEXT NOT NULL,
+                ticker TEXT NOT NULL,
+                forecast_periods TEXT NOT NULL DEFAULT '[]',
+                results TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                assumptions TEXT NOT NULL DEFAULT '{}',
+                driver_explanations TEXT NOT NULL DEFAULT '[]',
+                artifacts TEXT NOT NULL DEFAULT '[]',
+                FOREIGN KEY (model_id) REFERENCES custom_models(model_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_assumptions (
+                assumption_id TEXT PRIMARY KEY,
+                model_id TEXT NOT NULL,
+                variable TEXT NOT NULL,
+                value REAL,
+                scenario TEXT NOT NULL DEFAULT 'base',
+                FOREIGN KEY (model_id) REFERENCES custom_models(model_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_artifacts (
+                artifact_id TEXT PRIMARY KEY,
+                model_id TEXT NOT NULL,
+                run_id TEXT,
+                artifact_type TEXT NOT NULL,
+                location TEXT,
+                data BLOB,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (model_id) REFERENCES custom_models(model_id),
+                FOREIGN KEY (run_id) REFERENCES model_runs(run_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS report_templates (
+                template_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                name TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                structure TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS template_placeholders (
+                placeholder_id TEXT PRIMARY KEY,
+                template_id TEXT NOT NULL,
+                placeholder_name TEXT NOT NULL,
+                data_type TEXT NOT NULL,
+                source_metric TEXT,
+                FOREIGN KEY (template_id) REFERENCES report_templates(template_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS frameworks (
+                framework_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                name TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                extracted_content TEXT NOT NULL DEFAULT '{}',
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS template_render_jobs (
+                job_id TEXT PRIMARY KEY,
+                template_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                ticker TEXT,
+                context TEXT NOT NULL DEFAULT '{}',
+                audit_log TEXT NOT NULL DEFAULT '[]',
+                output_path TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (template_id) REFERENCES report_templates(template_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS framework_kpis (
+                framework_id TEXT NOT NULL,
+                kpi_name TEXT NOT NULL,
+                kpi_definition TEXT,
+                extracted_from TEXT,
+                PRIMARY KEY (framework_id, kpi_name),
+                FOREIGN KEY (framework_id) REFERENCES frameworks(framework_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS framework_methodology (
+                framework_id TEXT NOT NULL,
+                section TEXT NOT NULL,
+                content TEXT NOT NULL,
+                applies_to TEXT,
+                PRIMARY KEY (framework_id, section),
+                FOREIGN KEY (framework_id) REFERENCES frameworks(framework_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS uploaded_documents (
+                document_id TEXT PRIMARY KEY,
+                conversation_id TEXT,
+                filename TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
 
         _apply_migrations(connection)
 
@@ -713,6 +996,66 @@ def initialise(database_path: Path) -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_attribution_results_portfolio
             ON attribution_results (portfolio_id, start_date DESC, end_date DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_custom_kpis_user
+            ON custom_kpis (user_id, created_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_custom_kpi_usage_lookup
+            ON custom_kpi_usage (kpi_id, ticker, period)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_kpi_dependencies_lookup
+            ON kpi_dependencies (kpi_id, metric_name)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_custom_models_user
+            ON custom_models (user_id, created_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_model_runs_lookup
+            ON model_runs (model_id, ticker, created_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_model_artifacts_model
+            ON model_artifacts (model_id, created_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_report_templates_user
+            ON report_templates (user_id, created_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_frameworks_user
+            ON frameworks (user_id, created_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_uploaded_documents_conversation
+            ON uploaded_documents (conversation_id, created_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_template_render_jobs_template
+            ON template_render_jobs (template_id, created_at DESC)
             """
         )
         connection.commit()
