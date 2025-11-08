@@ -531,6 +531,9 @@ class Conversation:
     active_forecast: Optional[Dict[str, Any]] = field(default=None, init=False)
     forecast_history: List[Dict[str, Any]] = field(default_factory=list, init=False)
     saved_forecasts: Dict[str, Dict[str, Any]] = field(default_factory=dict, init=False)
+    
+    # Custom KPI library for this conversation
+    custom_kpis: Dict[str, Any] = field(default_factory=dict, init=False)
 
     def as_llm_messages(self) -> List[Mapping[str, str]]:
         """Render the conversation history in chat-completions format."""
@@ -689,6 +692,18 @@ class Conversation:
                 LOGGER.error(f"Failed to list forecasts from database: {e}", exc_info=True)
         
         return sorted(forecast_names)
+    
+    def add_custom_kpi(self, kpi_id: str, kpi_data: Dict[str, Any]) -> None:
+        """Add a custom KPI to the conversation library."""
+        self.custom_kpis[kpi_id] = kpi_data
+    
+    def get_custom_kpi(self, kpi_id: str) -> Optional[Dict[str, Any]]:
+        """Get a custom KPI by ID."""
+        return self.custom_kpis.get(kpi_id)
+    
+    def list_custom_kpis(self) -> List[str]:
+        """List all custom KPI IDs."""
+        return list(self.custom_kpis.keys())
 
 
 SYSTEM_PROMPT = (
@@ -898,6 +913,34 @@ SYSTEM_PROMPT = (
     "   - Always show confidence: 'Model confidence: 78%' or '95% CI: [$X - $Y]'\n"
     "   - Always explain model choice: 'LSTM was selected because...'\n"
     "   - Always invite questions: 'Ask me anything about this forecast'\n\n"
+    
+    "## 🎨 Custom KPI Builder - USER-DEFINED METRICS\n\n"
+    "**When users define custom KPIs:**\n\n"
+    "1. **ACKNOWLEDGE KPI CREATION** - When a custom KPI is defined:\n"
+    "   - '✅ Custom KPI created: [Name]'\n"
+    "   - Show the formula clearly: 'Formula: (ROE + ROIC) / 2'\n"
+    "   - List required base metrics: 'Requires: ROE, ROIC'\n"
+    "   - Explain what it measures: 'This measures average capital efficiency'\n"
+    "   - Provide examples: 'Try: Calculate Efficiency Score for Apple'\n\n"
+    "2. **CALCULATE CUSTOM KPIS** - When asked to calculate a custom KPI:\n"
+    "   - Use the EXACT formula provided in the custom KPI definition\n"
+    "   - Show the calculation step-by-step\n"
+    "   - Display base metric values used\n"
+    "   - Show the final result prominently\n"
+    "   - Example: 'ROE: 28.6%, ROIC: 20.0% → Efficiency Score: 24.3%'\n\n"
+    "3. **LIST CUSTOM KPIS** - When asked to list custom KPIs:\n"
+    "   - Show all custom KPIs with their formulas\n"
+    "   - Indicate which base metrics each requires\n"
+    "   - Provide usage examples\n\n"
+    "4. **CUSTOM KPI IN COMPARISONS** - When comparing companies with custom KPIs:\n"
+    "   - Calculate the custom KPI for each company\n"
+    "   - Show base metrics + custom KPI in comparison table\n"
+    "   - Rank companies by the custom KPI\n"
+    "   - Explain what the custom KPI reveals about each company\n\n"
+    "5. **VALIDATION ERRORS** - If custom KPI cannot be calculated:\n"
+    "   - Explain which metrics are missing\n"
+    "   - Suggest companies/periods with available data\n"
+    "   - Offer alternative formulas if possible\n\n"
 
     "- Explain the model used and its confidence level\n"
     "- Reference academic sources (e.g., 'Hochreiter & Schmidhuber (1997) introduced LSTM networks...')\n"
@@ -6089,9 +6132,253 @@ class BenchmarkOSChatbot:
         
         return "\n".join(context_lines)
     
+    def _handle_custom_kpi_query(self, user_input: str, kpi_query: Dict[str, Any]) -> str:
+        """
+        Handle custom KPI definition, calculation, or management.
+        
+        Args:
+            user_input: Original user query
+            kpi_query: Parsed KPI query from detect_custom_kpi_query
+            
+        Returns:
+            Context string for LLM
+        """
+        from .custom_kpi_builder import CustomKPIBuilder
+        
+        query_type = kpi_query.get("type")
+        context_lines = [
+            "=" * 80,
+            "🎨 CUSTOM KPI BUILDER",
+            "=" * 80,
+            ""
+        ]
+        
+        if query_type == "define":
+            # User wants to define a new custom KPI
+            name = kpi_query.get("name")
+            formula = kpi_query.get("formula")
+            
+            context_lines.extend([
+                f"**User wants to define a custom KPI:**",
+                f"- Name: {name}",
+                f"- Formula: {formula}",
+                ""
+            ])
+            
+            # Create the custom KPI
+            builder = CustomKPIBuilder()
+            custom_kpi = builder.create_custom_kpi(name, formula)
+            
+            if custom_kpi:
+                # Store in conversation
+                self.conversation.add_custom_kpi(custom_kpi.kpi_id, custom_kpi.to_dict())
+                
+                context_lines.extend([
+                    "**✅ Custom KPI Created Successfully**",
+                    "",
+                    f"**KPI ID:** {custom_kpi.kpi_id}",
+                    f"**Display Name:** {custom_kpi.display_name}",
+                    f"**Formula:** {custom_kpi.formula}",
+                    f"**Required Metrics:** {', '.join(custom_kpi.base_metrics)}",
+                    f"**Unit:** {custom_kpi.unit}",
+                    f"**Complexity:** {custom_kpi.operator_tree.get('complexity', 'unknown')}",
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    f"1. Confirm that '{custom_kpi.display_name}' has been created",
+                    "2. Explain the formula in plain language",
+                    "3. List the required base metrics",
+                    "4. Explain what this KPI measures (interpret the formula)",
+                    "5. Provide example queries:",
+                    f"   - 'Calculate {custom_kpi.display_name} for Apple'",
+                    f"   - 'Compare {custom_kpi.display_name} for AAPL, MSFT, GOOGL'",
+                    f"   - 'Show me companies with highest {custom_kpi.display_name}'",
+                    ""
+                ])
+            else:
+                context_lines.extend([
+                    "**❌ Custom KPI Creation Failed**",
+                    "",
+                    "**Possible Reasons:**",
+                    "  - Formula contains unknown metrics",
+                    "  - Formula has syntax errors",
+                    "  - Formula is empty or invalid",
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    "1. Apologize that the custom KPI could not be created",
+                    "2. Explain possible reasons for failure",
+                    "3. Suggest fixing the formula:",
+                    "   - Use recognized metrics: ROE, ROIC, revenue, net_income, etc.",
+                    "   - Check parentheses are balanced",
+                    "   - Use simple operators: +, -, *, /, avg()",
+                    "4. Provide example valid formulas:",
+                    "   - 'Define Efficiency Score = (ROE + ROIC) / 2'",
+                    "   - 'Define Growth Quality = revenue_cagr * profit_margin'",
+                    ""
+                ])
+        
+        elif query_type == "calculate":
+            # User wants to calculate a custom KPI for a company
+            kpi_name = kpi_query.get("kpi_name")
+            ticker = kpi_query.get("ticker")
+            
+            # Normalize KPI name to ID
+            kpi_id = re.sub(r'[^\w]+', '_', kpi_name.lower()).strip('_')
+            
+            # Check if this custom KPI exists
+            custom_kpi_data = self.conversation.get_custom_kpi(kpi_id)
+            
+            if custom_kpi_data:
+                context_lines.extend([
+                    f"**User wants to calculate custom KPI for {ticker}:**",
+                    f"- KPI: {custom_kpi_data['display_name']}",
+                    f"- Formula: {custom_kpi_data['formula']}",
+                    f"- Required Metrics: {', '.join(custom_kpi_data['base_metrics'])}",
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    f"1. Fetch the base metric values for {ticker}:",
+                ])
+                
+                for metric in custom_kpi_data['base_metrics']:
+                    context_lines.append(f"   - {metric}: [fetch from database]")
+                
+                context_lines.extend([
+                    f"2. Calculate {custom_kpi_data['display_name']} using the formula: {custom_kpi_data['formula']}",
+                    "3. Show the calculation step-by-step",
+                    "4. Present the final result prominently",
+                    "5. Interpret what the value means for this company",
+                    "6. Compare to peers if helpful",
+                    "",
+                    "**Note:** You'll need to fetch the base metrics from the financial database.",
+                    ""
+                ])
+            else:
+                context_lines.extend([
+                    f"**❌ Custom KPI '{kpi_name}' Not Found**",
+                    "",
+                    f"**Available Custom KPIs:**",
+                ])
+                
+                available_kpis = self.conversation.list_custom_kpis()
+                if available_kpis:
+                    for kpi_id_available in available_kpis:
+                        kpi_data = self.conversation.get_custom_kpi(kpi_id_available)
+                        if kpi_data:
+                            context_lines.append(f"  - {kpi_data['display_name']}: {kpi_data['formula']}")
+                else:
+                    context_lines.append("  (No custom KPIs defined yet)")
+                
+                context_lines.extend([
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    f"1. Inform the user that '{kpi_name}' was not found",
+                    "2. Show available custom KPIs (if any)",
+                    "3. Suggest defining the KPI first:",
+                    f"   - 'Define custom metric: {kpi_name} = [your formula]'",
+                    "4. Provide example formulas they could use",
+                    ""
+                ])
+        
+        elif query_type == "list":
+            # User wants to see all custom KPIs
+            context_lines.extend([
+                "**User wants to list all custom KPIs**",
+                "",
+                "**Custom KPIs Defined in This Conversation:**",
+                ""
+            ])
+            
+            available_kpis = self.conversation.list_custom_kpis()
+            if available_kpis:
+                for kpi_id in available_kpis:
+                    kpi_data = self.conversation.get_custom_kpi(kpi_id)
+                    if kpi_data:
+                        context_lines.append(f"**{kpi_data['display_name']}**")
+                        context_lines.append(f"  - Formula: {kpi_data['formula']}")
+                        context_lines.append(f"  - Requires: {', '.join(kpi_data['base_metrics'])}")
+                        context_lines.append(f"  - Unit: {kpi_data['unit']}")
+                        context_lines.append("")
+                
+                context_lines.extend([
+                    "**🎯 YOUR TASK:**",
+                    "1. Present all custom KPIs in a clear, structured format",
+                    "2. For each KPI, show:",
+                    "   - Name and formula",
+                    "   - Required base metrics",
+                    "   - What it measures (interpret the formula)",
+                    "3. Provide usage examples for each KPI",
+                    "4. Suggest creating new custom KPIs if needed",
+                    ""
+                ])
+            else:
+                context_lines.extend([
+                    "(No custom KPIs defined yet)",
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    "1. Inform the user that no custom KPIs have been defined yet",
+                    "2. Explain how to define a custom KPI:",
+                    "   - 'Define custom metric: [Name] = [Formula]'",
+                    "3. Provide example custom KPIs they could create:",
+                    "   - 'Efficiency Score = (ROE + ROIC) / 2'",
+                    "   - 'Growth Quality = revenue_cagr * profit_margin'",
+                    "   - 'Capital Intensity = total_assets / revenue'",
+                    "4. List available base metrics they can use",
+                    ""
+                ])
+        
+        elif query_type == "delete":
+            # User wants to delete a custom KPI
+            kpi_name = kpi_query.get("kpi_name")
+            kpi_id = re.sub(r'[^\w]+', '_', kpi_name.lower()).strip('_')
+            
+            custom_kpi_data = self.conversation.get_custom_kpi(kpi_id)
+            
+            if custom_kpi_data:
+                # Delete from conversation
+                del self.conversation.custom_kpis[kpi_id]
+                
+                context_lines.extend([
+                    f"**✅ Custom KPI Deleted**",
+                    "",
+                    f"**Deleted:** {custom_kpi_data['display_name']}",
+                    f"**Formula:** {custom_kpi_data['formula']}",
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    f"1. Confirm that '{custom_kpi_data['display_name']}' has been deleted",
+                    "2. List remaining custom KPIs (if any)",
+                    "3. Suggest creating new custom KPIs if needed",
+                    ""
+                ])
+            else:
+                context_lines.extend([
+                    f"**❌ Custom KPI '{kpi_name}' Not Found**",
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    f"1. Inform the user that '{kpi_name}' was not found",
+                    "2. List available custom KPIs",
+                    "3. Suggest the correct name if similar KPI exists",
+                    ""
+                ])
+        
+        context_lines.extend([
+            "=" * 80,
+            "END OF CUSTOM KPI CONTEXT",
+            "=" * 80
+        ])
+        
+        return "\n".join(context_lines)
+    
     def _build_enhanced_rag_context(self, user_input: str) -> Optional[str]:
         """Enhanced RAG context building with comprehensive financial data."""
-        # FIRST: Check if this is a follow-up question about an active forecast
+        # FIRST: Check if this is a custom KPI query
+        try:
+            from .custom_kpi_builder import detect_custom_kpi_query, CustomKPIBuilder
+            custom_kpi_query = detect_custom_kpi_query(user_input)
+            if custom_kpi_query:
+                return self._handle_custom_kpi_query(user_input, custom_kpi_query)
+        except ImportError:
+            LOGGER.debug("Custom KPI builder not available")
+        
+        # SECOND: Check if this is a follow-up question about an active forecast
         followup = self._detect_forecast_followup(user_input)
         if followup:
             return self._build_forecast_followup_context(user_input, followup)
