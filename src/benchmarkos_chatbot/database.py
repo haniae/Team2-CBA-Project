@@ -528,6 +528,28 @@ def initialise(database_path: Path) -> None:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS ml_forecasts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id TEXT NOT NULL,
+                forecast_name TEXT,
+                ticker TEXT NOT NULL,
+                metric TEXT NOT NULL,
+                method TEXT NOT NULL,
+                periods INTEGER NOT NULL,
+                predicted_values TEXT NOT NULL,
+                confidence_intervals_low TEXT NOT NULL,
+                confidence_intervals_high TEXT NOT NULL,
+                model_confidence REAL,
+                parameters TEXT NOT NULL DEFAULT '{}',
+                explainability TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                created_by TEXT NOT NULL DEFAULT 'user',
+                UNIQUE(conversation_id, forecast_name)
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS portfolio_metadata (
                 portfolio_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -1821,6 +1843,175 @@ def fetch_scenario_results(
             )
         )
     return results
+
+
+# -----------------------------
+# ML Forecast Persistence
+# -----------------------------
+
+
+def save_ml_forecast(
+    database_path: Path,
+    conversation_id: str,
+    forecast_name: str,
+    ticker: str,
+    metric: str,
+    method: str,
+    periods: int,
+    predicted_values: List[float],
+    confidence_intervals_low: List[float],
+    confidence_intervals_high: List[float],
+    model_confidence: float,
+    parameters: Optional[Dict[str, Any]] = None,
+    explainability: Optional[Dict[str, Any]] = None,
+) -> int:
+    """
+    Save an ML forecast to the database.
+    
+    Args:
+        database_path: Path to database
+        conversation_id: Conversation ID
+        forecast_name: User-defined name for the forecast
+        ticker: Company ticker
+        metric: Metric forecasted
+        method: ML model used
+        periods: Number of periods forecasted
+        predicted_values: List of predicted values
+        confidence_intervals_low: Lower confidence bounds
+        confidence_intervals_high: Upper confidence bounds
+        model_confidence: Overall model confidence (0-1)
+        parameters: Model parameters used
+        explainability: Explainability data (drivers, features, etc.)
+        
+    Returns:
+        Row ID of the saved forecast
+    """
+    created_at = datetime.now(timezone.utc).isoformat()
+    
+    # Serialize lists and dicts to JSON
+    predicted_json = json.dumps(predicted_values)
+    ci_low_json = json.dumps(confidence_intervals_low)
+    ci_high_json = json.dumps(confidence_intervals_high)
+    parameters_json = json.dumps(parameters or {})
+    explainability_json = json.dumps(explainability or {})
+    
+    with _connect(database_path) as connection:
+        cursor = connection.execute(
+            """
+            INSERT OR REPLACE INTO ml_forecasts (
+                conversation_id, forecast_name, ticker, metric, method, periods,
+                predicted_values, confidence_intervals_low, confidence_intervals_high,
+                model_confidence, parameters, explainability, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                conversation_id,
+                forecast_name,
+                _normalize_ticker(ticker),
+                metric,
+                method,
+                periods,
+                predicted_json,
+                ci_low_json,
+                ci_high_json,
+                model_confidence,
+                parameters_json,
+                explainability_json,
+                created_at,
+            ),
+        )
+        connection.commit()
+        return cursor.lastrowid
+
+
+def load_ml_forecast(
+    database_path: Path,
+    conversation_id: str,
+    forecast_name: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Load a saved ML forecast from the database.
+    
+    Args:
+        database_path: Path to database
+        conversation_id: Conversation ID
+        forecast_name: Name of the forecast to load
+        
+    Returns:
+        Dictionary with forecast data, or None if not found
+    """
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            """
+            SELECT * FROM ml_forecasts
+            WHERE conversation_id = ? AND forecast_name = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (conversation_id, forecast_name)
+        ).fetchone()
+    
+    if not row:
+        return None
+    
+    # Deserialize JSON fields
+    predicted_values = json.loads(row["predicted_values"])
+    ci_low = json.loads(row["confidence_intervals_low"])
+    ci_high = json.loads(row["confidence_intervals_high"])
+    parameters = json.loads(row["parameters"] or "{}")
+    explainability = json.loads(row["explainability"] or "{}")
+    
+    return {
+        "id": row["id"],
+        "ticker": row["ticker"],
+        "metric": row["metric"],
+        "method": row["method"],
+        "periods": row["periods"],
+        "predicted_values": predicted_values,
+        "confidence_intervals_low": ci_low,
+        "confidence_intervals_high": ci_high,
+        "model_confidence": row["model_confidence"],
+        "parameters": parameters,
+        "explainability": explainability,
+        "created_at": row["created_at"],
+    }
+
+
+def list_ml_forecasts(
+    database_path: Path,
+    conversation_id: str,
+    ticker: Optional[str] = None
+) -> List[Tuple[str, str, str, str]]:
+    """
+    List saved ML forecasts for a conversation.
+    
+    Args:
+        database_path: Path to database
+        conversation_id: Conversation ID
+        ticker: Optional ticker filter
+        
+    Returns:
+        List of tuples: (forecast_name, ticker, metric, created_at)
+    """
+    query = """
+        SELECT forecast_name, ticker, metric, created_at
+        FROM ml_forecasts
+        WHERE conversation_id = ?
+    """
+    params = [conversation_id]
+    
+    if ticker:
+        query += " AND ticker = ?"
+        params.append(_normalize_ticker(ticker))
+    
+    query += " ORDER BY created_at DESC"
+    
+    with _connect(database_path) as connection:
+        rows = connection.execute(query, params).fetchall()
+    
+    return rows
 
 
 # -----------------------------

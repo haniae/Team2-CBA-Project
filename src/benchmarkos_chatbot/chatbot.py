@@ -526,10 +526,169 @@ class Conversation:
 
     conversation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     messages: List[Mapping[str, str]] = field(default_factory=list)
+    
+    # Forecast state tracking for interactive ML forecasting
+    active_forecast: Optional[Dict[str, Any]] = field(default=None, init=False)
+    forecast_history: List[Dict[str, Any]] = field(default_factory=list, init=False)
+    saved_forecasts: Dict[str, Dict[str, Any]] = field(default_factory=dict, init=False)
 
     def as_llm_messages(self) -> List[Mapping[str, str]]:
         """Render the conversation history in chat-completions format."""
         return [{"role": "system", "content": SYSTEM_PROMPT}, *self.messages]
+    
+    def set_active_forecast(
+        self,
+        ticker: str,
+        metric: str,
+        method: str,
+        periods: int,
+        forecast_result: Any,
+        explainability: Optional[Dict[str, Any]] = None,
+        parameters: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """
+        Store the active forecast for follow-up interactions.
+        
+        Args:
+            ticker: Company ticker
+            metric: Metric forecasted
+            method: ML model used
+            periods: Forecast horizon
+            forecast_result: MLForecast object
+            explainability: Explainability results (drivers, SHAP, etc.)
+            parameters: Model parameters used
+        """
+        self.active_forecast = {
+            "ticker": ticker,
+            "metric": metric,
+            "method": method,
+            "periods": periods,
+            "forecast_result": forecast_result,
+            "explainability": explainability or {},
+            "parameters": parameters or {},
+            "timestamp": time.time(),
+            "baseline_predictions": forecast_result.predicted_values if forecast_result else [],
+        }
+        # Add to history
+        self.forecast_history.append(self.active_forecast.copy())
+    
+    def get_active_forecast(self) -> Optional[Dict[str, Any]]:
+        """Get the currently active forecast for follow-up questions."""
+        return self.active_forecast
+    
+    def save_forecast(self, name: str, database_path: Optional[Path] = None) -> bool:
+        """
+        Save the active forecast with a user-defined name.
+        
+        Saves to both in-memory cache and database (if provided).
+        
+        Args:
+            name: User-defined name for this forecast
+            database_path: Optional path to database for persistence
+            
+        Returns:
+            True if saved successfully
+        """
+        if not self.active_forecast:
+            return False
+        
+        # Save to in-memory cache
+        self.saved_forecasts[name] = self.active_forecast.copy()
+        
+        # Save to database if path provided
+        if database_path:
+            try:
+                from . import database
+                forecast_result = self.active_forecast.get("forecast_result")
+                if forecast_result:
+                    database.save_ml_forecast(
+                        database_path=database_path,
+                        conversation_id=self.conversation_id,
+                        forecast_name=name,
+                        ticker=self.active_forecast["ticker"],
+                        metric=self.active_forecast["metric"],
+                        method=self.active_forecast["method"],
+                        periods=self.active_forecast["periods"],
+                        predicted_values=forecast_result.predicted_values,
+                        confidence_intervals_low=forecast_result.confidence_intervals_low,
+                        confidence_intervals_high=forecast_result.confidence_intervals_high,
+                        model_confidence=forecast_result.confidence,
+                        parameters=self.active_forecast.get("parameters"),
+                        explainability=self.active_forecast.get("explainability"),
+                    )
+                    LOGGER.info(f"Forecast '{name}' saved to database for conversation {self.conversation_id}")
+            except Exception as e:
+                LOGGER.error(f"Failed to save forecast to database: {e}", exc_info=True)
+                # Still return True since in-memory save succeeded
+        
+        return True
+    
+    def load_forecast(self, name: str, database_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+        """
+        Load a previously saved forecast by name.
+        
+        Checks in-memory cache first, then database.
+        
+        Args:
+            name: Name of the forecast to load
+            database_path: Optional path to database
+            
+        Returns:
+            Dictionary with forecast data, or None if not found
+        """
+        # Check in-memory cache first
+        if name in self.saved_forecasts:
+            return self.saved_forecasts[name]
+        
+        # Try loading from database
+        if database_path:
+            try:
+                from . import database
+                forecast_data = database.load_ml_forecast(
+                    database_path=database_path,
+                    conversation_id=self.conversation_id,
+                    forecast_name=name
+                )
+                if forecast_data:
+                    LOGGER.info(f"Loaded forecast '{name}' from database")
+                    # Cache it in memory for faster access
+                    self.saved_forecasts[name] = forecast_data
+                    return forecast_data
+            except Exception as e:
+                LOGGER.error(f"Failed to load forecast from database: {e}", exc_info=True)
+        
+        return None
+    
+    def list_saved_forecasts(self, database_path: Optional[Path] = None) -> List[str]:
+        """
+        Get list of saved forecast names.
+        
+        Combines in-memory and database forecasts.
+        
+        Args:
+            database_path: Optional path to database
+            
+        Returns:
+            List of forecast names
+        """
+        # Start with in-memory forecasts
+        forecast_names = set(self.saved_forecasts.keys())
+        
+        # Add forecasts from database
+        if database_path:
+            try:
+                from . import database
+                db_forecasts = database.list_ml_forecasts(
+                    database_path=database_path,
+                    conversation_id=self.conversation_id
+                )
+                for forecast_name, _, _, _ in db_forecasts:
+                    if forecast_name:
+                        forecast_names.add(forecast_name)
+            except Exception as e:
+                LOGGER.error(f"Failed to list forecasts from database: {e}", exc_info=True)
+        
+        return sorted(forecast_names)
 
 
 SYSTEM_PROMPT = (
@@ -679,6 +838,67 @@ SYSTEM_PROMPT = (
     "- Include all forecasted values for each year (2025, 2026, 2027)\n"
     "- Explain LSTM: 'LSTM (Long Short-Term Memory) uses memory cells with gates to learn which historical patterns to remember, making it ideal for capturing complex non-linear relationships in financial data.'\n"
     "- Show confidence intervals for each forecast\n"
+    
+    "## 🎯 Interactive ML Forecasting - EXPLAINABILITY & FOLLOW-UPS\n\n"
+    "**When a forecast is generated, you MUST provide interactive guidance and explainability:**\n\n"
+    "1. **ALWAYS END WITH EXPLORATION PROMPTS** - After presenting any forecast, ALWAYS suggest follow-up questions:\n"
+    "   - '💡 **Want to explore further?** Try asking:'\n"
+    "   - '  • \"Why is it increasing?\" - See the drivers and component breakdown'\n"
+    "   - '  • \"What if [assumption]?\" - Test different scenarios'\n"
+    "   - '  • \"Show me the uncertainty breakdown\" - Understand confidence intervals'\n"
+    "   - '  • \"Switch to [model name]\" - Compare different forecasting methods'\n"
+    "   - '  • \"Save this forecast as [name]\" - Store for later comparison'\n\n"
+    
+    "2. **EXPLAINABILITY CONTEXT DETECTION** - When the context includes 'FORECAST EXPLAINABILITY' or 'DRIVER ANALYSIS' sections:\n"
+    "   - **INCLUDE ALL DRIVERS** with exact percentages from context (e.g., 'Sales volume: +8.2%')\n"
+    "   - **Show component breakdown** (trend, seasonality, external factors)\n"
+    "   - **List top features** from feature importance analysis\n"
+    "   - **Include SHAP values** if provided in context\n"
+    "   - **Explain attention weights** for Transformer/LSTM models\n"
+    "   - Present this in a clear, structured format with emojis (📈 for growth, 📊 for metrics, 🌍 for external factors)\n\n"
+    
+    "3. **FOLLOW-UP QUESTION HANDLING** - Detect these patterns and provide detailed explainability:\n"
+    "   - 'Why?', 'Why is it [increasing/decreasing]?', 'What's driving this?'\n"
+    "     → Provide driver breakdown with exact percentages\n"
+    "   - 'How confident?', 'What's the uncertainty?', 'Show me the confidence intervals'\n"
+    "     → Explain confidence intervals, prediction intervals, model performance metrics\n"
+    "   - 'What are the top drivers?', 'Which factors matter most?'\n"
+    "     → List top 5 features from feature importance with exact values\n"
+    "   - 'Show me the components', 'Break it down'\n"
+    "     → Show trend, seasonality, cyclical, external factor components\n\n"
+    
+    "4. **SCENARIO COMPARISON** - When comparing forecasts (baseline vs. modified):\n"
+    "   - Show both values side-by-side: 'Baseline: $104.2B → New: $107.1B (+2.8%)'\n"
+    "   - Explain the delta: 'The +$2.9B increase is driven by...'\n"
+    "   - List changed assumptions: 'Modified assumptions: Marketing spend +15%'\n"
+    "   - Show impact breakdown: 'Primary impact: Sales volume +2.3pp'\n\n"
+    
+    "5. **CONVERSATIONAL CONTINUITY** - When user refers to 'it', 'this', 'the forecast', 'the model':\n"
+    "   - Understand they mean the ACTIVE FORECAST from the conversation\n"
+    "   - No need to re-state company/metric unless context is ambiguous\n"
+    "   - Example: User says 'Why?' after a Tesla forecast → Provide Tesla forecast drivers\n\n"
+    
+    "6. **PARAMETER ADJUSTMENT DETECTION** - When user requests parameter changes:\n"
+    "   - 'Change horizon to X years', 'Forecast for X years'\n"
+    "     → Acknowledge: 'Refitting forecast with X-year horizon...'\n"
+    "   - 'Switch to [model]', 'Use [model] instead'\n"
+    "     → Acknowledge: 'Refitting with [model] model...'\n"
+    "   - 'Exclude [year]', 'Remove [year] as outlier'\n"
+    "     → Acknowledge: 'Refitting with [year] excluded...'\n"
+    "   - Always show before/after comparison when parameters change\n\n"
+    
+    "7. **FORECAST SAVING** - When user requests to save:\n"
+    "   - 'Save this as [name]', 'Store this forecast', 'Remember this'\n"
+    "     → Confirm: '✅ Saved as **[name]**. You can reference it later by saying \"Compare to [name]\" or \"Load [name]\"'\n"
+    "   - 'Compare to [name]', 'How does this compare to [name]?'\n"
+    "     → Load both forecasts and show side-by-side comparison\n\n"
+    
+    "8. **TRANSPARENCY EMPHASIS** - For ALL forecasts:\n"
+    "   - Always show data source: 'Based on 28 quarterly data points (2018-2024)'\n"
+    "   - Always show confidence: 'Model confidence: 78%' or '95% CI: [$X - $Y]'\n"
+    "   - Always explain model choice: 'LSTM was selected because...'\n"
+    "   - Always invite questions: 'Ask me anything about this forecast'\n\n"
+
     "- Explain the model used and its confidence level\n"
     "- Reference academic sources (e.g., 'Hochreiter & Schmidhuber (1997) introduced LSTM networks...')\n"
     "- Compare forecast to historical growth trends\n"
@@ -4769,8 +4989,923 @@ class BenchmarkOSChatbot:
             LOGGER.exception(f"Could not build portfolio context: {e}")
             return None
     
+    def _detect_forecast_followup(self, user_input: str) -> Optional[Dict[str, Any]]:
+        """
+        Detect if user is asking a follow-up question about an active forecast.
+        
+        Returns:
+            Dictionary with 'type' and optionally 'details' if follow-up detected, else None
+            Types: 'explainability', 'drivers', 'confidence', 'breakdown', 'parameters', 
+                   'scenario', 'save', 'compare', 'model_switch'
+        """
+        if not self.conversation.get_active_forecast():
+            return None  # No active forecast to follow up on
+        
+        lowered = user_input.strip().lower()
+        
+        # Simple "Why?" questions
+        if lowered in ["why", "why?", "how come", "how come?", "explain", "explain this"]:
+            return {"type": "explainability"}
+        
+        # "Why is it [increasing/decreasing/changing]?"
+        if re.search(r"\bwhy\s+(?:is\s+)?(?:it|this|the\s+forecast)?\s*(?:increasing|decreasing|going\s+up|going\s+down|rising|falling|changing|growing)", lowered):
+            return {"type": "explainability", "focus": "trend"}
+        
+        # "What's driving this?" or "What are the drivers?"
+        if re.search(r"what(?:'s|\s+is|\s+are)?\s+(?:the\s+)?(?:driving|drivers?|main\s+factors?|top\s+factors?|key\s+factors?)", lowered):
+            return {"type": "drivers"}
+        
+        # "How confident?" or "What's the uncertainty?"
+        if re.search(r"how\s+confident|(?:what(?:'s|\s+is))?\s+(?:the\s+)?(?:confidence|uncertainty|confidence\s+interval|prediction\s+interval)", lowered):
+            return {"type": "confidence"}
+        
+        # "Show me the breakdown" or "Break it down"
+        if re.search(r"(?:show\s+(?:me\s+)?the\s+)?(?:breakdown|break\s+it\s+down|components?|decomposition)", lowered):
+            return {"type": "breakdown"}
+        
+        # "What are the top drivers?" or "Which factors matter most?"
+        if re.search(r"(?:top|main|most\s+important)\s+(?:\d+\s+)?(?:drivers?|factors?|features?)|which\s+(?:factors?|features?)\s+matter", lowered):
+            return {"type": "drivers", "focus": "top"}
+        
+        # Parameter adjustments: "Change horizon to X years"
+        horizon_match = re.search(r"(?:change|set|use|make\s+it)\s+(?:the\s+)?(?:forecast\s+)?horizon\s+(?:to\s+)?(\d+)", lowered)
+        if horizon_match:
+            return {"type": "parameters", "parameter": "horizon", "value": int(horizon_match.group(1))}
+        
+        # Parameter adjustments: "Forecast for X years"
+        years_match = re.search(r"(?:forecast|predict|project)\s+(?:for\s+)?(\d+)\s+years?", lowered)
+        if years_match:
+            return {"type": "parameters", "parameter": "horizon", "value": int(years_match.group(1))}
+        
+        # Model switching: "Switch to [model]" or "Use [model] instead"
+        model_match = re.search(r"(?:switch|change|use)\s+(?:to\s+)?(?:the\s+)?(arima|prophet|ets|lstm|gru|transformer|ensemble)", lowered)
+        if model_match:
+            return {"type": "model_switch", "model": model_match.group(1)}
+        
+        # Scenario testing: "What if [assumption]?"
+        if re.search(r"what\s+if|suppose|assuming|imagine\s+if", lowered):
+            # Try to parse specific scenario parameters
+            scenario_details = self._parse_scenario_parameters(user_input)
+            return {"type": "scenario", "query": user_input, "details": scenario_details}
+        
+        # Save forecast: "Save this as [name]"
+        save_match = re.search(r"(?:save|store|remember)\s+(?:this|the\s+forecast)\s+(?:as\s+)?['\"]?([a-zA-Z0-9_\-\s]+)['\"]?", lowered)
+        if save_match:
+            name = save_match.group(1).strip()
+            return {"type": "save", "name": name}
+        
+        # Compare forecasts: "Compare to [name]" or "How does this compare to [name]?"
+        compare_match = re.search(r"(?:compare|comparison)\s+(?:to|with|vs\.?)\s+['\"]?([a-zA-Z0-9_\-\s]+)['\"]?", lowered)
+        if compare_match:
+            name = compare_match.group(1).strip()
+            return {"type": "compare", "name": name}
+        
+        # Exclude data: "Exclude 2020" or "Remove 2020 as outlier"
+        exclude_match = re.search(r"(?:exclude|remove|drop|ignore)\s+(\d{4})", lowered)
+        if exclude_match:
+            return {"type": "parameters", "parameter": "exclude_year", "value": int(exclude_match.group(1))}
+        
+        # Generic pronoun reference: "it", "this", "the forecast", "the model"
+        # If user says something with these pronouns, it's likely a follow-up
+        if re.search(r"\b(?:it|this|that|the\s+forecast|the\s+model|the\s+prediction)\b", lowered):
+            # Check if it's a question or statement about the forecast
+            if re.search(r"\?|how|what|why|when|where|explain|show|tell", lowered):
+                return {"type": "explainability", "generic": True}
+        
+        return None
+    
+    def _parse_scenario_parameters(self, user_input: str) -> Dict[str, Any]:
+        """
+        Parse specific parameters from scenario questions.
+        
+        Detects patterns like:
+        - "What if revenue grows 10%?"
+        - "What if COGS rises 5%?"
+        - "What if margins improve 2 percentage points?"
+        - "What if volume increases 15%?"
+        - "What if marketing spend increases 20%?"
+        
+        Returns:
+            Dictionary with scenario parameters
+        """
+        lowered = user_input.lower()
+        scenario_params = {}
+        
+        # Revenue/sales growth
+        revenue_match = re.search(
+            r"(?:revenue|sales?)\s+(?:grows?|increases?|rises?|goes?\s+up)\s+(?:by\s+)?(\d+(?:\.\d+)?)%?",
+            lowered
+        )
+        if revenue_match:
+            scenario_params["revenue_growth"] = float(revenue_match.group(1)) / 100
+        
+        # COGS/cost changes
+        cogs_match = re.search(
+            r"(?:cogs|cost\s+of\s+goods|costs?)\s+(?:rises?|increases?|grows?|goes?\s+up|falls?|decreases?|drops?)\s+(?:by\s+)?(\d+(?:\.\d+)?)%?",
+            lowered
+        )
+        if cogs_match:
+            change = float(cogs_match.group(1)) / 100
+            # Check if it's a decrease
+            if re.search(r"falls?|decreases?|drops?|declines?", lowered):
+                change = -change
+            scenario_params["cogs_change"] = change
+        
+        # Margin changes
+        margin_match = re.search(
+            r"(?:margin|gross\s+margin|profit\s+margin)\s+(?:improves?|increases?|expands?|rises?|deteriorates?|decreases?|shrinks?|falls?)\s+(?:by\s+)?(\d+(?:\.\d+)?)\s*(?:percentage\s+points?|pp|points?|%)?",
+            lowered
+        )
+        if margin_match:
+            change = float(margin_match.group(1)) / 100  # Convert to decimal
+            if re.search(r"deteriorates?|decreases?|shrinks?|falls?", lowered):
+                change = -change
+            scenario_params["margin_change"] = change
+        
+        # Volume changes
+        volume_match = re.search(
+            r"(?:volume|sales\s+volume|units)\s+(?:increases?|grows?|rises?|doubles?|decreases?|falls?|drops?)\s+(?:by\s+)?(\d+(?:\.\d+)?)%?",
+            lowered
+        )
+        if volume_match:
+            change = float(volume_match.group(1)) / 100
+            if re.search(r"decreases?|falls?|drops?|declines?", lowered):
+                change = -change
+            elif re.search(r"doubles?", lowered):
+                change = 1.0  # 100% increase
+            scenario_params["volume_change"] = change
+        
+        # Marketing/OpEx changes
+        marketing_match = re.search(
+            r"(?:marketing|opex|operating\s+expenses?)\s+(?:spend|spending|expenses?)\s+(?:increases?|rises?|grows?|decreases?|falls?)\s+(?:by\s+)?(\d+(?:\.\d+)?)%?",
+            lowered
+        )
+        if marketing_match:
+            change = float(marketing_match.group(1)) / 100
+            if re.search(r"decreases?|falls?|drops?", lowered):
+                change = -change
+            scenario_params["marketing_change"] = change
+        
+        # GDP/economic changes
+        gdp_match = re.search(
+            r"gdp\s+(?:drops?|falls?|decreases?|rises?|grows?|increases?)\s+(?:by\s+)?(\d+(?:\.\d+)?)%?",
+            lowered
+        )
+        if gdp_match:
+            change = float(gdp_match.group(1)) / 100
+            if re.search(r"drops?|falls?|decreases?", lowered):
+                change = -change
+            scenario_params["gdp_change"] = change
+        
+        # Price changes
+        price_match = re.search(
+            r"(?:price|prices?|pricing)\s+(?:increases?|rises?|decreases?|falls?)\s+(?:by\s+)?(\d+(?:\.\d+)?)%?",
+            lowered
+        )
+        if price_match:
+            change = float(price_match.group(1)) / 100
+            if re.search(r"decreases?|falls?|drops?", lowered):
+                change = -change
+            scenario_params["price_change"] = change
+        
+        return scenario_params
+    
+    def _build_forecast_followup_context(self, user_input: str, followup: Dict[str, Any]) -> str:
+        """
+        Build specialized context for forecast follow-up questions.
+        
+        Args:
+            user_input: Original user query
+            followup: Detected follow-up information from _detect_forecast_followup
+            
+        Returns:
+            Formatted context string for LLM
+        """
+        active_forecast = self.conversation.get_active_forecast()
+        if not active_forecast:
+            return "⚠️ No active forecast found. Please generate a forecast first."
+        
+        followup_type = followup.get("type")
+        ticker = active_forecast.get("ticker")
+        metric = active_forecast.get("metric")
+        method = active_forecast.get("method")
+        forecast_result = active_forecast.get("forecast_result")
+        explainability = active_forecast.get("explainability", {})
+        parameters = active_forecast.get("parameters", {})
+        
+        context_lines = [
+            "=" * 80,
+            f"🎯 FORECAST FOLLOW-UP CONTEXT - {ticker} {metric.upper()}",
+            "=" * 80,
+            "",
+            f"**User is asking a follow-up question about the active forecast:**",
+            f"- Company: {ticker}",
+            f"- Metric: {metric}",
+            f"- Method: {method.upper()}",
+            f"- Follow-up Type: {followup_type}",
+            "",
+            "=" * 80,
+            "📊 ACTIVE FORECAST DATA",
+            "=" * 80,
+            ""
+        ]
+        
+        # Include forecast predictions
+        if forecast_result and hasattr(forecast_result, 'predicted_values'):
+            context_lines.append("**Forecasted Values:**")
+            for i, (year, value) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                low = forecast_result.confidence_intervals_low[i]
+                high = forecast_result.confidence_intervals_high[i]
+                context_lines.append(f"  - Year {year}: ${value/1e9:.2f}B (95% CI: ${low/1e9:.2f}B - ${high/1e9:.2f}B)")
+            context_lines.append("")
+        
+        # Handle different follow-up types
+        if followup_type in ["explainability", "drivers", "breakdown"]:
+            context_lines.extend([
+                "=" * 80,
+                "🔍 FORECAST EXPLAINABILITY",
+                "=" * 80,
+                "",
+                "**📊 CRITICAL: The user wants to understand WHY the forecast is what it is.**",
+                "**You MUST provide detailed driver analysis using the information below.**",
+                ""
+            ])
+            
+            # Extract and format drivers
+            drivers = explainability.get("drivers", {})
+            if drivers:
+                context_lines.append("**Key Drivers and Components:**")
+                
+                # Feature importance
+                features = drivers.get("features", {})
+                if features:
+                    context_lines.append("")
+                    context_lines.append("**Feature Importance (Top Drivers):**")
+                    sorted_features = sorted(features.items(), key=lambda x: abs(x[1]), reverse=True)[:10]
+                    for feat_name, importance in sorted_features:
+                        context_lines.append(f"  - {feat_name}: {importance:.4f}")
+                    context_lines.append("")
+                
+                # Component breakdown (for Prophet, ARIMA, etc.)
+                components = drivers.get("components", {})
+                if components:
+                    context_lines.append("**Forecast Component Breakdown:**")
+                    for component_name, value in components.items():
+                        context_lines.append(f"  - {component_name}: {value}")
+                    context_lines.append("")
+                
+                # Prophet-specific components
+                prophet_components = drivers.get("prophet", {})
+                if prophet_components:
+                    context_lines.append("**Prophet Model Components:**")
+                    for comp_name, comp_value in prophet_components.items():
+                        context_lines.append(f"  - {comp_name}: {comp_value}")
+                    context_lines.append("")
+            
+            # Model confidence and performance
+            confidence = explainability.get("confidence", 0)
+            context_lines.append(f"**Model Confidence:** {confidence:.1%}")
+            context_lines.append("")
+            
+            # Performance metrics
+            performance = explainability.get("performance", {})
+            if performance:
+                context_lines.append("**Model Performance Metrics:**")
+                for metric_name, metric_value in performance.items():
+                    if isinstance(metric_value, float):
+                        context_lines.append(f"  - {metric_name}: {metric_value:.6f}")
+                    else:
+                        context_lines.append(f"  - {metric_name}: {metric_value}")
+                context_lines.append("")
+            
+            context_lines.extend([
+                "**🎯 YOUR TASK:**",
+                "1. Explain the TOP 3-5 DRIVERS of this forecast using the data above",
+                "2. For each driver, include:",
+                "   - What it is (clear explanation)",
+                "   - How it impacts the forecast (increase/decrease, magnitude)",
+                "   - Why it matters (business context)",
+                "3. Use specific numbers from the data above (don't generalize)",
+                "4. Present in a structured format with emojis:",
+                "   📈 for positive drivers, 📉 for negative drivers, 📊 for neutral factors",
+                "5. Keep the explanation clear but detailed (aim for 400-600 words)",
+                ""
+            ])
+        
+        elif followup_type == "confidence":
+            context_lines.extend([
+                "=" * 80,
+                "📊 CONFIDENCE & UNCERTAINTY ANALYSIS",
+                "=" * 80,
+                "",
+                "**The user wants to understand the confidence and uncertainty in the forecast.**",
+                ""
+            ])
+            
+            # Confidence intervals
+            if forecast_result and hasattr(forecast_result, 'confidence_intervals_low'):
+                context_lines.append("**Confidence Intervals (95%):**")
+                for i, year in enumerate(forecast_result.periods):
+                    pred = forecast_result.predicted_values[i]
+                    low = forecast_result.confidence_intervals_low[i]
+                    high = forecast_result.confidence_intervals_high[i]
+                    width = high - low
+                    pct_width = (width / pred) * 100 if pred > 0 else 0
+                    context_lines.append(f"  - Year {year}:")
+                    context_lines.append(f"      Forecast: ${pred/1e9:.2f}B")
+                    context_lines.append(f"      Range: ${low/1e9:.2f}B to ${high/1e9:.2f}B")
+                    context_lines.append(f"      Interval Width: ${width/1e9:.2f}B ({pct_width:.1f}% of forecast)")
+                context_lines.append("")
+            
+            # Model confidence
+            confidence = explainability.get("confidence", 0)
+            context_lines.append(f"**Overall Model Confidence:** {confidence:.1%}")
+            context_lines.append("")
+            
+            # Performance metrics (indicate reliability)
+            performance = explainability.get("performance", {})
+            if performance:
+                context_lines.append("**Model Performance Indicators:**")
+                for metric_name, metric_value in performance.items():
+                    if isinstance(metric_value, float):
+                        context_lines.append(f"  - {metric_name}: {metric_value:.6f}")
+                context_lines.append("")
+            
+            context_lines.extend([
+                "**🎯 YOUR TASK:**",
+                "1. Explain what the confidence intervals mean in plain language",
+                "2. Interpret the interval width (narrow = more confident, wide = less confident)",
+                "3. Explain the overall model confidence score",
+                "4. Mention any factors that might increase or decrease uncertainty",
+                "5. Be transparent about limitations",
+                ""
+            ])
+        
+        elif followup_type == "parameters":
+            parameter = followup.get("parameter")
+            value = followup.get("value")
+            
+            context_lines.extend([
+                "=" * 80,
+                "⚙️ PARAMETER ADJUSTMENT - FORECAST REGENERATION",
+                "=" * 80,
+                "",
+                f"**User wants to adjust: {parameter} = {value}**",
+                "",
+                "**Baseline Forecast (Before Adjustment):**"
+            ])
+            
+            # Show baseline forecast values
+            if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                for i, (year, value_baseline) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                    context_lines.append(f"  - Year {year}: ${value_baseline/1e9:.2f}B")
+                context_lines.append("")
+            
+            context_lines.extend([
+                "**Current Parameters:**"
+            ])
+            
+            for param_name, param_value in parameters.items():
+                context_lines.append(f"  - {param_name}: {param_value}")
+            
+            # Try to regenerate forecast with new parameters
+            context_lines.append("")
+            context_lines.append("**🔄 Regenerating Forecast with Adjusted Parameters...**")
+            context_lines.append("")
+            
+            try:
+                # Build new parameters
+                new_periods = value if parameter == "horizon" else parameters.get("periods", 3)
+                new_method = parameters.get("method", method)
+                
+                # Import ML forecaster
+                from .ml_forecasting import get_ml_forecaster
+                ml_forecaster = get_ml_forecaster(self.settings.database_path)
+                
+                # Generate new forecast
+                new_forecast = ml_forecaster.forecast(
+                    ticker=ticker,
+                    metric=metric,
+                    periods=new_periods,
+                    method=new_method
+                )
+                
+                if new_forecast:
+                    context_lines.append("**✅ New Forecast Generated Successfully**")
+                    context_lines.append("")
+                    context_lines.append("**Adjusted Forecast (After Parameter Change):**")
+                    
+                    for i, (year, new_value) in enumerate(zip(new_forecast.periods, new_forecast.predicted_values)):
+                        low = new_forecast.confidence_intervals_low[i]
+                        high = new_forecast.confidence_intervals_high[i]
+                        context_lines.append(f"  - Year {year}: ${new_value/1e9:.2f}B (95% CI: ${low/1e9:.2f}B - ${high/1e9:.2f}B)")
+                    
+                    context_lines.append("")
+                    context_lines.append("**📊 Before vs. After Comparison:**")
+                    context_lines.append("")
+                    
+                    # Create comparison table data
+                    context_lines.append("| Year | Baseline | Adjusted | Delta ($) | Delta (%) |")
+                    context_lines.append("|------|----------|----------|-----------|-----------|")
+                    
+                    # Compare overlapping years
+                    baseline_periods = set(forecast_result.periods) if forecast_result else set()
+                    new_periods_set = set(new_forecast.periods)
+                    common_years = sorted(baseline_periods & new_periods_set)
+                    
+                    for year in common_years:
+                        baseline_idx = list(forecast_result.periods).index(year)
+                        new_idx = list(new_forecast.periods).index(year)
+                        
+                        baseline_val = forecast_result.predicted_values[baseline_idx]
+                        new_val = new_forecast.predicted_values[new_idx]
+                        delta_abs = new_val - baseline_val
+                        delta_pct = (delta_abs / baseline_val * 100) if baseline_val != 0 else 0
+                        
+                        context_lines.append(
+                            f"| {year} | ${baseline_val/1e9:.2f}B | ${new_val/1e9:.2f}B | "
+                            f"${delta_abs/1e9:+.2f}B | {delta_pct:+.1f}% |"
+                        )
+                    
+                    # Add new years that weren't in baseline
+                    new_only_years = sorted(new_periods_set - baseline_periods)
+                    if new_only_years:
+                        for year in new_only_years:
+                            new_idx = list(new_forecast.periods).index(year)
+                            new_val = new_forecast.predicted_values[new_idx]
+                            context_lines.append(
+                                f"| {year} | — | ${new_val/1e9:.2f}B | New | New |"
+                            )
+                    
+                    context_lines.append("")
+                    
+                    # Update the active forecast to the new one
+                    self.conversation.set_active_forecast(
+                        ticker=ticker,
+                        metric=metric,
+                        method=new_method,
+                        periods=new_periods,
+                        forecast_result=new_forecast,
+                        explainability={},  # Would need to extract from new forecast
+                        parameters={"periods": new_periods, "method": new_method, parameter: value}
+                    )
+                    
+                    context_lines.extend([
+                        "**🎯 YOUR TASK:**",
+                        "1. Present the ADJUSTED FORECAST VALUES prominently",
+                        "2. Show the BEFORE VS. AFTER COMPARISON TABLE above",
+                        "3. Explain the impact of the parameter change:",
+                        f"   - What changed: {parameter} = {value}",
+                        "   - Impact on forecast (quantitative analysis using the table)",
+                        "   - Key insights from the comparison",
+                        "4. Note that the adjusted forecast is now the ACTIVE forecast",
+                        "5. Suggest further adjustments or scenarios to explore",
+                        ""
+                    ])
+                else:
+                    context_lines.extend([
+                        "**⚠️ Forecast Regeneration Failed**",
+                        "",
+                        "**🎯 YOUR TASK:**",
+                        f"1. Acknowledge the parameter adjustment request: {parameter} = {value}",
+                        "2. Apologize that forecast regeneration encountered an error",
+                        "3. Explain possible causes (insufficient data, model limitations)",
+                        "4. Suggest alternative approaches",
+                        ""
+                    ])
+                    
+            except Exception as e:
+                LOGGER.error(f"Failed to regenerate forecast with adjusted parameters: {e}", exc_info=True)
+                context_lines.extend([
+                    f"**⚠️ Error Regenerating Forecast: {str(e)[:100]}**",
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    f"1. Acknowledge the parameter adjustment request: {parameter} = {value}",
+                    "2. Explain that an error occurred during forecast regeneration",
+                    "3. Provide the technical error details",
+                    "4. Suggest the user try again or use a different approach",
+                    ""
+                ])
+        
+        elif followup_type == "model_switch":
+            new_model = followup.get("model")
+            
+            context_lines.extend([
+                "=" * 80,
+                "🔄 MODEL SWITCH - FORECAST REGENERATION",
+                "=" * 80,
+                "",
+                f"**User wants to switch from {method.upper()} to {new_model.upper()}**",
+                "",
+                f"**Baseline Model:** {method.upper()}",
+                f"**Requested Model:** {new_model.upper()}",
+                "",
+                "**Baseline Forecast:**"
+            ])
+            
+            # Show baseline forecast values
+            if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                for i, (year, value_baseline) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                    context_lines.append(f"  - Year {year}: ${value_baseline/1e9:.2f}B")
+                context_lines.append("")
+            
+            # Try to regenerate forecast with new model
+            context_lines.append("**🔄 Refitting with New Model...**")
+            context_lines.append("")
+            
+            try:
+                # Import ML forecaster
+                from .ml_forecasting import get_ml_forecaster
+                ml_forecaster = get_ml_forecaster(self.settings.database_path)
+                
+                # Generate new forecast with different model
+                new_forecast = ml_forecaster.forecast(
+                    ticker=ticker,
+                    metric=metric,
+                    periods=parameters.get("periods", 3),
+                    method=new_model
+                )
+                
+                if new_forecast:
+                    context_lines.append("**✅ New Forecast Generated with " + new_model.upper() + "**")
+                    context_lines.append("")
+                    context_lines.append(f"**{new_model.upper()} Forecast:**")
+                    
+                    for i, (year, new_value) in enumerate(zip(new_forecast.periods, new_forecast.predicted_values)):
+                        low = new_forecast.confidence_intervals_low[i]
+                        high = new_forecast.confidence_intervals_high[i]
+                        context_lines.append(f"  - Year {year}: ${new_value/1e9:.2f}B (95% CI: ${low/1e9:.2f}B - ${high/1e9:.2f}B)")
+                    
+                    context_lines.append("")
+                    context_lines.append(f"**📊 Model Comparison: {method.upper()} vs. {new_model.upper()}**")
+                    context_lines.append("")
+                    
+                    # Create comparison table
+                    context_lines.append(f"| Year | {method.upper()} | {new_model.upper()} | Delta ($) | Delta (%) |")
+                    context_lines.append("|------|----------|----------|-----------|-----------|")
+                    
+                    for i, year in enumerate(forecast_result.periods if forecast_result else []):
+                        if i < len(new_forecast.periods):
+                            baseline_val = forecast_result.predicted_values[i]
+                            new_val = new_forecast.predicted_values[i]
+                            delta_abs = new_val - baseline_val
+                            delta_pct = (delta_abs / baseline_val * 100) if baseline_val != 0 else 0
+                            
+                            context_lines.append(
+                                f"| {year} | ${baseline_val/1e9:.2f}B | ${new_val/1e9:.2f}B | "
+                                f"${delta_abs/1e9:+.2f}B | {delta_pct:+.1f}% |"
+                            )
+                    
+                    context_lines.append("")
+                    
+                    # Model comparison metrics
+                    context_lines.append("**Model Performance Comparison:**")
+                    if forecast_result and hasattr(forecast_result, 'confidence'):
+                        context_lines.append(f"  - {method.upper()} Confidence: {forecast_result.confidence:.1%}")
+                    if new_forecast and hasattr(new_forecast, 'confidence'):
+                        context_lines.append(f"  - {new_model.upper()} Confidence: {new_forecast.confidence:.1%}")
+                    context_lines.append("")
+                    
+                    # Update the active forecast to the new model
+                    self.conversation.set_active_forecast(
+                        ticker=ticker,
+                        metric=metric,
+                        method=new_model,
+                        periods=parameters.get("periods", 3),
+                        forecast_result=new_forecast,
+                        explainability={},  # Would need to extract from new forecast
+                        parameters={"periods": parameters.get("periods", 3), "method": new_model}
+                    )
+                    
+                    context_lines.extend([
+                        "**🎯 YOUR TASK:**",
+                        f"1. Present the {new_model.upper()} FORECAST VALUES prominently",
+                        "2. Show the MODEL COMPARISON TABLE above",
+                        "3. Explain the key differences between the models:",
+                        f"   - How {method.upper()} works vs. how {new_model.upper()} works",
+                        "   - Which model is more confident (use confidence scores)",
+                        "   - Quantitative differences (use the comparison table)",
+                        "4. Provide recommendation on which model to trust",
+                        f"5. Note that {new_model.upper()} is now the ACTIVE model",
+                        "6. Suggest further exploration or model options",
+                        ""
+                    ])
+                else:
+                    context_lines.extend([
+                        "**⚠️ Model Switch Failed**",
+                        "",
+                        f"Possible reasons {new_model.upper()} could not be used:",
+                        f"  - Model dependencies missing (e.g., TensorFlow for LSTM, PyTorch for Transformer)",
+                        "  - Insufficient data for this model type",
+                        "  - Model training errors",
+                        "",
+                        "**🎯 YOUR TASK:**",
+                        f"1. Apologize that switching to {new_model.upper()} failed",
+                        "2. Explain possible causes (dependencies, data requirements)",
+                        "3. Suggest alternative models that might work",
+                        f"4. Keep the {method.upper()} forecast as the active forecast",
+                        ""
+                    ])
+                    
+            except Exception as e:
+                LOGGER.error(f"Failed to switch model from {method} to {new_model}: {e}", exc_info=True)
+                context_lines.extend([
+                    f"**⚠️ Error Switching Models: {str(e)[:100]}**",
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    f"1. Acknowledge the model switch request to {new_model.upper()}",
+                    "2. Explain that an error occurred during model switching",
+                    "3. Provide technical error details for transparency",
+                    f"4. Keep the {method.upper()} forecast active",
+                    ""
+                ])
+        
+        elif followup_type == "save":
+            name = followup.get("name")
+            
+            # Try to save the forecast (with database persistence)
+            success = self.conversation.save_forecast(name, self.settings.database_path)
+            
+            context_lines.extend([
+                "=" * 80,
+                "💾 SAVE FORECAST REQUEST",
+                "=" * 80,
+                "",
+                f"**User wants to save this forecast as: '{name}'**",
+                "",
+                f"**Save Status:** {'✅ Success' if success else '❌ Failed'}",
+                ""
+            ])
+            
+            if success:
+                context_lines.extend([
+                    "**🎯 YOUR TASK:**",
+                    f"1. Confirm that the forecast has been saved as '{name}'",
+                    "2. Tell the user they can reference it later by saying:",
+                    f"   - 'Compare to {name}'",
+                    f"   - 'Load {name}'",
+                    f"   - 'How does this compare to {name}?'",
+                    "3. Ask if they'd like to explore other scenarios or make adjustments",
+                    ""
+                ])
+            else:
+                context_lines.extend([
+                    "**🎯 YOUR TASK:**",
+                    "1. Apologize that the forecast could not be saved",
+                    "2. Explain that there may not be an active forecast to save",
+                    "3. Suggest generating a new forecast first",
+                    ""
+                ])
+        
+        elif followup_type == "compare":
+            name = followup.get("name")
+            
+            # Try to load the comparison forecast (from memory or database)
+            comparison_forecast = self.conversation.load_forecast(name, self.settings.database_path)
+            
+            context_lines.extend([
+                "=" * 80,
+                "📊 FORECAST COMPARISON REQUEST",
+                "=" * 80,
+                "",
+                f"**User wants to compare current forecast to: '{name}'**",
+                ""
+            ])
+            
+            if comparison_forecast:
+                comp_result = comparison_forecast.get("forecast_result")
+                context_lines.extend([
+                    "**Comparison Forecast Found:**",
+                    f"  - Name: {name}",
+                    f"  - Company: {comparison_forecast.get('ticker')}",
+                    f"  - Metric: {comparison_forecast.get('metric')}",
+                    f"  - Method: {comparison_forecast.get('method')}",
+                    "",
+                    "**Comparison Forecast Values:**"
+                ])
+                
+                if comp_result and hasattr(comp_result, 'predicted_values'):
+                    for i, (year, value) in enumerate(zip(comp_result.periods, comp_result.predicted_values)):
+                        context_lines.append(f"  - Year {year}: ${value/1e9:.2f}B")
+                
+                context_lines.extend([
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    "1. Create a side-by-side comparison table showing:",
+                    "   - Year",
+                    f"   - {name} (baseline)",
+                    "   - Current Forecast",
+                    "   - Delta ($ and %)",
+                    "2. Explain the key differences between the two forecasts",
+                    "3. Highlight which assumptions or parameters changed",
+                    "4. Provide insights on why the forecasts differ",
+                    ""
+                ])
+            else:
+                context_lines.extend([
+                    f"**⚠️ Comparison Forecast '{name}' Not Found**",
+                    "",
+                    "Available saved forecasts:",
+                ])
+                
+                saved_names = self.conversation.list_saved_forecasts(self.settings.database_path)
+                if saved_names:
+                    for saved_name in saved_names:
+                        context_lines.append(f"  - {saved_name}")
+                else:
+                    context_lines.append("  (No saved forecasts)")
+                
+                context_lines.extend([
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    f"1. Inform the user that '{name}' was not found",
+                    "2. Show the list of available saved forecasts (if any)",
+                    "3. Suggest saving the current forecast first, or choosing an available forecast",
+                    ""
+                ])
+        
+        elif followup_type == "scenario":
+            scenario_details = followup.get("details", {})
+            
+            context_lines.extend([
+                "=" * 80,
+                "🧪 SCENARIO TESTING - QUANTITATIVE ANALYSIS",
+                "=" * 80,
+                "",
+                f"**User wants to test a scenario: '{user_input}'**",
+                "",
+                "**Parsed Scenario Parameters:**"
+            ])
+            
+            if scenario_details:
+                for param_name, param_value in scenario_details.items():
+                    if isinstance(param_value, float):
+                        context_lines.append(f"  - {param_name}: {param_value:+.1%}")
+                    else:
+                        context_lines.append(f"  - {param_name}: {param_value}")
+                context_lines.append("")
+            else:
+                context_lines.append("  - (No specific parameters detected - will provide qualitative analysis)")
+                context_lines.append("")
+            
+            context_lines.append("**Baseline Forecast:**")
+            
+            if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                baseline_total = sum(forecast_result.predicted_values)
+                for i, (year, value) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                    context_lines.append(f"  - Year {year}: ${value/1e9:.2f}B")
+                context_lines.append("")
+                context_lines.append(f"**Baseline Total ({len(forecast_result.periods)}-year):** ${baseline_total/1e9:.1f}B")
+                context_lines.append("")
+            
+            # If we have specific parameters, calculate scenario impact
+            if scenario_details:
+                context_lines.append("**🔢 Quantitative Scenario Impact:**")
+                context_lines.append("")
+                
+                # Calculate impact based on parameters
+                if "revenue_growth" in scenario_details:
+                    growth_factor = 1 + scenario_details["revenue_growth"]
+                    context_lines.append(f"**Revenue Growth Impact ({scenario_details['revenue_growth']:+.1%}):**")
+                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                            adjusted_val = baseline_val * growth_factor
+                            delta = adjusted_val - baseline_val
+                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B (+${delta/1e9:.2f}B)")
+                    context_lines.append("")
+                
+                if "cogs_change" in scenario_details:
+                    cogs_impact = scenario_details["cogs_change"]
+                    # COGS impacts margin, which impacts revenue (simplified model)
+                    # For revenue forecast: higher COGS → lower margins → potentially lower revenue
+                    margin_impact = -cogs_impact * 0.5  # Simplified: 50% of COGS change affects margin
+                    context_lines.append(f"**COGS Change Impact ({cogs_impact:+.1%}):**")
+                    context_lines.append(f"  - Estimated Margin Impact: {margin_impact:+.2%}")
+                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                            adjusted_val = baseline_val * (1 + margin_impact)
+                            delta = adjusted_val - baseline_val
+                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
+                    context_lines.append("")
+                
+                if "margin_change" in scenario_details:
+                    margin_impact = scenario_details["margin_change"]
+                    # Direct margin change affects revenue proportionally
+                    context_lines.append(f"**Margin Change Impact ({margin_impact:+.2%}):**")
+                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                            # Margin change affects bottom line more than top line
+                            # For revenue forecast, margin expansion might indicate pricing power
+                            adjusted_val = baseline_val * (1 + margin_impact * 0.3)  # 30% of margin change affects revenue
+                            delta = adjusted_val - baseline_val
+                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
+                    context_lines.append("")
+                
+                if "volume_change" in scenario_details:
+                    volume_impact = scenario_details["volume_change"]
+                    context_lines.append(f"**Volume Change Impact ({volume_impact:+.1%}):**")
+                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                            # Volume directly impacts revenue (1:1 relationship for most companies)
+                            adjusted_val = baseline_val * (1 + volume_impact)
+                            delta = adjusted_val - baseline_val
+                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B (+${delta/1e9:.2f}B)")
+                    context_lines.append("")
+                
+                if "marketing_change" in scenario_details:
+                    marketing_impact = scenario_details["marketing_change"]
+                    # Marketing spend affects volume with diminishing returns
+                    # Simplified: 10% marketing increase → 2-3% volume increase
+                    volume_impact = marketing_impact * 0.25
+                    context_lines.append(f"**Marketing Spend Impact ({marketing_impact:+.1%}):**")
+                    context_lines.append(f"  - Estimated Volume Impact: {volume_impact:+.2%}")
+                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                            # Marketing affects revenue through volume
+                            adjusted_val = baseline_val * (1 + volume_impact)
+                            delta = adjusted_val - baseline_val
+                            # But also increases opex, reducing margin
+                            margin_hit = marketing_impact * 0.1  # 10% of marketing spend hits margin
+                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B (+${delta/1e9:.2f}B)")
+                        context_lines.append(f"  - Trade-off: Operating margin decreases by ~{margin_hit:.2%}")
+                    context_lines.append("")
+                
+                if "gdp_change" in scenario_details:
+                    gdp_impact = scenario_details["gdp_change"]
+                    # GDP affects revenue with beta coefficient (typically 0.3-0.8 for most companies)
+                    revenue_sensitivity = 0.5  # Simplified: 50% sensitivity
+                    revenue_impact = gdp_impact * revenue_sensitivity
+                    context_lines.append(f"**GDP Change Impact ({gdp_impact:+.1%}):**")
+                    context_lines.append(f"  - Estimated Revenue Sensitivity: {revenue_sensitivity:.0%}")
+                    context_lines.append(f"  - Expected Revenue Impact: {revenue_impact:+.2%}")
+                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                            adjusted_val = baseline_val * (1 + revenue_impact)
+                            delta = adjusted_val - baseline_val
+                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
+                    context_lines.append("")
+                
+                if "price_change" in scenario_details:
+                    price_impact = scenario_details["price_change"]
+                    context_lines.append(f"**Price Change Impact ({price_impact:+.1%}):**")
+                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                            # Price directly affects revenue (assuming constant volume)
+                            adjusted_val = baseline_val * (1 + price_impact)
+                            delta = adjusted_val - baseline_val
+                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
+                    context_lines.append("")
+                
+                context_lines.extend([
+                    "**🎯 YOUR TASK:**",
+                    "1. Present the SCENARIO IMPACT ANALYSIS above",
+                    "2. Create a SUMMARY COMPARISON TABLE showing:",
+                    "   | Year | Baseline | Scenario | Delta ($) | Delta (%) |",
+                    "3. Explain the business logic behind the impact:",
+                    "   - Which assumptions changed (use the parsed parameters)",
+                    "   - How they affect revenue (use the calculated impacts)",
+                    "   - Any trade-offs or secondary effects",
+                    "4. Discuss confidence level in the scenario",
+                    "5. Suggest related scenarios to explore",
+                    "",
+                    "**Note:** These calculations use simplified business models. For production scenario analysis,",
+                    "more sophisticated econometric models would be used.",
+                    ""
+                ])
+            else:
+                # No specific parameters - provide qualitative analysis
+                context_lines.extend([
+                    "",
+                    "**🎯 YOUR TASK:**",
+                    "1. Acknowledge the scenario request",
+                    "2. Explain what assumptions would change in this scenario",
+                    "3. Provide a QUALITATIVE estimate of impact:",
+                    "   - Would revenue increase or decrease?",
+                    "   - By approximately how much (rough % range)?",
+                    "   - What are the key mechanisms driving the change?",
+                    "4. Suggest making the scenario more specific:",
+                    "   - 'What if revenue grows 10%?'",
+                    "   - 'What if COGS rises 5%?'",
+                    "   - 'What if volume increases 15%?'",
+                    "5. Explain that specific percentages enable quantitative analysis",
+                    ""
+                ])
+        
+        context_lines.extend([
+            "=" * 80,
+            "END OF FOLLOW-UP CONTEXT",
+            "=" * 80
+        ])
+        
+        return "\n".join(context_lines)
+    
     def _build_enhanced_rag_context(self, user_input: str) -> Optional[str]:
         """Enhanced RAG context building with comprehensive financial data."""
+        # FIRST: Check if this is a follow-up question about an active forecast
+        followup = self._detect_forecast_followup(user_input)
+        if followup:
+            return self._build_forecast_followup_context(user_input, followup)
+        
         # Skip financial context for portfolio queries (they have their own context)
         portfolio_id_pattern = r"\bport_[\w]{4,12}\b"
         if re.search(portfolio_id_pattern, user_input, re.IGNORECASE):
@@ -4866,6 +6001,24 @@ class BenchmarkOSChatbot:
                 max_tickers=3
             )
             if financial_context:
+                # Check if a forecast was generated and store its metadata in conversation state
+                try:
+                    from .context_builder import get_last_forecast_metadata
+                    forecast_metadata = get_last_forecast_metadata()
+                    if forecast_metadata:
+                        LOGGER.info(f"Storing forecast metadata in conversation: {forecast_metadata['ticker']} {forecast_metadata['metric']}")
+                        self.conversation.set_active_forecast(
+                            ticker=forecast_metadata['ticker'],
+                            metric=forecast_metadata['metric'],
+                            method=forecast_metadata['method'],
+                            periods=forecast_metadata['periods'],
+                            forecast_result=forecast_metadata['forecast_result'],
+                            explainability=forecast_metadata.get('explainability'),
+                            parameters=forecast_metadata.get('parameters')
+                        )
+                except Exception as forecast_error:
+                    LOGGER.warning(f"Failed to store forecast metadata: {forecast_error}")
+                
                 return financial_context
         except Exception as e:
             LOGGER.debug(f"Smart context builder failed, falling back: {e}")

@@ -39,6 +39,44 @@ except ImportError:
     ML_FORECASTING_AVAILABLE = False
     LOGGER.debug("ML forecasting not available - forecasting will use basic methods")
 
+# Module-level storage for the latest forecast metadata (for interactive forecasting)
+# This allows the chatbot to retrieve forecast details after context building
+_LAST_FORECAST_METADATA: Optional[Dict[str, Any]] = None
+
+
+def get_last_forecast_metadata() -> Optional[Dict[str, Any]]:
+    """
+    Retrieve metadata for the most recently generated forecast.
+    
+    Returns:
+        Dictionary containing ticker, metric, method, forecast_result, explainability, parameters
+    """
+    global _LAST_FORECAST_METADATA
+    return _LAST_FORECAST_METADATA
+
+
+def _set_last_forecast_metadata(
+    ticker: str,
+    metric: str,
+    method: str,
+    periods: int,
+    forecast_result: Any,
+    explainability: Optional[Dict[str, Any]] = None,
+    parameters: Optional[Dict[str, Any]] = None
+) -> None:
+    """Store metadata for the latest forecast (internal use only)."""
+    global _LAST_FORECAST_METADATA
+    _LAST_FORECAST_METADATA = {
+        "ticker": ticker,
+        "metric": metric,
+        "method": method,
+        "periods": periods,
+        "forecast_result": forecast_result,
+        "explainability": explainability or {},
+        "parameters": parameters or {},
+    }
+    LOGGER.debug(f"Stored forecast metadata for {ticker} {metric} using {method}")
+
 
 def format_currency(value: Optional[float]) -> str:
     """Format currency value to human-readable string."""
@@ -1933,11 +1971,63 @@ def _build_ml_forecast_context(
         
         forecast_lines.append(f"\n{'='*80}\n")
         
-        return "\n".join(forecast_lines), forecast
+        # Extract explainability information for interactive forecasting
+        explainability_data = {}
+        try:
+            if forecast and forecast.model_details:
+                model_details = forecast.model_details
+                
+                # Extract forecast drivers (if available)
+                drivers = {}
+                if 'feature_importance' in model_details:
+                    drivers['features'] = model_details['feature_importance']
+                if 'component_breakdown' in model_details:
+                    drivers['components'] = model_details['component_breakdown']
+                if 'prophet_components' in model_details:
+                    drivers['prophet'] = model_details['prophet_components']
+                
+                explainability_data['drivers'] = drivers
+                
+                # Extract model confidence and uncertainty
+                explainability_data['confidence'] = forecast.confidence
+                explainability_data['method'] = forecast.method
+                
+                # Extract parameter information
+                params = {}
+                if 'epochs' in model_details:
+                    params['epochs'] = model_details['epochs']
+                if 'learning_rate' in model_details:
+                    params['learning_rate'] = model_details['learning_rate']
+                if 'batch_size' in model_details:
+                    params['batch_size'] = model_details['batch_size']
+                if 'lookback' in model_details:
+                    params['lookback'] = model_details['lookback']
+                
+                explainability_data['parameters'] = params
+                
+                # Extract performance metrics
+                metrics = {}
+                if 'training_loss' in model_details:
+                    metrics['training_loss'] = model_details['training_loss']
+                if 'validation_loss' in model_details:
+                    metrics['validation_loss'] = model_details['validation_loss']
+                if 'rmse' in model_details:
+                    metrics['rmse'] = model_details['rmse']
+                if 'mae' in model_details:
+                    metrics['mae'] = model_details['mae']
+                
+                explainability_data['performance'] = metrics
+                
+                LOGGER.info(f"Extracted explainability data for {ticker} {metric}: {list(explainability_data.keys())}")
+        except Exception as exp_error:
+            LOGGER.warning(f"Failed to extract explainability data: {exp_error}")
+            explainability_data = {}
+        
+        return "\n".join(forecast_lines), forecast, explainability_data
         
     except Exception as e:
         LOGGER.exception(f"Error building ML forecast context: {e}")
-        return None, None
+        return None, None, None
 
 
 def _build_historical_forecast_comparison(
@@ -3478,7 +3568,7 @@ def build_financial_context(
                     LOGGER.info(f"  - Ticker: {ticker}")
                     LOGGER.info(f"  - Metric: {forecast_metric}")
                     LOGGER.info(f"  - Method: {forecast_method}")
-                    ml_forecast_context, forecast_result = _build_ml_forecast_context(
+                    ml_forecast_context, forecast_result, explainability_data = _build_ml_forecast_context(
                         ticker=ticker,
                         metric=forecast_metric,
                         database_path=database_path,
@@ -3491,6 +3581,22 @@ def build_financial_context(
                         # The forecast IS the answer, not historical data
                         context_parts.insert(0, ml_forecast_context)
                         LOGGER.info(f"ML forecast context generated and inserted at top of context for {ticker} {forecast_metric}")
+                        
+                        # Store forecast metadata for interactive forecasting
+                        if forecast_result:
+                            parameters = {
+                                "periods": 3,
+                                "method": forecast_method,
+                            }
+                            _set_last_forecast_metadata(
+                                ticker=ticker,
+                                metric=forecast_metric,
+                                method=forecast_method,
+                                periods=3,
+                                forecast_result=forecast_result,
+                                explainability=explainability_data,
+                                parameters=parameters
+                            )
                         LOGGER.info(f"  - Context length: {len(ml_forecast_context)} characters")
                         LOGGER.info(f"  - Contains 'ML FORECAST': {'ML FORECAST' in ml_forecast_context or 'CRITICAL: THIS IS THE PRIMARY ANSWER' in ml_forecast_context}")
                     else:
