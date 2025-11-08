@@ -5084,20 +5084,33 @@ class BenchmarkOSChatbot:
         - "What if margins improve 2 percentage points?"
         - "What if volume increases 15%?"
         - "What if marketing spend increases 20%?"
+        - "What if revenue grows 10% AND COGS rises 5%?" (multi-factor)
+        - "What if volume doubles and prices fall 5%?" (complex)
         
         Returns:
-            Dictionary with scenario parameters
+            Dictionary with scenario parameters, validation warnings, and metadata
         """
         lowered = user_input.lower()
         scenario_params = {}
+        warnings = []
+        
+        # Detect multi-factor scenarios (AND, plus, combined)
+        is_multi_factor = bool(re.search(r"\b(?:and|plus|with|combined\s+with|along\s+with)\b", lowered))
         
         # Revenue/sales growth
         revenue_match = re.search(
-            r"(?:revenue|sales?)\s+(?:grows?|increases?|rises?|goes?\s+up)\s+(?:by\s+)?(\d+(?:\.\d+)?)%?",
+            r"(?:revenue|sales?)\s+(?:grows?|increases?|rises?|goes?\s+up|falls?|decreases?|declines?|drops?)\s+(?:by\s+)?(\d+(?:\.\d+)?)%?",
             lowered
         )
         if revenue_match:
-            scenario_params["revenue_growth"] = float(revenue_match.group(1)) / 100
+            value = float(revenue_match.group(1)) / 100
+            # Check direction
+            if re.search(r"falls?|decreases?|declines?|drops?", lowered):
+                value = -value
+            # Validate bounds (reasonable business assumptions)
+            if abs(value) > 1.0:  # More than 100% change
+                warnings.append(f"revenue_growth: {value:.1%} seems extreme (>100%)")
+            scenario_params["revenue_growth"] = value
         
         # COGS/cost changes
         cogs_match = re.search(
@@ -5109,17 +5122,23 @@ class BenchmarkOSChatbot:
             # Check if it's a decrease
             if re.search(r"falls?|decreases?|drops?|declines?", lowered):
                 change = -change
+            # Validate bounds
+            if abs(change) > 0.5:  # More than 50% COGS change is unusual
+                warnings.append(f"cogs_change: {change:.1%} is very large (>50%)")
             scenario_params["cogs_change"] = change
         
         # Margin changes
         margin_match = re.search(
-            r"(?:margin|gross\s+margin|profit\s+margin)\s+(?:improves?|increases?|expands?|rises?|deteriorates?|decreases?|shrinks?|falls?)\s+(?:by\s+)?(\d+(?:\.\d+)?)\s*(?:percentage\s+points?|pp|points?|%)?",
+            r"(?:margin|gross\s+margin|profit\s+margin|operating\s+margin)\s+(?:improves?|increases?|expands?|rises?|deteriorates?|decreases?|shrinks?|falls?)\s+(?:by\s+)?(\d+(?:\.\d+)?)\s*(?:percentage\s+points?|pp|points?|%)?",
             lowered
         )
         if margin_match:
             change = float(margin_match.group(1)) / 100  # Convert to decimal
             if re.search(r"deteriorates?|decreases?|shrinks?|falls?", lowered):
                 change = -change
+            # Validate margin bounds (margins typically -20% to +20% range)
+            if abs(change) > 0.2:  # More than 20pp change
+                warnings.append(f"margin_change: {change:.1%} is very large (>20pp)")
             scenario_params["margin_change"] = change
         
         # Volume changes
@@ -5166,9 +5185,66 @@ class BenchmarkOSChatbot:
             change = float(price_match.group(1)) / 100
             if re.search(r"decreases?|falls?|drops?", lowered):
                 change = -change
+            # Validate price bounds
+            if abs(change) > 0.5:  # More than 50% price change
+                warnings.append(f"price_change: {change:.1%} is very large (>50%)")
             scenario_params["price_change"] = change
         
-        return scenario_params
+        # Interest rate changes
+        interest_match = re.search(
+            r"(?:interest\s+rate|rates?|fed\s+rate)\s+(?:increases?|rises?|goes?\s+up|decreases?|falls?|drops?)\s+(?:by\s+)?(\d+(?:\.\d+)?)\s*(?:percentage\s+points?|pp|points?|%)?",
+            lowered
+        )
+        if interest_match:
+            change = float(interest_match.group(1)) / 100
+            if re.search(r"decreases?|falls?|drops?", lowered):
+                change = -change
+            # Interest rate changes typically in smaller increments
+            if abs(change) > 0.05:  # More than 5pp
+                warnings.append(f"interest_rate_change: {change:.1%} is large (>5pp)")
+            scenario_params["interest_rate_change"] = change
+        
+        # Tax rate changes
+        tax_match = re.search(
+            r"(?:tax\s+rate|taxes?)\s+(?:increases?|rises?|decreases?|falls?)\s+(?:by\s+)?(\d+(?:\.\d+)?)\s*(?:percentage\s+points?|pp|points?|%)?",
+            lowered
+        )
+        if tax_match:
+            change = float(tax_match.group(1)) / 100
+            if re.search(r"decreases?|falls?|drops?", lowered):
+                change = -change
+            if abs(change) > 0.15:  # More than 15pp tax change
+                warnings.append(f"tax_rate_change: {change:.1%} is very large (>15pp)")
+            scenario_params["tax_rate_change"] = change
+        
+        # Market share changes
+        market_share_match = re.search(
+            r"(?:market\s+share)\s+(?:increases?|grows?|gains?|decreases?|loses?|falls?)\s+(?:by\s+)?(\d+(?:\.\d+)?)\s*(?:percentage\s+points?|pp|points?|%)?",
+            lowered
+        )
+        if market_share_match:
+            change = float(market_share_match.group(1)) / 100
+            if re.search(r"decreases?|loses?|falls?", lowered):
+                change = -change
+            if abs(change) > 0.1:  # More than 10pp market share change
+                warnings.append(f"market_share_change: {change:.1%} is aggressive (>10pp)")
+            scenario_params["market_share_change"] = change
+        
+        # Return with metadata
+        result = {
+            "parameters": scenario_params,
+            "warnings": warnings,
+            "is_multi_factor": is_multi_factor,
+            "parameter_count": len(scenario_params)
+        }
+        
+        # Log parsing results
+        if scenario_params:
+            LOGGER.info(f"Parsed scenario parameters: {scenario_params}")
+            if warnings:
+                LOGGER.warning(f"Scenario validation warnings: {warnings}")
+        
+        return result
     
     def _build_forecast_followup_context(self, user_input: str, followup: Dict[str, Any]) -> str:
         """
@@ -5726,6 +5802,10 @@ class BenchmarkOSChatbot:
         
         elif followup_type == "scenario":
             scenario_details = followup.get("details", {})
+            scenario_params = scenario_details.get("parameters", {})
+            scenario_warnings = scenario_details.get("warnings", [])
+            is_multi_factor = scenario_details.get("is_multi_factor", False)
+            param_count = scenario_details.get("parameter_count", 0)
             
             context_lines.extend([
                 "=" * 80,
@@ -5734,16 +5814,32 @@ class BenchmarkOSChatbot:
                 "",
                 f"**User wants to test a scenario: '{user_input}'**",
                 "",
-                "**Parsed Scenario Parameters:**"
             ])
             
-            if scenario_details:
-                for param_name, param_value in scenario_details.items():
+            # Show scenario metadata
+            if is_multi_factor:
+                context_lines.append(f"**⚠️ MULTI-FACTOR SCENARIO DETECTED ({param_count} factors)**")
+                context_lines.append("")
+            
+            context_lines.append("**Parsed Scenario Parameters:**")
+            
+            if scenario_params:
+                for param_name, param_value in scenario_params.items():
                     if isinstance(param_value, float):
                         context_lines.append(f"  - {param_name}: {param_value:+.1%}")
                     else:
                         context_lines.append(f"  - {param_name}: {param_value}")
                 context_lines.append("")
+                
+                # Show validation warnings if any
+                if scenario_warnings:
+                    context_lines.append("**⚠️ Validation Warnings:**")
+                    for warning in scenario_warnings:
+                        context_lines.append(f"  - {warning}")
+                    context_lines.append("")
+                    context_lines.append("**Note:** These assumptions are outside typical business ranges.")
+                    context_lines.append("**You should acknowledge these warnings in your response.**")
+                    context_lines.append("")
             else:
                 context_lines.append("  - (No specific parameters detected - will provide qualitative analysis)")
                 context_lines.append("")
@@ -5759,14 +5855,20 @@ class BenchmarkOSChatbot:
                 context_lines.append("")
             
             # If we have specific parameters, calculate scenario impact
-            if scenario_details:
+            if scenario_params:
                 context_lines.append("**🔢 Quantitative Scenario Impact:**")
                 context_lines.append("")
                 
+                # For multi-factor scenarios, calculate compound effects
+                if is_multi_factor and param_count > 1:
+                    context_lines.append(f"**🔗 Combined Impact ({param_count} factors):**")
+                    context_lines.append("**Note:** Factors interact and compound.")
+                    context_lines.append("")
+                
                 # Calculate impact based on parameters
-                if "revenue_growth" in scenario_details:
-                    growth_factor = 1 + scenario_details["revenue_growth"]
-                    context_lines.append(f"**Revenue Growth Impact ({scenario_details['revenue_growth']:+.1%}):**")
+                if "revenue_growth" in scenario_params:
+                    growth_factor = 1 + scenario_params["revenue_growth"]
+                    context_lines.append(f"**Revenue Growth Impact ({scenario_params['revenue_growth']:+.1%}):**")
                     if forecast_result and hasattr(forecast_result, 'predicted_values'):
                         for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
                             adjusted_val = baseline_val * growth_factor
@@ -5774,8 +5876,8 @@ class BenchmarkOSChatbot:
                             context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B (+${delta/1e9:.2f}B)")
                     context_lines.append("")
                 
-                if "cogs_change" in scenario_details:
-                    cogs_impact = scenario_details["cogs_change"]
+                if "cogs_change" in scenario_params:
+                    cogs_impact = scenario_params["cogs_change"]
                     # COGS impacts margin, which impacts revenue (simplified model)
                     # For revenue forecast: higher COGS → lower margins → potentially lower revenue
                     margin_impact = -cogs_impact * 0.5  # Simplified: 50% of COGS change affects margin
@@ -5788,8 +5890,8 @@ class BenchmarkOSChatbot:
                             context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
                     context_lines.append("")
                 
-                if "margin_change" in scenario_details:
-                    margin_impact = scenario_details["margin_change"]
+                if "margin_change" in scenario_params:
+                    margin_impact = scenario_params["margin_change"]
                     # Direct margin change affects revenue proportionally
                     context_lines.append(f"**Margin Change Impact ({margin_impact:+.2%}):**")
                     if forecast_result and hasattr(forecast_result, 'predicted_values'):
@@ -5801,8 +5903,8 @@ class BenchmarkOSChatbot:
                             context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
                     context_lines.append("")
                 
-                if "volume_change" in scenario_details:
-                    volume_impact = scenario_details["volume_change"]
+                if "volume_change" in scenario_params:
+                    volume_impact = scenario_params["volume_change"]
                     context_lines.append(f"**Volume Change Impact ({volume_impact:+.1%}):**")
                     if forecast_result and hasattr(forecast_result, 'predicted_values'):
                         for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
@@ -5812,8 +5914,8 @@ class BenchmarkOSChatbot:
                             context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B (+${delta/1e9:.2f}B)")
                     context_lines.append("")
                 
-                if "marketing_change" in scenario_details:
-                    marketing_impact = scenario_details["marketing_change"]
+                if "marketing_change" in scenario_params:
+                    marketing_impact = scenario_params["marketing_change"]
                     # Marketing spend affects volume with diminishing returns
                     # Simplified: 10% marketing increase → 2-3% volume increase
                     volume_impact = marketing_impact * 0.25
@@ -5830,8 +5932,8 @@ class BenchmarkOSChatbot:
                         context_lines.append(f"  - Trade-off: Operating margin decreases by ~{margin_hit:.2%}")
                     context_lines.append("")
                 
-                if "gdp_change" in scenario_details:
-                    gdp_impact = scenario_details["gdp_change"]
+                if "gdp_change" in scenario_params:
+                    gdp_impact = scenario_params["gdp_change"]
                     # GDP affects revenue with beta coefficient (typically 0.3-0.8 for most companies)
                     revenue_sensitivity = 0.5  # Simplified: 50% sensitivity
                     revenue_impact = gdp_impact * revenue_sensitivity
@@ -5845,8 +5947,8 @@ class BenchmarkOSChatbot:
                             context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
                     context_lines.append("")
                 
-                if "price_change" in scenario_details:
-                    price_impact = scenario_details["price_change"]
+                if "price_change" in scenario_params:
+                    price_impact = scenario_params["price_change"]
                     context_lines.append(f"**Price Change Impact ({price_impact:+.1%}):**")
                     if forecast_result and hasattr(forecast_result, 'predicted_values'):
                         for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
@@ -5856,20 +5958,108 @@ class BenchmarkOSChatbot:
                             context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
                     context_lines.append("")
                 
+                # If multi-factor, calculate compound impact
+                if is_multi_factor and param_count > 1:
+                    context_lines.append("**🔗 Compound Impact (All Factors Combined):**")
+                    context_lines.append("")
+                    
+                    # Calculate total multiplier from all factors
+                    total_multiplier = 1.0
+                    impact_breakdown = []
+                    
+                    if "revenue_growth" in scenario_params:
+                        total_multiplier *= (1 + scenario_params["revenue_growth"])
+                        impact_breakdown.append(f"Revenue growth: {scenario_params['revenue_growth']:+.1%}")
+                    
+                    if "volume_change" in scenario_params:
+                        total_multiplier *= (1 + scenario_params["volume_change"])
+                        impact_breakdown.append(f"Volume change: {scenario_params['volume_change']:+.1%}")
+                    
+                    if "price_change" in scenario_params:
+                        total_multiplier *= (1 + scenario_params["price_change"])
+                        impact_breakdown.append(f"Price change: {scenario_params['price_change']:+.1%}")
+                    
+                    if "cogs_change" in scenario_params:
+                        margin_effect = -scenario_params["cogs_change"] * 0.5
+                        total_multiplier *= (1 + margin_effect)
+                        impact_breakdown.append(f"COGS impact: {scenario_params['cogs_change']:+.1%} → margin {margin_effect:+.1%}")
+                    
+                    if "margin_change" in scenario_params:
+                        revenue_effect = scenario_params["margin_change"] * 0.3
+                        total_multiplier *= (1 + revenue_effect)
+                        impact_breakdown.append(f"Margin impact: {scenario_params['margin_change']:+.1%} → revenue {revenue_effect:+.1%}")
+                    
+                    if "marketing_change" in scenario_params:
+                        volume_effect = scenario_params["marketing_change"] * 0.25
+                        total_multiplier *= (1 + volume_effect)
+                        impact_breakdown.append(f"Marketing impact: {scenario_params['marketing_change']:+.1%} → volume {volume_effect:+.1%}")
+                    
+                    if "gdp_change" in scenario_params:
+                        revenue_effect = scenario_params["gdp_change"] * 0.5
+                        total_multiplier *= (1 + revenue_effect)
+                        impact_breakdown.append(f"GDP impact: {scenario_params['gdp_change']:+.1%} → revenue {revenue_effect:+.1%}")
+                    
+                    total_impact_pct = (total_multiplier - 1.0) * 100
+                    
+                    context_lines.append("**Factor Interactions:**")
+                    for breakdown_item in impact_breakdown:
+                        context_lines.append(f"  - {breakdown_item}")
+                    context_lines.append("")
+                    context_lines.append(f"**Total Compound Impact:** {total_impact_pct:+.2f}%")
+                    context_lines.append("")
+                    
+                    # Show combined forecast
+                    context_lines.append("**Combined Scenario Forecast:**")
+                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
+                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
+                            combined_val = baseline_val * total_multiplier
+                            delta = combined_val - baseline_val
+                            delta_pct = (delta / baseline_val * 100) if baseline_val != 0 else 0
+                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${combined_val/1e9:.2f}B ({delta/1e9:+.2f}B, {delta_pct:+.1f}%)")
+                    context_lines.append("")
+                
+                # Add warnings section if any
+                if scenario_warnings:
+                    context_lines.append("**⚠️ Scenario Validation Warnings:**")
+                    for warning in scenario_warnings:
+                        context_lines.append(f"  - {warning}")
+                    context_lines.append("")
+                    context_lines.append("**Important:** These assumptions are outside typical ranges.")
+                    context_lines.append("**You should discuss the plausibility of these assumptions in your response.**")
+                    context_lines.append("")
+                
                 context_lines.extend([
                     "**🎯 YOUR TASK:**",
                     "1. Present the SCENARIO IMPACT ANALYSIS above",
                     "2. Create a SUMMARY COMPARISON TABLE showing:",
                     "   | Year | Baseline | Scenario | Delta ($) | Delta (%) |",
-                    "3. Explain the business logic behind the impact:",
-                    "   - Which assumptions changed (use the parsed parameters)",
-                    "   - How they affect revenue (use the calculated impacts)",
-                    "   - Any trade-offs or secondary effects",
+                ])
+                
+                # Add special instructions for multi-factor scenarios
+                if is_multi_factor and param_count > 1:
+                    context_lines.extend([
+                        "3. **CRITICAL:** This is a MULTI-FACTOR scenario - explain:",
+                        "   - Individual impacts of each factor (use the breakdown above)",
+                        "   - How factors interact and compound",
+                        f"   - Total compound impact: {total_impact_pct:+.2f}%",
+                        "   - Any conflicting effects (e.g., volume +10% but price -5%)",
+                    ])
+                else:
+                    context_lines.extend([
+                        "3. Explain the business logic behind the impact:",
+                        "   - Which assumption changed (use the parsed parameter)",
+                        "   - How it affects revenue (use the calculated impact)",
+                        "   - Any trade-offs or secondary effects",
+                    ])
+                
+                context_lines.extend([
                     "4. Discuss confidence level in the scenario",
-                    "5. Suggest related scenarios to explore",
+                    "5. If validation warnings exist, acknowledge them and discuss plausibility",
+                    "6. Suggest related scenarios to explore",
                     "",
-                    "**Note:** These calculations use simplified business models. For production scenario analysis,",
-                    "more sophisticated econometric models would be used.",
+                    "**Note:** Calculations use simplified business models (e.g., volume → revenue 1:1,",
+                    "COGS → margin 0.5x). In production, company-specific sensitivities would be calibrated",
+                    "from historical data and industry benchmarks.",
                     ""
                 ])
             else:
