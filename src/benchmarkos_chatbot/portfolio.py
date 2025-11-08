@@ -20,7 +20,13 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
+
+# Optional imports for market data
+try:
+    import yfinance as yf
+except ImportError:
+    yf = None  # type: ignore
+    logging.warning("yfinance not available - real-time market data will be limited")
 
 # Optional imports for optimization and PDF processing
 try:
