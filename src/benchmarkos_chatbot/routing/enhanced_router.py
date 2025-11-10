@@ -6,7 +6,7 @@ This is a NON-INVASIVE layer that can be enabled via config without changing exi
 from __future__ import annotations
 
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -56,6 +56,14 @@ class EnhancedIntent(Enum):
     PORTFOLIO_SCHEDULE = "portfolio_schedule"
     PORTFOLIO_ENRICHMENT = "portfolio_enrichment"
     PORTFOLIO_SUMMARY = "portfolio_summary"
+    # KPI intents
+    CREATE_KPI = "create_kpi"
+    COMPUTE_KPI = "compute_kpi"
+    MANAGE_KPI = "manage_kpi"
+    TEMPLATE_SAVE = "template_save"
+    TEMPLATE_RUN = "template_run"
+    SOURCE_LOOKUP = "source_lookup"
+    HELP = "help"
     # ML Forecasting intents
     ML_FORECAST_ARIMA = "ml_forecast_arima"
     ML_FORECAST_PROPHET = "ml_forecast_prophet"
@@ -75,6 +83,10 @@ class EnhancedRouting:
     force_text_only: bool = False  # Never build dashboard
     legacy_command: Optional[str] = None  # If legacy, pass this through
     confidence: float = 1.0  # Confidence in routing decision
+    # Optional hints/slots to help downstream handlers (backwards compatible)
+    slots: Optional[Dict[str, Any]] = None
+    missing_slots: Optional[List[str]] = None
+    disambiguation_questions: Optional[List[str]] = None
     
 
 def enhance_structured_parse(
@@ -97,7 +109,100 @@ def enhance_structured_parse(
     if existing_structured is None:
         existing_structured = {}
     
-    lowered = text.strip().lower()
+    clean_text = text.strip()
+    lowered = clean_text.lower()
+
+    def with_conf(c: float) -> float:
+        """Clamp and discretize confidence values for stability."""
+        return max(0.0, min(1.0, round(c, 2)))
+    
+    def extract_period_from_structured(periods_data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not isinstance(periods_data, dict):
+            return None
+        items = periods_data.get("items") or []
+        if not items:
+            return None
+        first = items[0]
+        if not isinstance(first, dict):
+            return None
+        year = first.get("fy")
+        quarter = first.get("fq")
+        period_type = periods_data.get("type")
+        result: Dict[str, Any] = {
+            "basis": "QUARTER" if quarter not in (None, "", -1) else "FY",
+            "year": year,
+            "quarter": quarter if quarter not in (None, "", -1) else None,
+            "ttm": False,
+        }
+        if period_type in {"ytd", "qtd"}:
+            result["basis"] = period_type.upper()
+        if period_type in {"latest", "future"}:
+            result["tag"] = period_type
+        if periods_data.get("normalize_to_fiscal") is False and result["basis"] == "FY":
+            result["basis"] = "YEAR"
+        return result
+    
+    def extract_tickers_from_structured(structured: Optional[Dict[str, Any]]) -> List[str]:
+        if not structured:
+            return []
+        raw = structured.get("tickers") or []
+        tickers: List[str] = []
+        if isinstance(raw, Sequence):
+            for item in raw:
+                if isinstance(item, dict):
+                    ticker = item.get("ticker")
+                    if ticker:
+                        tickers.append(str(ticker).upper())
+                elif isinstance(item, str):
+                    tickers.append(item.upper())
+        return tickers
+    
+    def extract_metric_candidate(structured: Optional[Dict[str, Any]]) -> Optional[str]:
+        if not structured:
+            return None
+        metrics = structured.get("vmetrics") or []
+        if not metrics:
+            return None
+        first = metrics[0]
+        if isinstance(first, dict):
+            value = first.get("key") or first.get("input")
+            if value:
+                return str(value).strip()
+        elif isinstance(first, str):
+            return first.strip()
+        return None
+    
+    def build_source_lookup_routing(kpi_name: str, extra_slots: Optional[Dict[str, Any]] = None, *, missing_slots: Optional[List[str]] = None) -> EnhancedRouting:
+        slots = {
+            "kpi_name": kpi_name,
+            "lookup_scope": ["internal_dictionary", "financial_glossary", "web"],
+        }
+        if extra_slots:
+            slots.update(extra_slots)
+        return EnhancedRouting(
+            intent=EnhancedIntent.SOURCE_LOOKUP,
+            confidence=with_conf(0.78),
+            force_text_only=True,
+            slots=slots,
+            missing_slots=missing_slots or [],
+            disambiguation_questions=[],
+        )
+    
+    structured_intent = existing_structured.get("intent")
+    if structured_intent in {"create_kpi", "compute_kpi"}:
+        slots = existing_structured.get("slots") or {}
+        if not isinstance(slots, dict):
+            slots = {}
+        formula_text = slots.get("formula_text") or existing_structured.get("formula_text")
+        kpi_name = slots.get("kpi_name") or existing_structured.get("kpi_name")
+        if not kpi_name:
+            metrics = existing_structured.get("vmetrics") or []
+            if isinstance(metrics, list) and metrics:
+                first = metrics[0]
+                if isinstance(first, dict):
+                    kpi_name = first.get("input") or first.get("key")
+        if (formula_text is None or str(formula_text).strip() == "") and kpi_name:
+            return build_source_lookup_routing(str(kpi_name).strip(), slots)
     
     # ========================================
     # 0. PORTFOLIO INTENTS (Highest Priority)
@@ -453,6 +558,223 @@ def enhance_structured_parse(
                 confidence=0.7
             )
     
+    # ========================================
+    # 1A. KPI / TEMPLATE INTENTS
+    # ========================================
+    PERIOD_RX = r"(?P<period>(?:fy(?P<fy>\d{4})|q(?P<q>[1-4])\s*fy(?P<qfy>\d{4})|latest\s+quarter|ttm))"
+    ENTITY_RX = r"(?P<entity>[A-Za-z0-9&.\-\s]+?)"
+    KPI_NAME_RX = r"(?P<kpi>[\w\s\-%/()\.]+?)"
+
+    # CREATE_KPI with explicit formula
+    m = re.search(
+        r"\b(?:create|define|add)\s+(?:a\s+)?kpi[:\s]+" + KPI_NAME_RX + r"\s*=\s*(?P<formula>[^;]+)$",
+        clean_text,
+        re.IGNORECASE,
+    )
+    if m:
+        kpi = m.group("kpi").strip()
+        formula = m.group("formula").strip()
+        return EnhancedRouting(
+            intent=EnhancedIntent.CREATE_KPI,
+            confidence=with_conf(0.95),
+            force_text_only=True,
+            slots={"kpi_name": kpi, "formula_text": formula, "scope": "user"},
+            missing_slots=[],
+            disambiguation_questions=[],
+        )
+
+    # CREATE_KPI without formula -> SOURCE_LOOKUP
+    m = re.search(
+        r"\b(?:create|define|add)\s+(?:a\s+)?kpi[:\s]+" + KPI_NAME_RX + r"$",
+        clean_text,
+        re.IGNORECASE,
+    )
+    if m:
+        kpi = m.group("kpi").strip()
+        return build_source_lookup_routing(kpi)
+
+    # COMPUTE_KPI for entity + period
+    m = re.search(
+        r"\b(?:show|compute|calculate)\s+(?:my\s+custom\s+)?kpi\s*" + KPI_NAME_RX
+        + r"\s+(?:for|on)\s+" + ENTITY_RX + r"\s+" + PERIOD_RX + r"\b",
+        clean_text,
+        re.IGNORECASE,
+    )
+    if not m:
+        m = re.search(
+            r"\b(?:show|compute|calculate)\s+" + KPI_NAME_RX + r"\s+(?:for|on)\s+"
+            + ENTITY_RX + r"\s+" + PERIOD_RX + r"\b",
+            clean_text,
+            re.IGNORECASE,
+        )
+
+    if m:
+        kpi = m.group("kpi").strip()
+        entity = m.group("entity").strip()
+        period_text = m.group("period")
+        period_text_lower = period_text.lower() if period_text else ""
+
+        period_info = extract_period_from_structured(existing_structured.get("periods"))
+        period = period_info or {"basis": None, "year": None, "quarter": None, "ttm": False}
+
+        if not period_info:
+            if m.group("fy"):
+                period["basis"] = "FY"
+                period["year"] = int(m.group("fy"))
+            elif m.group("q") and m.group("qfy"):
+                period["basis"] = "QUARTER"
+                period["quarter"] = int(m.group("q"))
+                period["year"] = int(m.group("qfy"))
+            elif "latest quarter" in period_text_lower:
+                period["basis"] = "QUARTER"
+                period["quarter"] = "LATEST"
+            elif "ttm" in period_text_lower:
+                period["basis"] = "TTM"
+                period["ttm"] = True
+            elif "financial year" in period_text_lower or "fiscal year" in period_text_lower:
+                digits = re.findall(r"\d{4}", period_text)
+                if digits:
+                    period["basis"] = "FY"
+                    period["year"] = int(digits[0])
+            elif re.search(r"\b20\d{2}\b", period_text_lower):
+                digits = re.findall(r"\b20\d{2}\b", period_text_lower)
+                if digits:
+                    period["basis"] = "FY"
+                    period["year"] = int(digits[0])
+
+        if period_text:
+            period["text"] = period_text.strip()
+
+        tickers_slot = extract_tickers_from_structured(existing_structured)
+        if not tickers_slot and entity:
+            primary = entity.strip().split()
+            if primary:
+                tickers_slot.append(primary[0].upper())
+        tickers_slot = list(dict.fromkeys(tickers_slot))
+
+        slots_payload = {
+            "kpi_name": kpi,
+            "tickers": tickers_slot,
+            "entity_text": entity,
+            "period": period,
+            "scope": "user",
+        }
+
+        missing_slots: List[str] = []
+        if not tickers_slot:
+            missing_slots.append("tickers")
+        if not period.get("basis") or (period.get("basis") in {"FY", "YEAR"} and period.get("year") is None):
+            missing_slots.append("period")
+
+        if missing_slots:
+            return build_source_lookup_routing(kpi, slots_payload, missing_slots=missing_slots)
+
+        return EnhancedRouting(
+            intent=EnhancedIntent.COMPUTE_KPI,
+            confidence=with_conf(0.9),
+            force_text_only=True,
+            slots=slots_payload,
+            missing_slots=[],
+            disambiguation_questions=[],
+        )
+
+    # MANAGE_KPI: list/delete/rename
+    if re.search(r"\b(?:list|show)\s+(?:my\s+)?custom\s+kpis?\b", clean_text, re.IGNORECASE):
+        return EnhancedRouting(
+            intent=EnhancedIntent.MANAGE_KPI,
+            confidence=with_conf(0.9),
+            slots={"action": "list"},
+            force_text_only=True,
+        )
+    m = re.search(r"\bdelete\s+kpi\s+(.+)$", clean_text, re.IGNORECASE)
+    if m:
+        return EnhancedRouting(
+            intent=EnhancedIntent.MANAGE_KPI,
+            confidence=with_conf(0.9),
+            slots={"action": "delete", "kpi_name": m.group(1).strip()},
+            force_text_only=True,
+        )
+    m = re.search(r"\brename\s+kpi\s+(.+?)\s+to\s+(.+)$", clean_text, re.IGNORECASE)
+    if m:
+        return EnhancedRouting(
+            intent=EnhancedIntent.MANAGE_KPI,
+            confidence=with_conf(0.9),
+            slots={
+                "action": "rename",
+                "kpi_name": m.group(1).strip(),
+                "new_name": m.group(2).strip(),
+            },
+            force_text_only=True,
+        )
+
+    # Structured parser detected KPI + ticker (+/- period) - promote to compute/lookup
+    metric_candidate = extract_metric_candidate(existing_structured)
+    structured_tickers = extract_tickers_from_structured(existing_structured)
+    structured_period = extract_period_from_structured(existing_structured.get("periods"))
+
+    if metric_candidate and structured_tickers:
+        slots = {
+            "kpi_name": metric_candidate,
+            "tickers": structured_tickers,
+            "period": structured_period or {"basis": None, "year": None, "quarter": None, "ttm": False},
+            "scope": "user",
+        }
+        if not structured_period:
+            return build_source_lookup_routing(metric_candidate, slots, missing_slots=["period"])
+
+        return EnhancedRouting(
+            intent=EnhancedIntent.COMPUTE_KPI,
+            confidence=with_conf(0.82),
+            force_text_only=True,
+            slots=slots,
+            missing_slots=[],
+            disambiguation_questions=[],
+        )
+
+    # TEMPLATE SAVE/RUN
+    m = re.search(r'\b(?:save|store)\s+(?:this|it)\s+as\s+"([^"]+)"', clean_text, re.IGNORECASE)
+    if m:
+        return EnhancedRouting(
+            intent=EnhancedIntent.TEMPLATE_SAVE,
+            confidence=with_conf(0.95),
+            slots={"template_name": m.group(1)},
+            force_text_only=True,
+        )
+
+    m = re.search(
+        r'\b(?:run|load)\s+my\s+"([^"]+)"\s+for\s+([A-Za-z0-9,\s]+)\s+(?:with\s+)?(?:fiscal_)?year\s*=\s*(\d{4})',
+        clean_text,
+        re.IGNORECASE,
+    )
+    if m:
+        tickers = [t.strip().upper() for t in re.split(r"[,\s]+", m.group(2)) if t.strip()]
+        return EnhancedRouting(
+            intent=EnhancedIntent.TEMPLATE_RUN,
+            confidence=with_conf(0.93),
+            force_text_only=True,
+            slots={
+                "template_name": m.group(1),
+                "tickers": tickers,
+                "period": {"basis": "FY", "year": int(m.group(3))},
+            },
+        )
+
+    # Generic KPI mention -> SOURCE_LOOKUP fallback
+    maybe_kpi = re.search(r"\b(show|compute|calculate)\s+([A-Za-z][\w\s\-/%()\.]+)\b", clean_text, re.IGNORECASE)
+    if maybe_kpi and not any(w in lowered for w in [" vs ", " compare ", " dashboard "]):
+        kpi_guess = maybe_kpi.group(2).strip()
+        return EnhancedRouting(
+            intent=EnhancedIntent.SOURCE_LOOKUP,
+            confidence=with_conf(0.8),
+            force_text_only=True,
+            slots={
+                "kpi_name": kpi_guess,
+                "lookup_scope": ["internal_dictionary", "financial_glossary", "web"],
+            },
+            missing_slots=[],
+            disambiguation_questions=[],
+        )
+
     # ========================================
     # 1. LEGACY COMMANDS (High Priority)
     # ========================================

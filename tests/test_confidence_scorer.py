@@ -160,8 +160,7 @@ class TestAddConfidenceFooter:
         
         result = add_confidence_footer(response, confidence)
         
-        assert "Confidence: 95%" in result
-        assert "Verified: 2/2 facts" in result
+        assert result == response
     
     def test_add_confidence_footer_with_details(self):
         """Test adding confidence footer with detailed breakdown."""
@@ -180,8 +179,7 @@ class TestAddConfidenceFooter:
         
         result = add_confidence_footer(response, confidence, include_details=True)
         
-        assert "Confidence: 85%" in result
-        assert "Confidence Factors:" in result
+        assert result == response
 
 
 class TestCalculateConfidenceFromVerifiedResponse:
@@ -231,5 +229,6 @@ class TestCalculateConfidenceFromVerifiedResponse:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
 
 

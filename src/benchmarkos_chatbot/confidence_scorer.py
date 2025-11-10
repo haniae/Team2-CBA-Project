@@ -137,20 +137,12 @@ def add_confidence_footer(
         # Remove existing footer
         response = response.split(footer_marker)[0]
     
-    # Build footer
-    footer = "\n\n---\n"
-    footer += f"**Confidence: {confidence.score*100:.0f}%**"
-    footer += f" | Verified: {confidence.verified_facts}/{confidence.total_facts} facts"
+    # Confidence footers are intentionally suppressed to keep responses concise.
+    # Preserve the footer stripping behavior in case upstream content already added one.
+    _ = confidence  # Parameters retained for backwards compatibility.
+    _ = include_details
     
-    if confidence.total_facts > 0:
-        footer += f" | Sources: {confidence.total_facts - confidence.missing_sources} citations"
-    
-    if include_details and confidence.factors:
-        footer += "\n\n**Confidence Factors:**\n"
-        for factor in confidence.factors[:5]:  # Limit to top 5 factors
-            footer += f"- {factor}\n"
-    
-    return response + footer
+    return response
 
 
 def calculate_confidence_from_verified_response(
