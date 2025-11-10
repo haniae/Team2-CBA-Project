@@ -854,6 +854,122 @@ class AnalyticsEngine:
 
         return list(sorted(latest_map.values(), key=lambda rec: rec.metric))
 
+    def compute_growth_metrics(self, ticker: str, latest_records: Dict[str, Any]) -> Optional[Dict[str, float]]:
+        """
+        Calculate growth metrics (YoY, CAGR) for a ticker.
+        
+        Args:
+            ticker: Stock ticker symbol
+            latest_records: Dictionary of latest metric records
+            
+        Returns:
+            Dictionary with growth metrics as percentages (e.g., 7.2 for 7.2%)
+            Returns None if insufficient data
+        """
+        try:
+            # Fetch ALL records for this ticker to calculate historical growth
+            all_records = database.fetch_metric_snapshots(self.settings.database_path, ticker.upper())
+            if not all_records:
+                return None
+            
+            # Group records by metric and period
+            from collections import defaultdict
+            metrics_by_name = defaultdict(list)
+            for record in all_records:
+                metrics_by_name[record.metric].append(record)
+            
+            growth_data = {}
+            
+            # Helper to calculate YoY growth
+            def calculate_yoy(metric_name: str) -> Optional[float]:
+                records = sorted(metrics_by_name.get(metric_name, []), 
+                               key=lambda r: (r.period or "", r.updated_at), 
+                               reverse=True)
+                if len(records) < 2:
+                    return None
+                current = records[0].value
+                previous = records[1].value
+                if previous and previous != 0 and current is not None:
+                    # Return as percentage (e.g., 7.2 for 7.2%)
+                    return ((current - previous) / abs(previous)) * 100
+                return None
+            
+            # Calculate revenue growth
+            revenue_yoy = calculate_yoy("revenue")
+            if revenue_yoy is not None:
+                growth_data["revenue_growth_yoy"] = revenue_yoy
+            
+            # Calculate EPS growth
+            eps_yoy = calculate_yoy("eps_diluted")
+            if eps_yoy is not None:
+                growth_data["eps_growth_yoy"] = eps_yoy
+            
+            # Calculate net income growth
+            ni_yoy = calculate_yoy("net_income")
+            if ni_yoy is not None:
+                growth_data["net_income_growth_yoy"] = ni_yoy
+            
+            # Calculate FCF growth
+            fcf_yoy = calculate_yoy("free_cash_flow")
+            if fcf_yoy is not None:
+                growth_data["fcf_growth_yoy"] = fcf_yoy
+            
+            # Calculate CAGR (requires 3+ years of data)
+            def calculate_cagr(metric_name: str, years: int = 3) -> Optional[float]:
+                records = sorted(metrics_by_name.get(metric_name, []), 
+                               key=lambda r: (r.period or "", r.updated_at), 
+                               reverse=True)
+                if len(records) < years + 1:
+                    return None
+                current = records[0].value
+                historical = records[years].value
+                if historical and historical > 0 and current is not None and current > 0:
+                    # CAGR formula: (end/start)^(1/years) - 1
+                    return ((current / historical) ** (1/years) - 1) * 100
+                return None
+            
+            # Revenue CAGR
+            revenue_cagr_3y = calculate_cagr("revenue", 3)
+            if revenue_cagr_3y is not None:
+                growth_data["revenue_cagr_3y"] = revenue_cagr_3y
+            
+            revenue_cagr_5y = calculate_cagr("revenue", 5)
+            if revenue_cagr_5y is not None:
+                growth_data["revenue_cagr_5y"] = revenue_cagr_5y
+            
+            # EPS CAGR
+            eps_cagr_3y = calculate_cagr("eps_diluted", 3)
+            if eps_cagr_3y is not None:
+                growth_data["eps_cagr_3y"] = eps_cagr_3y
+            
+            # Margin changes (in basis points)
+            def calculate_margin_change(metric_name: str) -> Optional[float]:
+                records = sorted(metrics_by_name.get(metric_name, []), 
+                               key=lambda r: (r.period or "", r.updated_at), 
+                               reverse=True)
+                if len(records) < 2:
+                    return None
+                current = records[0].value
+                previous = records[1].value
+                if previous is not None and current is not None:
+                    # Return change in basis points (e.g., 0.25 to 0.27 = +200 bps)
+                    return (current - previous) * 10000
+                return None
+            
+            ebitda_margin_change = calculate_margin_change("adjusted_ebitda_margin")
+            if ebitda_margin_change is not None:
+                growth_data["margin_change_yoy"] = ebitda_margin_change
+            
+            gross_margin_change = calculate_margin_change("gross_margin")
+            if gross_margin_change is not None:
+                growth_data["gross_margin_change_yoy"] = gross_margin_change
+            
+            return growth_data if growth_data else None
+            
+        except Exception as e:
+            LOGGER.error(f"Error computing growth metrics for {ticker}: {e}", exc_info=True)
+            return None
+
     def generate_summary(self, ticker: str) -> str:
         """Return a narrative summary of key metrics for ``ticker``."""
         ticker_upper = ticker.upper()
