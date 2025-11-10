@@ -1930,19 +1930,49 @@ class BenchmarkOSChatbot:
         user_id = "default"  # TODO: Get from session/user context
         
         if intent["action"] == "create":
+            lookup_scope = intent.get("lookup_scope")
             try:
-                definition: CustomKPIDefinition = intent.get("definition")  # type: ignore[assignment]
-                if not definition:
+                definition: Optional[CustomKPIDefinition] = intent.get("definition")  # type: ignore[assignment]
+                kpi: Optional[CustomKPI] = None
+                created_via_lookup = False
+
+                if definition:
+                    formula_text = getattr(definition, "formula", "")
+                    if formula_text:
+                        kpi = calculator.upsert_kpi(user_id, definition)
+                    else:
+                        lookup_name = getattr(definition, "name", "") or intent.get("raw_name", "")
+                        lookup_name = lookup_name.strip()
+                        if not lookup_name:
+                            return "Please provide a KPI name so I can look it up."
+                        kpi = calculator.ensure_kpi_from_lookup(user_id, lookup_name, lookup_scope)
+                        if not kpi:
+                            return (
+                                f"I couldn't find an established formula for '{lookup_name}'. "
+                                "Would you like to define it manually?"
+                            )
+                        created_via_lookup = True
+                else:
                     name = intent.get("raw_name", "").strip()
                     formula = intent.get("raw_formula", "").strip()
-                    if not name or not formula:
-                        return (
-                            "Please provide both a name and a formula for the custom KPI. "
-                            "Example: 'Create a KPI called Contribution Margin = (Revenue - Cost of Revenue) / Revenue'"
-                        )
-                    definition = self.kpi_intent_parser._definition_from_text(intent.get("raw_prompt", ""), name, formula)
+                    if name and formula:
+                        definition = self.kpi_intent_parser._definition_from_text(intent.get("raw_prompt", ""), name, formula)
+                        kpi = calculator.upsert_kpi(user_id, definition)
+                    else:
+                        lookup_name = name or intent.get("kpi_name", "").strip()
+                        if not lookup_name:
+                            return "Please provide a KPI name so I can look it up."
+                        kpi = calculator.ensure_kpi_from_lookup(user_id, lookup_name, lookup_scope)
+                        if not kpi:
+                            return (
+                                f"I couldn't find an established formula for '{lookup_name}'. "
+                                "Would you like to define it manually?"
+                            )
+                        created_via_lookup = True
 
-                kpi = calculator.upsert_kpi(user_id, definition)
+                if not kpi:
+                    return "Unable to save the KPI definition."
+
                 details = kpi.metadata or {}
                 extras = []
                 if kpi.frequency:
@@ -1953,6 +1983,16 @@ class BenchmarkOSChatbot:
                     extras.append(f"**Inputs:** {', '.join(sorted(set(kpi.inputs)))}")
                 if kpi.source_tags:
                     extras.append(f"**Source Tags:** {', '.join(sorted(set(kpi.source_tags)))}")
+                if created_via_lookup:
+                    source = details.get("definition_source") or {}
+                    source_label = source.get("name") or source.get("type")
+                    if source_label:
+                        extras.append(f"**Definition Source:** {source_label}")
+                    else:
+                        extras.append("**Definition Source:** Auto-resolved library")
+                    confidence = details.get("lookup_confidence")
+                    if confidence is not None:
+                        extras.append(f"**Lookup Confidence:** {confidence:.2f}")
                 meta_text = "\n".join(extras) if extras else ""
 
                 return (
@@ -1970,6 +2010,7 @@ class BenchmarkOSChatbot:
         elif intent["action"] == "calculate":
             kpi_name = intent.get("kpi_name", "").strip()
             ticker = intent.get("ticker", "").strip().upper()
+            lookup_scope = intent.get("lookup_scope")
             
             if not kpi_name or not ticker:
                 return "Please provide both a KPI name and ticker. Example: 'Calculate Contribution Margin for AAPL'"
@@ -1982,6 +2023,12 @@ class BenchmarkOSChatbot:
                     matching_kpi = kpi
                     break
             
+            created_via_lookup = False
+            if not matching_kpi:
+                matching_kpi = calculator.ensure_kpi_from_lookup(user_id, kpi_name, lookup_scope)
+                if matching_kpi:
+                    created_via_lookup = True
+
             if not matching_kpi:
                 return f"❌ Custom KPI '{kpi_name}' not found. Use 'List my custom KPIs' to see available KPIs."
             
@@ -2027,6 +2074,57 @@ class BenchmarkOSChatbot:
             if result.dependencies:
                 response += f"\n**Dependencies:** {', '.join(result.dependencies)}\n"
             
+            if created_via_lookup:
+                source = matching_kpi.metadata.get("definition_source") or result.metadata.get("definition_source", {})
+                source_label = None
+                if isinstance(source, dict):
+                    source_label = source.get("name") or source.get("type")
+                if source_label:
+                    response += f"\n_Lookup source: {source_label}_\n"
+            
+            return response
+        
+        elif intent["action"] == "source_lookup":
+            lookup_scope = intent.get("lookup_scope")
+            kpi_name = intent.get("kpi_name") or intent.get("raw_name") or intent.get("raw_prompt")
+            if not kpi_name:
+                return "Please tell me which KPI to look up, e.g. 'Define KPI: Gross Margin'."
+            
+            kpi_name = str(kpi_name).strip()
+            if not kpi_name:
+                return "Please tell me which KPI to look up, e.g. 'Define KPI: Gross Margin'."
+
+            kpi = calculator.ensure_kpi_from_lookup(user_id, kpi_name, lookup_scope)
+            if not kpi:
+                return (
+                    f"I couldn't find an established formula for '{kpi_name}'. "
+                    "Would you like to define it manually?"
+                )
+
+            details = kpi.metadata or {}
+            source = details.get("definition_source") or {}
+            source_label = source.get("name") if isinstance(source, dict) else None
+            confidence = details.get("lookup_confidence")
+            notes: List[str] = []
+            if source_label:
+                notes.append(f"Definition source: {source_label}")
+            elif source:
+                notes.append("Definition source: external reference")
+            if confidence is not None:
+                notes.append(f"Confidence: {confidence:.2f}")
+
+            description = kpi.description or details.get("definition_description")
+            note_text = "\n".join(f"- {line}" for line in notes) if notes else ""
+
+            response = (
+                f"✅ Created KPI **{kpi.name}**\n\n"
+                f"**Formula:** `{kpi.formula}`\n"
+            )
+            if note_text:
+                response += note_text + "\n\n"
+            if description:
+                response += f"{description}\n\n"
+            response += f"You can calculate it with `Calculate {kpi.name} for AAPL`."
             return response
         
         elif intent["action"] == "list":

@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 _YEAR_TOKEN = r"(?:[12]\d{3}|\d{2})"
 FY_PATTERN = re.compile(rf"(?i)\bfy['’\-\s]*({_YEAR_TOKEN})(?=[^\d]|$)")
 FISCAL_PATTERN = re.compile(
-    rf"(?i)\b(?:fiscal|financial)\s+(?:year\s*)?({_YEAR_TOKEN})(?=[^\d]|$)"
+    rf"(?i)\b(?:fiscal|financial)\s+(?:year\s*(?:ending|ended|ends)?\s*)?({_YEAR_TOKEN})(?=[^\d]|$)"
 )
 CY_PATTERN = re.compile(
     rf"(?i)\bcy['’\-\s]*({_YEAR_TOKEN})(?=[^\d]|$)|\bcalendar\s+([12]\d{{3}})\b"
@@ -46,6 +46,9 @@ TRAILING_PATTERN = re.compile(r"(?i)\btrailing\s+(\d{1,2})\s+(months?|quarters?|
 FOR_YEAR_PATTERN = re.compile(r"(?i)\bfor\s+(20\d{2})\b")
 IN_YEAR_PATTERN = re.compile(r"(?i)\bin\s+(20\d{2})\b")
 DURING_PATTERN = re.compile(r"(?i)\bduring\s+(20\d{2})\b")
+YEAR_ENDING_PATTERN = re.compile(
+    rf"(?i)\b(?:year\s*(?:ending|ended|end)?\s*|fye\s*)(?:of\s+|on\s+|in\s+|for\s+)?({_YEAR_TOKEN})(?=[^\d]|$)"
+)
 
 # Modifier patterns
 ANNUAL_MODIFIERS = [
@@ -94,6 +97,7 @@ _NORMALIZATION_RULES: Sequence[Tuple[re.Pattern, str]] = [
     (re.compile(r"(?i)\bcalender\b"), "calendar"),
     (re.compile(r"(?i)\bf\s*[\-']?\s*y\b"), "FY"),
     (re.compile(r"(?i)\bc\s*[\-']?\s*y\b"), "CY"),
+    (re.compile(r"(?i)\bfye\b"), "FY"),
 ]
 QUARTER_COMBOS: Sequence[Tuple[re.Pattern, Tuple[int, int]]] = [
     (re.compile(rf"(?i)\bQ([1-4])\s*FY['’\-\s]*({_YEAR_TOKEN})\b"), (1, 2)),
@@ -759,6 +763,30 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
         return {
             "type": "single",
             "granularity": "fiscal_year",
+            "items": [{"fy": year, "fq": None}],
+            "normalize_to_fiscal": prefer_fiscal,
+            "warnings": warnings,
+        }
+
+    fiscal_match = FISCAL_PATTERN.search(lower_text)
+    if fiscal_match:
+        year = _extract_year(fiscal_match.group(1))
+        warnings.append("fiscal_year_detected")
+        return {
+            "type": "single",
+            "granularity": "fiscal_year" if prefer_fiscal else "calendar_year",
+            "items": [{"fy": year, "fq": None}],
+            "normalize_to_fiscal": prefer_fiscal,
+            "warnings": warnings,
+        }
+
+    year_ending_match = YEAR_ENDING_PATTERN.search(lower_text)
+    if year_ending_match:
+        year = _extract_year(year_ending_match.group(1))
+        warnings.append("year_ending_detected")
+        return {
+            "type": "single",
+            "granularity": "fiscal_year" if prefer_fiscal else "calendar_year",
             "items": [{"fy": year, "fq": None}],
             "normalize_to_fiscal": prefer_fiscal,
             "warnings": warnings,

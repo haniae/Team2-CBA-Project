@@ -29,6 +29,8 @@ def test_natural_language_time_periods():
         ("Show me revenue for 2024", "single", "For 2024 detected"),
         ("What happened in 2023?", "single", "In 2023 detected"),
         ("Performance during 2022", "single", "During 2022 detected"),
+        ("Gross margin for Tesla financial year 2024", "single", "Financial year phrasing detected"),
+        ("EBITDA margin for TSLA year ending 2023", "single", "Year ending phrasing detected"),
         
         # YTD
         ("Apple's YTD performance", "ytd", "YTD detected"),
@@ -93,6 +95,16 @@ def test_natural_language_time_periods():
     else:
         print(f"✗ {failed} tests failed.")
         return False
+
+
+def test_financial_year_phrase_returns_correct_year():
+    result = parse_periods("show revenue for the financial year ending March 2024")
+    assert result.get("items")[0].get("fy") == 2024
+
+
+def test_year_ending_phrase_returns_correct_year():
+    result = parse_periods("ebitda margin year ending 2023")
+    assert result.get("items")[0].get("fy") == 2023
 
 if __name__ == "__main__":
     success = test_natural_language_time_periods()

@@ -25,6 +25,7 @@ from pydantic import BaseModel
 
 from . import AnalyticsEngine, BenchmarkOSChatbot, database, load_settings
 from .custom_kpis import CustomKPICalculator
+from .analytics_workspace import DataSourcePreferencesManager
 from .source_tracer import SourceTracer
 from .interactive_modeling import ModelBuilder
 from .framework_processor import FrameworkProcessor
@@ -3955,6 +3956,8 @@ class CreateKPIRequest(BaseModel):
     source_tags: Optional[List[str]] = None
     metadata: Optional[Dict[str, Any]] = None
     user_id: Optional[str] = "default"
+    parameter_schema: Optional[Dict[str, Any]] = None
+    data_preferences_id: Optional[str] = None
 
 
 class KPICalculationRequest(BaseModel):
@@ -3962,6 +3965,112 @@ class KPICalculationRequest(BaseModel):
     ticker: str
     period: Optional[str] = None
     fiscal_year: Optional[int] = None
+    user_id: Optional[str] = "default"
+    data_preferences_id: Optional[str] = None
+    source_order: Optional[List[str]] = None
+
+
+class CreateDataPreferenceRequest(BaseModel):
+    """Request payload for creating data source preferences."""
+
+    name: str
+    source_order: List[str]
+    fallback_rules: Optional[Dict[str, Any]] = None
+    description: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = "default"
+
+
+class UpdateDataPreferenceRequest(BaseModel):
+    """Request payload for updating data source preferences."""
+
+    name: Optional[str] = None
+    source_order: Optional[List[str]] = None
+    fallback_rules: Optional[Dict[str, Any]] = None
+    description: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class CreateAnalysisTemplateRequest(BaseModel):
+    """Request payload for creating analysis templates."""
+
+    name: str
+    kpi_ids: List[str]
+    description: Optional[str] = None
+    layout_config: Optional[Dict[str, Any]] = None
+    parameter_schema: Optional[Dict[str, Any]] = None
+    data_preferences_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = "default"
+
+
+class UpdateAnalysisTemplateRequest(BaseModel):
+    """Request payload for updating analysis templates."""
+
+    name: Optional[str] = None
+    kpi_ids: Optional[List[str]] = None
+    description: Optional[str] = None
+    layout_config: Optional[Dict[str, Any]] = None
+    parameter_schema: Optional[Dict[str, Any]] = None
+    data_preferences_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = None
+
+
+class RenderAnalysisTemplateRequest(BaseModel):
+    """Request payload for rendering templates."""
+
+    tickers: List[str]
+    parameters: Optional[Dict[str, Any]] = None
+    data_preferences_id: Optional[str] = None
+    source_order: Optional[List[str]] = None
+    user_id: Optional[str] = "default"
+
+
+class CreateProfileRequest(BaseModel):
+    """Request payload for creating analyst profiles."""
+
+    name: str
+    kpi_library: Optional[List[str]] = None
+    template_ids: Optional[List[str]] = None
+    data_preferences_id: Optional[str] = None
+    output_preferences: Optional[Dict[str, Any]] = None
+    description: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = "default"
+
+
+class UpdateProfileRequest(BaseModel):
+    """Request payload for updating analyst profiles."""
+
+    name: Optional[str] = None
+    kpi_library: Optional[List[str]] = None
+    template_ids: Optional[List[str]] = None
+    data_preferences_id: Optional[str] = None
+    output_preferences: Optional[Dict[str, Any]] = None
+    description: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = None
+
+
+class SaveSessionRequest(BaseModel):
+    """Request payload for saving sessions."""
+
+    profile_id: str
+    workspace_state: Dict[str, Any]
+    name: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    expires_at: Optional[datetime] = None
+    user_id: Optional[str] = "default"
+
+
+class UpdateSessionRequest(BaseModel):
+    """Request payload for updating sessions."""
+
+    workspace_state: Optional[Dict[str, Any]] = None
+    name: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    expires_at: Optional[datetime] = None
 
 
 @app.post("/api/kpis/custom")
@@ -3980,6 +4089,8 @@ def create_custom_kpi(request: CreateKPIRequest) -> Dict[str, Any]:
             unit=request.unit,
             inputs=request.inputs,
             source_tags=request.source_tags,
+            parameter_schema=request.parameter_schema,
+            data_preferences_id=request.data_preferences_id,
         )
         return {
             "success": True,
@@ -4020,11 +4131,29 @@ def calculate_custom_kpi(
     try:
         settings = get_settings()
         calculator = CustomKPICalculator(settings.database_path)
+        source_preferences = list(request.source_order or [])
+
+        if request.data_preferences_id:
+            pref_manager = DataSourcePreferencesManager(settings.database_path)
+            preference = pref_manager.get(request.data_preferences_id)
+            if preference is None:
+                LOGGER.warning("Data source preference %s not found", request.data_preferences_id)
+            elif request.user_id and preference.user_id != request.user_id:
+                LOGGER.warning(
+                    "User %s attempted to access data preference %s owned by %s",
+                    request.user_id,
+                    request.data_preferences_id,
+                    preference.user_id,
+                )
+            elif not source_preferences:
+                source_preferences = preference.source_order
+
         result = calculator.calculate_kpi(
             kpi_id=kpi_id,
             ticker=request.ticker,
             period=request.period,
-            fiscal_year=request.fiscal_year
+            fiscal_year=request.fiscal_year,
+            source_preferences=source_preferences or None,
         )
         return {
             "success": result.error is None,
@@ -4098,6 +4227,391 @@ def get_custom_kpi_usage(
     except Exception as e:
         LOGGER.error(f"KPI usage retrieval failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"KPI usage retrieval failed: {str(e)}"})
+
+
+# ============================================================================
+# Analyst Workspace API Endpoints
+# ============================================================================
+
+
+@app.post("/api/analytics/data-preferences")
+def create_data_preference(request: CreateDataPreferenceRequest) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        preference = processor.create_data_preferences(
+            user_id=request.user_id or "default",
+            name=request.name,
+            source_order=request.source_order,
+            fallback_rules=request.fallback_rules,
+            description=request.description,
+            metadata=request.metadata,
+        )
+        return {"success": True, "preference": preference}
+    except Exception as exc:
+        LOGGER.error("Data preference creation failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Data preference creation failed: {str(exc)}"})
+
+
+@app.put("/api/analytics/data-preferences/{preference_id}")
+def update_data_preference(
+    preference_id: str,
+    request: UpdateDataPreferenceRequest,
+) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        updated = processor.update_data_preferences(
+            preference_id,
+            name=request.name,
+            source_order=request.source_order,
+            fallback_rules=request.fallback_rules,
+            description=request.description,
+            metadata=request.metadata,
+        )
+        if not updated:
+            raise HTTPException(status_code=404, detail={"message": f"Preference {preference_id} not found"})
+        return {"success": True, "preference": updated}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Data preference update failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Data preference update failed: {str(exc)}"})
+
+
+@app.get("/api/analytics/data-preferences")
+def list_data_preferences(user_id: str = Query("default")) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        preferences = processor.list_data_preferences(user_id or "default")
+        return {"success": True, "preferences": preferences, "count": len(preferences)}
+    except Exception as exc:
+        LOGGER.error("Listing data preferences failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Listing data preferences failed: {str(exc)}"})
+
+
+@app.get("/api/analytics/data-preferences/{preference_id}")
+def get_data_preference(preference_id: str) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        preference = processor.get_data_preference(preference_id)
+        if not preference:
+            raise HTTPException(status_code=404, detail={"message": f"Preference {preference_id} not found"})
+        return {"success": True, "preference": preference}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Fetching data preference failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Fetching data preference failed: {str(exc)}"})
+
+
+@app.post("/api/analytics/templates")
+def create_analysis_template(request: CreateAnalysisTemplateRequest) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        template = processor.create_analysis_template(
+            user_id=request.user_id or "default",
+            name=request.name,
+            kpi_ids=request.kpi_ids,
+            description=request.description,
+            layout_config=request.layout_config,
+            parameter_schema=request.parameter_schema,
+            data_preferences_id=request.data_preferences_id,
+            metadata=request.metadata,
+            created_by=request.user_id or "system",
+        )
+        return {"success": True, "template": template}
+    except Exception as exc:
+        LOGGER.error("Analysis template creation failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template creation failed: {str(exc)}"})
+
+
+@app.put("/api/analytics/templates/{template_id}")
+def update_analysis_template(
+    template_id: str,
+    request: UpdateAnalysisTemplateRequest,
+) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        updated = processor.update_analysis_template(
+            template_id,
+            name=request.name,
+            description=request.description,
+            kpi_ids=request.kpi_ids,
+            layout_config=request.layout_config,
+            parameter_schema=request.parameter_schema,
+            data_preferences_id=request.data_preferences_id,
+            metadata=request.metadata,
+            updated_by=request.user_id or "system",
+        )
+        if not updated:
+            raise HTTPException(status_code=404, detail={"message": f"Template {template_id} not found"})
+        return {"success": True, "template": updated}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Analysis template update failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template update failed: {str(exc)}"})
+
+
+@app.get("/api/analytics/templates")
+def list_analysis_templates(user_id: str = Query("default")) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        templates = processor.list_analysis_templates(user_id or "default")
+        return {"success": True, "templates": templates, "count": len(templates)}
+    except Exception as exc:
+        LOGGER.error("Template listing failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template listing failed: {str(exc)}"})
+
+
+@app.get("/api/analytics/templates/{template_id}")
+def get_analysis_template_endpoint(template_id: str) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        template = processor.get_analysis_template(template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail={"message": f"Template {template_id} not found"})
+        return {"success": True, "template": template}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Template fetch failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template fetch failed: {str(exc)}"})
+
+
+@app.delete("/api/analytics/templates/{template_id}")
+def delete_analysis_template(template_id: str) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        deleted = processor.delete_analysis_template(template_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail={"message": f"Template {template_id} not found"})
+        return {"success": True, "message": f"Template {template_id} deleted"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Template deletion failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template deletion failed: {str(exc)}"})
+
+
+@app.get("/api/analytics/templates/{template_id}/versions")
+def list_analysis_template_versions(template_id: str, limit: int = Query(20, ge=1, le=100)) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        history = processor.list_analysis_template_versions(template_id, limit=limit)
+        return {"success": True, "template_id": template_id, "versions": history, "count": len(history)}
+    except Exception as exc:
+        LOGGER.error("Template version listing failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template version listing failed: {str(exc)}"})
+
+
+@app.post("/api/analytics/templates/{template_id}/render")
+def render_analysis_template(
+    template_id: str,
+    request: RenderAnalysisTemplateRequest,
+) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        payload = processor.render_analysis_template(
+            template_id=template_id,
+            tickers=request.tickers,
+            parameters=request.parameters,
+            data_preferences_id=request.data_preferences_id,
+            source_order=request.source_order,
+            user_id=request.user_id or "default",
+        )
+        return {"success": True, "render": payload}
+    except Exception as exc:
+        LOGGER.error("Template render failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Template render failed: {str(exc)}"})
+
+
+@app.post("/api/analytics/profiles")
+def create_profile(request: CreateProfileRequest) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        profile = processor.create_profile(
+            user_id=request.user_id or "default",
+            name=request.name,
+            kpi_library=request.kpi_library,
+            template_ids=request.template_ids,
+            data_preferences_id=request.data_preferences_id,
+            output_preferences=request.output_preferences,
+            description=request.description,
+            metadata=request.metadata,
+        )
+        return {"success": True, "profile": profile}
+    except Exception as exc:
+        LOGGER.error("Profile creation failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Profile creation failed: {str(exc)}"})
+
+
+@app.put("/api/analytics/profiles/{profile_id}")
+def update_profile(
+    profile_id: str,
+    request: UpdateProfileRequest,
+) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        profile = processor.update_profile(
+            profile_id,
+            name=request.name,
+            description=request.description,
+            kpi_library=request.kpi_library,
+            template_ids=request.template_ids,
+            data_preferences_id=request.data_preferences_id,
+            output_preferences=request.output_preferences,
+            metadata=request.metadata,
+        )
+        if not profile:
+            raise HTTPException(status_code=404, detail={"message": f"Profile {profile_id} not found"})
+        return {"success": True, "profile": profile}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Profile update failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Profile update failed: {str(exc)}"})
+
+
+@app.get("/api/analytics/profiles")
+def list_profiles(user_id: str = Query("default")) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        profiles = processor.list_profiles(user_id or "default")
+        return {"success": True, "profiles": profiles, "count": len(profiles)}
+    except Exception as exc:
+        LOGGER.error("Profile listing failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Profile listing failed: {str(exc)}"})
+
+
+@app.get("/api/analytics/profiles/{profile_id}")
+def get_profile(profile_id: str) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        profile = processor.get_profile(profile_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail={"message": f"Profile {profile_id} not found"})
+        return {"success": True, "profile": profile}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Profile retrieval failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Profile retrieval failed: {str(exc)}"})
+
+
+@app.delete("/api/analytics/profiles/{profile_id}")
+def delete_profile(profile_id: str) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        deleted = processor.delete_profile(profile_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail={"message": f"Profile {profile_id} not found"})
+        return {"success": True, "message": f"Profile {profile_id} deleted"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Profile deletion failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Profile deletion failed: {str(exc)}"})
+
+
+@app.post("/api/analytics/sessions")
+def save_session(request: SaveSessionRequest) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        session = processor.save_session(
+            profile_id=request.profile_id,
+            user_id=request.user_id or "default",
+            workspace_state=request.workspace_state,
+            name=request.name,
+            metadata=request.metadata,
+            expires_at=request.expires_at,
+        )
+        return {"success": True, "session": session}
+    except Exception as exc:
+        LOGGER.error("Session save failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Session save failed: {str(exc)}"})
+
+
+@app.put("/api/analytics/sessions/{session_id}")
+def update_session(session_id: str, request: UpdateSessionRequest) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        session = processor.update_session(
+            session_id,
+            workspace_state=request.workspace_state,
+            name=request.name,
+            metadata=request.metadata,
+            expires_at=request.expires_at,
+        )
+        if not session:
+            raise HTTPException(status_code=404, detail={"message": f"Session {session_id} not found"})
+        return {"success": True, "session": session}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Session update failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Session update failed: {str(exc)}"})
+
+
+@app.get("/api/analytics/sessions/{session_id}")
+def get_session(session_id: str) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        session = processor.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail={"message": f"Session {session_id} not found"})
+        return {"success": True, "session": session}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Session fetch failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Session fetch failed: {str(exc)}"})
+
+
+@app.get("/api/analytics/profiles/{profile_id}/sessions")
+def list_sessions_for_profile(profile_id: str, limit: int = Query(50, ge=1, le=200)) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        sessions = processor.list_sessions_for_profile(profile_id, limit=limit)
+        return {"success": True, "sessions": sessions, "count": len(sessions)}
+    except Exception as exc:
+        LOGGER.error("Session listing failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Session listing failed: {str(exc)}"})
+
+
+@app.delete("/api/analytics/sessions/{session_id}")
+def delete_session(session_id: str) -> Dict[str, Any]:
+    try:
+        settings = get_settings()
+        processor = TemplateProcessor(settings.database_path)
+        deleted = processor.delete_session(session_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail={"message": f"Session {session_id} not found"})
+        return {"success": True, "message": f"Session {session_id} deleted"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.error("Session deletion failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"message": f"Session deletion failed: {str(exc)}"})
 
 
 # ============================================================================

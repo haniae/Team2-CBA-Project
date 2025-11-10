@@ -14,10 +14,16 @@ import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from . import database
 from .document_processor import extract_text_from_file
+from .analytics_workspace import (
+    AnalysisTemplateRegistry,
+    AnalyticsProfileManager,
+    DataSourcePreferencesManager,
+    SessionStore,
+)
 from .custom_kpis import CustomKPICalculator
 from .interactive_modeling import ModelBuilder
 from .predictive_analytics import PredictiveAnalytics
@@ -522,6 +528,363 @@ class TemplateProcessor:
         self.model_builder = ModelBuilder(db_path)
         self.chart_generator = ChartGenerator(db_path)
         self.source_tracer = SourceTracer(db_path)
+        self.template_registry = AnalysisTemplateRegistry(db_path)
+        self.data_preferences_manager = DataSourcePreferencesManager(db_path)
+        self.profile_manager = AnalyticsProfileManager(db_path)
+        self.session_store = SessionStore(db_path)
+
+    # ------------------------------------------------------------------
+    # Analyst workspace helpers
+    # ------------------------------------------------------------------
+
+    def create_analysis_template(
+        self,
+        user_id: str,
+        name: str,
+        *,
+        kpi_ids: Sequence[str],
+        description: Optional[str] = None,
+        layout_config: Optional[Dict[str, Any]] = None,
+        parameter_schema: Optional[Dict[str, Any]] = None,
+        data_preferences_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        created_by: str = "system",
+    ) -> Dict[str, Any]:
+        template = self.template_registry.create(
+            user_id=user_id,
+            name=name,
+            kpi_ids=kpi_ids,
+            description=description,
+            layout_config=layout_config,
+            parameter_schema=parameter_schema,
+            data_preferences_id=data_preferences_id,
+            metadata=metadata,
+            created_by=created_by,
+        )
+        return template.to_dict()
+
+    def update_analysis_template(
+        self,
+        template_id: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        kpi_ids: Optional[Sequence[str]] = None,
+        layout_config: Optional[Dict[str, Any]] = None,
+        parameter_schema: Optional[Dict[str, Any]] = None,
+        data_preferences_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        updated_by: str = "system",
+    ) -> Optional[Dict[str, Any]]:
+        template = self.template_registry.update(
+            template_id,
+            name=name,
+            description=description,
+            kpi_ids=kpi_ids,
+            layout_config=layout_config,
+            parameter_schema=parameter_schema,
+            data_preferences_id=data_preferences_id,
+            metadata=metadata,
+            updated_by=updated_by,
+        )
+        return template.to_dict() if template else None
+
+    def list_analysis_templates(self, user_id: str) -> List[Dict[str, Any]]:
+        return [template.to_dict() for template in self.template_registry.list(user_id)]
+
+    def get_analysis_template(self, template_id: str) -> Optional[Dict[str, Any]]:
+        template = self.template_registry.get(template_id)
+        return template.to_dict() if template else None
+
+    def delete_analysis_template(self, template_id: str) -> bool:
+        return self.template_registry.delete(template_id)
+
+    def list_analysis_template_versions(self, template_id: str, limit: int = 20) -> List[Dict[str, Any]]:
+        return self.template_registry.list_versions(template_id, limit=limit)
+
+    def create_data_preferences(
+        self,
+        user_id: str,
+        name: str,
+        *,
+        source_order: Sequence[str],
+        fallback_rules: Optional[Dict[str, Any]] = None,
+        description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        pref = self.data_preferences_manager.create(
+            user_id=user_id,
+            name=name,
+            source_order=source_order,
+            fallback_rules=fallback_rules,
+            description=description,
+            metadata=metadata,
+        )
+        return pref.to_dict()
+
+    def update_data_preferences(
+        self,
+        preference_id: str,
+        *,
+        name: Optional[str] = None,
+        source_order: Optional[Sequence[str]] = None,
+        fallback_rules: Optional[Dict[str, Any]] = None,
+        description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        pref = self.data_preferences_manager.update(
+            preference_id,
+            name=name,
+            source_order=source_order,
+            fallback_rules=fallback_rules,
+            description=description,
+            metadata=metadata,
+        )
+        return pref.to_dict() if pref else None
+
+    def list_data_preferences(self, user_id: str) -> List[Dict[str, Any]]:
+        return [pref.to_dict() for pref in self.data_preferences_manager.list(user_id)]
+
+    def get_data_preference(self, preference_id: str) -> Optional[Dict[str, Any]]:
+        pref = self.data_preferences_manager.get(preference_id)
+        return pref.to_dict() if pref else None
+
+    def create_profile(
+        self,
+        user_id: str,
+        name: str,
+        *,
+        kpi_library: Optional[Sequence[str]] = None,
+        template_ids: Optional[Sequence[str]] = None,
+        data_preferences_id: Optional[str] = None,
+        output_preferences: Optional[Dict[str, Any]] = None,
+        description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        profile = self.profile_manager.create(
+            user_id=user_id,
+            name=name,
+            kpi_library=kpi_library,
+            template_ids=template_ids,
+            data_preferences_id=data_preferences_id,
+            output_preferences=output_preferences,
+            description=description,
+            metadata=metadata,
+        )
+        return profile.to_dict()
+
+    def update_profile(
+        self,
+        profile_id: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        kpi_library: Optional[Sequence[str]] = None,
+        template_ids: Optional[Sequence[str]] = None,
+        data_preferences_id: Optional[str] = None,
+        output_preferences: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        profile = self.profile_manager.update(
+            profile_id,
+            name=name,
+            description=description,
+            kpi_library=kpi_library,
+            template_ids=template_ids,
+            data_preferences_id=data_preferences_id,
+            output_preferences=output_preferences,
+            metadata=metadata,
+        )
+        return profile.to_dict() if profile else None
+
+    def list_profiles(self, user_id: str) -> List[Dict[str, Any]]:
+        return [profile.to_dict() for profile in self.profile_manager.list(user_id)]
+
+    def get_profile(self, profile_id: str) -> Optional[Dict[str, Any]]:
+        profile = self.profile_manager.get(profile_id)
+        return profile.to_dict() if profile else None
+
+    def delete_profile(self, profile_id: str) -> bool:
+        return self.profile_manager.delete(profile_id)
+
+    def save_session(
+        self,
+        profile_id: str,
+        user_id: str,
+        *,
+        workspace_state: Dict[str, Any],
+        name: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        expires_at: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        session = self.session_store.save(
+            profile_id=profile_id,
+            user_id=user_id,
+            workspace_state=workspace_state,
+            name=name,
+            metadata=metadata,
+            expires_at=expires_at,
+        )
+        return session.to_dict()
+
+    def update_session(
+        self,
+        session_id: str,
+        *,
+        workspace_state: Optional[Dict[str, Any]] = None,
+        name: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        expires_at: Optional[datetime] = None,
+    ) -> Optional[Dict[str, Any]]:
+        session = self.session_store.update(
+            session_id,
+            workspace_state=workspace_state,
+            name=name,
+            metadata=metadata,
+            expires_at=expires_at,
+        )
+        return session.to_dict() if session else None
+
+    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        session = self.session_store.get(session_id)
+        return session.to_dict() if session else None
+
+    def list_sessions_for_profile(self, profile_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        return [session.to_dict() for session in self.session_store.list_for_profile(profile_id, limit=limit)]
+
+    def delete_session(self, session_id: str) -> bool:
+        return self.session_store.delete(session_id)
+
+    def render_analysis_template(
+        self,
+        template_id: str,
+        tickers: Sequence[str],
+        *,
+        parameters: Optional[Dict[str, Any]] = None,
+        data_preferences_id: Optional[str] = None,
+        source_order: Optional[Sequence[str]] = None,
+        user_id: str = "default",
+    ) -> Dict[str, Any]:
+        template = self.template_registry.get(template_id)
+        if not template:
+            raise ValueError(f"Template {template_id} not found.")
+
+        normalized_tickers = [ticker.upper() for ticker in tickers if ticker]
+        if not normalized_tickers:
+            raise ValueError("At least one ticker is required to render a template.")
+
+        runtime_parameters: Dict[str, Any] = {}
+        schema_defaults = template.parameter_schema.get("defaults", {}) if template.parameter_schema else {}
+        runtime_parameters.update(schema_defaults)
+        if parameters:
+            runtime_parameters.update(parameters)
+
+        fiscal_years = runtime_parameters.get("fiscal_years")
+        if isinstance(fiscal_years, int):
+            fiscal_years = [fiscal_years]
+        elif not isinstance(fiscal_years, list):
+            fiscal_years = None
+
+        if not fiscal_years:
+            single_year = runtime_parameters.get("fiscal_year")
+            fiscal_years = [single_year] if single_year is not None else [None]
+
+        period = runtime_parameters.get("period")
+        effective_preference_id = data_preferences_id or template.data_preferences_id
+
+        normalized_years: List[Optional[int]] = []
+        for year in fiscal_years:
+            if year in (None, "", "latest"):
+                normalized_years.append(None)
+                continue
+            try:
+                normalized_years.append(int(year))
+            except (TypeError, ValueError):
+                LOGGER.debug("Ignoring invalid fiscal year '%s' for template %s", year, template_id)
+        fiscal_years = normalized_years or [None]
+
+        applied_preference: Optional[Dict[str, Any]] = None
+        effective_source_order: List[str] = list(source_order or [])
+        if effective_preference_id and not effective_source_order:
+            preference = self.data_preferences_manager.get(effective_preference_id)
+            if preference:
+                effective_source_order = preference.source_order
+                applied_preference = preference.to_dict()
+
+        results_by_ticker: Dict[str, List[Dict[str, Any]]] = {}
+        errors: List[Dict[str, Any]] = []
+        audit_log: List[Dict[str, Any]] = []
+
+        for ticker in normalized_tickers:
+            ticker_results: List[Dict[str, Any]] = []
+            results_by_ticker[ticker] = ticker_results
+
+            for kpi_id in template.kpi_ids:
+                for fiscal_year in fiscal_years:
+                    try:
+                        calc_result = self.custom_kpi_calculator.calculate_kpi(
+                            kpi_id,
+                            ticker,
+                            period=period,
+                            fiscal_year=fiscal_year,
+                            source_preferences=effective_source_order,
+                        )
+                    except Exception as exc:  # pragma: no cover - defensive
+                        LOGGER.error("Template KPI calculation failed: %s", exc, exc_info=True)
+                        errors.append(
+                            {
+                                "template_id": template_id,
+                                "kpi_id": kpi_id,
+                                "ticker": ticker,
+                                "fiscal_year": fiscal_year,
+                                "error": str(exc),
+                            }
+                        )
+                        continue
+
+                    payload = calc_result.to_dict()
+                    payload["fiscal_year"] = fiscal_year
+                    payload["ticker"] = ticker
+                    ticker_results.append(payload)
+
+                    audit_log.append(
+                        {
+                            "template_id": template_id,
+                            "kpi_id": kpi_id,
+                            "ticker": ticker,
+                            "fiscal_year": fiscal_year,
+                            "steps": calc_result.calculation_steps,
+                            "sources": calc_result.sources,
+                            "error": calc_result.error,
+                        }
+                    )
+
+                    if calc_result.error:
+                        errors.append(
+                            {
+                                "template_id": template_id,
+                                "kpi_id": kpi_id,
+                                "ticker": ticker,
+                                "fiscal_year": fiscal_year,
+                                "error": calc_result.error,
+                            }
+                        )
+
+        return {
+            "template": template.to_dict(),
+            "tickers": normalized_tickers,
+            "parameters": runtime_parameters,
+            "data_preferences": {
+                "applied_id": applied_preference.get("preference_id") if applied_preference else effective_preference_id,
+                "source_order": effective_source_order,
+                "details": applied_preference,
+            },
+            "results": results_by_ticker,
+            "errors": errors,
+            "audit": audit_log,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "user_id": user_id,
+        }
 
     # ------------------------------------------------------------------
     # Helpers

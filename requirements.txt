@@ -65,6 +65,7 @@ python-jose[cryptography]>=3.3.0
 click>=8.1.0
 tqdm>=4.65.0
 python-dateutil>=2.8.0
+pyyaml>=6.0.0
 
 # UX/UI & Design
 pillow>=10.0.0

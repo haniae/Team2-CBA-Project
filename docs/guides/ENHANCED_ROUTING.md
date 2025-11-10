@@ -44,6 +44,19 @@ enhance_structured_parse() → EnhancedIntent.METRICS_SINGLE
 Returns: "Displaying financial dashboard for Apple Inc. (AAPL)."
 ```
 
+## Router System Prompt Guidance
+
+Add the following guidance after the rules section of your router system prompt to enable KPI source lookup:
+
+1. If the user mentions a KPI without supplying a formula (for example, “Define KPI: EBITDA Margin”), set `intent = SOURCE_LOOKUP`.
+2. Attempt to locate the canonical definition and formula using this priority order:
+   - Internal KPI dictionary/library
+   - Standard finance glossaries (Investopedia, CFA definitions, SEC XBRL taxonomy)
+   - Web search query `"<KPI name> KPI definition formula"`
+3. If a definition is found, return both the formula and textual description.
+4. Automatically hand the resolved definition to the `CREATE_KPI` handler (or `COMPUTE_KPI` if the user asked to calculate a value).
+5. Only ask the user to confirm if multiple competing formulas are discovered.
+
 ## Enabling Enhanced Routing
 
 ### Option 1: Environment Variable

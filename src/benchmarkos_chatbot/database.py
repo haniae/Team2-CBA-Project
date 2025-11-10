@@ -356,6 +356,103 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS metric_dictionary (
+                alias TEXT PRIMARY KEY,
+                raw_alias TEXT,
+                canonical_metric TEXT NOT NULL,
+                source_system TEXT NOT NULL DEFAULT 'sec_xbrl',
+                primary_tag TEXT,
+                fallback_tags TEXT NOT NULL DEFAULT '[]',
+                description TEXT,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                created_by TEXT NOT NULL DEFAULT 'system',
+                updated_by TEXT NOT NULL DEFAULT 'system'
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS data_source_preferences (
+                preference_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                source_order TEXT NOT NULL DEFAULT '[]',
+                fallback_rules TEXT NOT NULL DEFAULT '{}',
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS analysis_templates (
+                template_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                kpi_ids TEXT NOT NULL DEFAULT '[]',
+                layout_config TEXT NOT NULL DEFAULT '{}',
+                parameter_schema TEXT NOT NULL DEFAULT '{}',
+                data_preferences_id TEXT,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS analysis_template_versions (
+                version_id TEXT PRIMARY KEY,
+                template_id TEXT NOT NULL,
+                version_number INTEGER NOT NULL,
+                snapshot TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                change_summary TEXT,
+                FOREIGN KEY (template_id) REFERENCES analysis_templates(template_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS analytics_profiles (
+                profile_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                kpi_library TEXT NOT NULL DEFAULT '[]',
+                template_ids TEXT NOT NULL DEFAULT '[]',
+                data_preferences_id TEXT,
+                output_preferences TEXT NOT NULL DEFAULT '{}',
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS saved_sessions (
+                session_id TEXT PRIMARY KEY,
+                profile_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                name TEXT,
+                workspace_state TEXT NOT NULL,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                expires_at TEXT,
+                FOREIGN KEY (profile_id) REFERENCES analytics_profiles(profile_id)
+            )
+            """
+        )
 
     if "custom_models" in tables:
         _ensure_column(connection, "custom_models", "description", "TEXT")
@@ -1002,6 +1099,36 @@ def initialise(database_path: Path) -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_custom_kpis_user
             ON custom_kpis (user_id, created_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_metric_dictionary_canonical
+            ON metric_dictionary (canonical_metric)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_data_source_preferences_user
+            ON data_source_preferences (user_id, updated_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_analysis_templates_user
+            ON analysis_templates (user_id, updated_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_analytics_profiles_user
+            ON analytics_profiles (user_id, updated_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_saved_sessions_profile
+            ON saved_sessions (profile_id, updated_at DESC)
             """
         )
         connection.execute(
