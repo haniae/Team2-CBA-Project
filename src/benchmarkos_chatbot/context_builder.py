@@ -3759,7 +3759,24 @@ def build_financial_context(
                 continue
         
         if not context_parts:
-            return ""
+            # CRITICAL: Return explicit "no data" message instead of empty string
+            # Empty string causes LLM to hallucinate from training data
+            return (
+                "=" * 80 + "\n"
+                "⚠️ NO FINANCIAL DATA AVAILABLE\n"
+                "=" * 80 + "\n\n"
+                f"**Query:** {query}\n\n"
+                f"**Status:** No financial data found in database\n\n"
+                "**Detected tickers:** " + (", ".join(tickers) if tickers else "None") + "\n\n"
+                "**Reason:** Database is empty or ticker data hasn't been ingested yet.\n\n"
+                "**🎯 INSTRUCTION TO LLM:**\n"
+                "1. DO NOT make up financial data from your training data!\n"
+                "2. DO NOT calculate percentages or growth rates!\n"
+                "3. RESPOND WITH: 'I don't have current financial data for [Company] in my database.'\n"
+                "4. SUGGEST: 'To get accurate data, please run: ingest [TICKER]'\n"
+                "5. BE CLEAR that you're waiting for data, not providing estimates\n\n"
+                "=" * 80 + "\n"
+            )
         
         # Add multi-source data (Yahoo Finance, FRED, etc.) if available
         if MULTI_SOURCE_AVAILABLE and tickers:
