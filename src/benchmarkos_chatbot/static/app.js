@@ -9,46 +9,45 @@ const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
 const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
 const CHAT_FILE_INPUT_ID = "chat-file-upload";
 const CHAT_FILE_BUTTON_ID = "chat-file-upload-btn";
-const LEGACY_FILE_INPUT_ID = "file-input";
 const LEGACY_BUTTON_ID = "upload-button";
 
 let chatUploadHandlersBound = false;
 
-function normaliseChatUploadElements() {
-  let button =
+function resolveChatUploadButton() {
+  return (
     document.getElementById(CHAT_FILE_BUTTON_ID) ||
     document.getElementById(LEGACY_BUTTON_ID) ||
-    document.querySelector(".chat-file-upload-btn");
+    document.querySelector(".chat-file-upload-btn")
+  );
+}
 
-  if (button && button.id !== CHAT_FILE_BUTTON_ID) {
-    console.log("[Upload] Normalising upload button ID from", button.id);
-    button.id = CHAT_FILE_BUTTON_ID;
-  }
-
-  let input =
-    document.getElementById(CHAT_FILE_INPUT_ID) ||
-    document.getElementById(LEGACY_FILE_INPUT_ID) ||
-    (button ? button.querySelector('input[type="file"]') : null) ||
-    document.querySelector('.chat-form input[type="file"]');
-
-  if (input && input.id !== CHAT_FILE_INPUT_ID) {
-    console.log("[Upload] Normalising file input ID from", input.id);
-    input.id = CHAT_FILE_INPUT_ID;
-  }
-
+function ensureChatUploadInput() {
+  let input = document.getElementById(CHAT_FILE_INPUT_ID);
   if (input) {
-    input.style.display = "none";
-    if (input.accept !== "*/*") {
-      input.setAttribute("accept", "*/*");
-    }
+    return input;
   }
-
-  return { input, button };
+  if (!document.body) {
+    return null;
+  }
+  input = document.createElement("input");
+  input.type = "file";
+  input.accept = "*/*";
+  input.id = CHAT_FILE_INPUT_ID;
+  input.style.position = "fixed";
+  input.style.left = "-10000px";
+  input.style.top = "auto";
+  input.style.opacity = "0";
+  input.style.pointerEvents = "none";
+  input.style.width = "1px";
+  input.style.height = "1px";
+  document.body.appendChild(input);
+  return input;
 }
 
 function getChatUploadElements() {
-  const elements = normaliseChatUploadElements();
-  return elements;
+  const button = resolveChatUploadButton();
+  const input = button ? ensureChatUploadInput() : null;
+  return { input, button };
 }
 
 function bindChatUploadHandlers(reason = "unspecified") {
@@ -94,6 +93,11 @@ function bindChatUploadHandlers(reason = "unspecified") {
 
   button.addEventListener("click", triggerPicker);
   button.addEventListener("keydown", handleButtonKeydown);
+
+  if (!input.dataset.chatUploadChangeBound) {
+    input.addEventListener("change", onChatFileSelected);
+    input.dataset.chatUploadChangeBound = "true";
+  }
 
   console.log("[Upload] Chat upload handlers bound", { reason });
   chatUploadHandlersBound = true;
@@ -764,7 +768,6 @@ function saveAlertPreferences(preferences) {
     throw error;
   }
 }
-
 function renderAlertPreview(previewEl, preferences) {
   if (!previewEl) {
     return;
@@ -1381,7 +1384,6 @@ const HELP_PROMPTS = [
   "Show me a dashboard for Apple",
   "What are the key risks for Tesla?",
 ];
-
 const HELP_SECTIONS = [
   {
     icon: "📊",
@@ -2138,12 +2140,10 @@ function buildKpiLibraryHero(data) {
 
   const metaList = document.createElement("ul");
   metaList.className = "kpi-library__meta";
-
 // ============================================
 // FILE UPLOAD INITIALIZATION - RUNS IMMEDIATELY
 // ============================================
 console.log("🚀🚀🚀 [Upload] SCRIPT LOADED - FILE UPLOAD CODE IS RUNNING! 🚀🚀🚀");
-
 const API_BASE = window.API_BASE || "";
 const STORAGE_KEY = "benchmarkos.chatHistory.v2";
 const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
@@ -2155,8 +2155,7 @@ const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
   console.log("🚀 [Upload] TOP LEVEL: Document ready state:", document.readyState);
   
   function tryInit() {
-    const input = document.getElementById("chat-file-upload");
-    const button = document.getElementById("chat-file-upload-btn");
+    const { input, button } = getChatUploadElements();
     console.log("🚀 [Upload] TOP LEVEL: Element check:", {
       input: !!input,
       button: !!button,
@@ -2166,17 +2165,7 @@ const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
     
     if (input && button) {
       console.log("🚀 [Upload] TOP LEVEL: ✅ Elements found! Setting up click handler...");
-      button.addEventListener("click", function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log("🚀 [Upload] TOP LEVEL: Button clicked!");
-        try {
-          input.click();
-          console.log("🚀 [Upload] TOP LEVEL: Input click triggered!");
-        } catch (err) {
-          console.error("🚀 [Upload] TOP LEVEL: Error:", err);
-        }
-      });
+      bindChatUploadHandlers("top-level");
       
       input.addEventListener("change", function(e) {
         console.log("🚀 [Upload] TOP LEVEL: File selected:", e.target.files?.[0]?.name);
@@ -2929,7 +2918,6 @@ function renderAlertPreview(previewEl, preferences) {
     : "Quiet hours disabled.";
   previewEl.append(quietLine);
 }
-
 function renderAlertSettingsSection({ container } = {}) {
   if (!container) {
     return;
@@ -3474,7 +3462,7 @@ async function renderCompanyUniverseSection({ container } = {}) {
 const HELP_PROMPTS = [
   "Show Apple KPIs for 2022–2024",
   "Compare Microsoft and Amazon in FY2023",
-  "What was Tesla’s 2022 revenue?",
+  "What was Tesla's 2022 revenue?",
 ];
 
 const HELP_SECTIONS = [
@@ -3482,7 +3470,7 @@ const HELP_SECTIONS = [
     icon: "📊",
     title: "KPI & Comparisons",
     command: "Metrics TICKER [YEAR | YEAR–YEAR] [+ peers]",
-    purpose: "Summarise a company’s finance snapshot or line up peers on one table.",
+    purpose: "Summarise a company's finance snapshot or line up peers on one table.",
     example: "Metrics AAPL 2023 vs MSFT",
     delivers: "Revenue, profitability, free cash flow, ROE, valuation ratios.",
   },
@@ -3721,7 +3709,6 @@ function refreshHelpArtifacts() {
     utilityContent.innerHTML = HELP_GUIDE_HTML;
   }
 }
-
 async function loadHelpContentOverrides() {
   try {
     const response = await fetch(`${API_BASE}/help-content`);
@@ -4490,7 +4477,6 @@ function formatFilingDate(dateString) {
   }
   return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
-
 async function renderFilingViewerSection({ container } = {}) {
   if (!container) {
     return;
@@ -5249,7 +5235,6 @@ function renderMessageArtifacts(wrapper, artifacts) {
   }
   wrapper.classList.toggle("message--has-dashboard", hasDashboard);
 }
-
 function createDashboardLayout(artifacts) {
   const hasComparison =
     artifacts?.comparisonTable &&
@@ -6050,7 +6035,6 @@ function createDashboardFooter({ conclusion, citations, exports }) {
   }
   return section;
 }
-
 function createHighlightsSection(highlights) {
   if (!Array.isArray(highlights) || !highlights.length) {
     return null;
@@ -6784,7 +6768,6 @@ function pushProgressEventsInternal(tracker, events) {
   });
   tracker.render();
 }
-
 function startProgressTracking(requestId, wrapper) {
   if (!requestId || !wrapper) {
     return null;
@@ -7555,7 +7538,6 @@ function openProjectSubmenu(conversationId, anchor) {
   const items = Array.from(projectMenu.querySelectorAll(".menu-item"));
   focusMenuItem(items[0], items);
 }
-
 function handleProjectMenuClick(event) {
   const button = event.target.closest(".menu-item");
   if (!button) {
@@ -8307,7 +8289,6 @@ function getFilteredConversations() {
     );
   });
 }
-
 function renderConversationList() {
   if (!conversationList) {
     return;
@@ -9087,7 +9068,6 @@ function renderCompanyUniverseTable(data) {
     tbody.append(row);
   });
 }
-
 function applyCompanyUniverseFilters() {
   if (!companyUniverseData.length) {
     if (companyUniverseSkeleton) {
@@ -9270,6 +9250,18 @@ async function onChatFileSelected(event) {
     fileType: file.type || "unknown",
   });
 
+  const conversation = ensureActiveConversation();
+  let remoteConversationId = conversation?.remoteId;
+  if (!remoteConversationId) {
+    const generatedId =
+      (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
+      `conv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    conversation.remoteId = generatedId;
+    remoteConversationId = generatedId;
+    promoteConversation(conversation);
+    saveConversations();
+  }
+
   const uploadingMsgWrapper = appendMessage("user", `📎 Uploading ${file.name}...`, { forceScroll: true });
   setSending(true);
 
@@ -9278,9 +9270,8 @@ async function onChatFileSelected(event) {
     const formData = new FormData();
     formData.append("file", file);
 
-    const conversationId = getActiveConversationId();
-    if (conversationId) {
-      formData.append("conversation_id", conversationId);
+    if (remoteConversationId) {
+      formData.append("conversation_id", remoteConversationId);
     }
 
     const response = await fetch(`${API_BASE}/api/documents/upload`, {
@@ -9298,6 +9289,12 @@ async function onChatFileSelected(event) {
 
     if (result.success) {
       console.log("[Upload] Upload successful!");
+      if (result.conversation_id && result.conversation_id !== remoteConversationId) {
+        remoteConversationId = result.conversation_id;
+        conversation.remoteId = result.conversation_id;
+        promoteConversation(conversation);
+        saveConversations();
+      }
       if (uploadingMsgWrapper) {
         const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
         if (bodyEl) {
@@ -9309,8 +9306,16 @@ async function onChatFileSelected(event) {
       const assistantMsg = result.message
         ? result.message
         : `✅ File "${file.name}" uploaded successfully. The document has been processed and is now available for analysis. You can ask questions about it or use it as a framework/template.`;
-      recordMessage("assistant", assistantMsg);
+      recordMessage("assistant", assistantMsg, {
+        upload: { documentId: result.document_id, filename: file.name },
+      });
       appendMessage("assistant", assistantMsg, { forceScroll: true });
+
+      if (Array.isArray(result.warnings) && result.warnings.length) {
+        const warningText = `⚠️ Upload warnings for "${file.name}": ${result.warnings.join(" ")}`;
+        recordMessage("system", warningText);
+        appendMessage("system", warningText, { forceScroll: true });
+      }
     } else {
       console.error("[Upload] Upload failed:", result.errors);
       throw new Error(result.errors?.[0] || "Upload failed");
@@ -9842,7 +9847,6 @@ function startHealthCheck() {
     });
   }, 30000);
 }
-
 // Start health check - simplified approach
 (function initializeHealthCheck() {
   console.log("App.js health check initializing...");
@@ -10642,7 +10646,6 @@ async function loadCfiCompareMarkup(host) {
   const html = await response.text();
   host.innerHTML = prepareEmbeddedLayout(html, "cfi_compare");
 }
-
 async function showCfiCompareDashboard(options = {}) {
   const { container, payload: suppliedPayload, ...fetchOptions } = options || {};
   let host = null;

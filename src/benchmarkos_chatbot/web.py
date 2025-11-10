@@ -662,6 +662,7 @@ class DocumentUploadResponse(BaseModel):
     """Response for document upload."""
     success: bool
     document_id: Optional[str] = None
+    conversation_id: Optional[str] = None
     filename: Optional[str] = None
     file_type: Optional[str] = None
     content_preview: Optional[str] = None
@@ -704,6 +705,10 @@ def build_bot(conversation_id: Optional[str] = None) -> BenchmarkOSChatbot:
             bot.conversation.messages = [
                 {"role": msg.role, "content": msg.content} for msg in history
             ]
+        else:
+            # Even when no prior messages exist, lock the conversation id so uploads and
+            # subsequent prompts share the same identifier.
+            bot.conversation.conversation_id = conversation_id
     
     # CRITICAL: Ensure fresh bot starts with no dashboard AND no cached summaries
     # This prevents stale dashboards and wrong company summaries from persisting
@@ -1917,6 +1922,7 @@ async def document_upload(
     """
     settings = get_settings()
     db_path = settings.database_path
+    conversation_id = (conversation_id or "").strip() or f"conv_{uuid.uuid4().hex[:10]}"
     
     # Create temporary file
     import tempfile
@@ -2057,6 +2063,7 @@ async def document_upload(
         return DocumentUploadResponse(
             success=True,
             document_id=document_id,
+            conversation_id=conversation_id,
             filename=file.filename,
             file_type=file_type,
             content_preview=content_preview,
@@ -2077,6 +2084,7 @@ async def document_upload(
         
         return DocumentUploadResponse(
             success=False,
+            conversation_id=conversation_id,
             errors=[error_detail]
         )
     finally:

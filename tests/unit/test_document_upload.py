@@ -40,6 +40,7 @@ async def test_document_upload_accepts_binary_file(tmp_path: Path, monkeypatch) 
 
     assert response.success is True
     assert response.document_id
+    assert response.conversation_id
     assert response.filename == "example.png"
     assert response.warnings, "Expected a warning when no text can be extracted"
     assert any("text" in warning.lower() for warning in response.warnings)

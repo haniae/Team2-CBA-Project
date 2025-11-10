@@ -174,6 +174,21 @@ class PolicyDocumentRecord:
 
 
 @dataclass(frozen=True)
+class UploadedDocumentRecord:
+    """Document uploaded by a user for conversational analysis."""
+
+    document_id: str
+    conversation_id: Optional[str]
+    filename: str
+    file_type: Optional[str]
+    file_size: int
+    content: str
+    metadata: Dict[str, Any]
+    uploaded_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
 class PortfolioTransactionRecord:
     """Portfolio transaction (buy, sell, rebalance)."""
 
@@ -1232,6 +1247,96 @@ def fetch_conversation(
                 content=content,
                 created_at=_parse_dt(created_at) or datetime(1970, 1, 1, tzinfo=timezone.utc),
             )
+
+
+def fetch_uploaded_documents(
+    database_path: Path,
+    conversation_id: Optional[str],
+    *,
+    limit: int = 5,
+    include_unscoped: bool = True,
+) -> List[UploadedDocumentRecord]:
+    """
+    Fetch recently uploaded documents for a conversation.
+
+    Args:
+        database_path: Path to the SQLite database.
+        conversation_id: Conversation identifier to scope results.
+        limit: Maximum number of documents to return.
+        include_unscoped: When True, include recent documents that were uploaded
+            without an associated conversation_id (e.g. legacy uploads).
+    """
+    if limit <= 0:
+        return []
+
+    def _rows_to_records(rows: Iterable[sqlite3.Row]) -> List[UploadedDocumentRecord]:
+        records: List[UploadedDocumentRecord] = []
+        for row in rows:
+            raw_metadata = row[6] if len(row) > 6 else "{}"
+            try:
+                metadata: Dict[str, Any] = json.loads(raw_metadata) if raw_metadata else {}
+            except json.JSONDecodeError:
+                metadata = {}
+            records.append(
+                UploadedDocumentRecord(
+                    document_id=row[0],
+                    conversation_id=row[1],
+                    filename=row[2],
+                    file_type=row[3],
+                    file_size=row[4],
+                    content=row[5] or "",
+                    metadata=metadata,
+                    uploaded_at=_parse_dt(row[7]) or datetime(1970, 1, 1, tzinfo=timezone.utc),
+                    updated_at=_parse_dt(row[8]) or datetime(1970, 1, 1, tzinfo=timezone.utc),
+                )
+            )
+        return records
+
+    records: List[UploadedDocumentRecord] = []
+    seen_ids: set[str] = set()
+
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+
+        if conversation_id:
+            convo_rows = connection.execute(
+                """
+                SELECT document_id, conversation_id, filename, file_type, file_size,
+                       content, metadata, created_at, updated_at
+                FROM uploaded_documents
+                WHERE conversation_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (conversation_id, limit),
+            ).fetchall()
+            convo_records = _rows_to_records(convo_rows)
+            records.extend(convo_records)
+            seen_ids.update(record.document_id for record in convo_records)
+
+        remaining = limit - len(records)
+
+        if include_unscoped and remaining > 0:
+            unscoped_rows = connection.execute(
+                """
+                SELECT document_id, conversation_id, filename, file_type, file_size,
+                       content, metadata, created_at, updated_at
+                FROM uploaded_documents
+                WHERE conversation_id IS NULL
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (remaining,),
+            ).fetchall()
+            for record in _rows_to_records(unscoped_rows):
+                if record.document_id in seen_ids:
+                    continue
+                records.append(record)
+                seen_ids.add(record.document_id)
+                if len(records) >= limit:
+                    break
+
+    return records
 
 
 @contextmanager

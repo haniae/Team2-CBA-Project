@@ -55,6 +55,199 @@ const chatFormContainer = document.getElementById("chat-form");
 const savedSearchTrigger = document.querySelector("[data-action='search-saved']");
 const archivedToggleButton = document.querySelector("[data-action='toggle-archived']");
 
+const CHAT_FILE_INPUT_ID = "chat-file-upload";
+const CHAT_FILE_BUTTON_ID = "chat-file-upload-btn";
+const LEGACY_UPLOAD_BUTTON_ID = "upload-button";
+
+let chatUploadHandlersBound = false;
+let uploadInitAttempts = 0;
+const MAX_UPLOAD_INIT_ATTEMPTS = 40;
+
+function resolveChatUploadButton() {
+  return (
+    document.getElementById(CHAT_FILE_BUTTON_ID) ||
+    document.getElementById(LEGACY_UPLOAD_BUTTON_ID) ||
+    document.querySelector(".chat-file-upload-btn")
+  );
+}
+
+function ensureChatUploadInput() {
+  let input = document.getElementById(CHAT_FILE_INPUT_ID);
+  if (input) {
+    return input;
+  }
+  if (!document.body) {
+    return null;
+  }
+  input = document.createElement("input");
+  input.type = "file";
+  input.accept = "*/*";
+  input.id = CHAT_FILE_INPUT_ID;
+  input.style.position = "fixed";
+  input.style.left = "-10000px";
+  input.style.top = "auto";
+  input.style.opacity = "0";
+  input.style.pointerEvents = "none";
+  input.style.width = "1px";
+  input.style.height = "1px";
+  document.body.appendChild(input);
+  return input;
+}
+
+function getChatUploadElements() {
+  const button = resolveChatUploadButton();
+  const input = button ? ensureChatUploadInput() : null;
+  return { input, button };
+}
+
+function bindChatUploadHandlers(reason = "initial") {
+  if (chatUploadHandlersBound) {
+    return true;
+  }
+
+  const { input, button } = getChatUploadElements();
+  if (!input || !button) {
+    console.debug("Upload controls not ready yet", { reason, inputFound: !!input, buttonFound: !!button });
+    return false;
+  }
+
+  const triggerPicker = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    input.click();
+  };
+
+  button.addEventListener("click", triggerPicker);
+  button.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      triggerPicker(event);
+    }
+  });
+
+  if (!input.dataset.chatUploadChangeBound) {
+    input.addEventListener("change", onChatFileSelected);
+    input.dataset.chatUploadChangeBound = "true";
+  }
+
+  chatUploadHandlersBound = true;
+  console.debug("Upload controls bound");
+  return true;
+}
+
+async function onChatFileSelected(event) {
+  const input = event.target;
+  const file = input?.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  const conversation = ensureActiveConversation();
+  let remoteConversationId = conversation.remoteId;
+  if (!remoteConversationId) {
+    const generatedId =
+      (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
+      `conv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    conversation.remoteId = generatedId;
+    remoteConversationId = generatedId;
+    promoteConversation(conversation);
+    saveConversations();
+  }
+
+  const uploadingMsgWrapper = appendMessage("user", `📎 Uploading ${file.name}...`, { forceScroll: true });
+  setSending(true);
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (remoteConversationId) {
+      formData.append("conversation_id", remoteConversationId);
+    }
+
+    const response = await fetch(`${API_BASE}/api/documents/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.success) {
+      const errorMessage =
+        (payload && (payload.message || (payload.errors && payload.errors[0]))) ||
+        `Upload failed with status ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    if (payload.conversation_id && payload.conversation_id !== remoteConversationId) {
+      remoteConversationId = payload.conversation_id;
+      conversation.remoteId = payload.conversation_id;
+      promoteConversation(conversation);
+      saveConversations();
+    }
+
+    if (uploadingMsgWrapper) {
+      const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
+      if (bodyEl) {
+        bodyEl.textContent = `📎 Uploaded ${file.name} successfully`;
+        uploadingMsgWrapper.classList.add("upload-success");
+      }
+    }
+
+    const assistantMsg =
+      payload.message ||
+      `✅ File "${file.name}" uploaded successfully. The document has been processed and is ready for analysis. Ask about it directly in your next prompt.`;
+    recordMessage("assistant", assistantMsg, { upload: { documentId: payload.document_id, filename: file.name } });
+    appendMessage("assistant", assistantMsg, { forceScroll: true });
+
+    if (Array.isArray(payload.warnings) && payload.warnings.length) {
+      const warningText = `⚠️ Upload warnings for "${file.name}": ${payload.warnings.join(" ")}`;
+      recordMessage("system", warningText);
+      appendMessage("system", warningText, { forceScroll: true });
+    }
+  } catch (error) {
+    console.error("Upload failed", error);
+    if (uploadingMsgWrapper) {
+      const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
+      if (bodyEl) {
+        bodyEl.textContent = `❌ Upload failed: ${error.message}`;
+        uploadingMsgWrapper.classList.add("upload-error");
+      }
+    }
+    const errorMsg = `❌ Failed to upload ${file.name}: ${error.message}`;
+    recordMessage("system", errorMsg);
+    appendMessage("system", errorMsg, { forceScroll: true });
+  } finally {
+    setSending(false);
+    if (input) {
+      input.value = "";
+    }
+  }
+}
+
+function tryInitializeFileUpload() {
+  if (chatUploadHandlersBound) {
+    return;
+  }
+  uploadInitAttempts += 1;
+  if (bindChatUploadHandlers(`attempt-${uploadInitAttempts}`)) {
+    return;
+  }
+  if (uploadInitAttempts < MAX_UPLOAD_INIT_ATTEMPTS) {
+    window.setTimeout(tryInitializeFileUpload, 120);
+  }
+}
+
+if (typeof document !== "undefined") {
+  const scheduleUploadInit = () => {
+    tryInitializeFileUpload();
+    window.setTimeout(tryInitializeFileUpload, 400);
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", scheduleUploadInit, { once: true });
+  } else {
+    scheduleUploadInit();
+  }
+  window.addEventListener("load", tryInitializeFileUpload, { once: true });
+}
+
 const STREAM_STEP_MS = 18;
 const STREAM_MIN_SLICE = 2;
 const STREAM_MAX_SLICE = 24;
@@ -601,7 +794,6 @@ const DEFAULT_USER_SETTINGS = {
   currency: "USD",
   compliance: "standard",
 };
-
 function loadUserSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
@@ -2073,7 +2265,6 @@ function composeHelpText(content) {
 
   return lines.join("\n");
 }
-
 function renderHelpGuide(content) {
   const article = document.createElement("article");
   article.className = "help-guide";
@@ -2771,7 +2962,6 @@ function buildCategoriesSection(kpis) {
 
   return wrapper;
 }
-
 function buildKpiLibraryView(data) {
   const container = document.createElement("div");
   container.className = "kpi-library";
@@ -3515,7 +3705,6 @@ function normaliseArtifacts(response) {
   }
   return artifacts;
 }
-
 function appendMessage(
   role,
   text,
@@ -4306,7 +4495,6 @@ function createDashboardHighlights(highlights) {
   section.append(list);
   return section;
 }
-
 function normalizeDashboardText(value) {
   if (value === null || value === undefined) {
     return "";
@@ -5092,7 +5280,6 @@ function formatCsvValue(value) {
   }
   return stringValue;
 }
-
 function openPdfPreview(payload) {
   const headers = Array.isArray(payload.headers) ? payload.headers : [];
   const rows = Array.isArray(payload.rows) ? payload.rows : [];
@@ -5888,7 +6075,6 @@ function handleReportAction(action, conversationId) {
     deleteConversation(conversationId);
   }
 }
-
 function handleReportMenuKeyDown(event) {
   if (!reportMenu) {
     return;
@@ -6637,7 +6823,6 @@ function composeTitleComponents({ tickers, period, metricLabel, intentInfo }) {
 
   return title;
 }
-
 function buildSemanticSummary(prompt) {
   const trimmed = (prompt || "").trim();
   if (!trimmed) {
@@ -8216,7 +8401,6 @@ function updateProgressTrackerWithEvent(tracker, event) {
     tracker.title.textContent = activeStep?.label || "Analysis ready";
   }
 }
-
 function renderProgressTracker(tracker) {
   if (!tracker?.list) {
     return;

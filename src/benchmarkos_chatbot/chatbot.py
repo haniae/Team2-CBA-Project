@@ -44,6 +44,7 @@ from .interactive_modeling import ModelBuilder
 from .source_tracer import SourceTracer
 from .framework_processor import FrameworkProcessor
 from .template_processor import TemplateProcessor
+from .document_context import build_uploaded_document_context
 
 # Portfolio module imports (combined portfolio.py)
 from .portfolio import (
@@ -3204,33 +3205,44 @@ class BenchmarkOSChatbot:
                 except ImportError:
                     pass
                 
-                # Check if this is a portfolio query - portfolio queries get special handling
+                context_detail = ""
+                context = None
+
                 portfolio_context = self._build_portfolio_context(user_input)
-                
+
                 if portfolio_context:
-                    # For portfolio queries, use portfolio context as PRIMARY context
-                    # This ensures the LLM focuses on the actual portfolio data
                     context = portfolio_context
+                    context_detail = "Portfolio context compiled - using actual portfolio data"
                     LOGGER.info("Using portfolio context for query")
-                    emit("context_build_ready", "Portfolio context compiled - using actual portfolio data")
                 else:
-                    # For non-portfolio queries, use regular financial context
                     context = self._build_enhanced_rag_context(user_input)
-                    
-                    # For forecasting queries, even if context is empty, ensure we still call LLM
-                    # The LLM can handle forecasting queries even without full context
+
                     if is_forecasting and not context:
-                        LOGGER.warning(f"Forecasting query detected but context is empty - will still call LLM")
-                        # Add a minimal context indicating this is a forecasting query
+                        LOGGER.warning("Forecasting query detected but context is empty - will still call LLM")
                         context = f"\n{'='*80}\n📊 FORECASTING QUERY DETECTED\n{'='*80}\n"
                         context += f"**Query:** {user_input}\n"
-                        context += f"**Note:** This is a forecasting query. Please provide a forecast based on available data.\n"
+                        context += "**Note:** This is a forecasting query. Please provide a forecast based on available data.\n"
                         context += f"{'='*80}\n"
-                    
-                    emit(
-                        "context_build_ready",
-                        "Context compiled" if context else "Context not required",
+
+                    context_detail = "Context compiled" if context else "Context not required"
+
+                doc_context = build_uploaded_document_context(
+                    user_input,
+                    getattr(self.conversation, "conversation_id", None),
+                    Path(self.settings.database_path),
+                )
+                if doc_context:
+                    context = f"{context}\n\n{doc_context}" if context else doc_context
+                    context_detail = (
+                        f"{context_detail} + uploaded documents"
+                        if context_detail and context_detail != "Context not required"
+                        else "Uploaded document context attached"
                     )
+
+                emit(
+                    "context_build_ready",
+                    context_detail or ("Context compiled" if context else "Context not required"),
+                )
                 
                 messages = self._prepare_llm_messages(context)
                 LOGGER.debug(f"Prepared {len(messages)} messages for LLM")
