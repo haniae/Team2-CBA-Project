@@ -92,9 +92,17 @@ def format_currency(value: Optional[float]) -> str:
 
 
 def format_percent(value: Optional[float]) -> str:
-    """Format percentage value."""
+    """Format percentage value with validation."""
     if value is None:
         return "N/A"
+    
+    # CRITICAL: Detect if value is absurdly large (likely a formatting bug)
+    if abs(value) > 1000:
+        LOGGER.error(f"❌ FORMATTING BUG: Value {value:,.0f} is too large for a percentage!")
+        LOGGER.error(f"   This suggests an absolute value (like revenue $) is being treated as %")
+        # Return error indicator instead of nonsensical percentage
+        return f"[ERROR: {value:,.0f}]"
+    
     return f"{value:.1f}%"
 
 
