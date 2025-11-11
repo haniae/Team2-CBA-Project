@@ -1788,6 +1788,39 @@ class BenchmarkOSChatbot:
         
         return messages
 
+    def _is_document_followup(self, user_input: str) -> bool:
+        """Heuristic to determine if the user is asking about a recently uploaded document."""
+        lowered = (user_input or "").strip().lower()
+        if not lowered:
+            return False
+
+        doc_keywords = {
+            "document",
+            "uploaded",
+            "upload",
+            "file",
+            "pdf",
+            "ppt",
+            "slide",
+            "presentation",
+            "report",
+            "paper",
+            "case study",
+        }
+        if any(keyword in lowered for keyword in doc_keywords):
+            return True
+
+        # Short follow-up (e.g., "analyze it")
+        if len(lowered.split()) <= 6 and "it" in lowered:
+            recent_messages = self.conversation.messages[-4:]
+            for message in reversed(recent_messages):
+                if message.get("role") != "assistant":
+                    continue
+                content = (message.get("content") or "").lower()
+                if "uploaded" in content or "ready for analysis" in content:
+                    return True
+        return False
+
     def _preload_popular_metrics(self) -> None:
         """Warm cached metrics for high-traffic tickers to reduce first-response latency."""
         for ticker in POPULAR_TICKERS:
@@ -2007,6 +2040,9 @@ class BenchmarkOSChatbot:
                     extras.append(f"**Frequency:** {kpi.frequency}")
                 if kpi.unit:
                     extras.append(f"**Unit:** {kpi.unit}")
+                group = (kpi.metadata or {}).get("group")
+                if group:
+                    extras.append(f"**Group:** {group}")
                 if kpi.inputs:
                     extras.append(f"**Inputs:** {', '.join(sorted(set(kpi.inputs)))}")
                 if kpi.source_tags:
@@ -2896,12 +2932,21 @@ class BenchmarkOSChatbot:
             reply: Optional[str] = None
             lowered_input = user_input.strip().lower()
             emit("intent_analysis_start", "Analyzing prompt phrasing")
+            doc_context = build_uploaded_document_context(
+                user_input,
+                getattr(self.conversation, "conversation_id", None),
+                Path(self.settings.database_path),
+            )
+            is_document_followup = bool(doc_context) and self._is_document_followup(user_input)
             normalized_command = self._normalize_nl_to_command(user_input)
             canonical_prompt = self._canonical_prompt(user_input, normalized_command)
-            if normalized_command:
+            if normalized_command and not is_document_followup:
                 emit("intent_analysis_complete", f"Intent candidate: {normalized_command}")
             else:
-                emit("intent_analysis_complete", "Proceeding with natural language handling")
+                if is_document_followup:
+                    emit("intent_skip_summary", "Skipping ticker summary for document follow-up")
+                else:
+                    emit("intent_analysis_complete", "Proceeding with natural language handling")
             cacheable = self._should_cache_prompt(canonical_prompt)
 
             cached_entry: Optional[_CachedReply] = None
@@ -3198,28 +3243,31 @@ class BenchmarkOSChatbot:
                                 emit("summary_unavailable", f"Dashboard unavailable for {ticker}")
                         # If no tickers detected, fall through to other handlers
                     else:
-                        # Not a dashboard request - check for regular summary
-                        # CRITICAL: Skip summary for forecasting queries - they should use LLM with forecast context
-                        is_forecasting = False
-                        try:
-                            from .context_builder import _is_forecasting_query
-                            is_forecasting = _is_forecasting_query(user_input)
-                        except ImportError:
-                            pass
-                        
-                        if not is_forecasting:
-                            summary_target = self._detect_summary_target(user_input, normalized_command)
-                            if summary_target:
-                                # Use text summary for regular ticker queries (bare mentions only)
-                                emit("summary_attempt", f"Compiling text summary for {summary_target}")
-                                reply = self._get_ticker_summary(summary_target, user_input)
-                                if reply:
-                                    emit("summary_complete", f"Text snapshot prepared for {summary_target}")
-                                else:
-                                    emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
+                        if is_document_followup:
+                            emit("intent_skip_summary", "Skipping summary heuristics for document follow-up")
                         else:
-                            # Forecasting query - skip summary generation, use LLM with forecast context
-                            emit("intent_forecasting", "Forecasting query detected - skipping snapshot, using LLM with ML forecast context")
+                            # Not a dashboard request - check for regular summary
+                            # CRITICAL: Skip summary for forecasting queries - they should use LLM with forecast context
+                            is_forecasting = False
+                            try:
+                                from .context_builder import _is_forecasting_query
+                                is_forecasting = _is_forecasting_query(user_input)
+                            except ImportError:
+                                pass
+                            
+                            if not is_forecasting:
+                                summary_target = self._detect_summary_target(user_input, normalized_command)
+                                if summary_target:
+                                    # Use text summary for regular ticker queries (bare mentions only)
+                                    emit("summary_attempt", f"Compiling text summary for {summary_target}")
+                                    reply = self._get_ticker_summary(summary_target, user_input)
+                                    if reply:
+                                        emit("summary_complete", f"Text snapshot prepared for {summary_target}")
+                                    else:
+                                        emit("summary_unavailable", f"No cached snapshot available for {summary_target}")
+                            else:
+                                # Forecasting query - skip summary generation, use LLM with forecast context
+                                emit("intent_forecasting", "Forecasting query detected - skipping snapshot, using LLM with ML forecast context")
 
             if reply is None:
                 emit("context_build_start", "Gathering enhanced financial context")
@@ -3253,11 +3301,6 @@ class BenchmarkOSChatbot:
 
                     context_detail = "Context compiled" if context else "Context not required"
 
-                doc_context = build_uploaded_document_context(
-                    user_input,
-                    getattr(self.conversation, "conversation_id", None),
-                    Path(self.settings.database_path),
-                )
                 if doc_context:
                     context = f"{context}\n\n{doc_context}" if context else doc_context
                     context_detail = (

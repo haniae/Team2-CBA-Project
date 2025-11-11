@@ -8,6 +8,7 @@ Implements time series models (ARIMA, Prophet, ETS) and deep learning models.
 from __future__ import annotations
 
 from .ml_forecaster import MLForecaster, get_ml_forecaster
+from .user_plugins import ForecastingPluginManager
 
 # Try to import forecasters (may not be available if dependencies missing)
 try:
@@ -53,6 +54,7 @@ except ImportError:
 __all__ = [
     "MLForecaster",
     "get_ml_forecaster",
+    "ForecastingPluginManager",
 ]
 
 # Add individual forecasters if available

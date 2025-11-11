@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 
 from . import database
 from .predictive_analytics import PredictiveAnalytics, Forecast
+from .ml_forecasting.user_plugins import ForecastingPluginManager, ForecastingPlugin, PluginForecast, PluginExecutionError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -504,6 +505,135 @@ class LSTMBackend(GrowthRateBackend):
         return fallback
 
 
+class PluginBackend(BaseModelBackend):
+    """Backend wrapper that delegates to a user-defined forecasting plugin."""
+
+    base_model_type = "plugin"
+
+    def __init__(
+        self,
+        analytics: PredictiveAnalytics,
+        plugin_manager: ForecastingPluginManager,
+        plugin: ForecastingPlugin,
+    ) -> None:
+        super().__init__(analytics)
+        self.plugin_manager = plugin_manager
+        self.plugin = plugin
+        self.model_type = f"plugin:{plugin.plugin_id}"
+        self.display_name = f"Plugin – {plugin.name}"
+
+    @staticmethod
+    def _confidence_for_index(
+        confidence: Optional[List[Dict[str, Any]]],
+        idx: int,
+    ) -> Dict[str, Any]:
+        if not confidence:
+            return {"low": None, "high": None, "confidence": None}
+        if idx < len(confidence):
+            entry = confidence[idx]
+            return {
+                "low": entry.get("low"),
+                "high": entry.get("high"),
+                "confidence": entry.get("confidence"),
+            }
+        return {"low": None, "high": None, "confidence": None}
+
+    def train(
+        self,
+        model: CustomModel,
+        ticker: str,
+        metric: str,
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        try:
+            details = self.plugin_manager.train_plugin(
+                self.plugin.plugin_id,
+                ticker=ticker,
+                metric=metric,
+                parameters=parameters,
+            )
+            return {"status": "trained", "details": details}
+        except PluginExecutionError as exc:
+            raise ModelBackendError(str(exc)) from exc
+
+    def forecast(
+        self,
+        model: CustomModel,
+        ticker: str,
+        metric: str,
+        forecast_years: int,
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        try:
+            plugin_result = self.plugin_manager.forecast_with_plugin(
+                self.plugin.plugin_id,
+                ticker=ticker,
+                metric=metric,
+                forecast_years=forecast_years,
+                parameters=parameters,
+                retrain=parameters.get("retrain", False) if parameters else False,
+            )
+        except PluginExecutionError as exc:
+            raise ModelBackendError(str(exc)) from exc
+
+        historical_series = self.plugin_manager._load_metric_series(ticker, metric)
+        historical_data = [
+            {"year": item.get("fiscal_year"), "value": item.get("value")}
+            for item in historical_series
+            if item.get("value") is not None
+        ]
+        last_year = None
+        for entry in reversed(historical_data):
+            if isinstance(entry.get("year"), int):
+                last_year = entry["year"]
+                break
+        if last_year is None:
+            last_year = datetime.now(timezone.utc).year
+
+        forecasts: List[Dict[str, Any]] = []
+        for idx, value in enumerate(plugin_result.predictions, start=1):
+            forecasts.append(
+                {
+                    "method": self.model_type,
+                    "fiscal_year": last_year + idx,
+                    "value": value,
+                    "confidence_interval": self._confidence_for_index(
+                        plugin_result.confidence, idx - 1
+                    ),
+                    "details": plugin_result.description,
+                }
+            )
+
+        driver_summary = {"method": self.model_type, "plugin": self.plugin.name}
+        driver_summary.update(
+            {
+                key: val
+                for key, val in plugin_result.description.items()
+                if isinstance(key, str)
+            }
+        )
+
+        return {
+            "forecasts": forecasts,
+            "historical_data": historical_data,
+            "driver_summary": driver_summary,
+            "driver_explanations": [],
+            "confidence_bands": plugin_result.confidence or [],
+            "method": self.model_type,
+        }
+
+    def what_if(
+        self,
+        model: CustomModel,
+        ticker: str,
+        metric: str,
+        assumptions: Dict[str, float],
+        forecast_years: int,
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        raise ModelBackendError("Scenario analysis is not supported for plugin models yet.")
+
+
 class ModelBuilder:
     """Builds and manages custom forecasting models."""
     
@@ -517,6 +647,14 @@ class ModelBuilder:
             "arima": ARIMABackend(self.predictive_analytics),
             "lstm": LSTMBackend(self.predictive_analytics),
         }
+        self.plugin_aliases: Dict[str, str] = {}
+        self.plugin_manager: Optional[ForecastingPluginManager] = None
+        try:
+            self.plugin_manager = ForecastingPluginManager(self.db_path)
+            self._load_plugin_backends()
+        except Exception as exc:  # pragma: no cover - defensive guard
+            LOGGER.warning("Unable to load user forecasting plugins: %s", exc)
+            self.plugin_manager = None
 
     def _get_backend(self, model_type: str) -> BaseModelBackend:
         backend = self.backends.get(model_type.lower())
@@ -566,6 +704,19 @@ class ModelBuilder:
             artifact_ids.append(artifact_id)
         return artifact_ids
 
+    def _load_plugin_backends(self):
+        """Loads user-defined forecasting plugins into the backend registry."""
+        if self.plugin_manager:
+            for plugin in self.plugin_manager.list_plugins():
+                backend_key = f"plugin:{plugin.plugin_id}"
+                if backend_key in self.backends:
+                    self.plugin_aliases[plugin.name.lower()] = backend_key
+                else:
+                    self.backends[backend_key] = PluginBackend(
+                        self.predictive_analytics, self.plugin_manager, plugin
+                    )
+                    self.plugin_aliases[plugin.name.lower()] = backend_key
+
     def available_backends(self) -> List[Dict[str, str]]:
         """Return available forecasting backends."""
         return [
@@ -590,9 +741,17 @@ class ModelBuilder:
         """Create a new custom model."""
         # Validate model type
         valid_types = set(self.backends.keys())
-        model_type_lower = model_type.lower()
-        if model_type_lower not in valid_types:
-            raise ValueError(f"Invalid model type: {model_type}. Valid types: {sorted(valid_types)}")
+        requested_type = model_type.lower()
+        backend_key = requested_type
+        if requested_type not in valid_types:
+            alias_key = self.plugin_aliases.get(requested_type)
+            if alias_key:
+                backend_key = alias_key
+            else:
+                raise ValueError(
+                    f"Invalid model type: {model_type}. Valid types: "
+                    f"{sorted(valid_types.union(self.plugin_aliases.keys()))}"
+                )
         
         model_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
@@ -606,7 +765,7 @@ class ModelBuilder:
             model_id=model_id,
             user_id=user_id,
             name=name,
-            model_type=model_type_lower,
+            model_type=backend_key,
             parameters=parameters or {},
             metrics=metrics,
             created_at=now,

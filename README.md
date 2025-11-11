@@ -52,6 +52,8 @@ This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washin
 - [📊 Current Data Coverage](#-current-data-coverage)
 - [⚡ Core Capabilities](#-core-capabilities)
 - [🚀 Advanced Analytics (Phase 1)](#-advanced-analytics-phase-1---new)
+- [🤖 Machine Learning Stack](#-machine-learning-stack)
+- [📚 Retrieval-Augmented Generation](#-retrieval-augmented-generation)
 - [🏗️ Architecture Map](#-architecture-map)
 - [🧠 Retrieval & ML Internals](#-retrieval--ml-internals)
 - [🚀 Quick Start](#-quick-start)
@@ -160,6 +162,78 @@ Four sophisticated analytics modules deliver institutional-grade capabilities:
 **Test Suite:** Run `python test_new_analytics.py` to see live demonstrations with real S&P 500 data.
 
 These modules transform BenchmarkOS into a professional analytics platform comparable to Bloomberg Terminal and FactSet.
+
+## 🤖 Machine Learning Stack
+
+BenchmarkOS blends deterministic analytics with a modular ML layer so finance teams can prototype forecasts without giving up auditability.
+
+### Architecture Overview
+
+- **Data Foundation:** `analytics_engine.AnalyticsEngine.refresh_metrics()` normalises SEC filings into `metric_snapshots`. Forecast pipelines consume the same curated metrics, keeping model inputs aligned with what the dashboard renders.
+- **Model Registry:** Classical (Prophet, ARIMA/ETS) and ML estimators live under `src/benchmarkos_chatbot/ml_forecasting/`. Shared base classes (`ml_forecasting.ml_forecaster`) expose a consistent interface so new models can be dropped in with minimal wiring.
+- **Context Builder:** `context_builder.build_forecast_context()` assembles explicit data dumps (predictions, confidence bands, training diagnostics) that are injected verbatim into the LLM prompt. The bot cannot answer without citing these artefacts.
+
+### Forecast Workflow
+
+1. **Trigger:** The intent router flags a forecasting query (see `routing/enhanced_router.py`).  
+2. **Dataset Assembly:** Historical metrics are pulled from SQLite or Postgres and preprocessed (`predictive_analytics.prepare_training_series`).  
+3. **Model Selection:** The ensemble coordinator benchmarks candidates, caching scores so repeated queries stay performant.  
+4. **Output Packaging:** Predictions, bull/base/bear scenarios, CAGR deltas, and sector benchmarks are serialised into the forecast context.  
+5. **Conversation Delivery:** `BenchmarkOSChatbot.ask()` appends the forecast context to the conversational history before calling the LLM client.
+
+### Guardrails & Verification
+
+- `ml_response_verifier.verify_ml_forecast_response()` checks that every figure from the explicit data dump appears in the generated answer and back-fills omissions.
+- `response_verifier.verify_response()` plus the `confidence_scorer` attach a confidence footer and can redact the reply if confidence falls below configurable thresholds.
+- Structured fallbacks prevent snapshots or dashboards from leaking into forecast responses; missing numbers yield a polite apology instead of hallucinations.
+
+### Developer Workflow
+
+- **Enable/Disable:** Toggle forecasting via the runtime settings object (`config.get_settings().forecasting_enabled`) or by exporting the matching environment variable (see `config.py` for names).  
+- **Refresh Data:** `python scripts/ingestion/fill_data_gaps.py --ticker AAPL --years-back 5` hydrates the metric store before training.  
+- **Unit Tests:** `pytest tests/unit/test_analytics_engine.py tests/unit/test_analysis_templates.py` cover metric hydration, forecast assembly, and verification hooks.  
+- **Interactive Checks:** In a Python shell run `from benchmarkos_chatbot.predictive_analytics import build_forecast_payload` to assemble the forecast dictionary for a given ticker/metric before handing it to the chatbot.
+
+- `src/benchmarkos_chatbot/context_builder.py` – forecast context orchestration.  
+- `src/benchmarkos_chatbot/predictive_analytics.py` – training/evaluation utilities and scenario generation.  
+- `src/benchmarkos_chatbot/ml_forecasting/` – individual model implementations and preprocessing helpers.  
+- `src/benchmarkos_chatbot/ml_response_verifier.py` – forecast-specific guardrails.  
+- `src/benchmarkos_chatbot/response_verifier.py` & `confidence_scorer.py` – cross-cutting verification and confidence scoring.
+
+## 📚 Retrieval-Augmented Generation
+
+Natural-language answers are grounded in auditable data through a layered RAG stack that combines structured metrics, uploaded documents, and conversational memory.
+
+### Document Lifecycle
+
+1. **Upload:** The frontend posts to `/api/documents/upload`; FastAPI persists the binary, metadata, and extracted text alongside the active `conversation_id` (`web.py`, `database.store_uploaded_document`).  
+2. **Extraction:** File-type specific parsers normalise text and capture warnings (e.g., OCR failures) that are surfaced back to the user and stored for context generation.  
+3. **Indexing:** Documents remain in SQLite for deterministic recall; we avoid opaque vector stores so every snippet can be reviewed in audits.
+
+### Prompt-Aware Retrieval
+
+- `document_context.build_uploaded_document_context()` tokenises the user query, scores overlapping chunks, and stitches together sentence-level snippets so the LLM sees the most pertinent evidence first.
+- Chunk overlap, snippet length, and stop-word lists are configurable, letting admins tighten or loosen recall depending on compliance needs.
+- Matched terms, file metadata, and extraction warnings are embedded directly in the context so the model can cite sources verbatim.
+
+### Context Fusion
+
+- `BenchmarkOSChatbot.ask()` merges three layers in priority order: portfolio analytics, financial KPI context, and document snippets.  
+- A document-follow-up heuristic (`_is_document_followup`) skips ticker summary heuristics when the user says “summarise it” immediately after an upload.  
+- When heuristics cannot serve the request, the bot falls back to a plain conversational instruction set ensuring non-financial prompts still receive responses.
+
+### Quality & Monitoring
+
+- **Unit Tests:** `pytest tests/unit/test_document_upload.py tests/unit/test_uploaded_document_context.py` guard conversation linkage and snippet relevance.  
+- **Telemetry:** Progress events (e.g., `context_sources_ready`, `upload_complete`) are emitted via Server-Sent Events so the UI can surface status breadcrumbs.  
+- **Operational Runbooks:** Refer to `docs/guides/PORTFOLIO_QUESTIONS_GUIDE.md` (upload section) and inline module docstrings for end-to-end walkthroughs when onboarding analysts.
+
+### Key Modules
+
+- `src/benchmarkos_chatbot/document_context.py` – prompt-aware chunking and snippet assembly.  
+- `src/benchmarkos_chatbot/chatbot.py` – document-aware intent routing and context fusion.  
+- `src/benchmarkos_chatbot/static/app.js` & `webui/app.js` – frontend upload orchestration with persistent `conversation_id`s.  
+- `src/benchmarkos_chatbot/web.py` – backend API endpoint, validation, and database persistence.
 
 ## 📊 Portfolio Management 
 

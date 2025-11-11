@@ -478,6 +478,12 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
         _ensure_column(connection, "custom_models", "regressors", "TEXT NOT NULL DEFAULT '[]'")
         _ensure_column(connection, "custom_models", "metadata", "TEXT NOT NULL DEFAULT '{}'")
 
+    if "user_forecasting_plugins" in tables:
+        _ensure_column(connection, "user_forecasting_plugins", "description", "TEXT")
+        _ensure_column(connection, "user_forecasting_plugins", "metadata", "TEXT NOT NULL DEFAULT '{}'")
+        _ensure_column(connection, "user_forecasting_plugins", "state", "TEXT")
+        _ensure_column(connection, "user_forecasting_plugins", "last_trained_at", "TEXT")
+
     if "model_runs" in tables:
         _ensure_column(connection, "model_runs", "assumptions", "TEXT NOT NULL DEFAULT '{}'")
         _ensure_column(connection, "model_runs", "driver_explanations", "TEXT NOT NULL DEFAULT '[]'")
@@ -906,6 +912,23 @@ def initialise(database_path: Path) -> None:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS user_forecasting_plugins (
+                plugin_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                name TEXT NOT NULL,
+                class_name TEXT NOT NULL,
+                module_path TEXT NOT NULL,
+                description TEXT,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                state TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_trained_at TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS model_runs (
                 run_id TEXT PRIMARY KEY,
                 model_id TEXT NOT NULL,
@@ -1162,6 +1185,12 @@ def initialise(database_path: Path) -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_custom_models_user
             ON custom_models (user_id, created_at DESC)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_forecasting_plugins_user
+            ON user_forecasting_plugins (user_id, name)
             """
         )
         connection.execute(

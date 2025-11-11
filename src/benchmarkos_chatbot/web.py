@@ -3966,6 +3966,7 @@ class CreateKPIRequest(BaseModel):
     user_id: Optional[str] = "default"
     parameter_schema: Optional[Dict[str, Any]] = None
     data_preferences_id: Optional[str] = None
+    group: Optional[str] = None
 
 
 class KPICalculationRequest(BaseModel):
@@ -4099,6 +4100,7 @@ def create_custom_kpi(request: CreateKPIRequest) -> Dict[str, Any]:
             source_tags=request.source_tags,
             parameter_schema=request.parameter_schema,
             data_preferences_id=request.data_preferences_id,
+            group=request.group,
         )
         return {
             "success": True,

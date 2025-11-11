@@ -20,8 +20,13 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from . import database
-from .analytics_workspace import DataDictionary, DataSourcePreferencesManager
+from .analytics_workspace import DataDictionary, DataSourcePreferencesManager, _CANONICAL_TAGS
 from .kpi_lookup import KPIDefinitionLookup, KPIDefinitionResult
+
+try:
+    import numexpr as _NUMEXPR  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    _NUMEXPR = None
 
 LOGGER = logging.getLogger(__name__)
 
@@ -56,6 +61,7 @@ class CustomKPIDefinition:
     bindings: List[Dict[str, Any]] = field(default_factory=list)
     parameter_schema: Dict[str, Any] = field(default_factory=dict)
     data_preferences_id: Optional[str] = None
+    group: Optional[str] = None
 
     def normalised_name(self) -> str:
         return re.sub(r"\s+", "", self.name or "", flags=re.UNICODE)
@@ -76,6 +82,8 @@ class CustomKPIDefinition:
             meta["parameter_schema"] = self.parameter_schema
         if self.data_preferences_id:
             meta["data_preferences_id"] = self.data_preferences_id
+        if self.group:
+            meta["group"] = self.group
         if self.metadata:
             meta.update(self.metadata)
         return meta
@@ -116,6 +124,7 @@ class CustomKPI:
             "bindings": self.metadata.get("bindings", []),
             "parameter_schema": self.metadata.get("parameter_schema", {}),
             "data_preferences_id": self.metadata.get("data_preferences_id"),
+            "group": self.metadata.get("group"),
         }
         return base
 
@@ -216,6 +225,10 @@ class KPIIntentParser:
                 r"(?:new\s+)?kpi\s+(?:called|named)\s*['\"]?([\w\s%-]+?)['\"]?\s*(?:=|as)\s*(.+)",
                 re.IGNORECASE,
             ),
+            re.compile(
+                r"(?:create|define|set up)\s+(?:a\s+)?(?:custom\s+)?(?:margin\s+)?(?:metric)\s*(?:called|named)?\s*['\"]?([\w\s%-]+?)['\"]?\s*(?:=|as)\s*(.+)",
+                re.IGNORECASE,
+            ),
         ]
         self._create_lookup_patterns = [
             re.compile(
@@ -282,9 +295,15 @@ class KPIIntentParser:
 
     def _definition_from_text(self, text: str, name: str, formula: str) -> CustomKPIDefinition:
         """Build structured KPI definition from natural language."""
-        frequency = self._extract_frequency(text)
-        unit = self._extract_unit(text, formula)
-        inputs = self._extract_inputs(formula)
+        formula_body, inline_hints = self._parse_inline_metadata(formula)
+
+        frequency_hint = inline_hints.get("frequency")
+        unit_hint = inline_hints.get("unit")
+        group_hint = inline_hints.get("group")
+
+        frequency = frequency_hint or self._extract_frequency(text)
+        unit = unit_hint or self._extract_unit(text, formula_body)
+        inputs = self._extract_inputs(formula_body)
         source_tags = self._extract_source_tags(text, inputs)
         description = self._extract_description(text, name)
 
@@ -292,17 +311,85 @@ class KPIIntentParser:
             "prompt": text.strip(),
             "parsed_at": datetime.now(timezone.utc).isoformat(),
         }
+        if inline_hints:
+            metadata["inline_hints"] = inline_hints
 
         return CustomKPIDefinition(
             name=name.strip(),
-            formula=formula.strip(),
+            formula=formula_body.strip(),
             description=description,
             frequency=frequency,
             unit=unit,
             inputs=inputs,
             source_tags=source_tags,
             metadata=metadata,
+            group=group_hint,
         )
+
+    def _parse_inline_metadata(self, formula: str) -> Tuple[str, Dict[str, Any]]:
+        segments = [segment.strip() for segment in formula.split(",")]
+        if not segments:
+            return formula.strip(), {}
+
+        main_formula = segments[0]
+        hints: Dict[str, Any] = {}
+
+        for segment in segments[1:]:
+            if not segment:
+                continue
+            parts = segment.split(None, 1)
+            key = parts[0].lower()
+            value = parts[1].strip() if len(parts) > 1 else ""
+
+            if key == "unit":
+                normalised = self._normalise_unit_hint(value)
+                if normalised:
+                    hints["unit"] = normalised
+            elif key in {"freq", "frequency"}:
+                normalised_freq = self._normalise_frequency_hint(value)
+                if normalised_freq:
+                    hints["frequency"] = normalised_freq
+            elif key == "group":
+                if value:
+                    hints["group"] = value
+
+        return main_formula, hints
+
+    @staticmethod
+    def _normalise_unit_hint(value: str) -> Optional[str]:
+        token = (value or "").strip().lower()
+        if not token:
+            return None
+        if token in {"%", "percent", "percentage", "pct"}:
+            return "pct"
+        if "basis" in token and "point" in token:
+            return "bps"
+        if token in {"bps"}:
+            return "bps"
+        if "million" in token:
+            return "usd_millions"
+        if "billion" in token:
+            return "usd_billions"
+        if "usd" in token or "dollar" in token:
+            return "usd"
+        return token
+
+    @staticmethod
+    def _normalise_frequency_hint(value: str) -> Optional[str]:
+        token = (value or "").strip().lower()
+        if not token:
+            return None
+        if token.startswith("annual") or token.startswith("year"):
+            return "annual"
+        if token.startswith("quarter"):
+            return "quarterly"
+        if token.startswith("month"):
+            return "monthly"
+        if token.startswith("week"):
+            return "weekly"
+        if token.startswith("day"):
+            return "daily"
+        return token
 
     def _extract_frequency(self, text: str) -> Optional[str]:
         lowered = text.lower()
@@ -538,15 +625,22 @@ class FormulaParser:
         validator.visit(tree)
 
         dependencies = sorted(validator.identifiers)
-        bindings_map = self.dictionary.resolve(dependencies)
+        bindings_map = self.dictionary.resolve(dependencies, create_missing=False)
 
         name_mapping: Dict[str, str] = {}
         canonical_dependencies: List[str] = []
         binding_metadata: List[Dict[str, Any]] = []
+        unresolved_tokens: Set[str] = set()
 
         for token in dependencies:
             binding = bindings_map.get(token)
             if not binding:
+                canonical_candidate = self.dictionary._canonical_from_alias(token)
+                if canonical_candidate and canonical_candidate in _CANONICAL_TAGS:
+                    fallback_map = self.dictionary.resolve([token], create_missing=True)
+                    binding = fallback_map.get(token)
+            if not binding:
+                unresolved_tokens.add(token)
                 continue
             canonical_metric = binding.canonical_metric
             name_mapping[token] = canonical_metric
@@ -556,6 +650,9 @@ class FormulaParser:
             binding_metadata.append(binding.to_metadata())
 
         canonical_dependencies = sorted(dict.fromkeys(canonical_dependencies))
+
+        if unresolved_tokens:
+            raise ValueError(f"Unknown metrics in formula: {', '.join(unresolved_tokens)}")
 
         transformer = _CanonicalNameTransformer(name_mapping)
         canonical_tree = transformer.visit(tree)
@@ -606,6 +703,7 @@ class CustomKPICalculator:
         source_tags: Optional[List[str]] = None,
         parameter_schema: Optional[Dict[str, Any]] = None,
         data_preferences_id: Optional[str] = None,
+        group: Optional[str] = None,
     ) -> CustomKPI:
         """Create a new custom KPI."""
         definition = CustomKPIDefinition(
@@ -619,6 +717,7 @@ class CustomKPICalculator:
             metadata=metadata or {},
             parameter_schema=parameter_schema or {},
             data_preferences_id=data_preferences_id,
+            group=group,
         )
         return self.create_kpi_from_definition(user_id=user_id, definition=definition)
 
@@ -632,6 +731,9 @@ class CustomKPICalculator:
             canonical_formula, dependencies, binding_metadata, original_formula = self.parser.parse(definition.formula)
         except ValueError as exc:
             raise ValueError(f"Invalid formula: {exc}") from exc
+
+        if CustomKPICalculator._formula_references_name(definition.name, canonical_formula):
+            raise ValueError(f"KPI '{definition.name}' cannot reference itself.")
 
         kpi_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
@@ -647,6 +749,8 @@ class CustomKPICalculator:
         metadata_payload["canonical_formula"] = canonical_formula
         metadata_payload["canonical_inputs"] = dependencies
         metadata_payload["binding_count"] = len(binding_metadata)
+        if definition.group:
+            metadata_payload["group"] = definition.group
 
         kpi = CustomKPI(
             kpi_id=kpi_id,
@@ -735,14 +839,18 @@ class CustomKPICalculator:
 
     def upsert_kpi(self, user_id: str, definition: CustomKPIDefinition) -> CustomKPI:
         """Create a KPI or update existing one by name."""
-        existing = self.get_kpi_by_name(user_id, definition.name)
-        if not existing:
-            return self.create_kpi_from_definition(user_id, definition)
-
         try:
             canonical_formula, dependencies, binding_metadata, original_formula = self.parser.parse(definition.formula)
         except ValueError as exc:
             raise ValueError(f"Invalid formula: {exc}") from exc
+
+        if CustomKPICalculator._formula_references_name(definition.name, canonical_formula):
+            raise ValueError(f"KPI '{definition.name}' cannot reference itself.")
+
+        existing = self.get_kpi_by_name(user_id, definition.name)
+        if not existing:
+            return self.create_kpi_from_definition(user_id, definition)
+
         now = datetime.now(timezone.utc)
         inputs = definition.inputs or dependencies
         source_tags = self._derive_source_tags(definition.source_tags, binding_metadata)
@@ -754,6 +862,8 @@ class CustomKPICalculator:
         metadata_payload["canonical_formula"] = canonical_formula
         metadata_payload["canonical_inputs"] = dependencies
         metadata_payload["binding_count"] = len(binding_metadata)
+        if definition.group:
+            metadata_payload["group"] = definition.group
 
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
@@ -1197,13 +1307,12 @@ class CustomKPICalculator:
         calculation_steps: List[Dict[str, Any]],
         sources: List[Dict[str, Any]]
     ) -> float:
-        """Evaluate formula with metric values."""
-        # Create evaluation context
+        """Evaluate formula with metric values, preferring numexpr when available."""
         context: Dict[str, Any] = {}
-        numeric_snapshot: Dict[str, Optional[float]] = {}
+        numeric_snapshot: Dict[str, float] = {}
+        numeric_context: Dict[str, float] = {}
 
         for metric, metric_value in metric_values.items():
-            numeric_snapshot[metric] = metric_value.value
             sources.append(
                 {
                     "metric": metric,
@@ -1221,12 +1330,15 @@ class CustomKPICalculator:
             if metric_value.value is None:
                 raise ValueError(f"Missing value for metric: {metric}")
 
-            value = metric_value.value
+            value = float(metric_value.value)
+            numeric_snapshot[metric] = value
             context.setdefault(metric, value)
             context.setdefault(metric.lower(), value)
             context.setdefault(metric.upper(), value)
+            numeric_context[metric] = value
+            numeric_context[metric.lower()] = value
+            numeric_context[metric.upper()] = value
 
-        # Track data fetch steps for auditing
         for metric, metric_value in metric_values.items():
             calculation_steps.append(
                 {
@@ -1237,7 +1349,7 @@ class CustomKPICalculator:
                 }
             )
 
-        # Inject allowed helper functions
+        # Inject helper functions for AST evaluation
         context["sum"] = lambda *args: sum(args)
         context["avg"] = lambda *args: sum(args) / len(args) if args else 0
         context["max"] = lambda *args: max(args) if args else 0
@@ -1245,16 +1357,21 @@ class CustomKPICalculator:
         context["abs"] = abs
         context["round"] = round
 
-        try:
-            tree = ast.parse(formula, mode="eval")
-        except SyntaxError as exc:  # pragma: no cover - defensive
-            raise ValueError(f"Invalid canonical formula '{formula}': {exc}") from exc
+        engine = "ast"
+        result: Optional[float] = None
 
-        evaluator = _FormulaEvaluator(context, FormulaParser._ALLOWED_FUNCTIONS)
-        try:
-            result = evaluator.visit(tree)
-        except Exception as exc:
-            raise ValueError(f"Formula evaluation error: {exc}") from exc
+        if self._can_use_numexpr(formula, numeric_context):
+            try:
+                eval_result = _NUMEXPR.evaluate(formula, local_dict=numeric_context)  # type: ignore[arg-type]
+                result = float(eval_result)
+                engine = "numexpr"
+            except Exception:  # pragma: no cover - defensive fallback
+                LOGGER.debug("NumExpr evaluation failed for formula '%s'", formula, exc_info=True)
+                result = None
+
+        if result is None:
+            result = self._evaluate_formula_ast(formula, context)
+            engine = "ast"
 
         calculation_steps.append(
             {
@@ -1262,10 +1379,37 @@ class CustomKPICalculator:
                 "formula": formula,
                 "inputs": numeric_snapshot,
                 "result": result,
+                "engine": engine,
             }
         )
         return float(result)
-    
+
+    @staticmethod
+    def _evaluate_formula_ast(formula: str, context: Dict[str, Any]) -> float:
+        try:
+            tree = ast.parse(formula, mode="eval")
+        except SyntaxError as exc:  # pragma: no cover - defensive
+            raise ValueError(f"Invalid canonical formula '{formula}': {exc}") from exc
+
+        evaluator = _FormulaEvaluator(context, FormulaParser._ALLOWED_FUNCTIONS)
+        try:
+            value = evaluator.visit(tree)
+        except Exception as exc:
+            raise ValueError(f"Formula evaluation error: {exc}") from exc
+        return float(value)
+
+    @staticmethod
+    def _can_use_numexpr(formula: str, numeric_context: Dict[str, float]) -> bool:
+        if _NUMEXPR is None:
+            return False
+        lowered = formula.lower()
+        for func in FormulaParser._ALLOWED_FUNCTIONS:
+            if re.search(rf"\b{func}\s*\(", lowered):
+                return False
+        identifiers = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", formula))
+        available = {key.lower() for key in numeric_context.keys()}
+        return all(identifier.lower() in available for identifier in identifiers)
+
     @staticmethod
     def _format_value(value: Optional[float], unit: Optional[str]) -> Optional[str]:
         if value is None:
@@ -1411,5 +1555,22 @@ class CustomKPICalculator:
             merged["applied_data_preferences_id"] = applied_preference_id
             merged.setdefault("data_preferences_id", applied_preference_id)
         return merged
+
+    @staticmethod
+    def _formula_references_name(kpi_name: str, formula: str) -> bool:
+        """Return True if the formula references the KPI's own name."""
+        if not kpi_name or not formula:
+            return False
+
+        normalised_name = re.sub(r"[^a-z0-9]", "", kpi_name.lower())
+        if not normalised_name:
+            return False
+
+        tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", formula)
+        for token in tokens:
+            token_norm = re.sub(r"[^a-z0-9]", "", token.lower())
+            if token_norm == normalised_name:
+                return True
+        return False
 
 

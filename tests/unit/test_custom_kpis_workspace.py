@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from benchmarkos_chatbot import custom_kpis
 from benchmarkos_chatbot.analytics_workspace import DataSourcePreferencesManager
-from benchmarkos_chatbot.custom_kpis import CustomKPICalculator
+from benchmarkos_chatbot.custom_kpis import CustomKPICalculator, KPIIntentParser
 from benchmarkos_chatbot.kpi_lookup import KPIDefinitionLookup
 from benchmarkos_chatbot.database import initialise
 
@@ -162,4 +163,106 @@ def test_calculate_kpi_missing_period_message(tmp_path):
     result = calculator.calculate_kpi(kpi.kpi_id, "TSLA", fiscal_year=2024)
     assert result.error is not None
     assert "FY2024 data not ingested yet" in result.error
+
+
+def test_custom_kpi_rejects_unknown_metric(tmp_path):
+    db_path = tmp_path / "workspace.db"
+    initialise(Path(db_path))
+    calculator = CustomKPICalculator(Path(db_path))
+
+    with pytest.raises(ValueError, match="Unknown metrics"):
+        calculator.create_kpi(
+            user_id="default",
+            name="Invalid KPI",
+            formula="Revenue + MadeUpMetric",
+        )
+
+
+def test_custom_kpi_rejects_self_reference(tmp_path):
+    db_path = tmp_path / "workspace.db"
+    initialise(Path(db_path))
+    calculator = CustomKPICalculator(Path(db_path))
+
+    with pytest.raises(ValueError, match="cannot reference itself"):
+        calculator.create_kpi(
+            user_id="default",
+            name="Recurring",
+            formula="Recurring + 1",
+        )
+
+
+def test_custom_kpi_group_metadata(tmp_path):
+    db_path = tmp_path / "workspace.db"
+    initialise(Path(db_path))
+    calculator = CustomKPICalculator(Path(db_path))
+
+    kpi = calculator.create_kpi(
+        user_id="default",
+        name="Operating Spread",
+        formula="Revenue - CostOfRevenue, unit percent, group Profitability",
+    )
+
+    assert kpi.metadata.get("group") == "Profitability"
+    assert kpi.to_dict()["group"] == "Profitability"
+    assert kpi.unit == "pct"
+
+
+def test_kpi_intent_handles_define_metric():
+    parser = KPIIntentParser()
+    intent = parser.detect("define metric Custom Spread = Revenue - NetIncome")
+    assert intent is not None
+    assert intent.get("action") == "create"
+    definition = intent.get("definition")
+    assert definition is not None
+    assert definition.formula == "Revenue - NetIncome"
+
+
+def test_kpi_intent_handles_custom_margin_metric():
+    parser = KPIIntentParser()
+    intent = parser.detect("Define custom margin metric Gross Efficiency = GrossProfit / Revenue")
+    assert intent is not None
+    assert intent.get("action") == "create"
+    definition = intent.get("definition")
+    assert definition is not None
+    assert definition.formula == "GrossProfit / Revenue"
+
+
+def test_custom_kpi_alias_resolution(tmp_path):
+    db_path = tmp_path / "workspace.db"
+    initialise(Path(db_path))
+    calculator = CustomKPICalculator(Path(db_path))
+
+    kpi = calculator.create_kpi(
+        user_id="default",
+        name="Net Debt Coverage",
+        formula="(CashAndCashEquivalents + ShortTermInvestments) / TotalDebt",
+    )
+
+    assert set(kpi.inputs) == {
+        "CashAndCashEquivalents",
+        "ShortTermInvestments",
+        "TotalDebt",
+    }
+    assert "cash_and_cash_equivalents" in kpi.formula
+    assert "short_term_investments" in kpi.formula
+    assert "total_debt" in kpi.formula
+
+
+@pytest.mark.skipif(custom_kpis._NUMEXPR is None, reason="numexpr not available")
+def test_custom_kpi_uses_numexpr_when_available(tmp_path):
+    db_path = tmp_path / "workspace.db"
+    initialise(Path(db_path))
+    calculator = CustomKPICalculator(Path(db_path))
+
+    kpi = calculator.create_kpi(
+        user_id="default",
+        name="Simple Sum",
+        formula="Revenue + NetIncome",
+    )
+
+    _seed_metric_snapshots(Path(db_path), "AAPL", "revenue", 80.0, 2024)
+    _seed_metric_snapshots(Path(db_path), "AAPL", "net_income", 20.0, 2024)
+
+    result = calculator.calculate_kpi(kpi.kpi_id, "AAPL", fiscal_year=2024)
+    assert pytest.approx(result.value, rel=1e-6) == 100.0
 
