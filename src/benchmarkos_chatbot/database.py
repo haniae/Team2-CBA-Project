@@ -566,6 +566,10 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
 
 def initialise(database_path: Path) -> None:
     """Create the database file and ensure core tables exist."""
+    # Convert to Path if string is provided
+    if isinstance(database_path, str):
+        database_path = Path(database_path)
+    
     database_path.parent.mkdir(parents=True, exist_ok=True)
     with _connect(database_path) as connection:
         connection.execute(
