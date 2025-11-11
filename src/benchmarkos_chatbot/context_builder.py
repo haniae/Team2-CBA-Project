@@ -3276,13 +3276,18 @@ def build_financial_context(
     Returns:
         Formatted financial context as natural language text with source citations
     """
+    LOGGER.critical(f"🔍 DEBUG: build_financial_context called for: {query}")
     try:
         # Check if this is a forecasting query FIRST - forecasting queries need special handling
         is_forecasting = _is_forecasting_query(query)
+        LOGGER.critical(f"🔍 DEBUG: is_forecasting = {is_forecasting}")
         
         # Parse query to extract tickers and metrics
         structured = parse_to_structured(query)
+        LOGGER.critical(f"🔍 DEBUG: Parsed structured: {structured}")
+        LOGGER.critical(f"🔍 DEBUG: structured.get('tickers'): {structured.get('tickers') if structured else None}")
         tickers = [t["ticker"] for t in structured.get("tickers", [])][:max_tickers]
+        LOGGER.critical(f"🔍 DEBUG: Final tickers list: {tickers}")
         
         # For forecasting queries, if no tickers were extracted, try to extract manually
         # This handles cases like "Forecast Apple revenue using LSTM" where ticker might not be parsed
@@ -3386,10 +3391,24 @@ def build_financial_context(
             except Exception as e:
                 LOGGER.debug(f"Could not build macro context: {e}")
         
+        LOGGER.critical(f"🔍 DEBUG: Starting loop over {len(tickers)} tickers: {tickers}")
         for ticker in tickers:
+            LOGGER.critical(f"🔍 DEBUG: Processing ticker: {ticker}")
             try:
-                # Get company name
-                company_name = analytics_engine.get_company_name(ticker) or ticker
+                # Get company name from database
+                LOGGER.critical(f"🔍 DEBUG: Getting company name for {ticker}")
+                try:
+                    # Try to get company name from financial_facts table
+                    import sqlite3
+                    conn = sqlite3.connect(database_path)
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT company_name FROM financial_facts WHERE ticker = ? AND company_name IS NOT NULL LIMIT 1", (ticker,))
+                    row = cursor.fetchone()
+                    company_name = row[0] if row else ticker
+                    conn.close()
+                except:
+                    company_name = ticker
+                LOGGER.critical(f"🔍 DEBUG: Company name: {company_name}")
                 
                 # Fetch metric records (not just values) to get period info
                 all_metrics = [
@@ -3401,15 +3420,26 @@ def build_financial_context(
                     "ev_ebitda", "pe", "pb", "ev_revenue", "price", "market_cap"
                 ]
                 
-                records = analytics_engine.fetch_metrics(ticker, metrics=all_metrics)
+                # Fetch metric records from database
+                LOGGER.critical(f"🔍 DEBUG: About to fetch metrics for {ticker} from {database_path}")
+                try:
+                    records = database.fetch_metric_snapshots(database_path, ticker)
+                    LOGGER.critical(f"🔍 DEBUG: Successfully fetched {len(records) if records else 0} records for {ticker}")
+                except Exception as fetch_error:
+                    LOGGER.critical(f"🔍 DEBUG: EXCEPTION fetching metrics: {fetch_error}")
+                    records = None
                 
                 if not records:
+                    LOGGER.critical(f"🔍 DEBUG: No records found for {ticker} - skipping")
                     continue
                 
+                LOGGER.critical(f"🔍 DEBUG: Processing {len(records)} records, selecting latest...")
                 # Group by period for comprehensive view
-                latest_records = analytics_engine._select_latest_records(records)
+                latest_records = analytics_engine._select_latest_records(records, span_fn=analytics_engine._period_span)
+                LOGGER.critical(f"🔍 DEBUG: Latest records: {list(latest_records.keys()) if latest_records else 'NONE'}")
                 
                 if not latest_records:
+                    LOGGER.critical(f"🔍 DEBUG: No latest_records - skipping {ticker}")
                     continue
                 
                 # Extract period information from a representative record
@@ -3456,7 +3486,10 @@ def build_financial_context(
                         source_citation = f" (per {form_type} FY{fy})"
                 
                 # Build mandatory data block FIRST - this is critical for accuracy
+                LOGGER.critical(f"🔍 DEBUG: Building mandatory block for {ticker}, latest_records keys: {list(latest_records.keys()) if latest_records else 'EMPTY'}")
                 mandatory_block = _build_mandatory_data_block(ticker, latest_records, period_label)
+                LOGGER.critical(f"🔍 DEBUG: Mandatory block length: {len(mandatory_block)} chars")
+                LOGGER.critical(f"🔍 DEBUG: Mandatory block preview:\n{mandatory_block[:500]}")
                 
                 # Build comprehensive ticker context with SEC URLs prominently displayed
                 ticker_context = mandatory_block  # Start with mandatory block
@@ -3779,7 +3812,9 @@ def build_financial_context(
             )
         
         # Add multi-source data (Yahoo Finance, FRED, etc.) if available
-        if MULTI_SOURCE_AVAILABLE and tickers:
+        # TEMPORARILY DISABLED: Yahoo Finance has broken data (astronomical percentages)
+        # TODO: Re-enable after fixing yfinance data quality issues
+        if False and MULTI_SOURCE_AVAILABLE and tickers:
             for ticker in tickers[:1]:  # Add for first ticker to avoid context overload
                 try:
                     fred_api_key = os.getenv('FRED_API_KEY')

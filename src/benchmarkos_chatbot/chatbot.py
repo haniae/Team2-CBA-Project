@@ -3290,7 +3290,9 @@ class BenchmarkOSChatbot:
                     context_detail = "Portfolio context compiled - using actual portfolio data"
                     LOGGER.info("Using portfolio context for query")
                 else:
+                    LOGGER.critical(f"🔍 DEBUG: Building context for query: {user_input}")
                     context = self._build_enhanced_rag_context(user_input)
+                    LOGGER.critical(f"🔍 DEBUG: Context built, length: {len(context) if context else 0}")
 
                     if is_forecasting and not context:
                         LOGGER.warning("Forecasting query detected but context is empty - will still call LLM")
@@ -3321,6 +3323,8 @@ class BenchmarkOSChatbot:
                 if context:
                     context_length = len(context)
                     LOGGER.info(f"Context length: {context_length} characters")
+                    # DEBUG: Log first 1000 chars of context to see what LLM receives
+                    LOGGER.info(f"Context preview (first 1000 chars):\n{context[:1000]}")
                     if is_forecasting:
                         # Check if ML forecast context is present
                         has_ml_forecast = "ML FORECAST" in context or "CRITICAL: THIS IS THE PRIMARY ANSWER" in context
