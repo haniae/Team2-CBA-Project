@@ -702,8 +702,182 @@ python -m venv .venv
 # macOS/Linux
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .
 Copy-Item .env.example .env   # PowerShell
 # cp .env.example .env        # macOS/Linux
+```
+
+### 📦 Complete Package Installation Guide
+
+#### Prerequisites
+- **Python 3.10+** (Python 3.11 or 3.12 recommended)
+- **pip** (Python package manager, usually comes with Python)
+- **Git** (to clone the repository)
+
+#### All Required Packages
+
+The chatbot requires the following packages (all automatically installed via `requirements.txt`):
+
+**Core Framework:**
+- `fastapi>=0.111.0` - Web framework for API endpoints
+- `uvicorn[standard]>=0.30.0` - ASGI server for FastAPI
+- `python-dotenv>=1.0.1` - Environment variable management
+
+**AI/ML:**
+- `openai>=1.35.0` - OpenAI API client for LLM integration
+- `transformers>=4.35.0` - Hugging Face transformers library
+- `torch>=2.1.0` - PyTorch for deep learning models
+- `sentence-transformers>=2.2.0` - Sentence embeddings
+- `langchain>=0.1.0` - LLM application framework
+- `openai-whisper>=20231117` - Speech recognition
+
+**Database:**
+- `SQLAlchemy>=2.0` - SQL toolkit and ORM
+- `psycopg[binary]>=3.1` - PostgreSQL adapter (Python 3)
+- `psycopg2-binary>=2.9.9` - PostgreSQL adapter (legacy)
+
+**HTTP & API:**
+- `requests>=2.32.0` - HTTP library for API calls
+- `httpx>=0.25.0` - Async HTTP client
+
+**Financial Data Sources:**
+- `yfinance>=0.2.40` - Yahoo Finance data
+- `fredapi>=0.5.0` - Federal Reserve Economic Data API
+- `pandas-datareader>=0.10.0` - Financial data readers
+
+**Data Processing:**
+- `pandas>=2.0.0` - Data manipulation and analysis
+- `numpy>=1.26,<2.3` - Numerical computing
+- `openpyxl>=3.1.5` - Excel file support
+
+**Data Visualization:**
+- `plotly>=5.17.0` - Interactive plotting
+- `dash>=2.14.0` - Web dashboard framework
+- `dash-bootstrap-components>=1.5.0` - Bootstrap components for Dash
+- `matplotlib>=3.7.0` - Static plotting
+- `seaborn>=0.12.0` - Statistical visualization
+- `bokeh>=3.3.0` - Interactive visualization
+- `altair>=5.0.0` - Declarative visualization
+
+**Document Generation:**
+- `fpdf2>=2.7.8` - PDF generation
+- `python-pptx>=0.6.23` - PowerPoint generation
+
+**Web & Frontend:**
+- `jinja2>=3.1.0` - Template engine
+- `aiofiles>=23.0.0` - Async file operations
+- `streamlit>=1.28.0` - Streamlit web framework
+- `gradio>=4.0.0` - Gradio UI framework
+- `flask>=2.3.0` - Flask web framework
+- `flask-cors>=4.0.0` - CORS support for Flask
+- `flask-socketio>=5.3.0` - WebSocket support for Flask
+
+**Real-time & WebSocket:**
+- `websockets>=12.0` - WebSocket library
+- `socketio>=5.10.0` - Socket.IO client/server
+- `redis>=5.0.0` - Redis for caching/queues
+- `celery>=5.3.0` - Distributed task queue
+
+**ML Forecasting:**
+- `pmdarima>=2.0.0` - ARIMA models
+- `statsmodels>=0.14.0` - Statistical models
+- `prophet>=1.1.0` - Facebook Prophet forecasting
+- `tensorflow>=2.13.0` - TensorFlow for deep learning
+- `keras>=2.13.0` - Keras neural network library
+- `optuna>=3.0.0` - Hyperparameter optimization
+- `scikit-learn>=1.3.0` - Machine learning utilities
+- `pandas-ta>=0.3.14b0` - Technical analysis indicators
+- `scipy>=1.11.0` - Scientific computing
+- `shap>=0.42.0` - Model explainability
+- `ruptures>=1.1.8` - Change point detection
+
+**NLP & Text Processing:**
+- `nltk>=3.8.0` - Natural Language Toolkit
+- `spacy>=3.7.0` - Advanced NLP library
+- `textblob>=0.17.0` - Text processing library
+- `wordcloud>=1.9.0` - Word cloud generation
+
+**Utilities:**
+- `click>=8.1.0` - Command-line interface
+- `tqdm>=4.65.0` - Progress bars
+- `python-dateutil>=2.8.0` - Date utilities
+- `pyyaml>=6.0.0` - YAML parser
+- `pillow>=10.0.0` - Image processing
+
+**Logging & Monitoring:**
+- `structlog>=23.0.0` - Structured logging
+- `rich>=13.0.0` - Rich text and formatting
+
+**Security:**
+- `cryptography>=41.0.0` - Cryptographic library
+- `python-jose[cryptography]>=3.3.0` - JWT handling
+
+**Testing:**
+- `pytest>=8.2.0` - Testing framework
+- `pytest-asyncio>=0.21.0` - Async testing support
+- `pytest-cov>=4.0.0` - Coverage reporting
+
+**Development Tools:**
+- `black>=23.0.0` - Code formatter
+- `flake8>=6.0.0` - Linter
+- `mypy>=1.5.0` - Type checker
+
+#### Installation Verification
+
+After installation, verify everything works:
+
+```bash
+# Check Python version (should be 3.10+)
+python --version
+
+# Verify key packages are installed
+python -c "import fastapi, openai, pandas, sqlalchemy; print('✅ Core packages installed')"
+
+# Run a quick test
+python -c "from benchmarkos_chatbot.config import load_settings; print('✅ BenchmarkOS imports successfully')"
+```
+
+#### Troubleshooting Installation
+
+**Issue: Package conflicts**
+```bash
+# Create a fresh virtual environment
+deactivate  # Exit current venv
+rm -rf .venv  # Remove old venv (or rmdir /s .venv on Windows)
+python -m venv .venv  # Create new venv
+source .venv/bin/activate  # Activate (or .\.venv\Scripts\activate on Windows)
+pip install --upgrade pip  # Upgrade pip first
+pip install -r requirements.txt  # Reinstall
+```
+
+**Issue: psycopg2 installation fails (Windows)**
+```bash
+# Install pre-compiled binary
+pip install psycopg2-binary
+```
+
+**Issue: TensorFlow/GPU issues**
+```bash
+# For CPU-only installation (if GPU causes issues)
+pip install tensorflow-cpu
+```
+
+**Issue: Memory errors during installation**
+```bash
+# Install packages in smaller batches
+pip install fastapi uvicorn python-dotenv
+pip install openai requests httpx
+pip install pandas numpy
+# ... continue with other packages from requirements.txt
+```
+
+**Issue: Permission errors (Linux/macOS)**
+```bash
+# Use --user flag or ensure virtual environment is activated
+pip install --user -r requirements.txt
+# OR ensure venv is activated:
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ### 📊 PowerPoint Export & Analyst Documentation
