@@ -1739,6 +1739,61 @@ class BenchmarkOSChatbot:
         
         return None
 
+    def _fix_astronomical_percentages(self, text: str) -> str:
+        """
+        Fix catastrophic LLM percentage errors where dollar values are treated as percentages.
+        
+        Examples of errors this fixes:
+        - "391,035,000,000.0%" → Removed or replaced with qualitative language
+        - "112,010,000,000.0%" → Removed or replaced
+        
+        Any percentage > 1000% is almost certainly an error.
+        """
+        if not text:
+            return text
+        
+        import re
+        
+        # Pattern to match astronomical percentages (anything > 1000%)
+        # Matches: 391035000000.0%, 112010000000.0%, etc.
+        astronomical_pattern = r'(\d{4,}(?:,\d{3})*(?:\.\d+)?)\s*%'
+        
+        def replace_astronomical(match):
+            value_str = match.group(1).replace(',', '')
+            try:
+                value = float(value_str)
+                if value > 1000:
+                    # This is an astronomical percentage - remove it
+                    LOGGER.error(f"🔧 FIXED: Removed astronomical percentage {value:,.0f}% from LLM response")
+                    return "[growth rate]"  # Neutral placeholder
+                else:
+                    # Normal percentage, keep it
+                    return match.group(0)
+            except:
+                return match.group(0)
+        
+        # Replace astronomical percentages
+        fixed_text = re.sub(astronomical_pattern, replace_astronomical, text)
+        
+        # Additional cleanup: Remove common error patterns
+        error_patterns = [
+            (r'reflecting a \[growth rate\] year-over-year', 'reflecting year-over-year growth'),
+            (r'representing a \[growth rate\]', 'showing growth'),
+            (r'increased by \[growth rate\]', 'increased'),
+            (r'growth of \[growth rate\]', 'growth'),
+            (r': \[growth rate\]', ''),  # Remove standalone placeholders
+        ]
+        
+        for pattern, replacement in error_patterns:
+            fixed_text = re.sub(pattern, replacement, fixed_text)
+        
+        # Log if we made changes
+        if fixed_text != text:
+            changes_made = text.count('%') - fixed_text.count('%')
+            LOGGER.warning(f"🔧 Fixed {changes_made} astronomical percentage(s) in LLM response")
+        
+        return fixed_text
+
     def _prepare_llm_messages(self, rag_context: Optional[str]) -> List[Mapping[str, str]]:
         """Trim history before sending to the LLM and append optional RAG context."""
         history = self.conversation.as_llm_messages()
@@ -3354,6 +3409,9 @@ class BenchmarkOSChatbot:
                     )
                 else:
                     reply = self.llm_client.generate_reply(messages)
+                
+                # CRITICAL: Post-process to remove astronomical percentage errors
+                reply = self._fix_astronomical_percentages(reply)
                 
                 emit("llm_query_complete", "Explanation drafted")
                 LOGGER.info(f"Generated reply length: {len(reply) if reply else 0} characters")
