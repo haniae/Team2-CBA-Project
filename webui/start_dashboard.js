@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * BenchmarkOS Web Dashboard Starter
+ * Finalyze Web Dashboard Starter
  * Starts the web dashboard with proper configuration
  */
 
@@ -84,7 +84,7 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, HOST, () => {
-    console.log('🚀 BenchmarkOS Web Dashboard');
+    console.log('🚀 Finalyze Web Dashboard');
     console.log('=' * 40);
     console.log(`🌐 Server running on http://${HOST}:${PORT}`);
     console.log(`📱 Dashboard: http://${HOST}:${PORT}/dashboard`);

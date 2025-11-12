@@ -602,7 +602,7 @@
       const disposition = response.headers.get("Content-Disposition");
       const filename =
         parseFilenameFromDisposition(disposition) ||
-        `benchmarkos-export-${Date.now()}.${exportFormat === "ppt" ? "pptx" : exportFormat}`;
+        `finalyze-export-${Date.now()}.${exportFormat === "ppt" ? "pptx" : exportFormat}`;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
