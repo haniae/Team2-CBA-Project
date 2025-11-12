@@ -1078,6 +1078,16 @@ SYSTEM_PROMPT = (
     "4. **IF YOU MUST SHOW GROWTH:** Say 'Revenue increased from $367.8B to $394.3B' (qualitative)\n"
     "5. **CRITICAL:** The number '$394.3 billion' is NOT a percentage! Don't append '%' to dollar amounts!\n"
     "6. **VALIDATION:** If you're about to write a percentage > 100%, STOP - you've made an error!\n\n"
+    "## 🔒 GROWTH & TREND BLOCK IS AUTHORITATIVE\n\n"
+    "Whenever the context includes a section labeled '**Growth & Trend Analysis**' or bullet points like:\n"
+    "- Revenue Growth (YoY): 6.4%\n"
+    "- Revenue CAGR (3Y): 1.8%\n"
+    "- Net Income Growth (YoY): 19.5%\n"
+    "**you must quote these values verbatim**.\n"
+    "- ✅ Say: 'Revenue grew **6.4% year over year**' (use the exact number provided)\n"
+    "- ❌ NEVER restate the raw revenue amount as a percentage\n"
+    "- ❌ NEVER recompute CAGR/YoY yourself or round differently\n"
+    "- If a growth metric is missing, explicitly state it is unavailable instead of inventing one.\n\n"
     
     "**⚠️ COMMON MISTAKES TO AVOID:**\n"
     "- ❌ Using FY2024 data when context provides FY2025\n"
@@ -1793,6 +1803,290 @@ class BenchmarkOSChatbot:
             LOGGER.warning(f"🔧 Fixed {changes_made} astronomical percentage(s) in LLM response")
         
         return fixed_text
+
+    def _append_growth_snapshot(self, reply: str, user_input: str) -> str:
+        """Attach a deterministic growth block so UI always shows grounded numbers."""
+        if not reply or "📈 **Growth Snapshot" in reply:
+            return reply
+
+        tickers: List[str] = []
+        parser = self.last_structured_response.get("parser") if isinstance(self.last_structured_response, dict) else None
+        if isinstance(parser, dict):
+            for entry in parser.get("tickers", []) or []:
+                ticker = (entry.get("ticker") or entry.get("input") or "").strip()
+                if ticker:
+                    tickers.append(ticker.upper())
+
+        if not tickers:
+            tickers = [t.upper() for t in self._detect_tickers(user_input) if t]
+
+        target_year = self._extract_requested_year(user_input)
+
+        for ticker in tickers:
+            snapshot = self._build_growth_snapshot_data(ticker, target_year)
+            if not snapshot:
+                continue
+            block = snapshot.get("block")
+            summary = snapshot.get("summary")
+            yoy = snapshot.get("yoy")
+            if summary:
+                reply = f"{summary}\n\n{reply.lstrip()}"
+            if block:
+                reply = reply.rstrip() + "\n\n" + block + "\n"
+            if yoy is not None:
+                reply = reply.replace("[growth rate]", f"{yoy:+.1f}%")
+            margin_block = self._build_margin_snapshot_block(ticker, target_year)
+            if margin_block:
+                reply = reply.rstrip() + "\n\n" + margin_block + "\n"
+            LOGGER.info("Appended growth/margin snapshot for %s", ticker)
+            return reply
+        return reply
+
+    def _build_growth_snapshot_data(
+        self,
+        ticker: str,
+        target_year: Optional[int],
+    ) -> Optional[Dict[str, Any]]:
+        """Generate deterministic growth summary/snippet for a ticker."""
+        try:
+            records = self._fetch_metrics_cached(ticker)
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.debug(f"Unable to fetch metrics for growth snapshot ({ticker}): {exc}")
+            return None
+
+        if not records:
+            return None
+
+        selection = self._select_record_for_year(records, target_year)
+        if not selection:
+            return None
+        revenue_record, effective_year = selection
+
+        try:
+            growth_data = self.analytics_engine.compute_growth_metrics(
+                ticker,
+                {},
+                target_year=effective_year,
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.debug(f"Growth metric computation failed for {ticker}: {exc}")
+            return None
+
+        if not growth_data:
+            return None
+
+        percent_metrics = [
+            ("revenue_growth_yoy", "Revenue Growth (YoY)"),
+            ("revenue_cagr_3y", "Revenue CAGR (3Y)"),
+            ("revenue_cagr_5y", "Revenue CAGR (5Y)"),
+            ("net_income_growth_yoy", "Net Income Growth (YoY)"),
+            ("eps_growth_yoy", "EPS Growth (YoY)"),
+            ("eps_cagr_3y", "EPS CAGR (3Y)"),
+            ("fcf_growth_yoy", "Free Cash Flow Growth (YoY)"),
+        ]
+        margin_metrics = [
+            ("margin_change_yoy", "EBITDA Margin Δ"),
+            ("gross_margin_change_yoy", "Gross Margin Δ"),
+        ]
+
+        lines: List[str] = []
+        for key, label in percent_metrics:
+            value = growth_data.get(key)
+            if value is None:
+                continue
+            lines.append(f"- **{label}:** {value:+.1f}%")
+
+        for key, label in margin_metrics:
+            value = growth_data.get(key)
+            if value is None:
+                continue
+            lines.append(f"- **{label}:** {value:+.0f} bps")
+
+        if not lines:
+            return None
+
+        period = revenue_record.period or (f"FY{effective_year}" if effective_year else None)
+        revenue_value = revenue_record.value if revenue_record else None
+
+        header = f"📈 **Growth Snapshot ({ticker})**"
+        if period:
+            header = f"📈 **Growth Snapshot ({ticker} – {period})**"
+
+        block = "\n".join([header] + lines)
+
+        summary_parts: List[str] = []
+        if revenue_value is not None and period:
+            summary_parts.append(
+                f"{ticker} {period} revenue was {self._format_currency_compact(revenue_value)}"
+            )
+        yoy = growth_data.get("revenue_growth_yoy")
+        cagr3 = growth_data.get("revenue_cagr_3y")
+        if yoy is not None:
+            summary_parts.append(f"up {yoy:+.1f}% year over year")
+        if cagr3 is not None:
+            summary_parts.append(f"({cagr3:+.1f}% 3-year CAGR)")
+        summary_line = ""
+        if summary_parts:
+            summary_line = " ".join(summary_parts).strip()
+
+        return {"block": block, "summary": summary_line, "yoy": yoy}
+
+    def _build_margin_snapshot_block(
+        self,
+        ticker: str,
+        target_year: Optional[int],
+    ) -> Optional[str]:
+        """Generate a margin snapshot (gross/op/net) for the requested year."""
+        try:
+            records = self._fetch_metrics_cached(ticker)
+        except Exception as exc:  # pragma: no cover - defensive
+            LOGGER.debug(f"Unable to fetch metrics for margin snapshot ({ticker}): {exc}")
+            return None
+
+        if not records:
+            return None
+
+        wanted = {"gross_margin", "operating_margin", "net_margin"}
+        margin_records = self._select_metric_records(records, wanted, target_year)
+        if not margin_records:
+            return None
+
+        lines: List[str] = []
+        label_map = {
+            "gross_margin": "Gross Margin",
+            "operating_margin": "Operating Margin",
+            "net_margin": "Net Margin",
+        }
+        for key in ["gross_margin", "operating_margin", "net_margin"]:
+            record = margin_records.get(key)
+            if not record or record.value is None:
+                continue
+            value = record.value
+            formatted = f"{value * 100:.1f}%" if abs(value) <= 1 else f"{value:.1f}%"
+            lines.append(f"- **{label_map[key]}:** {formatted}")
+
+        if not lines:
+            return None
+
+        period = None
+        for record in margin_records.values():
+            if record.period:
+                period = record.period
+                break
+
+        header = f"📊 **Margin Snapshot ({ticker})**"
+        if period:
+            header = f"📊 **Margin Snapshot ({ticker} – {period})**"
+
+        return "\n".join([header] + lines)
+
+
+    @staticmethod
+    def _format_currency_compact(value: Optional[float]) -> str:
+        if value is None:
+            return "N/A"
+        abs_val = abs(value)
+        if abs_val >= 1_000_000_000:
+            return f"${value / 1_000_000_000:.1f}B"
+        if abs_val >= 1_000_000:
+            return f"${value / 1_000_000:.1f}M"
+        return f"${value:,.0f}"
+
+    def _extract_requested_year(self, user_input: str) -> Optional[int]:
+        parser = self.last_structured_response.get("parser")
+        if isinstance(parser, dict):
+            periods = parser.get("periods") or {}
+            items = periods.get("items") or []
+            for item in items:
+                if isinstance(item, dict):
+                    fy = item.get("fy")
+                    if isinstance(fy, int):
+                        return fy
+        match = re.search(r"(20\d{2}|19\d{2})", user_input)
+        if match:
+            try:
+                return int(match.group(1))
+            except ValueError:
+                return None
+        return None
+
+    def _select_record_for_year(
+        self,
+        records: Sequence[database.MetricRecord],
+        target_year: Optional[int],
+    ) -> Optional[Tuple[database.MetricRecord, Optional[int]]]:
+        best: Optional[database.MetricRecord] = None
+        best_year: Optional[int] = None
+        latest: Optional[database.MetricRecord] = None
+        latest_year: Optional[int] = None
+        latest_updated: Optional[datetime] = None
+
+        for record in records:
+            year = self._extract_year_from_period_label(record.period)
+            if year is None:
+                continue
+            updated = record.updated_at or datetime.min
+
+            if target_year and year == target_year:
+                if best is None or updated > (best.updated_at or datetime.min):
+                    best = record
+                    best_year = year
+
+            if latest is None:
+                latest = record
+                latest_year = year
+                latest_updated = updated
+            else:
+                if year > (latest_year or -1) or (year == latest_year and updated > (latest_updated or datetime.min)):
+                    latest = record
+                    latest_year = year
+                    latest_updated = updated
+
+        if best:
+            return best, best_year
+        if latest:
+            return latest, latest_year
+        return None
+
+    @staticmethod
+    def _extract_year_from_period_label(period: Optional[str]) -> Optional[int]:
+        if not period:
+            return None
+        match = re.search(r"(20\d{2}|19\d{2})", period)
+        if match:
+            try:
+                return int(match.group(1))
+            except ValueError:
+                return None
+        return None
+
+    def _select_metric_records(
+        self,
+        records: Sequence[database.MetricRecord],
+        metrics: Sequence[str],
+        target_year: Optional[int],
+    ) -> Dict[str, database.MetricRecord]:
+        """Return best record per metric for the requested year (fallback to latest)."""
+        target: Dict[str, database.MetricRecord] = {}
+        fallback: Dict[str, database.MetricRecord] = {}
+
+        wanted = set(metrics)
+        for record in records:
+            if record.metric not in wanted or record.value is None:
+                continue
+            year = self._extract_year_from_period_label(record.period)
+            updated = record.updated_at or datetime.min
+
+            if target_year and year == target_year:
+                existing = target.get(record.metric)
+                if existing is None or updated > (existing.updated_at or datetime.min):
+                    target[record.metric] = record
+
+            existing_fallback = fallback.get(record.metric)
+            if existing_fallback is None or updated > (existing_fallback.updated_at or datetime.min):
+                fallback[record.metric] = record
+
+        return target if target else fallback
 
     def _prepare_llm_messages(self, rag_context: Optional[str]) -> List[Mapping[str, str]]:
         """Trim history before sending to the LLM and append optional RAG context."""
@@ -3534,6 +3828,9 @@ class BenchmarkOSChatbot:
                 except ImportError:
                     emit("fallback", "Using enhanced fallback reply")
                     reply = self._handle_enhanced_error(ErrorCategory.UNKNOWN_ERROR)
+
+            if reply:
+                reply = self._append_growth_snapshot(reply, user_input)
 
             emit("finalize", "Finalising response")
             database.log_message(
@@ -6863,8 +7160,9 @@ class BenchmarkOSChatbot:
             financial_context = build_financial_context(
                 query=user_input,
                 analytics_engine=self.analytics_engine,
-                database_path=self.settings.database_path,
-                max_tickers=3
+                database_path=str(self.settings.database_path),
+                max_tickers=3,
+                include_macro_context=self.settings.include_macro_context,
             )
             if financial_context:
                 # Check if a forecast was generated and store its metadata in conversation state
@@ -7618,4 +7916,3 @@ class BenchmarkOSChatbot:
             return self._generate_pie_chart(data, title)
         else:
             return f"❌ Unsupported chart type: {chart_type}"
-

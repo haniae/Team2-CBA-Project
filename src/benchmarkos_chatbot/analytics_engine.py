@@ -854,7 +854,13 @@ class AnalyticsEngine:
 
         return list(sorted(latest_map.values(), key=lambda rec: rec.metric))
 
-    def compute_growth_metrics(self, ticker: str, latest_records: Dict[str, Any]) -> Optional[Dict[str, float]]:
+    def compute_growth_metrics(
+        self,
+        ticker: str,
+        latest_records: Dict[str, Any],
+        *,
+        target_year: Optional[int] = None,
+    ) -> Optional[Dict[str, float]]:
         """
         Calculate growth metrics (YoY, CAGR) for a ticker.
         
@@ -881,18 +887,39 @@ class AnalyticsEngine:
             growth_data = {}
             
             # Helper to calculate YoY growth
-            def calculate_yoy(metric_name: str) -> Optional[float]:
-                records = sorted(metrics_by_name.get(metric_name, []), 
-                               key=lambda r: (r.period or "", r.updated_at), 
-                               reverse=True)
-                if len(records) < 2:
+            def _values_by_year(metric_name: str) -> Dict[int, float]:
+                from collections import defaultdict
+                year_map: Dict[int, Tuple[float, datetime]] = {}
+                for record in metrics_by_name.get(metric_name, []):
+                    year = self._extract_year(record)
+                    if year is None or record.value is None:
+                        continue
+                    updated_at = record.updated_at or datetime.min
+                    existing = year_map.get(year)
+                    if existing is None or updated_at > existing[1]:
+                        year_map[year] = (record.value, updated_at)
+                return {year: value for year, (value, _) in year_map.items()}
+
+            def _select_year(value_map: Dict[int, float]) -> Optional[int]:
+                if not value_map:
                     return None
-                current = records[0].value
-                previous = records[1].value
-                if previous and previous != 0 and current is not None:
-                    # Return as percentage (e.g., 7.2 for 7.2%)
-                    return ((current - previous) / abs(previous)) * 100
-                return None
+                if target_year and target_year in value_map:
+                    return target_year
+                return max(value_map.keys())
+
+            def calculate_yoy(metric_name: str) -> Optional[float]:
+                values = _values_by_year(metric_name)
+                current_year = _select_year(values)
+                if current_year is None:
+                    return None
+                previous_year = current_year - 1
+                if previous_year not in values:
+                    return None
+                previous = values[previous_year]
+                current = values[current_year]
+                if previous == 0:
+                    return None
+                return ((current - previous) / abs(previous)) * 100
             
             # Calculate revenue growth
             revenue_yoy = calculate_yoy("revenue")
@@ -916,17 +943,18 @@ class AnalyticsEngine:
             
             # Calculate CAGR (requires 3+ years of data)
             def calculate_cagr(metric_name: str, years: int = 3) -> Optional[float]:
-                records = sorted(metrics_by_name.get(metric_name, []), 
-                               key=lambda r: (r.period or "", r.updated_at), 
-                               reverse=True)
-                if len(records) < years + 1:
+                values = _values_by_year(metric_name)
+                current_year = _select_year(values)
+                if current_year is None:
                     return None
-                current = records[0].value
-                historical = records[years].value
-                if historical and historical > 0 and current is not None and current > 0:
-                    # CAGR formula: (end/start)^(1/years) - 1
-                    return ((current / historical) ** (1/years) - 1) * 100
-                return None
+                start_year = current_year - years
+                if start_year not in values or current_year not in values:
+                    return None
+                historical = values[start_year]
+                current = values[current_year]
+                if historical is None or current is None or historical <= 0 or current <= 0:
+                    return None
+                return ((current / historical) ** (1 / years) - 1) * 100
             
             # Revenue CAGR
             revenue_cagr_3y = calculate_cagr("revenue", 3)
@@ -944,17 +972,18 @@ class AnalyticsEngine:
             
             # Margin changes (in basis points)
             def calculate_margin_change(metric_name: str) -> Optional[float]:
-                records = sorted(metrics_by_name.get(metric_name, []), 
-                               key=lambda r: (r.period or "", r.updated_at), 
-                               reverse=True)
-                if len(records) < 2:
+                values = _values_by_year(metric_name)
+                current_year = _select_year(values)
+                if current_year is None:
                     return None
-                current = records[0].value
-                previous = records[1].value
-                if previous is not None and current is not None:
-                    # Return change in basis points (e.g., 0.25 to 0.27 = +200 bps)
-                    return (current - previous) * 10000
-                return None
+                previous_year = current_year - 1
+                if previous_year not in values:
+                    return None
+                current = values[current_year]
+                previous = values[previous_year]
+                if current is None or previous is None:
+                    return None
+                return (current - previous) * 10000
             
             ebitda_margin_change = calculate_margin_change("adjusted_ebitda_margin")
             if ebitda_margin_change is not None:
@@ -1491,3 +1520,19 @@ def _compute_derived_metrics(
 
     return {name: value for name, value in derived.items() if name in DERIVED_METRICS}
 
+    @staticmethod
+    def _extract_year(record: database.MetricRecord) -> Optional[int]:
+        import re
+
+        if record.period:
+            match = re.search(r"(20\d{2}|19\d{2})", record.period)
+            if match:
+                try:
+                    return int(match.group(1))
+                except ValueError:
+                    return None
+        if record.end_year:
+            return record.end_year
+        if record.start_year:
+            return record.start_year
+        return None

@@ -3262,7 +3262,8 @@ def build_financial_context(
     query: str,
     analytics_engine: "AnalyticsEngine",
     database_path: str,
-    max_tickers: int = 3
+    max_tickers: int = 3,
+    include_macro_context: bool = True,
 ) -> str:
     """
     Build comprehensive financial context with SEC filing sources for LLM.
@@ -3375,7 +3376,7 @@ def build_financial_context(
         context_parts = []
         
         # Add macro economic context at the beginning
-        if MACRO_DATA_AVAILABLE:
+        if include_macro_context and MACRO_DATA_AVAILABLE:
             try:
                 macro_provider = get_macro_provider()
                 # Attempt to determine company sector (first ticker)
@@ -3390,6 +3391,8 @@ def build_financial_context(
                     context_parts.append(f"{'='*80}\n📊 MACRO ECONOMIC CONTEXT\n{'='*80}\n{macro_context}\n\n")
             except Exception as e:
                 LOGGER.debug(f"Could not build macro context: {e}")
+        elif not include_macro_context:
+            LOGGER.debug("Macro context disabled via settings")
         
         LOGGER.critical(f"🔍 DEBUG: Starting loop over {len(tickers)} tickers: {tickers}")
         for ticker in tickers:
@@ -3987,4 +3990,3 @@ def format_metrics_naturally(ticker: str, metrics: Dict[str, Any]) -> str:
         lines.append(f"  EV/EBITDA: {format_multiple(metrics['ev_ebitda'])}")
     
     return "\n".join(lines)
-

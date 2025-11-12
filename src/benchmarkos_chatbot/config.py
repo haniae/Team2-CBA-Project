@@ -116,6 +116,7 @@ class Settings:
     min_confidence_threshold: float = 0.85  # 85% minimum confidence
     cross_validation_enabled: bool = True
     auto_correct_enabled: bool = True
+    include_macro_context: bool = True
 
     @property
     def sqlite_uri(self) -> str:
@@ -351,12 +352,12 @@ def load_settings() -> Settings:
         min_confidence_threshold=_parse_float_env("MIN_CONFIDENCE_THRESHOLD", default=0.85),
         cross_validation_enabled=_env_flag("CROSS_VALIDATION_ENABLED", default=True),
         auto_correct_enabled=_env_flag("AUTO_CORRECT_ENABLED", default=True),
+        include_macro_context=_env_flag("ENABLE_MACRO_CONTEXT", default=True),
     )
 
 
 # The module-level import of os happens at the bottom to keep the public API
 # obvious when scanning from the top of the file.
 import os  # noqa: E402  (placed at end intentionally)
-
 
 
