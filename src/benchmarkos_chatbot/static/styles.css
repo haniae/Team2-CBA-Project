@@ -131,9 +131,9 @@ body::-webkit-scrollbar {
 }
 
 .sidebar {
-  width: 280px;
-  min-width: 280px;
-  max-width: 280px;
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
   background: linear-gradient(180deg, #0A1F44 0%, #0D2847 50%, #1E4D8B 100%);
   color: #e2e8f0;
   padding: 18px 16px;
