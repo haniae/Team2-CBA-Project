@@ -8039,6 +8039,25 @@ if (chatInput && sendButton) {
   updateSendDisabled();
 }
 
+if (chatInput && chatForm) {
+  chatInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const hasText = chatInput.value && chatInput.value.trim().length > 0;
+      if (!hasText || (sendButton && sendButton.disabled)) {
+        return;
+      }
+      event.preventDefault();
+      if (typeof chatForm.requestSubmit === "function") {
+        chatForm.requestSubmit();
+      } else if (sendButton) {
+        sendButton.click();
+      } else {
+        chatForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      }
+    }
+  });
+}
+
 // Near-bottom detection and Jump-to-latest button
 if (chatLog) {
   chatLog.addEventListener("scroll", () => {
