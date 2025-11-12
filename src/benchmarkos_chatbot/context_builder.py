@@ -3434,9 +3434,26 @@ def build_financial_context(
                     continue
                 
                 LOGGER.critical(f"🔍 DEBUG: Processing {len(records)} records, selecting latest...")
+                
+                # CRITICAL: Filter by requested fiscal year if specified!
+                requested_fy = None
+                if structured and structured.get("periods"):
+                    periods_info = structured["periods"]
+                    if periods_info.get("items") and len(periods_info["items"]) > 0:
+                        requested_fy = periods_info["items"][0].get("fy")
+                        LOGGER.critical(f"🔍 DEBUG: User requested FY{requested_fy}")
+                
+                # Filter records by fiscal year if requested
+                if requested_fy:
+                    filtered_records = [r for r in records if r.period and str(requested_fy) in r.period]
+                    LOGGER.critical(f"🔍 DEBUG: Filtered to {len(filtered_records)} records for FY{requested_fy}")
+                    if filtered_records:
+                        records = filtered_records
+                
                 # Group by period for comprehensive view
                 latest_records = analytics_engine._select_latest_records(records, span_fn=analytics_engine._period_span)
-                LOGGER.critical(f"🔍 DEBUG: Latest records: {list(latest_records.keys()) if latest_records else 'NONE'}")
+                LOGGER.critical(f"🔍 DEBUG: Latest records selected from period: {latest_records.get('revenue').period if latest_records and 'revenue' in latest_records else 'NONE'}")
+                LOGGER.critical(f"🔍 DEBUG: Latest records keys: {list(latest_records.keys()) if latest_records else 'NONE'}")
                 
                 if not latest_records:
                     LOGGER.critical(f"🔍 DEBUG: No latest_records - skipping {ticker}")
