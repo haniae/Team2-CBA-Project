@@ -387,7 +387,7 @@ body::-webkit-scrollbar {
 }
 
 .top-bar::after {
-  content: "BO";
+  content: "FZ";
   position: absolute;
   top: -32px;
   right: 48px;

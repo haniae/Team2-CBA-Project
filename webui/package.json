@@ -1,7 +1,7 @@
 {
-  "name": "benchmarkos-webui",
+  "name": "finalyze-webui",
   "version": "1.0.0",
-  "description": "BenchmarkOS Chatbot Web Interface with CFI Dashboard",
+  "description": "Finalyze Chatbot Web Interface with CFI Dashboard",
   "main": "app.js",
   "scripts": {
     "start": "node start_dashboard.js",
@@ -53,9 +53,9 @@
     "chatbot",
     "dashboard",
     "analytics",
-    "benchmarkos"
+    "finalyze"
   ],
-  "author": "BenchmarkOS Team",
+  "author": "Finalyze Team",
   "license": "MIT",
   "engines": {
     "node": ">=16.0.0",

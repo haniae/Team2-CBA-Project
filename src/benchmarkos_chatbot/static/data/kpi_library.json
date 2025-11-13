@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "library_name": "BenchmarkOS KPI Library",
+  "library_name": "Finalyze KPI Library",
   "last_updated": "2025-01-27",
   "global_conventions": {
     "periods_supported": ["FY", "Quarter", "TTM", "LTM", "YTD"],
