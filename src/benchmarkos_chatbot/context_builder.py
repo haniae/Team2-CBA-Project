@@ -792,6 +792,36 @@ def _extract_forecast_method(query: str) -> str:
     return "auto"
 
 
+def _extract_forecast_periods(query: str, default: int = 3, *, min_years: int = 1, max_years: int = 10) -> int:
+    """Extract requested forecast horizon (years) from the query."""
+    import re
+
+    query_lower = query.lower()
+    patterns = [
+        r'\bnext\s+(\d+)\s+years?\b',
+        r'\bfor\s+the\s+next\s+(\d+)\s+years?\b',
+        r'\bfor\s+(\d+)\s+years?\b',
+        r'\bover\s+the\s+next\s+(\d+)\s+years?\b',
+        r'\b(\d+)\s*-\s*year\s+(?:forecast|projection|outlook)\b',
+        r'\b(\d+)\s+year\s+(?:forecast|projection|outlook)\b',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, query_lower)
+        if match:
+            try:
+                years = int(match.group(1))
+            except (TypeError, ValueError):
+                continue
+            if years > 0:
+                return max(min_years, min(years, max_years))
+
+    if "next year" in query_lower or "upcoming year" in query_lower:
+        return max(min_years, 1)
+
+    return max(min_years, min(default, max_years))
+
+
 def _build_mandatory_data_block(ticker: str, latest_records: dict, period_label: str) -> str:
     """
     Build a prominent mandatory data block that LLM MUST use.
@@ -3618,9 +3648,11 @@ def build_financial_context(
                 is_forecasting = _is_forecasting_query(query)
                 forecast_metric = None
                 forecast_method = "auto"
+                forecast_periods = 3
                 if is_forecasting:
                     forecast_metric = _extract_forecast_metric(query)
                     forecast_method = _extract_forecast_method(query)
+                    forecast_periods = _extract_forecast_periods(query)
                     LOGGER.info(f"Forecasting query detected for {ticker} {forecast_metric} using {forecast_method}")
                 
                 # Add ML forecasting context FIRST if this is a forecasting query (prioritize it)
@@ -3633,7 +3665,7 @@ def build_financial_context(
                         ticker=ticker,
                         metric=forecast_metric,
                         database_path=database_path,
-                        periods=3,
+                        periods=forecast_periods,
                         method=forecast_method
                     )
                     if ml_forecast_context:
@@ -3646,20 +3678,22 @@ def build_financial_context(
                         # Store forecast metadata for interactive forecasting
                         if forecast_result:
                             parameters = {
-                                "periods": 3,
+                                "periods": forecast_periods,
                                 "method": forecast_method,
                             }
                             _set_last_forecast_metadata(
                                 ticker=ticker,
                                 metric=forecast_metric,
                                 method=forecast_method,
-                                periods=3,
+                                periods=forecast_periods,
                                 forecast_result=forecast_result,
                                 explainability=explainability_data,
                                 parameters=parameters
                             )
                         LOGGER.info(f"  - Context length: {len(ml_forecast_context)} characters")
                         LOGGER.info(f"  - Contains 'ML FORECAST': {'ML FORECAST' in ml_forecast_context or 'CRITICAL: THIS IS THE PRIMARY ANSWER' in ml_forecast_context}")
+                        # Skip additional historical context for forecasting prompts
+                        continue
                     else:
                         LOGGER.warning(f"ML forecast context generation returned None for {ticker} {forecast_metric} using {forecast_method}")
                         LOGGER.warning(f"  - This might be because ML forecasting dependencies are missing or forecast generation failed")

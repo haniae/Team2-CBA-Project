@@ -1733,16 +1733,14 @@ class BenchmarkOSChatbot:
         """Detect if the prompt requests a quick metrics summary for a single ticker."""
         normalized = (normalized_command or "").strip().lower()
         lowered = user_input.strip().lower()
-        summary_prefixes = ("summary", "metrics", "snapshot", "overview")
+        summary_prefixes = ("summary", "snapshot", "overview")
         summary_keywords = (
             "summary",
             "snapshot",
             "overview",
-            "metrics",
-            "metric",
-            "kpi",
-            "performance",
-            "report",
+            "quick summary",
+            "quick snapshot",
+            "cheat sheet",
         )
 
         should_attempt = False
@@ -1751,7 +1749,7 @@ class BenchmarkOSChatbot:
                 should_attempt = True
                 break
         if not should_attempt:
-            should_attempt = any(keyword in lowered for keyword in summary_keywords)
+        should_attempt = any(keyword in lowered for keyword in summary_keywords)
         if not should_attempt:
             return None
 
