@@ -1,0 +1,1175 @@
+Branching Out: Broadening AI Measurement and Evaluation with Measurement Trees
+Craig Greenberg, Patrick Hall*
+Theodore Jensen, Kristen Greene, Razvan Amironesei
+
+arXiv:2509.26632v1 [cs.AI] 30 Sep 2025
+
+National Institute of Standards and Technology
+Gaithersburg MD, USA
+
+Abstract
+This paper introduces measurement trees, a novel class of
+metrics designed to combine various constructs into an interpretable multi-level representation of a measurand. Unlike
+conventional metrics that yield single values, vectors, surfaces, or categories, measurement trees produce a hierarchical directed graph in which each node summarizes its children through user-defined aggregation methods. In response
+to recent calls to expand the scope of AI system evaluation,
+measurement trees enhance metric transparency and facilitate
+the integration of heterogeneous evidence, including, e.g.,
+agentic, business, energy-efficiency, sociotechnical, or security signals. We present definitions and examples, demonstrate practical utility through a large-scale measurement exercise, and provide accompanying open-source Python code.
+By operationalizing a transparent approach to measurement
+of complex constructs, this work offers a principled foundation for broader and more interpretable AI evaluation.
+
+Code — https://url.provided.after.review
+
+Introduction
+A large and growing number of machine learning (ML) and
+artificial intelligence (AI) applications and products are being deployed into real-world operating environments, and
+the usage of complex AI systems is becoming commonplace
+in various specialized and consequential contexts, as well as
+in everyday life (Maese 2025). As a result, there has been
+a growing recognition of the importance of evaluating these
+technologies and being able to better understand their complex performance characteristics outside of test suites and
+simulated data (Schwartz et al. 2025; Wallach et al. 2024;
+Raji et al. 2021).
+To help address this need, we propose the use of tree
+structures, where each additional level in the tree provides
+more detailed information; in particular, the leaves are the
+data, each parent node provides a summary of its children,
+and associated with each node in the tree is a method for
+summarizing its children. We refer to these tree structures
+as measurement trees. Whereas typical AI metrics can be
+understood as mappings between input data (often, system
+output and ground truth) and real values, measurement trees
+can be understood as mapping between input data and tree
+* NIST Associate.
+
+structures, where each node in the tree is associated with a
+summary of its descendants.
+This paper introduces measurement trees, offers some intuitive examples, analyzes various properties of measurement trees, and demonstrates their use. To summarize our
+contributions, in this paper we:
+1. Propose measurement trees, a novel tree-structured
+metric that explicitly represents constructs1 within the
+metric.
+2. Provide a formal definition of measurement trees and
+explore their properties for measuring constructs and
+subconstructs.
+3. Apply measurement trees to complex real-world measurement tasks, that consider signals from user feedback,
+expert annotation, and benchmarking.
+4. Share open source code used to compute and visualize
+measurement trees.
+Directly below, the related work section briefly surveys
+AI and ML measurement, contextualizing the role of trees,
+graphs, and hierarchical clustering in recent calls for broader
+AI evaluation methods. The following section introduces a
+formal definition of measurement trees and explores key
+mathematical properties. Illustrative examples come next,
+including a representation of a well-known AI benchmark
+using a measurement tree. A subsection on practical qualities addresses strengths and limitations, while the sample
+use case demonstrates how measurement trees underpin the
+Contextual Robustness Index (CoRIx) instrument in a sociotechnical AI evaluation. The paper concludes with a discussion of key directions for future development.
+
+Related Work
+Measurement of analytic systems, including AI and ML systems, has a long and rich history (e.g., Hernández-Orallo
+1
+Bhattacherjee et al. (2019) define a construct as “an abstract
+concept that is specifically chosen (or ‘created’) to explain a given
+phenomenon. A construct may be a simple concept ... or a combination of a set of related concepts ...” In this paper, we use measurand to refer to the overall concept which a measurement tree represents, and construct to refer to each of the various components
+(i.e., nodes) which comprise the overall concept. Subconstruct is
+also used when referring to a construct at a lower level of a tree.
+
+(2017)). For various historical and technical reasons, measurement in support of AI and ML systems has mostly been
+pursued in silos divided by some combination of modality, task, or domain (e.g., natural language processing vs.
+computer vision, supervised classification vs. text translation, or biomedical vs. financial, respectively (Chang et al.
+2024; Deng et al. 2009; Yann 1998; Caruana, Joachims, and
+Backstrom 2004; Papineni et al. 2002; Menze et al. 2014;
+Siddiqi 2012)). Some task-based communities have incorporated multiple modalities and domains (e.g., information
+retrieval from collections of news articles, tweets, or videos),
+and more recent years have seen the emergence of several
+so-called “general evaluations” (Raji et al. 2021). Yet, AI
+and ML measurement has largely taken a similar tact across
+modality, task, and domain (Liao et al. 2021), especially
+with respect to the form of metrics–representing the measurand with either a single real value, set of real values, ndimensional surface, or category.
+Not surprisingly, calls for more holistic and comprehensive measurement of AI systems have arisen, particularly in the context of trustworthy AI2 and sociotechnical systems theory.3 Recent contributions to the evaluation
+of generative AI systems emphasize the need for frameworks that integrate technical assessments with information from real-world deployments, user interactions, and social impact. Two prominent examples illustrate this shift.
+Weidinger et al. (2023) propose a three-layer model that
+augments traditional capability evaluations by incorporating human-AI interactions and systemic effects, offering a
+broader perspective on potential risks. Wallach et al. (2024)
+draw on social science measurement theory to introduce a
+four-level framework spanning foundational concepts, measurable constructs, instrumentation, and observed instances,
+aiming to improve clarity and validity of AI evaluations.
+Building on these conceptual frameworks, applied efforts
+have begun to operationalize broader approaches to AI evaluation by incorporating signals from user interactions, expert assessments, and system behavior under varied conditions. CoRIx is one such effort–a measurement instrument
+that uses measurement trees to integrate heterogeneous evidence from benchmarking, red teaming,4 and field testing5
+2
+Trustworthy AI is defined variously throughout literature and
+popular discourse. We cite the National Institute of Standards and
+Technology (NIST) AI Risk Management Framework (AI RMF)
+definition as an example (NIST 2023).
+3
+Defined briefly as follows: “Sociotechnical ‘theory’ is founded
+on two main principles. One is that the interaction of social and
+technical factors creates the conditions for successful (or unsuccessful) system performance ... The corollary of this, and the second of the two main principles, is that optimization of either socio,
+or far more commonly the technical, tends to increase not only the
+quantity of unpredictable, ‘un-designed,’ nonlinear relationships,
+but those relationships that are actually injurious to the system’s
+performance” (Walker et al. 2008).
+4
+We take red teaming to mean adversarial testing of AI systems
+by humans for security and various other risks. For a more expansive discussion see FMF (2023).
+5
+Herein field testing refers to human interactions with AI systems with subsequent surveys. For a broader discussion of scientific
+
+with human subjects (Schwartz et al. 2024). Designed to
+capture how AI systems perform across a range of operating domains and stakeholder perspectives, CoRIx exemplifies how measurement trees can support holistic, contextsensitive evaluation. Initial CoRIx results are presented in
+the sample use case section.
+
+Measurement Trees
+In this section, we develop mathematical foundations of
+measurement trees6 , present a few intuitive examples, and
+conclude with an analysis of measurement tree properties,
+including their potential strengths and weaknesses.7
+
+Mathematical Development
+Definition 1. (Hierarchical Clustering) Given a dataset of
+elements, X = {xi }N
+i=1 , a hierarchical clustering, H, is a
+set of nested subsets of X, s.t. X ∈ H, {{xi }}N
+⊂ H, and
+i=1T
+∀Xi , Xj ∈ H, either Xi ⊂ Xj , Xj ⊂ Xi , or Xi Xj = ∅.
+Further, ∀X
+S iS∈ H, if ∃Xj ∈ H s.t. Xj ⊂ Xi , then ∃Xk ⊂
+H s.t. Xj ( Xl ∈Xk Xl ) = Xi .
+Definition 2. (Summary Function) Given a nested subset, Xi , in a hierarchical clustering, H, a summary function, Fi applied to Xi is a functionSwith domain(Fi ) =
+{range(Fj )×...×range(F
+{Xj , ..., Xk } = Xi ,
+k )} s.t.
+S
+where ∀Xl ⊂ H s.t. Xl = Xi , |{Xj , ..., Xk }| < |Xl |
+if {Xj , ..., Xk } ̸= Xl , × is the Cartesian product, and |X|
+indicates the cardinality of X. The range of Fi can be arbitrary.
+Note that the intention for the summary function Fi for
+a given Xi is to clearly summarize Xi ’s children’s summaries. Note also that this implies that each summary function carries information from all its descendant nodes, i.e.,
+the mapped value of Fi is a sequence of function applications over the dataset Xi .
+Definition 3. (Measurement
+S Tree) A measurement tree,
+M := (H, F : H 7→ {F} Y ), over dataset X consists of
+a hierarchical clustering of X, H, and a summary function
+mapping, F, that maps the elements of the hierarchical clustering to summary functions (or datapoint values in the case
+of singletons), i.e.,
+
+Fi ∈ {F}, if |Xi | > 1
+F(Xi ) =
+yi ∈ Y,
+otherwise
+where {F} is the set of all summary functions and y is an
+observation function that maps each datapoint, xi ∈ X to
+its corresponding observed values yi ∈ Y .
+Measurement Tree Operations We now establish basic
+operations for measurement trees, namely the equality and
+comparison operations.8
+field experiments, see Bernard (2012).
+6
+Note that the tree structures underlying measurement trees
+could be replaced by the more general class of directed acyclic
+graphs. We limit consideration in this paper to tree structures for
+ease of exposition.
+7
+Proofs for lemmas and theorems can be found in Appendix A.
+8
+Note that, in theory, comparison of measurement trees with
+different topologies is possible, e.g., comparing with respect to a
+
+Definition 4. (Measurement Tree Equality) Given two
+measurement trees, Mi := (Hi , Fi ) and Mj := (Hj , Fj ),
+Mi = Mj ⇐⇒ Hi = Hj ∧ ∀Xk ∈ H − X, Fi (Xk ) =
+Fj (Xk ) ∧ Fi,k (Xk ) = Fj,k (Xk ),
+where Fi,k = Fi (Xk ).
+That is, two measurement trees are equal if and only if
+the tree topologies are the same, the measurement functions
+are the same, and the measurement function values are the
+same. Note that two measurement trees can be equal even if
+the datapoint values for the two trees are not the same. This
+is akin to two AI systems having the same measured F-score
+despite different observed outputs.
+We now consider ordering measurement trees. We start by
+defining functions that induce an ordering.
+Definition 5. (Function Ordering) We say a function, f ,
+induces an ordering, when ∃ a relation, ≤, s.t. ≤ is a partial (or total) ordering over the image of f . i.e., ∀x, y ∈
+Image(f ), (x ≤ x) ∧ ((x ≤ y ∧ y ≤ x) =⇒ (x =
+y)) ∧ ((x ≤ y ∧ y ≤ z) =⇒ (x ≤ z)).9
+Next, we establish two lemmas:
+Lemma 1. (Ordering of Composed Functions) Given a
+series of functions, f1 , ..., fn , s.t. the range of function fi is
+the domain the function fi+1 and ∀fi , fi induces an ordering, the composition of functions,fn (...(f1 (x))), induces an
+ordering.
+Lemma 2. (Summary Function Composition) A summary
+function, Fi , associated with a nested dataset, Xi , in a measurement tree, M, is a composition of the summary functions
+of the nested datasets, from each singleton in Xi to Xi .
+We will now prove that, for any set of measurement trees
+with a fixed topology and associated summarization functions, a partial ordering is induced over the set of measurement trees if every summarization function induces an ordering.
+Theorem 1. (Partial Ordering) Given a set of measurement trees, {Mi }ni=1 s.t. ∀Mj , Mk ∈ {Mi }ni=1 , Hj =
+Hk ∧ ∀Xl ∈ H − X, Fj (Xl ) = Fk (Xl ) ∧ Fi (Xk ) induces an ordering with relation ≤Fk , ∃ a relation, ≤, s.t.
+≤ is a partial ordering over the set {M1 , ..., Mn }. i.e.,
+∀Mi , Mj , Mk ∈ {M1 , ..., Mn }, (Mi ≤ Mi ) ∧ ((Mi ≤
+Mj ∧ Mj ≤ Mi ) =⇒ (Mi = Mj )) ∧ ((Mi ≤
+Mj ∧ Mj ≤ Mk ) =⇒ (Mi ≤ Mk )).
+That is, there exists a partial ordering over any set of measurement trees that share the same tree topology and summarization functions if each of the summarization functions
+induce an ordering.
+Definition 6. (Measurement Tree Relation ≤M ) Given
+two measurement trees, Mi := (Hi , Fi ) and Mj :=
+(Hj , Fj ) s.t. Hi = Hj ∧ (∀Xk ∈ Hi − X, Fi (Xk ) =
+Fj (Xk ) ∧ Fi (Xk ) induces an ordering with relation ≤Fk ),
+we define a relation, ≤M , where Mi ≤M Mj ⇐⇒
+∀Xk ∈ Hi , Fi,k (Xk ) ≤Fk Fj,k (Xk ),
+subtree; we focus on the simpler use case, where the trees share the
+same topology and summarization functions.
+9
+For a total ordering, the following must also be true: x ≤ y ∨
+y ≤ x.
+
+where Fi,k = Fi (Xk ).
+Theorem 2. (Relation ≤M is a Partial Ordering) The
+measurement tree relation, ≤M , described in Definition 6,
+forms a partial ordering over measurement trees.
+
+Example Measurement Trees
+To further illustrate measurement trees, examples are presented that illustrate composing subconstructs into higherlevel constructs, composing constructs from data points, performing basic aggregation calculations, and visualizing a
+popular trustworthy AI benchmark as a measurement tree.
+Example Tree Topologies In Figure 1 we see three example tree topologies for a set of four data points (with values
+1, 3, 2, and 2), represented at the leaves.
+
+(a) Two constructs, one higher-level construct.
+
+(b) Three constructs, one higher-level construct.
+
+(c) Three constructs, three higher-level constructs (at two levels).
+
+Figure 1: Illustration of example data points aggregated into
+various numbers of constructs and higher-level constructs.
+Example 1a displays a tree that represents two constructs
+(in the middle level) measured with respect to the data, while
+example 1b presents a tree that represents three constructs
+(in the middle level) measured with respect to the data. Example 1c corresponds to a tree that represents three subconstructs measured with respect to the data, and two higherlevel constructs with respect to the three subconstructs.
+These constructs, along with the rest of the tree structure,
+
+should be determined by some combination of data analysis
+and domain expertise, designed to correspond to the measurand application, and undergo construct validation processes,
+such as those described by Wallach et al. (2024) and Adcock
+and Collier (2001).
+Figure 1 tree topologies do not include edges, which serve
+to indicate a relationship between data and construct or subconstruct and higher-level construct. Figure 2 presents two
+examples of trees that each represent two constructs and
+their relationships.
+
+(a) Arithmetic mean.
+
+(a) Two data points per construct.
+(b) Maximum.
+
+Figure 3: Illustration of aggregating example data points into
+higher level constructs using descriptive statistics as summary functions.
+
+(b) One and three data points per construct.
+
+Figure 2: Illustration of different ways of aggregating data
+points into constructs, which are represented with tree edges.
+Example 2a corresponds to a tree where one construct
+is measured with respect to two data points ([1] and [3])
+and the other construct is measured with respect to two data
+points ([2] and [2]). Example 2b corresponds to a tree where
+one construct is measured with respect to one data point ([1])
+and the other construct is measured with respect to three data
+points ([3], [2], and [2]).
+Example Summary Functions Once a tree topology (including edges) is specified, it is still necessary to define the
+summary functions associating each node in the tree with a
+summary of its descendants. Figure 3 displays two example
+trees that each represent two constructs, where one construct
+is measured with respect to two data points ([1] and [3]) and
+the other construct is also measured with respect to two data
+points ([2] and [2]). Example 3a corresponds to a tree where
+the summary function associated with each (non-leaf) node
+is the arithmetic mean, and example 3b corresponds to a tree
+where the summary function associated with each (non-leaf)
+node is the maximum function.
+See Figure 5 in Appendix B for an additional example
+of representing an ML model quality metric as a summary
+function with a measurement tree. Note also that the summary functions need not be the same at every node in a
+tree, and that edges can be weighted as necessary. Moreover, there is a very large set of possible summary functions
+
+to choose from, such as ML classifiers that map to categories
+or large language models (LLMs) that map to text.
+Example Representation of a Large-Scale Benchmark
+Holistic Evaluation of Language Models (HELM) is a largescale foundation model benchmark made up of “... two levels: (i) an abstract taxonomy of scenarios and metrics to
+define the design space for language model evaluation and
+(ii) a concrete set of implemented scenarios and metrics that
+were selected to prioritize coverage (e.g. different English
+varieties), value (e.g. user-facing applications), and feasibility (e.g. limited engineering resources) ... ” (Liang et al.
+2023). Figure 4 displays a measurement tree for the Llama 2
+(70 B) model, using accuracy values from the HELM leaderboard on July 30, 2025 (CFRFM 2025). This representation
+of HELM highlights the utility of measurement trees for analyzing and communicating the complex information flows
+necessary for evaluation of contemporary AI systems.
+
+Practical Strengths and Limitations
+Tree-based representations of measurands pose several potential advantages. Because trees can be interpreted as computation graphs (Bauer 1974; Kantorovich 1957), the connection between data, construct, and metric value are built
+into the tree, increasing transparency of measurement and
+mitigating misrepresentation or misinterpretation. Trees also
+enable the explicit representation of the various constructs
+that make up the measurand by associating each node in
+the tree with a construct. By choosing the tree structures,
+constructs, and summary functions, domain experts can encode knowledge directly in the measurand’s data representation. Moreover, subtrees can enable composing larger trees
+
+measurements. Gamification–often framed as an instance of
+Goodhart’s Law (Goodhart 1984)–occurs when optimizing
+for a metric distorts the metric away from its intended measurand. By promoting metric transparency, inducing a partial ordering, and enabling direct assessment of real-world
+phenomena–as demonstrated below through user feedback
+and expert annotation in the CoRIx use case–measurement
+trees may reduce contamination and gamification risks.
+One practical limitation of measurement trees is their novelty—they will require time and resources to gain adoption.
+Constructing a tree may also demand deep domain expertise, and choices about structure and summarization functions may significantly vary depending on task, application,
+or measurement goals and may also impact measurement
+outcomes. At present, without advanced methods for capturing measurement uncertainty, measurement trees are better
+suited for characterizing AI models than for direct comparison—a limitation which may be shared by many existing
+AI benchmarks despite their wide use for ranking models.
+Finally, implementing measurement trees may involve substantial upfront investment in human subjects studies, red
+teaming, or other sociotechnical evaluations requiring specialized labor and infrastructure.
+
+Sample Use Case:
+Contextual Robustness Index Trees
+Figure 4: Llama 2 (70B) accuracy metric values from the
+HELM benchmark represented as a measurement tree with
+subcontructs aligned to HELM Core Scenarios. Mean win
+rate (MWR) is the summarization function for accuracy (the
+measurand) as well as the question answering, sentiment
+analysis, text classification, and toxicity classification subconstructs. Exact match (EM) and F1 metrics are used in
+lower-level nodes. For additional information see:
+https://crfm.stanford.edu/helm/classic/latest/.
+
+from various types of informative signals: user feedback, red
+teaming and security metrics, business performance indicators, agentic system metrics, energy-efficiency metrics, popular benchmarks, etc. The ability to limit the tree depth or
+consideration to one or more subtrees during presentation
+and analysis should also enhance informativeness. Additionally, tree structures are strictly more expressive than real values, since any real-valued (and many other) metrics can be
+represented using a two-level measurement tree–where the
+leaves are the data, the summary function associated with
+the root is the metric computation, and the value at the root
+is the metric value (see Appendix B for an example).
+Another advantage of measurement trees relative to metrics commonly used in the context of leaderboards is their
+potential to counteract data and task contamination (Singh
+et al. 2025; Li and Flanigan 2024; Balloccu et al. 2024)
+and gamification (Thomas and Uminsky 2022). Contamination arises when, during training, models are exposed to
+data meant for evaluation, leading to inflated performance
+
+The sample use case puts forward initial CoRIx measurement trees developed during the pilot phase of an ongoing
+large-scale AI evaluation.10 The presented CoRIx trees produce a validity and reliability risk score.11
+
+CoRIx Background
+In the pilot version of CoRIx, input signals are drawn from
+user perceptions and expert annotations of LLM output,
+gathered systematically with structured questionnaires and
+annotation protocols designed to elicit validity and reliability feedback.12 All displayed results arise from human
+study participants or human labelers, and not from LLMas-a-judge, ML classifiers, or other automated processes.
+User perceptions were collected from 19 field testers and
+10
+Schwartz et al. (2024) describe CoRIx as “a new multidimensional measurement instrument ... Annotation [sic] output and related material are used to calculate submitted AI application results, which are presented as a suite of metrics focused on contextual robustness, the ability of an AI system to maintain its level
+of functionality in a variety of real-world contexts and related user
+expectations [adapted from ISO (2022)].”
+11
+See the International Standards Organization (ISO) definition
+of validation, “confirmation, through the provision of objective evidence, that the requirements for a specific intended use or application have been fulfilled” (ISO 2015); and the ISO definition of reliable, “[the] ability of an item to perform as required, without failure, for a given time interval, under given conditions” (ISO 2022).
+12
+See the program homepage for additional information on
+questionnaire design, annotation instructions, construct validation, and other data and processes that support CoRIx:
+https://url.provided.after.review.
+
+51 red teamers.13 Expert annotations were conducted across
+196 LLM sessions with various numbers of conversational
+turns. Annotations covered three evaluation contexts: bespoke benchmarks (or, model testing), red teaming, and
+field testing, which are referred to as testing levels. Because
+benchmark testing was typically conducted by a single engineer running scripted interactions, user perception data was
+not collected for that level, but was gathered for both red
+teamers and field testers. All collected inputs were converted
+to numeric values on a 0-10 scale, where higher values indicate higher risk.
+To prevent ranking models based on pilot-phase methodology and results that do not yet account for measurement
+uncertainty, the presented CoRIx trees are used to characterize three separate LLM’s validity and reliability risks on
+three separate tasks:
+• Model–Task A: Proprietary LLM–travel planning.
+• Model–Task B: Open source LLM–TV summarization
+with spoiler guardrails.
+• Model–Task C: Fine-tuned open source LLM–meal
+planning.
+CoRIx trees for each model-task combination offer an increasingly detailed view of input data: the root node aggregates subtrees into the overall risk score, intermediate
+nodes summarize their children based on constructs defined
+by study designers, and leaves represent input data. More
+specifically, the CoRIx trees have five levels, progressing
+from high-level constructs to individual data points:
+• Level 1–Risks: Level 1 constructs represent risk
+dimensions–but only valid and reliable for the pilot evaluation. Level 1 nodes aggregate scores from the three
+testing levels.
+• Level 2–Testing Level: Level 2 nodes correspond to one
+of the three testing levels: model testing, red teaming, and
+field testing. These nodes may have up to two children:
+one for expert annotations, and one for user perceptions.
+• Level 3–Annotator Responses & User Perception:
+Level 3 nodes aggregate responses for either annotator
+labels or user feedback. Each node summarizes multiple
+questionnaire items or annotation labels.
+• Level 4–Response Collation: Level 4 nodes summarize
+results for individual questionnaire or annotation items,
+such as guardrail violations, out-of-date information, or
+user dissatisfaction, and are displayed with abbreviated
+identifiers defined by annotation guides and questionnaires (e.g., risk assessment (RA) 2.1, dialog utility (DU)
+2, DU 3, respectively). Each node summarizes responses
+to a single question over multiple LLM interactions. Table 2, available online or in Appendix C, provides a mapping between constructs and identifiers.
+• Level 5–Individual Annotator & User Responses:
+Leaf nodes represent individual questionnaire responses
+and annotation labels for each LLM interaction. These
+13
+
+For information on human subject protections, contact the Human Research Protections Program (HRPP): Anonymized Name,
+Anonymized.Name@url.provided.after.review.
+
+nodes are summarized in level 4 and presented online or
+in Appendix C via histograms and descriptive statistics.
+Table 1 provides an overview of the constructs and summarization functions used in the pilot CoRIx trees.
+Level 1
+
+Level 2
+
+Level 3
+
+Level 4
+
+Summarization: Maximum
+Constructs: Validity and Reliability
+Risk
+Summarization: Mean
+Constructs: Model Testing, Red Teaming, Field Testing
+Summarization: Mean, Median (field
+testing only)
+Constructs: User Perception, Labeler
+Annotation
+Summarization: Mean, Median (field
+testing only)
+Constructs: Risk Assessment (RA 1,
+2, 2.1); Dialogue Utility (DU 2, 3);
+Dialogue Dynamics (DD 1, 4, 5; red
+teaming and field testing only); Content
+Characterization (CC 1, 2, 3; red teaming and field testing only); Questionnaire Questions (QQ 1.2, 2.4; red teaming only) (QQ 1.1, 1.3, 1.4, 1.5, 2.3;
+field testing only)
+
+Table 1: Summarization and constructs employed across the
+levels of the CoRIx trees. Level 5 leaf nodes are not displayed here as they represent individual data inputs; they do
+not contain constructs or summarization functions. Table 2
+(online or in Appendix C) provides a mapping between constructs and identifiers.
+
+CoRIx Tree Results
+Large Figures 6, 7, and 8 and Table 2 are available online
+and in Appendix C:
+Figure 6 — https://tinyurl.com/y6kwzzjm (Model–Task A)
+Figure 7 — https://tinyurl.com/4tzc777p (Model–Task B)
+Figure 8 — https://tinyurl.com/4uph3cnd (Model–Task C)
+Table 2 — https://tinyurl.com/2et75ej7 (Overall Results)
+
+The figures show the CoRIx trees for model–task A, model–
+task B, and model–task C. Scores and additional interpretation details are available in Table 2.
+Model–Task A: Proprietary LLM—Travel Planning
+The CoRIx risk score for model-task A at level 1 is 2.88
+out of 10. This low score for the model-task combination indicates lower validity and reliability risks. Scores for each
+testing level in level 2 are also relatively low, ranging from
+0.72/10 for model testing to 2.88/10 red teaming. In level 3,
+scores for perceptions and annotations have a broader range
+from 0.72/10 for model testing annotations, to 3.52/10 for
+red teaming annotations. Of the perceptions and annotations
+collated in level 4, model testing annotations relating to general functionality (RA 1), response quality (RA 2), and currentness of information (DU 2) resulted in the lowest possible scores of 0.0/10. The highest level 4 scores arose from
+red teaming annotations for unnatural dialogue (DD 4) and
+
+red teaming and field testing annotations for superfluous information (CC 3). Several annotators also recorded guardrail
+violations in red teaming and field testing user interactions
+(RA 2.1).
+Taken together, the results from the CoRIx tree can indicate that validity and reliability risks are low for modeltask A, but guardrails may be necessary or may need to be
+improved, dialogue could be more natural, and system responses could improve their focus on pertinent output. See
+Figure 6 and Table 2 for more information (linked above or
+in Appendix C).
+Model–Task B: Open source LLM–TV Summarization
+with Spoiler Guardrails Figure 7 presents the CoRIx tree
+for model-task B. Model-task B yielded a CoRIx score of
+4.29/10 at level 1, signaling the potential for moderate validity and reliability risk. Scores at level 2 vary from 2.29/10
+for model testing to 4.29/10 for field testing. In level 3 of the
+tree, annotations for model testing display the lowest score
+of 2.29/10. Field testing user perceptions yield the highest
+score of 5.00/10, possibly suggesting user dissatisfaction or
+user detection of validity and reliability risks. In level 4 of
+the tree, model testing annotations for response quality (RA
+2) and field testing perceptions of safety (i.e., guardrail violations, QQ 2.3) present some of the lowest scores. Higher
+scores arise from annotated guardrail violations (RA 2.1),
+unnatural dialogue (DD 4), out-of-date information (DU 2),
+and superfluous information (CC 3), as well as from field
+tester perceptions for unhelpfulness (QQ 1.1), incompleteness (QQ 1.4), and user dissatisfaction (QQ 1.5).
+The CoRIx tree for model-task B suggests that to decrease potential validity and reliability risks, natural dialogue and focus on current and relevant information could
+be improved, guardrails could be hardened, and user experience could be enhanced. See Figure 7 and Table 2 for details
+(linked above or in Appendix C).
+Model–Task C: Fine-tuned Open Source LLM–Meal
+Planning Model-task C in Figure 8 displays a level 1 validity and reliability risk score of 6.30/10, suggesting moderate validity and reliability risks. The 6.30/10 score emerges
+from model testing in level 2. Red teaming scored 3.39/10 in
+level 2 and field testing scored 2.80/10. Level 3 annotation
+and perception scores range from 6.30/10 for model testing
+annotations to 2.03/10 for field testing perceptions, perhaps
+suggesting a difference between annotations of model testing and real-world user perceptions for model-task C. Annotations and user responses, collated in level 4 of Figure 8,
+present high scores for model testing annotations relating
+to basic functionality (RA 1), response quality (RA 2), and
+guardrail violations (RA 2.1). Note that these high scores
+arise from small samples, which then propagate through the
+CoRIx tree, contributing directly to the moderate score in
+level 1. High scores also arise from out-of-date information
+(DU 2), irrelevant information (CC 3), and unnatural dialogue (DD 4) in level 4. In general, the lowest scores in level
+4 stem from user experiences captured in field testing (QQ
+1.1, 1.3, and 1.5).
+The difference between model testing annotation and field
+testing perceptions could indicate that users missed issues
+
+that annotators spotted in model testing, that Model C struggles with single-turn automated prompting, or that model
+testing prompts or methodology fail to adequately capture
+real-world usage patterns for meal planning. However, results for this model-task combination indicate increased risk
+across several additional constructs, which developers could
+attempt to address. See Figure 8 and Table 2 for additional
+details (linked above or in Appendix C).
+
+Overall CoRIx Results
+While CoRIx and this pilot evaluation do not allow for
+model ranking, qualitative comparisons across models,
+tasks, and CoRIx trees reveal consistent patterns: user perceptions and expert annotations are generally more favorable than unfavorable, and recurring risks emerge–including
+unnatural dialogue, superfluous content, and guardrail violations. While model-task combinations vary, CoRIx helps
+surface the specific sources of performance variation that
+contribute to these differences. In doing so, CoRIx can support transparent communication of benefits, risks, and tradeoffs, and inform ongoing system refinement.
+
+Future Directions
+To further enhance the utility of measurement trees, several important directions remain. A key area is the representation of uncertainty. Ongoing work includes assessment
+of approaches such as principal component analysis, bootstrapping, and other sampling-based methods. Bayesian approaches are also under consideration for the expression and
+analysis of tree topology as a form of prior knowledge.
+Advancing the mathematical foundations of measurement
+trees is also a priority, including the development of new
+operations, gradients, and statistical tests for tree comparison. While the sample use case included basic handling
+of heterogeneous data, future implementations may benefit from more coordination with questionnaire designers,
+more consistent treatment of input directionality and scaling, and more sophisticated summarization functions, such
+as weighted combinations, projections, or statistical and ML
+models–particularly approaches that support both transparent measurement and variance propagation. All of these enhancements also aim to improve CoRIx’s own capacity to be
+formally validated, which we highlight as another element of
+future work.
+
+Acknowledgments
+We would like to acknowledge Gabriella Waters, Reva
+Schwartz, and Jon Fiscus for their influential contributions.
+
+Disclaimers
+Certain commercial equipment, instruments, software, or
+materials are identified in this document to specify the
+experimental procedure adequately. Such identification is
+not intended to imply recommendation or endorsement by
+NIST, nor necessarily the best available for the purpose. The
+descriptions and views contained herein are those of the authors and should not be interpreted as necessarily representing the official policies or endorsements, either expressed or
+
+implied, of NIST or the U.S. Government.
+Patrick Hall is a co-owner of the company D. Hall Research,
+LLC d/b/a HallResearch.ai.
+Patrick Hall used ChatGPT in the drafting of this document.
+
+References
+Adcock, R.; and Collier, D. 2001. Measurement validity:
+A shared standard for qualitative and quantitative research.
+American political science review, 95(3): 529–546.
+Balloccu, S.; Schmidtová, P.; Lango, M.; and Dušek, O.
+2024. Leak, Cheat, Repeat: Data Contamination and Evaluation Malpractices in Closed-Source LLMs. In Proceedings of the 18th Conference of the European Chapter of the
+Association for Computational Linguistics (Volume 1: Long
+Papers), 67–93.
+Bauer, F. L. 1974. Computational graphs and rounding error.
+SIAM Journal on Numerical Analysis, 11(1): 87–96.
+Bernard, H. R. 2012. Social Research Methods: Qualitative
+and quantitative approaches. Sage.
+Bhattacherjee, A.; Toleman, M.; Rowling, S.; Frederiks, A.;
+and Andersen, N. 2019. Social Science Research: Principles, Methods and Practices. University of Southern
+Queensland.
+Caruana, R.; Joachims, T.; and Backstrom, L. 2004. KDDCup 2004: Results and Analysis. ACM SIGKDD Explorations Newsletter, 6(2): 95–108.
+CFRFM. 2025. A Holistic Framework for Evaluating Foundation Models - Leaderboard: Core scenarios. Accessed:
+2025-07-14.
+Chang, Y.; Wang, X.; Wang, J.; Wu, Y.; Yang, L.; Zhu, K.;
+Chen, H.; Yi, X.; Wang, C.; Wang, Y.; et al. 2024. A survey
+on evaluation of large language models. ACM transactions
+on intelligent systems and technology, 15(3): 1–45.
+Deng, J.; Dong, W.; Socher, R.; Li, L.-J.; Li, K.; and FeiFei, L. 2009. Imagenet: A large-scale hierarchical image
+database. In 2009 IEEE conference on computer vision and
+pattern recognition, 248–255. IEEE.
+FMF. 2023. Frontier Model Forum: What is Red Teaming?
+Goodhart, C. A. 1984. Problems of monetary management:
+the UK experience. In Monetary theory and practice: The
+UK experience, 91–121. Springer.
+Hernández-Orallo, J. 2017. Evaluation in artificial intelligence: from task-oriented to ability-oriented measurement.
+Artificial Intelligence Review, 48(3): 397–447.
+ISO. 2015. Quality management systems—Fundamentals
+and vocabulary.
+ISO. 2022. Trustworthiness — Vocabulary.
+Kantorovich, L. V. 1957. On a mathematical symbolism
+convenient for performing machine calculations. In Dokl.
+Akad. Nauk SSSR, volume 113, 738–741.
+Li, C.; and Flanigan, J. 2024. Task contamination: Language
+models may not be few-shot anymore. In Proceedings of
+the AAAI Conference on Artificial Intelligence, volume 38,
+18471–18480.
+
+Liang, P.; Bommasani, R.; Lee, T.; Tsipras, D.; Soylu, D.;
+Yasunaga, M.; Zhang, Y.; Narayanan, D.; Wu, Y.; Kumar,
+A.; et al. 2023. Holistic Evaluation of Language Models.
+Trans. Mach. Learn. Res.
+Liao, T.; Taori, R.; Raji, I. D.; and Schmidt, L. 2021. Are We
+Learning Yet? A meta review of evaluation failures across
+machine learning. In Thirty-fifth Conference on Neural Information Processing Systems Datasets and Benchmarks.
+Maese, E. 2025. Americans Use AI in Everyday Products
+Without Realizing It.
+Menze, B. H.; Jakab, A.; Bauer, S.; Kalpathy-Cramer, J.;
+Farahani, K.; Kirby, J.; Burren, Y.; Porz, N.; Slotboom, J.;
+Wiest, R.; et al. 2014. The multimodal brain tumor image
+segmentation benchmark (BRATS). IEEE transactions on
+medical imaging, 34(10): 1993–2024.
+NIST. 2023. AI 100-1, AI RMF 1.0. NIST AI Risk Management Framework.
+Papineni, K.; Roukos, S.; Ward, T.; and Zhu, W.-J. 2002.
+BLEU: A method for automatic evaluation of machine translation. In Proceedings of the 40th annual meeting of the
+Association for Computational Linguistics, 311–318.
+Raji, D.; Denton, E.; Bender, E. M.; Hanna, A.; and
+Paullada, A. 2021. AI and the Everything in the Whole Wide
+World Benchmark. In Vanschoren, J.; and Yeung, S., eds.,
+Proceedings of the Neural Information Processing Systems
+Track on Datasets and Benchmarks, volume 1.
+Schwartz, R.; Chowdhury, R.; Kundu, A.; Frase, H.; Fadaee,
+M.; David, T.; Waters, G.; Taik, A.; Briggs, M.; Hall, P.;
+et al. 2025. Reality Check: A New Evaluation Ecosystem
+Is Necessary to Understand AI’s Real World Effects. arXiv
+preprint arXiv:2505.18893.
+Schwartz, R.; Waters, G.; Amironesei, R.; Greenberg, C.;
+Fiscus, J.; Hall, P.; Jones, A.; Jain, S.; Godil, A.; Greene, K.;
+et al. 2024. The Assessing Risks and Impacts of AI (ARIA)
+Program Evaluation Design Document. NIST.
+Siddiqi, N. 2012. Credit Risk Scorecards: Developing and
+implementing intelligent credit scoring, volume 3. John Wiley & Sons.
+Singh, S.; Nan, Y.; Wang, A.; D’Souza, D.; Kapoor, S.;
+Üstün, A.; Koyejo, S.; Deng, Y.; Longpre, S.; Smith, N. A.;
+et al. 2025. The Leaderboard Illusion. arXiv preprint
+arXiv:2504.20879.
+Thomas, R. L.; and Uminsky, D. 2022. Reliance on metrics
+is a fundamental challenge for AI. Patterns, 3(5).
+Walker, G. H.; Stanton, N. A.; Salmon, P. M.; and Jenkins,
+D. P. 2008. A review of sociotechnical systems theory: a
+classic concept for new command and control paradigms.
+Theoretical issues in ergonomics science, 9(6): 479–499.
+Wallach, H. M.; Desai, M. A.; Pangakis, N.; Cooper, A. F.;
+Wang, A.; Barocas, S.; Chouldechova, A.; Atalla, C.; Blodgett, S. L.; Corvi, E.; et al. 2024. Evaluating Generative AI
+Systems is a Social Science Measurement Challenge. CoRR.
+Weidinger, L.; Rauh, M.; Marchal, N.; Manzini, A.; Hendricks, L. A.; Mateos-Garcia, J.; Bergman, S.; Kay, J.; Griffin, C.; Bariach, B.; et al. 2023. Sociotechnical Safety
+Evaluation of Generative AI Systems. arXiv preprint
+arXiv:2310.11986.
+
+Yann, L. 1998. The MNIST database of handwritten digits.
+
+Appendix A: Proofs
+Proof of Lemma 1: We prove this by induction:
+Proof. The base case consists of two functions f1 and f2
+s.t. both f1 and f2 have ordering relations (≤1 and ≤2 ,
+resp.) and the range of f1 is the domain for f2 . ∀x, y, z ∈
+domain(f1 ):
+(1) f2 (f1 (x)) ≤2 f2 (f1 (x)) by reflexivity of ≤2 ,
+(2) (f2 (f1 (x)) ≤2 f2 (f1 (y)) ∧ f2 (f1 (y)) ≤2
+f2 (f1 (x))) =⇒ f2 (f1 (x)) = f2 (f1 (y)) by antisymmetry of ≤2 , and
+(3) (f2 (f1 (x)) ≤2 f2 (f1 (y)) ∧ f2 (f1 (y)) ≤2
+f2 (f1 (z))) =⇒ f2 (f1 (x)) ≤2 f2 (f1 (z)) by transitivity
+of ≤2 .
+This establishes the base case. We assume that the composition of functions f1 , ..., fn−1 induce an ordering (with
+realtions ≤1 ,...,≤n−1 ).
+For the inductive step, ∀x, y, z ∈ domain(f1 ):
+(1) fn+1 (fn (...(f1 (x)))) ≤n+1 fn+1 (fn (...(f1 (x)))) by
+reflexivity of ≤n+1 ,
+(2) (fn+1 (fn (...(f1 (x)))) ≤n+1 fn+1 (fn (...(f1 (y)))) ∧
+fn+1 (fn (...(f1 (y)))) ≤n+1 fn+1 (fn (...(f1 (x))))) =⇒
+f2 (f1 (x)) = f2 (f1 (y)) by antisymmetry of ≤n+1 , and
+(3) (fn+1 (fn (...(f1 (x)))) ≤n+1 fn+1 (fn (...(f1 (y)))) ∧
+fn+1 (fn (...(f1 (y)))) ≤n+1 fn+1 (fn (...(f1 (z))))) =⇒
+fn+1 (fn (...(f1 (x)))) ≤n+1 fn+1 (fn (...(f1 (z)))) by transitivity of ≤n+1 .
+Proof of Lemma 2: We prove this with induction:
+Proof. The base case is a two-level tree and follows from
+the definitions. I.e., given the root of H, Xroot , F(Xroot ) =
+Froot and Froot (Xroot ) = Froot (Fx1 (x1 ), ..., Fxn (xn )) =
+Froot (y(x1 ), ..., y(xn )).
+This completes the base case. We assume the lemma holds
+for all trees with m or fewer levels.
+For the inductive step, we have the root at level m +
+1, and notate the root as Xroot . We have F(Xroot ) =
+Froot and Froot (Xroot ) = Froot (FXi (Xi ), ..., FXj (Xj )),
+where Xi , ..., Xj are children of the root (by definition). Since FXi (Xi ), ..., FXj (Xj ) are each compositions
+of summary functions over their respective singletons
+(by inductive hypothesis), Froot is a summary function
+over FXS
+(Xi ), ..., FXj (Xj )) (by definition), and Xroot =
+i
+{Xk ∈ (Xi , ..., Xj ) s.t. |Xk | = 1} (by definition), therefore Froot is a composition of summary functions over the
+singletons in Xroot .
+Proof of Theorem 1: This is a direct result of Theorem 2.
+Proof of Theorem 2:
+Proof. To
+start,
+we
+establish
+∀Mi
+∈
+{M1 , ..., Mn }, Mi ≤M Mi : This follows, since ∀Xk ∈
+Hi , Fi,k (Xk ) = Fi,k (Xk ) =⇒ Fi,k (Xk ) ≤Fk Fi,k (Xk )
+Next, we show ((Mi ≤ Mj ∧ Mj ≤ Mi ) =⇒
+(Mi = Mj )): Assume toward contradiction this is not true.
+This implies ∃Xk ∈ Hi s.t. Fi,k (Xk ) ≤Fk Fj,k (Xk ) ∧
+Fj,k (Xk ) ≤Fk Fi,k (Xk ) ∧ Fi,k (Xk ) ̸= Fj,k (Xk ), a contradiction (since this implies ≤Fk is not a ordering).
+
+Finally, we show ((Mi ≤ Mj ∧ Mj ≤ Mk ) =⇒
+(Mi ≤ Mk )): Assume toward contradiction this is not
+true. This implies ∃Xl ∈ Hi s.t. Fi,l (Xl ) ≤Fl Fj,l (Xl ) ∧
+Fj,l (Xl ) ≤Fl Fk,l (Xl ) ∧ Fi,l (Xl ) ≰Fl Fj,l (Xl ), a contradiction (since this implies ≤Fl is not a ordering).
+
+Appendix B: Additional Measurement Tree
+Example
+Many common metrics can be represented using measurement trees. For example, here we see how accuracy, a common, real-valued metric, can be simply represented using a
+two-level measurement tree.
+Figure 5: An illustration of using a measurement tree to aggregate example data points into a common quality metric,
+accuracy.
+
+Appendix C: Sample Use Case Results
+Appendix C presents large images and tables of results referenced in the Sample Use Case Section. High resolution
+digital images are available for Figures 6, 7, and 8.
+Figure 6 — https://tinyurl.com/y6kwzzjm (Model–Task A)
+Figure 7 — https://tinyurl.com/4tzc777p (Model–Task B)
+Figure 8 — https://tinyurl.com/4uph3cnd (Model–Task C)
+Table 2 — https://tinyurl.com/2et75ej7 (Overall Results)
+
+To aid in interpretation of these figures in the paper, Table 2
+displays the key numeric results in Figures 6, 7, and 8 and a
+mapping between questionnaire items, annotator labels, and
+measurand constructs.
+
+Figure 6: CoRIx tree for Model A and the travel planner task. A high resolution digital image is available at the following
+shortened url: https://tinyurl.com/y6kwzzjm. Grey indicators signify missing data.
+
+Figure 7: CoRIx tree for Model B and the TV summarization task. A high resolution digital image is available at the following
+shortened url: https://tinyurl.com/4tzc777p. Grey indicators signify missing data.
+
+Figure 8: CoRIx tree for Model C and the meal planner task. A high resolution digital image is available at the following
+shortened url: https://tinyurl.com/4uph3cnd. Grey indicators signify missing data.
+
+Pilot CoRIx Scores (Higher Scores Indicate Increased Risk; Maximum Score is 10)
+Tree
+Level
+
+Test
+Level
+
+Construct
+
+Identifier
+
+1
+2
+2
+2
+
+All
+MT
+RT
+FT
+
+Validity and reliability risk
+Model testing (MT)
+Red teaming (RT)
+Field testing (FT)
+
+3
+
+MT
+
+Annotator label
+
+3
+
+RT
+
+Annotator label
+
+3
+
+RT
+
+User perception
+
+3
+
+FT
+
+Annotator label
+
+3
+
+FT
+
+User perception
+
+4
+
+MT
+
+4
+
+MT
+
+4
+4
+4
+4
+
+MT
+MT
+MT
+RT
+
+4
+
+RT
+
+4
+4
+4
+4
+4
+4
+4
+
+RT
+RT
+RT
+RT
+RT
+RT
+RT
+
+4
+
+RT
+
+4
+4
+
+RT
+FT
+
+4
+
+FT
+
+4
+4
+4
+4
+4
+4
+4
+4
+4
+4
+
+FT
+FT
+FT
+FT
+FT
+FT
+FT
+FT
+FT
+FT
+
+Did not operate as claimed
+Query not represented in
+response
+Guardrail violation
+Out-of-date information
+User dissatisfaction
+Did not operate as claimed
+Query not represented in
+response
+Guardrail violation
+Out-of-date information
+User dissatisfaction
+Failed to adapt
+Unnatural dialog
+Key asks unfulfilled
+Low-value information
+Number of successful
+attacks
+Irrelevant information
+Did not operate as claimed
+Query not represented in
+response
+Guardrail violation
+Out-of-date information
+User dissatisfaction
+Key asks unfulfilled
+Low-value information
+Unhelpful
+Inaccurate
+Incomplete
+Dissatisfying
+Unsafe
+
+V/R
+MT
+RT
+FT
+Annotator
+label
+Annotator
+label
+User
+perception
+Annotator
+label
+User
+perception
+RA 1
+
+Model A–
+Travel Planner
+
+Model B–
+TV Summarization
+
+Model C–
+Meal Planner
+
+2.88
+0.72
+2.88
+2.36
+
+4.29
+2.29
+3.55
+4.29
+
+6.30
+6.30
+3.39
+2.80
+
+0.72
+
+2.29
+
+6.30
+
+3.52
+
+3.75
+
+3.74
+
+2.24
+
+3.34
+
+3.05
+
+3.06
+
+3.58
+
+3.56
+
+1.67
+
+5.00
+
+2.03
+
+0.0
+
+2.00
+
+9.00
+
+RA 2
+
+0.0
+
+0.0
+
+7.00
+
+RA 2.1
+DU 2
+DU 3
+RA 1
+
+3.00
+0.0
+0.62
+2.11
+
+5.00
+2.17
+2.29
+3.19
+
+5.33
+4.24
+5.95
+3.15
+
+RA 2
+
+2.38
+
+2.56
+
+3.05
+
+RA 2.1
+DU 2
+DU 3
+DD 1
+DD 4
+CC 1
+CC 3
+
+3.87
+3.18
+3.64
+–
+4.98
+3.26
+4.69
+
+5.40
+3.59
+3.95
+2.11
+5.00
+3.24
+4.69
+
+4.24
+3.35
+3.26
+–
+4.88
+3.27
+4.69
+
+QQ 1.2
+
+1.98
+
+3.13
+
+1.89
+
+QQ 2.4
+RA 1
+
+2.50
+0.72
+
+3.56
+2.29
+
+4.20
+1.88
+
+RA 2
+
+2.57
+
+1.67
+
+2.92
+
+RA 2.1
+DU 2
+DU 3
+CC 1
+CC 3
+QQ 1.1
+QQ 1.3
+QQ 1.4
+QQ 1.5
+QQ 2.3
+
+3.42
+2.81
+1.14
+3.37
+7.41
+1.67
+3.33
+1.67
+1.67
+3.33
+
+3.26
+4.11
+3.06
+3.28
+7.42
+5.00
+1.67
+5.00
+5.00
+0.0
+
+2.50
+5.12
+1.79
+3.32
+7.42
+1.67
+2.03
+3.59
+1.67
+3.33
+
+Table 2: Pilot CoRIx tree scores across model-task combinations, annotator labels, user perceptions, and testing levels–model
+testing (MT), red teaming (RT), and field testing (FT). Note that comparisons across columns are not meaningful as each
+column represents a different model and task, and because CoRIx pilot results do not yet account for measurement uncertainty.
+All incorporated constructs were designed to have a direct relationship with validity and reliability (V/R) risk and occur only
+once across testing level, annotator label, or user perception combination. Constructs and identifiers apply to Figures 6, 7, and
+8. Blank cells indicate missing data.
+
+Appendix D: Abbreviations
+AI: artificial intelligence
+AI RMF: artificial intelligence risk management framework
+CC: content characterization
+CoRIx: Contextual Robustness Index
+DD: dialogue dynamics
+DU: dialogue utility
+EM: exact match
+FT: field testing
+HELM: Holistic Evaluation of Language Models
+HRPP: Human Research Protections Program
+ISO: International Standards Organization
+LLM: large language model
+ML: machine learning
+MT: model testing
+MWR: mean win rate
+NIST: National Institute of Standards and Technology
+QQ: questionnaire question
+RA: risk assessment
+RT: red teaming
+V/R: validity and reliability
+
+Appendix E: Description of Code
+Open source code is provided to calculate CoRIx scores and
+visualize CoRIx trees. CoRIx calculations and visualizations
+are based on JSON input files that define the tree structure,
+summarization functions, and input data at the leaf nodes.
+The code is provided with example data due to human subjects protections.
+
+

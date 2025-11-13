@@ -3687,7 +3687,9 @@ def build_financial_context(
                 
                 # Add comprehensive historical trend and growth analysis
                 try:
-                    growth_data = analytics_engine.compute_growth_metrics(ticker, latest_records)
+                    LOGGER.critical(f"🔍 DEBUG: Calling compute_growth_metrics for {ticker}, target_year={requested_fy}")
+                    growth_data = analytics_engine.compute_growth_metrics(ticker, latest_records, target_year=requested_fy)
+                    LOGGER.critical(f"🔍 DEBUG: Growth data returned: {growth_data}")
                     if growth_data:
                         trend_context = "📈 **Growth & Trend Analysis**:\n"
                         
@@ -3737,10 +3739,16 @@ def build_financial_context(
                             trend_context += "  Cash Flow Trends:\n    - " + "\n    - ".join(cf_items) + "\n"
                         
                         trend_context += "\n"
+                        LOGGER.critical(f"🔍 DEBUG: Appending growth/trend context, length: {len(trend_context)}")
+                        LOGGER.critical(f"🔍 DEBUG: Trend context preview: {trend_context[:300]}")
                         context_parts.append(trend_context)
+                    else:
+                        LOGGER.critical(f"🔍 DEBUG: Growth data was None or empty - no trend context added")
                         
                 except Exception as e:
-                    LOGGER.debug(f"Could not fetch growth data for {ticker}: {e}")
+                    LOGGER.critical(f"❌ ERROR: Could not fetch growth data for {ticker}: {e}")
+                    import traceback
+                    LOGGER.critical(traceback.format_exc())
                 
                 # Add key financial ratios and efficiency metrics
                 try:
@@ -3810,6 +3818,9 @@ def build_financial_context(
             except Exception as e:
                 LOGGER.debug(f"Could not fetch metrics for {ticker}: {e}")
                 continue
+        
+        LOGGER.critical(f"🔍 DEBUG: Built {len(context_parts)} context parts")
+        LOGGER.critical(f"🔍 DEBUG: Context parts types: {[type(p).__name__ for p in context_parts]}")
         
         if not context_parts:
             # CRITICAL: Return explicit "no data" message instead of empty string
@@ -3881,7 +3892,17 @@ def build_financial_context(
             "═══════════════════════════════════════════════════════════════════════════════\n\n"
         )
         
-        return header + "\n".join(context_parts)
+        final_context = header + "\n".join(context_parts)
+        LOGGER.critical(f"🔍 DEBUG: Final context length: {len(final_context)}")
+        LOGGER.critical(f"🔍 DEBUG: Context contains 'Revenue Growth (YoY)': {'Revenue Growth (YoY)' in final_context}")
+        LOGGER.critical(f"🔍 DEBUG: Context contains growth data: {'Growth & Trend Analysis' in final_context}")
+        
+        # Log a sample of the context to verify growth data is included
+        if "Growth & Trend Analysis" in final_context:
+            start_idx = final_context.find("Growth & Trend Analysis")
+            LOGGER.critical(f"🔍 DEBUG: Growth section preview: {final_context[start_idx:start_idx+400]}")
+        
+        return final_context
         
     except Exception as e:
         LOGGER.error(f"Error building financial context: {e}")
