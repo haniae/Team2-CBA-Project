@@ -8206,6 +8206,13 @@ function recordMessage(role, text, metadata = null) {
   if (!conversations.find((entry) => entry.id === conversation.id)) {
     conversations = [conversation, ...conversations];
   }
+  
+  // Remove sidebar footer text if accidentally included
+  const footerText = "Grounded by Finalyze analytics — audit-ready by design.";
+  if (typeof text === "string" && text.includes(footerText)) {
+    text = text.replace(new RegExp(footerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '').trim();
+  }
+  
   if (role === "user" && !conversation.previewPrompt) {
     conversation.previewPrompt = text;
     const summary = buildSemanticSummary(text);
@@ -8501,6 +8508,22 @@ function loadConversation(conversationId) {
 
   if (chatLog) {
     chatLog.innerHTML = "";
+  }
+
+  // Clean up footer text from existing messages
+  const footerText = "Grounded by Finalyze analytics — audit-ready by design.";
+  if (conversation.messages && Array.isArray(conversation.messages)) {
+    let needsSave = false;
+    conversation.messages.forEach((message) => {
+      if (typeof message.text === "string" && message.text.includes(footerText)) {
+        message.text = message.text.replace(new RegExp(footerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '').trim();
+        needsSave = true;
+      }
+    });
+    // Save cleaned conversations if any changes were made
+    if (needsSave) {
+      saveConversations();
+    }
   }
 
   if (conversation.messages.length) {
