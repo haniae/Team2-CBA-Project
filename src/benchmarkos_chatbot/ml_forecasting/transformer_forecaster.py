@@ -562,7 +562,7 @@ class TransformerForecaster(BaseForecaster):
             criterion = nn.MSELoss()
             optimizer = optim.Adam(model.parameters(), lr=learning_rate)
             scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.5, patience=5, verbose=False
+                optimizer, mode='min', factor=0.5, patience=5
             )
             
             best_val_loss = float('inf')

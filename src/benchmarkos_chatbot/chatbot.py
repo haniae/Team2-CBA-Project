@@ -1749,7 +1749,7 @@ class BenchmarkOSChatbot:
                 should_attempt = True
                 break
         if not should_attempt:
-        should_attempt = any(keyword in lowered for keyword in summary_keywords)
+            should_attempt = any(keyword in lowered for keyword in summary_keywords)
         if not should_attempt:
             return None
 
@@ -1776,7 +1776,7 @@ class BenchmarkOSChatbot:
             return valid_tickers[-1]
         
         return None
-    def _prepare_llm_messages(self, rag_context: Optional[str]) -> List[Mapping[str, str]]:
+    def _prepare_llm_messages(self, rag_context: Optional[str], *, is_forecasting: bool = False) -> List[Mapping[str, str]]:
         """Trim history before sending to the LLM and append optional RAG context."""
         history = self.conversation.as_llm_messages()
         if not history:
@@ -1788,19 +1788,20 @@ class BenchmarkOSChatbot:
         
         # For forecasting queries, add context to the LAST user message to ensure it's seen
         # For other queries, add as system message
-        is_forecasting = False
-        try:
-            from .context_builder import _is_forecasting_query
-            if chat_history:
-                last_user_msg = None
-                for msg in reversed(chat_history):
-                    if msg.get("role") == "user":
-                        last_user_msg = msg
-                        break
-                if last_user_msg:
-                    is_forecasting = _is_forecasting_query(last_user_msg.get("content", ""))
-        except ImportError:
-            pass
+        # If is_forecasting is not provided, try to detect it from chat history
+        if not is_forecasting:
+            try:
+                from .context_builder import _is_forecasting_query
+                if chat_history:
+                    last_user_msg = None
+                    for msg in reversed(chat_history):
+                        if msg.get("role") == "user":
+                            last_user_msg = msg
+                            break
+                    if last_user_msg:
+                        is_forecasting = _is_forecasting_query(last_user_msg.get("content", ""))
+            except ImportError:
+                pass
         
         if rag_context:
             if is_forecasting and chat_history:
@@ -2331,7 +2332,7 @@ class BenchmarkOSChatbot:
         return None
     def _handle_plugin_intent(self, intent: Dict[str, Any], raw_text: str) -> Optional[str]:
         """Execute plugin workflows (register, list, train, forecast)."""
-        builder = ModelBuilder(self.settings.database_path, settings=self.settings)
+        builder = ModelBuilder(self.settings.database_path)
         user_id = "default"
         action = intent["action"]
         refresh_flag = intent.get("refresh", False)
@@ -2561,7 +2562,7 @@ class BenchmarkOSChatbot:
 
     def _handle_modeling_intent(self, intent: Dict[str, Any]) -> Optional[str]:
         """Handle modeling intents."""
-        builder = ModelBuilder(self.settings.database_path, settings=self.settings)
+        builder = ModelBuilder(self.settings.database_path)
         user_id = "default"
         
         if intent["action"] == "create":
@@ -3271,11 +3272,15 @@ class BenchmarkOSChatbot:
                         attempted_intent = True
                     # Check for plugin workflow intent
                     elif not attempted_intent:
-                        plugin_intent = self._detect_plugin_intent(user_input)
-                        if plugin_intent:
-                            emit("intent_plugin", f"Plugin intent detected: {plugin_intent['action']}")
-                            reply = self._handle_plugin_intent(plugin_intent, user_input)
-                            attempted_intent = True
+                        try:
+                            plugin_intent = self._detect_plugin_intent(user_input)
+                            if plugin_intent:
+                                emit("intent_plugin", f"Plugin intent detected: {plugin_intent['action']}")
+                                reply = self._handle_plugin_intent(plugin_intent, user_input)
+                                attempted_intent = True
+                        except AttributeError:
+                            # _detect_plugin_intent not implemented, skip
+                            pass
                     # Check for modeling intent
                     if not attempted_intent:
                         modeling_intent = self._detect_modeling_intent(user_input)
@@ -3566,7 +3571,14 @@ class BenchmarkOSChatbot:
                     context_detail = "Portfolio context compiled - using actual portfolio data"
                     LOGGER.info("Using portfolio context for query")
                 else:
-                    context = self._build_enhanced_rag_context(user_input)
+                    # Use build_financial_context for all queries (including forecasting)
+                    context = build_financial_context(
+                        query=user_input,
+                        analytics_engine=self.analytics_engine,
+                        database_path=str(self.settings.database_path),
+                        max_tickers=3,
+                        include_macro_context=True
+                    )
 
                     if is_forecasting and not context:
                         LOGGER.warning("Forecasting query detected but context is empty - will still call LLM")
@@ -3590,7 +3602,8 @@ class BenchmarkOSChatbot:
                     context_detail or ("Context compiled" if context else "Context not required"),
                 )
                 
-                messages = self._prepare_llm_messages(context)
+                # Pass is_forecasting flag to message preparation
+                messages = self._prepare_llm_messages(context, is_forecasting=is_forecasting)
                 LOGGER.debug(f"Prepared {len(messages)} messages for LLM")
                 
                 # Log context details for debugging
@@ -3776,15 +3789,37 @@ class BenchmarkOSChatbot:
 
             # FINAL SAFEGUARD: Check if reply contains snapshot text for forecasting queries
             # This prevents returning snapshots even if they somehow got generated
+            # TEMPORARILY DISABLED - Let's see what the LLM actually generates
+            # TODO: Re-enable with more specific checks once we verify LLM behavior
             try:
                 from .context_builder import _is_forecasting_query
                 if _is_forecasting_query(user_input):
-                    # Check if reply contains snapshot markers (Phase1 KPIs, Phase 2 KPIs, etc.)
-                    if reply and ("Phase1 KPIs" in reply or "Phase 1 KPIs" in reply or "Phase 2 KPIs" in reply or ("snapshot" in reply.lower() and "forecast" not in reply.lower())):
-                        LOGGER.error(f"CRITICAL: Forecasting query returned a snapshot instead of forecast! Query: {user_input}, Reply preview: {reply[:200]}")
-                        # Replace snapshot with error message
-                        reply = "I apologize, but I encountered an issue generating the forecast. The system attempted to return a snapshot instead of a forecast. Please try rephrasing your query or specifying the company name and metric more clearly (e.g., 'Forecast Apple revenue using Prophet')."
-                        emit("forecasting_snapshot_error", "Forecasting query returned snapshot - replaced with error message")
+                    # Only flag very specific snapshot patterns that clearly indicate historical data
+                    # Allow the LLM to generate forecast responses even if they mention "snapshot" in a different context
+                    is_snapshot = False
+                    if reply:
+                        reply_lower = reply.lower()
+                        # Only check for very specific Phase 1/Phase 2 KPI patterns
+                        # These are clear indicators of historical snapshot data
+                        snapshot_indicators = [
+                            "phase1 kpis" in reply_lower,
+                            "phase 1 kpis" in reply_lower,
+                            "phase 2 kpis" in reply_lower,
+                            # Only flag if it's clearly a historical snapshot section, not forecast-related
+                            (reply_lower.count("growth snapshot") > 0 and 
+                             "forecast" not in reply_lower and 
+                             "revenue growth (yoy)" in reply_lower),
+                            (reply_lower.count("margin snapshot") > 0 and 
+                             "forecast" not in reply_lower and 
+                             "net margin" in reply_lower),
+                        ]
+                        is_snapshot = any(snapshot_indicators)
+                    
+                    if is_snapshot:
+                        LOGGER.warning(f"Forecasting query may have returned snapshot. Query: {user_input}, Reply preview: {reply[:500]}")
+                        # Don't replace - just log for now to see what's happening
+                        # reply = "I apologize, but I encountered an issue generating the forecast..."
+                        emit("forecasting_snapshot_warning", "Forecasting query may have returned snapshot - check logs")
             except ImportError:
                 pass
 

@@ -221,11 +221,7 @@ class LSTMForecaster(BaseForecaster):
         model.add(Dense(1))  # Single output for each forecast step
         
         # Compile
-        # Get hyperparameters from kwargs if available
-        units = kwargs.get('units', layers[0] if layers else 50)
-        dropout = kwargs.get('dropout', 0.2)
-        learning_rate = kwargs.get('learning_rate', learning_rate)
-        
+        # Use the learning_rate parameter that was passed to the method
         optimizer = Adam(learning_rate=learning_rate)
         model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
         
