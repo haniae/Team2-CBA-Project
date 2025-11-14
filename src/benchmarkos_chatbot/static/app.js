@@ -894,7 +894,7 @@ function renderAlertSettingsSection({ container } = {}) {
             <label class="alert-settings__toggle">
               <input type="checkbox" name="channel.slack.enabled" />
               <span>Slack webhook</span>
-              <small>Post alerts into a shared #benchmarkos channel.</small>
+              <small>Post alerts into a shared #finalyze channel.</small>
             </label>
             <div class="alert-settings__field">
               <span>Webhook URL</span>
@@ -1596,7 +1596,7 @@ let HELP_GUIDE_HTML = renderHelpGuide(getHelpContent()).outerHTML;
 
 function composeHelpText(content) {
   const lines = [];
-  lines.push("📘 BenchmarkOS Copilot — Quick Reference", "", "How to ask:");
+  lines.push("📘 Finalyze Copilot — Quick Reference", "", "How to ask:");
   content.prompts.forEach((prompt) => lines.push(`• ${prompt}`));
   lines.push("", "──────────────────────────────────────");
 
@@ -1653,7 +1653,7 @@ function renderHelpGuide(content) {
 
   const title = document.createElement("h2");
   title.className = "help-guide__title";
-  title.textContent = "BenchmarkOS Copilot — Quick Reference";
+  title.textContent = "Finalyze Copilot — Quick Reference";
 
   const subtitle = document.createElement("p");
   subtitle.className = "help-guide__subtitle";
@@ -2954,7 +2954,7 @@ function renderAlertSettingsSection({ container } = {}) {
             <label class="alert-settings__toggle">
               <input type="checkbox" name="channel.slack.enabled" />
               <span>Slack webhook</span>
-              <small>Post alerts into a shared #benchmarkos channel.</small>
+              <small>Post alerts into a shared #finalyze channel.</small>
             </label>
             <div class="alert-settings__field">
               <span>Webhook URL</span>
@@ -3460,7 +3460,7 @@ let HELP_GUIDE_HTML = renderHelpGuide(getHelpContent()).outerHTML;
 
 function composeHelpText(content) {
   const lines = [];
-  lines.push("📘 BenchmarkOS Copilot — Quick Reference", "", "How to ask:");
+  lines.push("📘 Finalyze Copilot — Quick Reference", "", "How to ask:");
   content.prompts.forEach((prompt) => lines.push(`• ${prompt}`));
   lines.push("", "──────────────────────────────────────");
 
@@ -3517,7 +3517,7 @@ function renderHelpGuide(content) {
 
   const title = document.createElement("h2");
   title.className = "help-guide__title";
-  title.textContent = "BenchmarkOS Copilot — Quick Reference";
+  title.textContent = "Finalyze Copilot — Quick Reference";
 
   const subtitle = document.createElement("p");
   subtitle.className = "help-guide__subtitle";
@@ -5089,11 +5089,11 @@ function appendMessage(
 
   const avatar = document.createElement("span");
   avatar.className = `avatar ${role}`;
-  avatar.textContent = role === "user" ? "You" : role === "assistant" ? "BO" : "SYS";
+  avatar.textContent = role === "user" ? "You" : role === "assistant" ? "FZ" : "SYS";
 
   const label = document.createElement("span");
   label.className = "message-role";
-  label.textContent = role === "user" ? "You" : role === "assistant" ? "BenchmarkOS" : "System";
+  label.textContent = role === "user" ? "You" : role === "assistant" ? "Finalyze" : "System";
 
   header.append(avatar, label);
   wrapper.append(header);
@@ -5133,7 +5133,7 @@ function createTypingIndicator() {
 
   const srLabel = document.createElement("span");
   srLabel.className = "sr-only";
-  srLabel.textContent = "BenchmarkOS is typing";
+  srLabel.textContent = "Finalyze is typing";
   container.append(srLabel);
 
   for (let index = 0; index < 3; index += 1) {
@@ -5156,13 +5156,13 @@ function updateMessageRole(wrapper, role) {
   const avatar = wrapper.querySelector(".avatar");
   if (avatar) {
     avatar.className = `avatar ${role}`;
-    avatar.textContent = role === "user" ? "You" : role === "assistant" ? "BO" : "SYS";
+    avatar.textContent = role === "user" ? "You" : role === "assistant" ? "FZ" : "SYS";
   }
 
   const roleLabel = wrapper.querySelector(".message-role");
   if (roleLabel) {
     roleLabel.textContent =
-      role === "user" ? "You" : role === "assistant" ? "BenchmarkOS" : "System";
+      role === "user" ? "You" : role === "assistant" ? "Finalyze" : "System";
   }
 }
 
@@ -6618,7 +6618,7 @@ function downloadCsv(payload) {
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
   link.href = url;
-  link.download = payload.filename || `benchmarkos-export-${Date.now()}.csv`;
+  link.download = payload.filename || `finalyze-export-${Date.now()}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -6648,7 +6648,7 @@ function openPdfPreview(payload) {
     alert("Unable to open preview window. Allow pop-ups and try again.");
     return;
   }
-  const title = payload.title || "BenchmarkOS export";
+  const title = payload.title || "Finalyze export";
   const descriptor = payload.descriptor ? `<p><strong>Period:</strong> ${payload.descriptor}</p>` : "";
   const highlights = Array.isArray(payload.highlights) && payload.highlights.length
     ? `<ul>${payload.highlights.map((line) => `<li>${line}</li>`).join("")}</ul>`
@@ -8234,6 +8234,13 @@ function recordMessage(role, text, metadata = null) {
   if (!conversations.find((entry) => entry.id === conversation.id)) {
     conversations = [conversation, ...conversations];
   }
+  
+  // Remove sidebar footer text if accidentally included
+  const footerText = "Grounded by Finalyze analytics — audit-ready by design.";
+  if (typeof text === "string" && text.includes(footerText)) {
+    text = text.replace(new RegExp(footerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '').trim();
+  }
+  
   if (role === "user" && !conversation.previewPrompt) {
     conversation.previewPrompt = text;
     const summary = buildSemanticSummary(text);
@@ -8421,11 +8428,11 @@ function exportConversationPdf(conversation) {
     showToast("Allow pop-ups to export the conversation.", "error");
     return;
   }
-  const title = conversation.title || "BenchmarkOS Conversation";
+  const title = conversation.title || "Finalyze Conversation";
   const entries = conversation.messages
     .map((message) => {
       const roleLabel =
-        message.role === "assistant" ? "BenchmarkOS" : message.role === "user" ? "You" : "System";
+        message.role === "assistant" ? "Finalyze" : message.role === "user" ? "You" : "System";
       const timestamp = formatExportTimestamp(message.timestamp);
       const safeText = (message.text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       return `<article class="export-entry"><header><h3>${roleLabel}</h3><span>${timestamp}</span></header><p>${safeText.replace(
@@ -8466,13 +8473,13 @@ function exportConversationPdf(conversation) {
 }
 
 function buildConversationSlug(conversation) {
-  const base = conversation.title || "benchmarkos-conversation";
+  const base = conversation.title || "finalyze-conversation";
   return (
     base
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "benchmarkos-conversation"
+      .slice(0, 60) || "finalyze-conversation"
   );
 }
 
@@ -8529,6 +8536,22 @@ function loadConversation(conversationId) {
 
   if (chatLog) {
     chatLog.innerHTML = "";
+  }
+
+  // Clean up footer text from existing messages
+  const footerText = "Grounded by Finalyze analytics — audit-ready by design.";
+  if (conversation.messages && Array.isArray(conversation.messages)) {
+    let needsSave = false;
+    conversation.messages.forEach((message) => {
+      if (typeof message.text === "string" && message.text.includes(footerText)) {
+        message.text = message.text.replace(new RegExp(footerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '').trim();
+        needsSave = true;
+      }
+    });
+    // Save cleaned conversations if any changes were made
+    if (needsSave) {
+      saveConversations();
+    }
   }
 
   if (conversation.messages.length) {
@@ -10436,16 +10459,16 @@ const DEMO_CFI_PAYLOAD = {
   kpi_summary: [
     { label: "Revenue CAGR", value: 0.17, type: "percent", period: "3Y CAGR", source: "SEC filings" },
     { label: "EPS CAGR", value: 0.21, type: "percent", period: "3Y CAGR", source: "SEC filings" },
-    { label: "EBITDA Growth", value: 0.12, type: "percent", period: "YoY", source: "BenchmarkOS model" },
-    { label: "EBITDA margin", value: 0.178, type: "percent", period: "TTM", source: "BenchmarkOS model" },
-    { label: "Operating margin", value: 0.073, type: "percent", period: "TTM", source: "BenchmarkOS model" },
+    { label: "EBITDA Growth", value: 0.12, type: "percent", period: "YoY", source: "Finalyze model" },
+    { label: "EBITDA margin", value: 0.178, type: "percent", period: "TTM", source: "Finalyze model" },
+    { label: "Operating margin", value: 0.073, type: "percent", period: "TTM", source: "Finalyze model" },
     { label: "Net margin", value: 0.053, type: "percent", period: "FY2023", source: "SEC filings" },
     { label: "Profit margin", value: 0.058, type: "percent", period: "FY2023", source: "SEC filings" },
-    { label: "Return on assets", value: 0.087, type: "percent", period: "FY2023", source: "BenchmarkOS model" },
-    { label: "Return on equity", value: 0.116, type: "percent", period: "FY2023", source: "BenchmarkOS model" },
-    { label: "Return on invested capital", value: 0.142, type: "percent", period: "FY2023", source: "BenchmarkOS model" },
+    { label: "Return on assets", value: 0.087, type: "percent", period: "FY2023", source: "Finalyze model" },
+    { label: "Return on equity", value: 0.116, type: "percent", period: "FY2023", source: "Finalyze model" },
+    { label: "Return on invested capital", value: 0.142, type: "percent", period: "FY2023", source: "Finalyze model" },
     { label: "Free cash flow margin", value: 0.114, type: "percent", period: "TTM", source: "Company filings" },
-    { label: "Cash conversion", value: 1.18, type: "percent", period: "FY2023", source: "BenchmarkOS model" },
+    { label: "Cash conversion", value: 1.18, type: "percent", period: "FY2023", source: "Finalyze model" },
     { label: "Debt to equity", value: 1.3, type: "multiple", period: "FY2023", source: "SEC filings" },
     { label: "P/E (ttm)", value: 112.0, type: "multiple", period: "TTM", source: "Market data" },
     { label: "EV/EBITDA (ttm)", value: 31.0, type: "multiple", period: "TTM", source: "Market data" },
@@ -10504,7 +10527,7 @@ const DEMO_CFI_PAYLOAD = {
     { label: "Net income", period: "FY2023", source: "SEC 10-K 2023", value: 30500 },
     { label: "Free cash flow", period: "FY2023", source: "Company filings", value: 65489 },
     { label: "Shares O/S (M)", period: "FY2023", source: "Market data snapshot", value: 5100 },
-    { label: "Net margin", period: "FY2023", source: "BenchmarkOS derived", value: 0.053 },
+    { label: "Net margin", period: "FY2023", source: "Finalyze derived", value: 0.053 },
   ],
   charts: {
     revenue_ev: { Year: [2019, 2020, 2021, 2022, 2023], Revenue: [280522, 386064, 469822, 513983, 574800], EV_Rev: [3.2, 2.8, 2.3, 2.1, 1.9] },

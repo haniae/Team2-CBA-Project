@@ -425,10 +425,27 @@ class TransformerForecaster(BaseForecaster):
             return None
         
         try:
-            # Get historical data
-            ts = self._get_historical_data(ticker, metric, min_periods=lookback_window + periods + 5)
+            # Get historical data with adaptive requirements
+            min_history_required = max(periods + 5, 10)
+            ts = self._get_historical_data(ticker, metric, min_periods=min_history_required)
             if ts is None:
                 return None
+
+            available_points = len(ts)
+            min_lookback = 4
+            max_lookback = max(min_lookback, available_points - periods - 1)
+            if max_lookback < min_lookback:
+                LOGGER.warning(
+                    f"Insufficient historical data for {ticker} {metric}: "
+                    f"{available_points} periods available, need at least {min_lookback + periods + 1}"
+                )
+                return None
+            if lookback_window > max_lookback:
+                LOGGER.info(
+                    f"Reducing transformer lookback from {lookback_window} to {max_lookback} "
+                    f"(history length: {available_points})"
+                )
+                lookback_window = max_lookback
             
             # Check for feature engineering
             use_technical_indicators = kwargs.get('use_technical_indicators', False)
@@ -545,7 +562,7 @@ class TransformerForecaster(BaseForecaster):
             criterion = nn.MSELoss()
             optimizer = optim.Adam(model.parameters(), lr=learning_rate)
             scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.5, patience=5, verbose=False
+                optimizer, mode='min', factor=0.5, patience=5
             )
             
             best_val_loss = float('inf')
@@ -779,4 +796,3 @@ def get_transformer_forecaster(database_path: str) -> Optional[TransformerForeca
     except Exception as e:
         LOGGER.error(f"Failed to create TransformerForecaster: {e}")
         return None
-

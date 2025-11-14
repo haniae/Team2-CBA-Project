@@ -903,9 +903,13 @@ class AnalyticsEngine:
             def _select_year(value_map: Dict[int, float]) -> Optional[int]:
                 if not value_map:
                     return None
+                LOGGER.critical(f"🔍 _select_year called with target_year={target_year}, available years: {list(value_map.keys())}")
                 if target_year and target_year in value_map:
+                    LOGGER.critical(f"🔍 Using target_year: {target_year}")
                     return target_year
-                return max(value_map.keys())
+                selected = max(value_map.keys())
+                LOGGER.critical(f"🔍 No target_year, using max: {selected}")
+                return selected
 
             def calculate_yoy(metric_name: str) -> Optional[float]:
                 values = _values_by_year(metric_name)
@@ -1304,6 +1308,27 @@ class AnalyticsEngine:
         if not years:
             return (0, 0)
         return (min(years), max(years))
+    
+    def _extract_year(self, record: database.MetricRecord) -> Optional[int]:
+        """Extract fiscal year from a metric record."""
+        try:
+            # Try to parse from period string (e.g., "FY2024")
+            if record.period:
+                years = re.findall(r"\d{4}", record.period)
+                if years:
+                    return int(years[0])
+            
+            # Fallback: try to get from fiscal_year attribute if it exists
+            if hasattr(record, 'fiscal_year') and record.fiscal_year:
+                return int(record.fiscal_year)
+            
+            # Last resort: try start_year
+            if hasattr(record, 'start_year') and record.start_year:
+                return int(record.start_year)
+                
+            return None
+        except (ValueError, AttributeError):
+            return None
 
 def _latest_timestamp(metrics: Dict[str, Tuple[Optional[float], datetime]]) -> datetime:
     """Return the newest ingestion timestamp among the metric entries."""

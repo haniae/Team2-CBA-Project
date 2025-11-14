@@ -41,6 +41,11 @@ from .routing import enhance_structured_parse, should_build_dashboard, EnhancedI
 from .context_builder import build_financial_context
 from .custom_kpis import CustomKPICalculator, KPIIntentParser, CustomKPIDefinition
 from .interactive_modeling import ModelBuilder
+from .ml_forecasting.user_plugins import (
+    PluginRegistrationError,
+    PluginExecutionError,
+    ForecastingPlugin,
+)
 from .source_tracer import SourceTracer
 from .framework_processor import FrameworkProcessor
 from .template_processor import TemplateProcessor
@@ -524,8 +529,6 @@ FACT_METRIC_ALIASES: Dict[str, str] = {
     "operating cash flow": "cash_from_operations",
     "cash from operations": "cash_from_operations",
 }
-
-
 @dataclass
 class Conversation:
     """Tracks a single chat session."""
@@ -1078,16 +1081,6 @@ SYSTEM_PROMPT = (
     "4. **IF YOU MUST SHOW GROWTH:** Say 'Revenue increased from $367.8B to $394.3B' (qualitative)\n"
     "5. **CRITICAL:** The number '$394.3 billion' is NOT a percentage! Don't append '%' to dollar amounts!\n"
     "6. **VALIDATION:** If you're about to write a percentage > 100%, STOP - you've made an error!\n\n"
-    "## 🔒 GROWTH & TREND BLOCK IS AUTHORITATIVE\n\n"
-    "Whenever the context includes a section labeled '**Growth & Trend Analysis**' or bullet points like:\n"
-    "- Revenue Growth (YoY): 6.4%\n"
-    "- Revenue CAGR (3Y): 1.8%\n"
-    "- Net Income Growth (YoY): 19.5%\n"
-    "**you must quote these values verbatim**.\n"
-    "- ✅ Say: 'Revenue grew **6.4% year over year**' (use the exact number provided)\n"
-    "- ❌ NEVER restate the raw revenue amount as a percentage\n"
-    "- ❌ NEVER recompute CAGR/YoY yourself or round differently\n"
-    "- If a growth metric is missing, explicitly state it is unavailable instead of inventing one.\n\n"
     
     "**⚠️ COMMON MISTAKES TO AVOID:**\n"
     "- ❌ Using FY2024 data when context provides FY2025\n"
@@ -1179,7 +1172,6 @@ SYSTEM_PROMPT = (
     "- \"How fast is Amazon's cloud business growing?\"\n"
     "- \"What's Apple's earnings growth outlook?\"\n"
     "- \"Which tech stock has the best growth trajectory?\"\n\n"
-    
     "**Cash Flow & Returns:**\n"
     "- \"What's Apple's free cash flow?\"\n"
     "- \"How much cash does Microsoft generate?\"\n"
@@ -1378,8 +1370,6 @@ SYSTEM_PROMPT = (
     "**If any item is missing, especially the sources section, DO NOT send the response until it's complete.**\n\n"
     "- Never use placeholder links like '[URL]' or 'url' - always use real URLs from context\n"
 )
-
-
 @dataclass
 # Wraps settings, analytics, ingestion hooks, and the LLM client into a stateful conversation
 # object. Use `BenchmarkOSChatbot.create()` before calling `ask()`.
@@ -1446,6 +1436,46 @@ class BenchmarkOSChatbot:
         """Normalise prompts so cache lookups remain stable."""
         candidate = normalized if normalized else original
         return " ".join(candidate.strip().split()).lower()
+
+    @staticmethod
+    def _intent_requests_live_data(text: str) -> bool:
+        """Determine if the user is explicitly requesting live data refresh."""
+        lowered = text.lower()
+        triggers = (
+            "live data",
+            "latest data",
+            "current data",
+            "fetch latest",
+            "real-time data",
+            "refresh the data",
+            "update the numbers",
+        )
+        return any(trigger in lowered for trigger in triggers)
+
+    @staticmethod
+    def _extract_template_name(text: str) -> Optional[str]:
+        """Extract a forecasting template name from the prompt if present."""
+        pattern = re.compile(
+            r"(?:use|create|add|register|instantiate)\s+(?:the\s+)?(?:['\"])?([A-Za-z0-9 _-]+?)(?:['\"])?\s+template",
+            re.IGNORECASE,
+        )
+        match = pattern.search(text)
+        if match:
+            return match.group(1).strip()
+        alt = re.search(r"template\s+(?:called|named)?\s*['\"]?([A-Za-z0-9 _-]+)['\"]?", text, re.IGNORECASE)
+        if alt:
+            return alt.group(1).strip()
+        return None
+
+    @staticmethod
+    def _extract_code_blocks(text: str) -> List[Tuple[Optional[str], str]]:
+        """Extract fenced code blocks along with their language identifiers."""
+        pattern = re.compile(r"```(?:([\w+-]+))?\s*(.*?)```", re.DOTALL)
+        blocks: List[Tuple[Optional[str], str]] = []
+        for match in pattern.finditer(text):
+            lang = match.group(1).lower() if match.group(1) else None
+            blocks.append((lang, match.group(2).strip()))
+        return blocks
 
     @staticmethod
     def _should_cache_prompt(prompt: str) -> bool:
@@ -1703,16 +1733,14 @@ class BenchmarkOSChatbot:
         """Detect if the prompt requests a quick metrics summary for a single ticker."""
         normalized = (normalized_command or "").strip().lower()
         lowered = user_input.strip().lower()
-        summary_prefixes = ("summary", "metrics", "snapshot", "overview")
+        summary_prefixes = ("summary", "snapshot", "overview")
         summary_keywords = (
             "summary",
             "snapshot",
             "overview",
-            "metrics",
-            "metric",
-            "kpi",
-            "performance",
-            "report",
+            "quick summary",
+            "quick snapshot",
+            "cheat sheet",
         )
 
         should_attempt = False
@@ -1748,347 +1776,7 @@ class BenchmarkOSChatbot:
             return valid_tickers[-1]
         
         return None
-
-    def _fix_astronomical_percentages(self, text: str) -> str:
-        """
-        Fix catastrophic LLM percentage errors where dollar values are treated as percentages.
-        
-        Examples of errors this fixes:
-        - "391,035,000,000.0%" → Removed or replaced with qualitative language
-        - "112,010,000,000.0%" → Removed or replaced
-        
-        Any percentage > 1000% is almost certainly an error.
-        """
-        if not text:
-            return text
-        
-        import re
-        
-        # Pattern to match astronomical percentages (anything > 1000%)
-        # Matches: 391035000000.0%, 112010000000.0%, etc.
-        astronomical_pattern = r'(\d{4,}(?:,\d{3})*(?:\.\d+)?)\s*%'
-        
-        def replace_astronomical(match):
-            value_str = match.group(1).replace(',', '')
-            try:
-                value = float(value_str)
-                if value > 1000:
-                    # This is an astronomical percentage - remove it
-                    LOGGER.error(f"🔧 FIXED: Removed astronomical percentage {value:,.0f}% from LLM response")
-                    return "[growth rate]"  # Neutral placeholder
-                else:
-                    # Normal percentage, keep it
-                    return match.group(0)
-            except:
-                return match.group(0)
-        
-        # Replace astronomical percentages
-        fixed_text = re.sub(astronomical_pattern, replace_astronomical, text)
-        
-        # Additional cleanup: Remove common error patterns
-        error_patterns = [
-            (r'reflecting a \[growth rate\] year-over-year', 'reflecting year-over-year growth'),
-            (r'representing a \[growth rate\]', 'showing growth'),
-            (r'increased by \[growth rate\]', 'increased'),
-            (r'growth of \[growth rate\]', 'growth'),
-            (r': \[growth rate\]', ''),  # Remove standalone placeholders
-        ]
-        
-        for pattern, replacement in error_patterns:
-            fixed_text = re.sub(pattern, replacement, fixed_text)
-        
-        # Log if we made changes
-        if fixed_text != text:
-            changes_made = text.count('%') - fixed_text.count('%')
-            LOGGER.warning(f"🔧 Fixed {changes_made} astronomical percentage(s) in LLM response")
-        
-        return fixed_text
-
-    def _append_growth_snapshot(self, reply: str, user_input: str) -> str:
-        """Attach a deterministic growth block so UI always shows grounded numbers."""
-        if not reply or "📈 **Growth Snapshot" in reply:
-            return reply
-
-        tickers: List[str] = []
-        parser = self.last_structured_response.get("parser") if isinstance(self.last_structured_response, dict) else None
-        if isinstance(parser, dict):
-            for entry in parser.get("tickers", []) or []:
-                ticker = (entry.get("ticker") or entry.get("input") or "").strip()
-                if ticker:
-                    tickers.append(ticker.upper())
-
-        if not tickers:
-            tickers = [t.upper() for t in self._detect_tickers(user_input) if t]
-
-        target_year = self._extract_requested_year(user_input)
-
-        for ticker in tickers:
-            snapshot = self._build_growth_snapshot_data(ticker, target_year)
-            if not snapshot:
-                continue
-            block = snapshot.get("block")
-            summary = snapshot.get("summary")
-            yoy = snapshot.get("yoy")
-            if summary:
-                reply = f"{summary}\n\n{reply.lstrip()}"
-            if block:
-                reply = reply.rstrip() + "\n\n" + block + "\n"
-            if yoy is not None:
-                reply = reply.replace("[growth rate]", f"{yoy:+.1f}%")
-            margin_block = self._build_margin_snapshot_block(ticker, target_year)
-            if margin_block:
-                reply = reply.rstrip() + "\n\n" + margin_block + "\n"
-            LOGGER.info("Appended growth/margin snapshot for %s", ticker)
-            return reply
-        return reply
-
-    def _build_growth_snapshot_data(
-        self,
-        ticker: str,
-        target_year: Optional[int],
-    ) -> Optional[Dict[str, Any]]:
-        """Generate deterministic growth summary/snippet for a ticker."""
-        try:
-            records = self._fetch_metrics_cached(ticker)
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.debug(f"Unable to fetch metrics for growth snapshot ({ticker}): {exc}")
-            return None
-
-        if not records:
-            return None
-
-        selection = self._select_record_for_year(records, target_year)
-        if not selection:
-            return None
-        revenue_record, effective_year = selection
-
-        try:
-            growth_data = self.analytics_engine.compute_growth_metrics(
-                ticker,
-                {},
-                target_year=effective_year,
-            )
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.debug(f"Growth metric computation failed for {ticker}: {exc}")
-            return None
-
-        if not growth_data:
-            return None
-
-        percent_metrics = [
-            ("revenue_growth_yoy", "Revenue Growth (YoY)"),
-            ("revenue_cagr_3y", "Revenue CAGR (3Y)"),
-            ("revenue_cagr_5y", "Revenue CAGR (5Y)"),
-            ("net_income_growth_yoy", "Net Income Growth (YoY)"),
-            ("eps_growth_yoy", "EPS Growth (YoY)"),
-            ("eps_cagr_3y", "EPS CAGR (3Y)"),
-            ("fcf_growth_yoy", "Free Cash Flow Growth (YoY)"),
-        ]
-        margin_metrics = [
-            ("margin_change_yoy", "EBITDA Margin Δ"),
-            ("gross_margin_change_yoy", "Gross Margin Δ"),
-        ]
-
-        lines: List[str] = []
-        for key, label in percent_metrics:
-            value = growth_data.get(key)
-            if value is None:
-                continue
-            lines.append(f"- **{label}:** {value:+.1f}%")
-
-        for key, label in margin_metrics:
-            value = growth_data.get(key)
-            if value is None:
-                continue
-            lines.append(f"- **{label}:** {value:+.0f} bps")
-
-        if not lines:
-            return None
-
-        period = revenue_record.period or (f"FY{effective_year}" if effective_year else None)
-        revenue_value = revenue_record.value if revenue_record else None
-
-        header = f"📈 **Growth Snapshot ({ticker})**"
-        if period:
-            header = f"📈 **Growth Snapshot ({ticker} – {period})**"
-
-        block = "\n".join([header] + lines)
-
-        summary_parts: List[str] = []
-        if revenue_value is not None and period:
-            summary_parts.append(
-                f"{ticker} {period} revenue was {self._format_currency_compact(revenue_value)}"
-            )
-        yoy = growth_data.get("revenue_growth_yoy")
-        cagr3 = growth_data.get("revenue_cagr_3y")
-        if yoy is not None:
-            summary_parts.append(f"up {yoy:+.1f}% year over year")
-        if cagr3 is not None:
-            summary_parts.append(f"({cagr3:+.1f}% 3-year CAGR)")
-        summary_line = ""
-        if summary_parts:
-            summary_line = " ".join(summary_parts).strip()
-
-        return {"block": block, "summary": summary_line, "yoy": yoy}
-
-    def _build_margin_snapshot_block(
-        self,
-        ticker: str,
-        target_year: Optional[int],
-    ) -> Optional[str]:
-        """Generate a margin snapshot (gross/op/net) for the requested year."""
-        try:
-            records = self._fetch_metrics_cached(ticker)
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.debug(f"Unable to fetch metrics for margin snapshot ({ticker}): {exc}")
-            return None
-
-        if not records:
-            return None
-
-        wanted = {"gross_margin", "operating_margin", "net_margin"}
-        margin_records = self._select_metric_records(records, wanted, target_year)
-        if not margin_records:
-            return None
-
-        lines: List[str] = []
-        label_map = {
-            "gross_margin": "Gross Margin",
-            "operating_margin": "Operating Margin",
-            "net_margin": "Net Margin",
-        }
-        for key in ["gross_margin", "operating_margin", "net_margin"]:
-            record = margin_records.get(key)
-            if not record or record.value is None:
-                continue
-            value = record.value
-            formatted = f"{value * 100:.1f}%" if abs(value) <= 1 else f"{value:.1f}%"
-            lines.append(f"- **{label_map[key]}:** {formatted}")
-
-        if not lines:
-            return None
-
-        period = None
-        for record in margin_records.values():
-            if record.period:
-                period = record.period
-                break
-
-        header = f"📊 **Margin Snapshot ({ticker})**"
-        if period:
-            header = f"📊 **Margin Snapshot ({ticker} – {period})**"
-
-        return "\n".join([header] + lines)
-
-
-    @staticmethod
-    def _format_currency_compact(value: Optional[float]) -> str:
-        if value is None:
-            return "N/A"
-        abs_val = abs(value)
-        if abs_val >= 1_000_000_000:
-            return f"${value / 1_000_000_000:.1f}B"
-        if abs_val >= 1_000_000:
-            return f"${value / 1_000_000:.1f}M"
-        return f"${value:,.0f}"
-
-    def _extract_requested_year(self, user_input: str) -> Optional[int]:
-        parser = self.last_structured_response.get("parser")
-        if isinstance(parser, dict):
-            periods = parser.get("periods") or {}
-            items = periods.get("items") or []
-            for item in items:
-                if isinstance(item, dict):
-                    fy = item.get("fy")
-                    if isinstance(fy, int):
-                        return fy
-        match = re.search(r"(20\d{2}|19\d{2})", user_input)
-        if match:
-            try:
-                return int(match.group(1))
-            except ValueError:
-                return None
-        return None
-
-    def _select_record_for_year(
-        self,
-        records: Sequence[database.MetricRecord],
-        target_year: Optional[int],
-    ) -> Optional[Tuple[database.MetricRecord, Optional[int]]]:
-        best: Optional[database.MetricRecord] = None
-        best_year: Optional[int] = None
-        latest: Optional[database.MetricRecord] = None
-        latest_year: Optional[int] = None
-        latest_updated: Optional[datetime] = None
-
-        for record in records:
-            year = self._extract_year_from_period_label(record.period)
-            if year is None:
-                continue
-            updated = record.updated_at or datetime.min
-
-            if target_year and year == target_year:
-                if best is None or updated > (best.updated_at or datetime.min):
-                    best = record
-                    best_year = year
-
-            if latest is None:
-                latest = record
-                latest_year = year
-                latest_updated = updated
-            else:
-                if year > (latest_year or -1) or (year == latest_year and updated > (latest_updated or datetime.min)):
-                    latest = record
-                    latest_year = year
-                    latest_updated = updated
-
-        if best:
-            return best, best_year
-        if latest:
-            return latest, latest_year
-        return None
-
-    @staticmethod
-    def _extract_year_from_period_label(period: Optional[str]) -> Optional[int]:
-        if not period:
-            return None
-        match = re.search(r"(20\d{2}|19\d{2})", period)
-        if match:
-            try:
-                return int(match.group(1))
-            except ValueError:
-                return None
-        return None
-
-    def _select_metric_records(
-        self,
-        records: Sequence[database.MetricRecord],
-        metrics: Sequence[str],
-        target_year: Optional[int],
-    ) -> Dict[str, database.MetricRecord]:
-        """Return best record per metric for the requested year (fallback to latest)."""
-        target: Dict[str, database.MetricRecord] = {}
-        fallback: Dict[str, database.MetricRecord] = {}
-
-        wanted = set(metrics)
-        for record in records:
-            if record.metric not in wanted or record.value is None:
-                continue
-            year = self._extract_year_from_period_label(record.period)
-            updated = record.updated_at or datetime.min
-
-            if target_year and year == target_year:
-                existing = target.get(record.metric)
-                if existing is None or updated > (existing.updated_at or datetime.min):
-                    target[record.metric] = record
-
-            existing_fallback = fallback.get(record.metric)
-            if existing_fallback is None or updated > (existing_fallback.updated_at or datetime.min):
-                fallback[record.metric] = record
-
-        return target if target else fallback
-
-    def _prepare_llm_messages(self, rag_context: Optional[str]) -> List[Mapping[str, str]]:
+    def _prepare_llm_messages(self, rag_context: Optional[str], *, is_forecasting: bool = False) -> List[Mapping[str, str]]:
         """Trim history before sending to the LLM and append optional RAG context."""
         history = self.conversation.as_llm_messages()
         if not history:
@@ -2100,19 +1788,20 @@ class BenchmarkOSChatbot:
         
         # For forecasting queries, add context to the LAST user message to ensure it's seen
         # For other queries, add as system message
-        is_forecasting = False
-        try:
-            from .context_builder import _is_forecasting_query
-            if chat_history:
-                last_user_msg = None
-                for msg in reversed(chat_history):
-                    if msg.get("role") == "user":
-                        last_user_msg = msg
-                        break
-                if last_user_msg:
-                    is_forecasting = _is_forecasting_query(last_user_msg.get("content", ""))
-        except ImportError:
-            pass
+        # If is_forecasting is not provided, try to detect it from chat history
+        if not is_forecasting:
+            try:
+                from .context_builder import _is_forecasting_query
+                if chat_history:
+                    last_user_msg = None
+                    for msg in reversed(chat_history):
+                        if msg.get("role") == "user":
+                            last_user_msg = msg
+                            break
+                    if last_user_msg:
+                        is_forecasting = _is_forecasting_query(last_user_msg.get("content", ""))
+            except ImportError:
+                pass
         
         if rag_context:
             if is_forecasting and chat_history:
@@ -2178,7 +1867,6 @@ class BenchmarkOSChatbot:
                 self._get_ticker_summary(ticker, None)
             except Exception:  # pragma: no cover - defensive caching preload
                 LOGGER.debug("Preload for %s failed", ticker, exc_info=True)
-
     @classmethod
     def create(cls, settings: Settings) -> "BenchmarkOSChatbot":
         """Factory that wires analytics, storage, and the LLM client together."""
@@ -2245,7 +1933,7 @@ class BenchmarkOSChatbot:
     # ----------------------------------------------------------------------------------
     def _name_to_ticker(self, term: str) -> Optional[str]:
         """Resolve free-text company names to tickers using:
-           1) engine.lookup_ticker (if provided)
+           1) engine's lookup_ticker (if provided)
            2) SEC-backed name index (exact/prefix/contains/token overlap)
            3) local alias fallback
         """
@@ -2568,6 +2256,7 @@ class BenchmarkOSChatbot:
     def _detect_modeling_intent(self, text: str) -> Optional[Dict[str, Any]]:
         """Detect if the prompt is about creating or using custom models."""
         lowered = text.lower()
+        live_flag = self._intent_requests_live_data(text)
         
         # Patterns for creating models
         create_patterns = [
@@ -2586,7 +2275,7 @@ class BenchmarkOSChatbot:
                     else:
                         model_type = match.group(1).strip()
                         name = match.group(2).strip()
-                    return {"action": "create", "name": name, "model_type": model_type}
+                    return {"action": "create", "name": name, "model_type": model_type, "refresh": live_flag}
         
         # Patterns for running forecasts
         forecast_patterns = [
@@ -2601,7 +2290,13 @@ class BenchmarkOSChatbot:
                 ticker = match.group(1).strip().upper()
                 metric = match.group(2).strip()
                 model_name = match.group(3).strip() if len(match.groups()) > 2 else None
-                return {"action": "forecast", "ticker": ticker, "metric": metric, "model_name": model_name}
+                return {
+                    "action": "forecast",
+                    "ticker": ticker,
+                    "metric": metric,
+                    "model_name": model_name,
+                    "refresh": live_flag,
+                }
         
         # Patterns for scenario analysis
         scenario_patterns = [
@@ -2616,18 +2311,233 @@ class BenchmarkOSChatbot:
                 ticker = match.group(1).strip().upper()
                 metric = match.group(2).strip()
                 growth_rate = float(match.group(3).strip())
-                return {"action": "scenario", "ticker": ticker, "metric": metric, "growth_rate": growth_rate}
+                return {
+                    "action": "scenario",
+                    "ticker": ticker,
+                    "metric": metric,
+                    "growth_rate": growth_rate,
+                    "refresh": live_flag,
+                }
         
         # Pattern for listing models
         if re.search(r'list\s+(?:my\s+)?(?:custom\s+)?models?', lowered):
-            return {"action": "list"}
+            return {"action": "list", "refresh": live_flag}
         
         # Pattern for explaining models
         explain_pattern = r'explain\s+(?:my\s+)?(?:model\s+)?["\']?([^"\']+)["\']?'
         match = re.search(explain_pattern, lowered)
         if match:
-            return {"action": "explain", "model_name": match.group(1).strip()}
+            return {"action": "explain", "model_name": match.group(1).strip(), "refresh": live_flag}
         
+        return None
+    def _handle_plugin_intent(self, intent: Dict[str, Any], raw_text: str) -> Optional[str]:
+        """Execute plugin workflows (register, list, train, forecast)."""
+        builder = ModelBuilder(self.settings.database_path)
+        user_id = "default"
+        action = intent["action"]
+        refresh_flag = intent.get("refresh", False)
+
+        if action == "list":
+            plugins = builder.list_forecasting_plugins(user_id=user_id)
+            if not plugins:
+                return "You don't have any custom forecasting plugins yet. Upload one by saying 'Upload my estimator' and include the code."
+
+            response = f"**Your Forecasting Plugins ({len(plugins)}):**\n\n"
+            for plugin in plugins:
+                provenance = plugin.metadata.get("provenance") if isinstance(plugin.metadata, dict) else None
+                response += f"- **{plugin.name}** (`{plugin.class_name}`)"
+                if provenance:
+                    response += f" – _provenance: {provenance}_"
+                if plugin.last_trained_at:
+                    response += f" (last trained {plugin.last_trained_at.date()})"
+                response += "\n"
+            return response
+
+        if action == "register":
+            code_blocks = self._extract_code_blocks(raw_text)
+            source_block = next(
+                (block for lang, block in code_blocks if lang in (None, "", "python", "py")),
+                None,
+            )
+            template_candidate = intent.get("template_name")
+            provided_name = intent.get("name")
+            if not source_block:
+                candidate = template_candidate or (provided_name.strip() if provided_name else "")
+                if candidate:
+                    try:
+                        plugin = builder.instantiate_template_plugin(
+                            candidate,
+                            user_id=user_id,
+                            plugin_name=provided_name or None,
+                        )
+                        provenance = plugin.metadata.get("provenance") if isinstance(plugin.metadata, dict) else "template_library"
+                        return (
+                            f"✅ Registered template plugin **{plugin.name}** (`{plugin.class_name}`)\n"
+                            f"- Template: {plugin.metadata.get('template_id', candidate)}\n"
+                            f"- Provenance: {provenance}\n"
+                            f"- Plugin ID: `{plugin.plugin_id}`\n"
+                            f"You can train it with: `Train my {plugin.name} on AAPL revenue`."
+                        )
+                    except ValueError:
+                        pass
+                return (
+                    "To register a plugin, include a Python code block with your estimator class or reference a known template. "
+                    "Example:\n```python\nclass MyForecaster:\n    ...\n```"
+                )
+            class_match = re.search(r"class\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|:)", source_block)
+            if not class_match:
+                return "I couldn't find a class definition in the provided code. Please define your forecaster class."
+            class_name = class_match.group(1)
+            plugin_name = intent.get("name") or class_name
+
+            metadata_block = next((block for lang, block in code_blocks if lang == "json"), None)
+            metadata_payload: Optional[Dict[str, Any]] = None
+            if metadata_block:
+                try:
+                    metadata_payload = json.loads(metadata_block)
+                except json.JSONDecodeError:
+                    return "I couldn't parse the metadata JSON block. Please ensure it's valid JSON."
+
+            try:
+                plugin = builder.register_forecasting_plugin(
+                    user_id=user_id,
+                    name=plugin_name,
+                    class_name=class_name,
+                    source_code=source_block,
+                    metadata=metadata_payload,
+                )
+            except PluginRegistrationError as exc:
+                return f"❌ Plugin registration failed: {exc}"
+            except Exception as exc:  # pragma: no cover - defensive
+                LOGGER.exception("Unexpected plugin registration failure")
+                return f"❌ Plugin registration failed: {exc}"
+
+            provenance = plugin.metadata.get("provenance") if isinstance(plugin.metadata, dict) else "unspecified"
+            return (
+                f"✅ Registered plugin **{plugin.name}** (`{plugin.class_name}`)\n"
+                f"- Provenance: {provenance}\n"
+                f"- Plugin ID: `{plugin.plugin_id}`\n"
+                f"You can train it with: `Train my {plugin.name} on AAPL revenue`."
+            )
+
+        plugin_name = intent.get("plugin_name")
+        if not plugin_name:
+            return None
+        plugin = self._lookup_plugin(builder, user_id, plugin_name)
+        if not plugin:
+            return f"❌ I couldn't find a plugin named '{plugin_name}'. Use 'List my plugins' to see available names."
+
+        ticker = intent.get("ticker", "").strip().upper()
+        metric = intent.get("metric", "").strip()
+        if not ticker or not metric:
+            return "Please include both a ticker and metric, e.g., 'Train my GrowthPlugin on AAPL revenue'."
+
+        parameters = {}
+        retrain_flag = bool(intent.get("retrain"))
+
+        if action == "train":
+            try:
+                details = builder.train_forecasting_plugin(
+                    plugin.plugin_id,
+                    ticker=ticker,
+                    metric=metric,
+                    parameters=parameters,
+                    user_id=user_id,
+                    refresh=refresh_flag,
+                )
+            except PluginExecutionError as exc:
+                return f"❌ Training failed: {exc}"
+            except Exception as exc:  # pragma: no cover
+                LOGGER.exception("Unexpected plugin training failure")
+                return f"❌ Training failed: {exc}"
+
+            description = details.get("description") or {}
+            if isinstance(description, dict):
+                summary = description.get("summary") or description.get("details")
+            else:
+                summary = str(description)
+            summary_line = f" – {summary}" if summary else ""
+
+            response = (
+                f"✅ Trained **{plugin.name}** on {ticker} {metric}{summary_line}\n"
+                f"Last trained at: {details.get('trained_at')}\n"
+                "Run a forecast with: "
+                f"`Forecast using my {plugin.name} plugin for {ticker} {metric}`."
+            )
+            live_info = details.get("live_data")
+            if isinstance(live_info, dict):
+                if live_info.get("fetched"):
+                    fetched_at = live_info.get("fetched_at") or "just now"
+                    response += f"\n_Live data fetched at {fetched_at}_"
+                elif live_info.get("warning"):
+                    response += f"\n_Warning: {live_info['warning']}_"
+            return response
+
+        if action == "forecast":
+            try:
+                result = builder.forecast_with_plugin(
+                    plugin.plugin_id,
+                    ticker=ticker,
+                    metric=metric,
+                    forecast_years=3,
+                    parameters=parameters,
+                    user_id=user_id,
+                    retrain=retrain_flag,
+                    refresh=refresh_flag,
+                )
+            except PluginExecutionError as exc:
+                return f"❌ Forecast failed: {exc}"
+            except Exception as exc:  # pragma: no cover
+                LOGGER.exception("Unexpected plugin forecast failure")
+                return f"❌ Forecast failed: {exc}"
+
+            preds = result.get("predictions") or []
+            preview = ""
+            for idx, value in enumerate(preds[:3], start=1):
+                try:
+                    numeric_value = float(value)
+                    rendered_value = f"{numeric_value:,.2f}"
+                except (TypeError, ValueError):
+                    rendered_value = str(value)
+                preview += f"- Year +{idx}: {rendered_value}\n"
+            provenance = result.get("provenance") or "unspecified"
+            description = result.get("description") or {}
+            if isinstance(description, dict):
+                summary = description.get("summary") or description.get("details")
+            else:
+                summary = str(description)
+
+            response = (
+                f"**Forecast from {plugin.name}** (provenance: {provenance})\n\n"
+            )
+            if summary:
+                response += f"{summary}\n\n"
+            if preview:
+                response += preview
+            else:
+                response += "No forecast values returned."
+            live_info = result.get("live_data")
+            if isinstance(live_info, dict):
+                if live_info.get("fetched"):
+                    fetched_at = live_info.get("fetched_at") or "just now"
+                    response += f"\n_Live data fetched at {fetched_at}."
+                elif live_info.get("warning"):
+                    response += f"\n_Warning: {live_info['warning']}_"
+            return response
+
+        return None
+
+    @staticmethod
+    def _lookup_plugin(
+        builder: ModelBuilder,
+        user_id: str,
+        plugin_name: str,
+    ) -> Optional[ForecastingPlugin]:
+        """Resolve a plugin by name (case-insensitive)."""
+        plugins = builder.list_forecasting_plugins(user_id=user_id)
+        for plugin in plugins:
+            if plugin.name.lower() == plugin_name.lower():
+                return plugin
         return None
 
     def _detect_source_trace_intent(self, text: str) -> Optional[Dict[str, Any]]:
@@ -2675,6 +2585,7 @@ class BenchmarkOSChatbot:
             ticker = intent.get("ticker", "").strip().upper()
             metric = intent.get("metric", "").strip()
             model_name = intent.get("model_name")
+            refresh_flag = intent.get("refresh", False)
             
             if not ticker or not metric:
                 return "Please provide both a ticker and metric. Example: 'Forecast AAPL's revenue using my Revenue Forecast model'"
@@ -2701,7 +2612,12 @@ class BenchmarkOSChatbot:
                     model_id = model.model_id
             
             # Run forecast
-            model_run = builder.run_forecast(model_id, ticker, metric)
+            model_run = builder.run_forecast(
+                model_id,
+                ticker,
+                metric,
+                refresh=refresh_flag,
+            )
             
             if not model_run.results:
                 return f"❌ Error running forecast for {ticker} {metric}"
@@ -2713,6 +2629,13 @@ class BenchmarkOSChatbot:
                     year = forecast.get("fiscal_year", "N/A")
                     value = forecast.get("predicted_value", 0)
                     response += f"- {year}: ${value:,.0f}\n"
+            live_info = model_run.results.get("live_data") if isinstance(model_run.results, dict) else None
+            if isinstance(live_info, dict):
+                if live_info.get("fetched"):
+                    fetched_at = live_info.get("fetched_at") or "just now"
+                    response += f"\n_Live data fetched at {fetched_at}_"
+                elif live_info.get("warning"):
+                    response += f"\n_Warning: {live_info['warning']}_"
             
             return response
         
@@ -2813,7 +2736,6 @@ class BenchmarkOSChatbot:
                         response += f"{i}. {filing}\n"
         
         return response
-
     def _normalize_nl_to_command(self, text: str) -> Optional[str]:
         """Turn flexible NL prompts into the strict CLI-style commands this class handles."""
         t = text.strip()
@@ -3348,8 +3270,19 @@ class BenchmarkOSChatbot:
                         emit("intent_custom_kpi", f"Custom KPI intent detected: {custom_kpi_intent['action']}")
                         reply = self._handle_custom_kpi_intent(custom_kpi_intent)
                         attempted_intent = True
-                    # Check for modeling intent
+                    # Check for plugin workflow intent
                     elif not attempted_intent:
+                        try:
+                            plugin_intent = self._detect_plugin_intent(user_input)
+                            if plugin_intent:
+                                emit("intent_plugin", f"Plugin intent detected: {plugin_intent['action']}")
+                                reply = self._handle_plugin_intent(plugin_intent, user_input)
+                                attempted_intent = True
+                        except AttributeError:
+                            # _detect_plugin_intent not implemented, skip
+                            pass
+                    # Check for modeling intent
+                    if not attempted_intent:
                         modeling_intent = self._detect_modeling_intent(user_input)
                         if modeling_intent:
                             emit("intent_modeling", f"Modeling intent detected: {modeling_intent['action']}")
@@ -3617,7 +3550,6 @@ class BenchmarkOSChatbot:
                             else:
                                 # Forecasting query - skip summary generation, use LLM with forecast context
                                 emit("intent_forecasting", "Forecasting query detected - skipping snapshot, using LLM with ML forecast context")
-
             if reply is None:
                 emit("context_build_start", "Gathering enhanced financial context")
                 
@@ -3639,9 +3571,14 @@ class BenchmarkOSChatbot:
                     context_detail = "Portfolio context compiled - using actual portfolio data"
                     LOGGER.info("Using portfolio context for query")
                 else:
-                    LOGGER.critical(f"🔍 DEBUG: Building context for query: {user_input}")
-                    context = self._build_enhanced_rag_context(user_input)
-                    LOGGER.critical(f"🔍 DEBUG: Context built, length: {len(context) if context else 0}")
+                    # Use build_financial_context for all queries (including forecasting)
+                    context = build_financial_context(
+                        query=user_input,
+                        analytics_engine=self.analytics_engine,
+                        database_path=str(self.settings.database_path),
+                        max_tickers=3,
+                        include_macro_context=True
+                    )
 
                     if is_forecasting and not context:
                         LOGGER.warning("Forecasting query detected but context is empty - will still call LLM")
@@ -3665,15 +3602,14 @@ class BenchmarkOSChatbot:
                     context_detail or ("Context compiled" if context else "Context not required"),
                 )
                 
-                messages = self._prepare_llm_messages(context)
+                # Pass is_forecasting flag to message preparation
+                messages = self._prepare_llm_messages(context, is_forecasting=is_forecasting)
                 LOGGER.debug(f"Prepared {len(messages)} messages for LLM")
                 
                 # Log context details for debugging
                 if context:
                     context_length = len(context)
                     LOGGER.info(f"Context length: {context_length} characters")
-                    # DEBUG: Log first 1000 chars of context to see what LLM receives
-                    LOGGER.info(f"Context preview (first 1000 chars):\n{context[:1000]}")
                     if is_forecasting:
                         # Check if ML forecast context is present
                         has_ml_forecast = "ML FORECAST" in context or "CRITICAL: THIS IS THE PRIMARY ANSWER" in context
@@ -3703,9 +3639,6 @@ class BenchmarkOSChatbot:
                     )
                 else:
                     reply = self.llm_client.generate_reply(messages)
-                
-                # CRITICAL: Post-process to remove astronomical percentage errors
-                reply = self._fix_astronomical_percentages(reply)
                 
                 emit("llm_query_complete", "Explanation drafted")
                 LOGGER.info(f"Generated reply length: {len(reply) if reply else 0} characters")
@@ -3799,7 +3732,7 @@ class BenchmarkOSChatbot:
                         else:
                             # Add confidence footer
                             reply = add_confidence_footer(reply, confidence, include_details=False)
-                            emit("verification_complete", f"Verified: {verification_result.correct_facts}/{verification_result.total_facts} facts, {confidence.score*100:.1f}% confidence")
+                            emit("verification_complete", f"Verified: {verification_result.correct_facts}/{verification_result.total_facts} facts verified, {confidence.score*100:.1f}% confidence")
                         
                         # Log verification results
                         LOGGER.info(
@@ -3829,9 +3762,6 @@ class BenchmarkOSChatbot:
                     emit("fallback", "Using enhanced fallback reply")
                     reply = self._handle_enhanced_error(ErrorCategory.UNKNOWN_ERROR)
 
-            if reply:
-                reply = self._append_growth_snapshot(reply, user_input)
-
             emit("finalize", "Finalising response")
             database.log_message(
                 self.settings.database_path,
@@ -3859,15 +3789,37 @@ class BenchmarkOSChatbot:
 
             # FINAL SAFEGUARD: Check if reply contains snapshot text for forecasting queries
             # This prevents returning snapshots even if they somehow got generated
+            # TEMPORARILY DISABLED - Let's see what the LLM actually generates
+            # TODO: Re-enable with more specific checks once we verify LLM behavior
             try:
                 from .context_builder import _is_forecasting_query
                 if _is_forecasting_query(user_input):
-                    # Check if reply contains snapshot markers (Phase1 KPIs, Phase 2 KPIs, etc.)
-                    if reply and ("Phase1 KPIs" in reply or "Phase 1 KPIs" in reply or "Phase 2 KPIs" in reply or ("snapshot" in reply.lower() and "forecast" not in reply.lower())):
-                        LOGGER.error(f"CRITICAL: Forecasting query returned a snapshot instead of forecast! Query: {user_input}, Reply preview: {reply[:200]}")
-                        # Replace snapshot with error message
-                        reply = "I apologize, but I encountered an issue generating the forecast. The system attempted to return a snapshot instead of a forecast. Please try rephrasing your query or specifying the company name and metric more clearly (e.g., 'Forecast Apple revenue using Prophet')."
-                        emit("forecasting_snapshot_error", "Forecasting query returned snapshot - replaced with error message")
+                    # Only flag very specific snapshot patterns that clearly indicate historical data
+                    # Allow the LLM to generate forecast responses even if they mention "snapshot" in a different context
+                    is_snapshot = False
+                    if reply:
+                        reply_lower = reply.lower()
+                        # Only check for very specific Phase 1/Phase 2 KPI patterns
+                        # These are clear indicators of historical snapshot data
+                        snapshot_indicators = [
+                            "phase1 kpis" in reply_lower,
+                            "phase 1 kpis" in reply_lower,
+                            "phase 2 kpis" in reply_lower,
+                            # Only flag if it's clearly a historical snapshot section, not forecast-related
+                            (reply_lower.count("growth snapshot") > 0 and 
+                             "forecast" not in reply_lower and 
+                             "revenue growth (yoy)" in reply_lower),
+                            (reply_lower.count("margin snapshot") > 0 and 
+                             "forecast" not in reply_lower and 
+                             "net margin" in reply_lower),
+                        ]
+                        is_snapshot = any(snapshot_indicators)
+                    
+                    if is_snapshot:
+                        LOGGER.warning(f"Forecasting query may have returned snapshot. Query: {user_input}, Reply preview: {reply[:500]}")
+                        # Don't replace - just log for now to see what's happening
+                        # reply = "I apologize, but I encountered an issue generating the forecast..."
+                        emit("forecasting_snapshot_warning", "Forecasting query may have returned snapshot - check logs")
             except ImportError:
                 pass
 
@@ -3890,226 +3842,6 @@ class BenchmarkOSChatbot:
     def reset(self) -> None:
         """Start a fresh conversation while keeping the same configuration."""
         self.conversation = Conversation()
-
-    # ----------------------------------------------------------------------------------
-    # Intent handling helpers
-    # ----------------------------------------------------------------------------------
-    def _handle_financial_intent(self, text: str) -> Optional[str]:
-        """Route based on query type - prefer natural language for questions."""
-        
-        lowered = text.strip().lower()
-        
-        # 0. CRITICAL: Check for forecasting queries FIRST (before anything else)
-        try:
-            from .context_builder import _is_forecasting_query
-            if _is_forecasting_query(text):
-                # Forecasting query - ALWAYS use LLM with forecasting context
-                # Don't process through any other path
-                self._progress("intent_forecasting", "Forecasting query detected - using LLM with ML forecast context")
-                return None  # Will trigger LLM with enhanced context including ML forecast
-        except ImportError:
-            pass  # If context_builder not available, continue to normal flow
-        
-        # 1. Help command
-        if lowered == "help":
-            return HELP_TEXT
-        
-        # 2. Explicit legacy commands (highest priority - exact matches)
-        if lowered.startswith("fact "):
-            return self._handle_fact_command(text)
-        if lowered.startswith("fact-range "):
-            return self._handle_fact_range_command(text)
-        if lowered.startswith("table "):
-            table_output = render_table_command(text, self.analytics_engine)
-            if table_output is None:
-                return "Unable to generate a table for that request."
-            return table_output
-        if lowered.startswith("audit "):
-            return self._handle_audit_command(text)
-        if lowered.startswith("ingest "):
-            return self._handle_ingest_command(text)
-        if lowered.startswith("scenario "):
-            return self._handle_scenario_command(text)
-
-        # 3. Explicit comparison with "vs" (table format)
-        if lowered.startswith("compare ") and self._is_legacy_compare_command(text):
-            tokens = text.split()[1:]
-            return self._handle_metrics_comparison(tokens)
-        
-        # 3.5. Check if this is a forecasting query (CRITICAL - must be before question check)
-        # Import forecasting detection functions
-        try:
-            from .context_builder import _is_forecasting_query
-            if _is_forecasting_query(text):
-                # Forecasting query - always use LLM with forecasting context
-                self._progress("intent_forecasting", "Forecasting query detected - using LLM with ML forecast context")
-                return None  # Will trigger LLM with enhanced context including ML forecast
-        except ImportError:
-            pass  # If context_builder not available, continue to normal flow
-        
-        # 4. Check if this is a natural language QUESTION (not a table request)
-        question_patterns = [
-            # CRITICAL: Contractions MUST come first to catch "What's", "How's" etc.
-            r'\bwhat\'s\b',  # "what's" contraction - CRITICAL for "What's Apple revenue?"
-            r'\bhow\'s\b',   # "how's" contraction
-            r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would|about|does|did)\b',
-            r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would|about|to|do|profitable|fast|good|bad|strong|weak)\b',
-            r'\bwhy\b',
-            r'\bexplain\b',
-            r'\btell\s+me\s+(?:about|why|how)\b',
-            r'\bis\s+\w+\s+(?:more|less|better|worse|higher|lower)',
-            r'\bis\s+\w+\s+(?:overvalued|undervalued|expensive|cheap|good|bad|risky|safe|strong|weak|profitable|worth)',  # "Is X overvalued?"
-            r'\bwhich\s+(?:company|stock|one|is|has|have)\b',
-            r'\bcan\s+you\b',
-            r'\bdoes\s+\w+\s+have\b',
-            r'\bshould\s+i\b',
-            r'\bwhen\s+(?:is|are|was|were|did|will)\b',
-            r'\bwhere\s+(?:is|are|can|do)\b',
-            # Forecasting patterns (also questions)
-            r'\b(?:forecast|predict|estimate|project)\b',
-            # Follow-up question patterns
-            r'^\s*(?:what|how)\s+about\b',  # "What about..." "How about..."
-            r'\b(?:their|its|theirs)\b',  # Pronouns indicating context reference
-            r'\b(?:them|it)\s+(?:compare|versus|vs)\b',  # "compare them", "compare it"
-            r'\bcompare\s+(?:them|those|these)\b',  # "compare them"
-        ]
-        
-        is_question = any(re.search(pattern, lowered) for pattern in question_patterns)
-        
-        # CRITICAL: Also check for filter queries  
-        # Comprehensive sector patterns with all variations
-        SECTOR_PATTERNS = (
-            r'tech|technology|software|hardware|semiconductor|semis?|chip|it\b',
-            r'financial?|finance|banking|banks?|insurance|fintech',
-            r'healthcare|health|pharma|pharmaceutical|biotech|medical|drug',
-            r'energy|oil|gas|petroleum|renewables?|clean energy',
-            r'consumer|retail|e-commerce|ecommerce|cpg|discretionary|staples',
-            r'industrial|manufacturing|aerospace|defense|machinery',
-            r'real estate|property|reit|reits',
-            r'utilit(?:y|ies)|power|electric|water|infrastructure',
-            r'materials?|mining|metals?|chemicals?|commodit(?:y|ies)',
-            r'communication|telecom|media|entertainment|broadcasting',
-        )
-        sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
-        
-        filter_query_patterns = [
-            # CRITICAL: Sector-to-sector comparison queries (e.g., "How does finance compare to tech?")
-            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
-            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
-            rf'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
-            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)\s+(?:the\s+)?(?:{sector_pattern})',
-            # "Analyze the [sector] sector: which companies..." (sector mentioned earlier)
-            rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
-            # "Show/List/Find [sector] companies"
-            rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
-            # "Which [sector] company"
-            rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
-            # "Which companies in [sector]"
-            rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
-            # "Companies in [sector] sector/industry"
-            rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
-            # "[Sector] sector companies"
-            rf'\b(?:{sector_pattern})\s+(?:sector|industry).*\b(?:companies|stocks|firms)',
-            # "In the [sector] sector, which companies..."
-            rf'\bin\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
-            # Revenue/sales filters
-            r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
-            # Growth filters
-            r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
-            r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
-            # Market cap filters
-            r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
-            # Profit margin filters with conditions
-            r'\b(?:companies|stocks|firms)\s+(?:have|with)?\s+(?:profit\s+)?margins?\s+(?:above|over|greater than|>)',
-            # Multiple criteria (growth AND margin AND cash flow)
-            r'\b(?:companies|stocks|firms).*(?:margins?|growth|cash flow).*(?:above|over|>).*(?:and|,)',
-        ]
-        is_filter_query = any(re.search(pattern, lowered) for pattern in filter_query_patterns)
-        
-        # CRITICAL: Check for specific metric queries - give focused LLM response, not full dashboard
-        # Pattern: "show [company]'s [specific metric]" → focused response, not dashboard
-        specific_metric_patterns = [
-            r'\b(?:show|tell|give)\s+(?:me\s+)?[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt|fcf|ev|market cap)',
-            r'\bwhat\'s\s+[\w\s]+?\'s\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt|fcf|ev|market cap)',
-            r'\b(?:show|tell|give)\s+(?:me\s+)?the\s+(?:revenue|profit|margin|earnings|ebitda|cash|p/e|pe|roi|roe|roic|growth|debt)\s+(?:of|for)\s+[\w\s]+',
-        ]
-        is_specific_metric = any(re.search(pattern, lowered) for pattern in specific_metric_patterns)
-        
-        if is_question or is_filter_query or is_specific_metric:
-            # Natural language question, filter query, or specific metric - let LLM handle with context
-            # Clear dashboard to prevent showing full KPI dashboard when user wants focused answer
-            if "dashboard" in self.last_structured_response:
-                self.last_structured_response["dashboard"] = None
-            
-            if is_filter_query:
-                self._progress("intent_filter", "Company filter/category query detected")
-            elif is_specific_metric:
-                self._progress("intent_specific_metric", "Specific metric query - routing to LLM for focused response")
-            else:
-                self._progress("intent_question", "Natural language question detected")
-            return None  # Will trigger LLM with enhanced context
-        
-        # 5. Check for explicit "show X kpis/metrics/table" pattern (table request)
-        if re.search(r'\bshow\s+.*\s+(?:kpis?|metrics?|table)', lowered):
-            # Check for forecasting queries FIRST - don't process as table request
-            try:
-                from .context_builder import _is_forecasting_query
-                if _is_forecasting_query(text):
-                    # Forecasting query - always use LLM with forecasting context
-                    return None
-            except ImportError:
-                pass
-            
-            structured = parse_to_structured(text)
-            self.last_structured_response["parser"] = structured
-
-            # Optional: Enhanced routing
-            if self.settings.enable_enhanced_routing:
-                enhanced_routing = enhance_structured_parse(text, structured)
-                # Check for portfolio intents early
-                if enhanced_routing and enhanced_routing.intent.value.startswith("portfolio_"):
-                    # Portfolio intents should be handled by LLM with portfolio context
-                    return None
-                # Check for ML forecasting intents early
-                if enhanced_routing and enhanced_routing.intent.value.startswith("ml_forecast_"):
-                    # ML forecasting intents should be handled by LLM with forecast context
-                    return None
-                self.last_structured_response["enhanced_routing"] = {
-                    "intent": enhanced_routing.intent.value,
-                    "confidence": enhanced_routing.confidence,
-                }
-                # Lower threshold for table commands
-                if enhanced_routing.confidence < 0.5:
-                    return None
-            
-            if structured:
-                structured_reply = self._handle_structured_metrics(structured)
-                if structured_reply:
-                    return structured_reply
-
-        # 6. Check for complex natural language that should use LLM
-        if self._is_complex_natural_language_query(text):
-            return None
-        
-        # 7. Try structured parsing as fallback (but with lower priority)
-        # IMPORTANT: Check for forecasting queries BEFORE structured parsing
-        try:
-            from .context_builder import _is_forecasting_query
-            if _is_forecasting_query(text):
-                # Forecasting query - always use LLM with forecasting context
-                # Don't even try structured parsing
-                return None
-        except ImportError:
-            pass
-        
-        try:
-            structured = parse_to_structured(text)
-        except Exception as e:
-            LOGGER.debug(f"Structured parsing failed: {e}")
-            structured = {}
-        
-        self.last_structured_response["parser"] = structured
-        
         # Optional: Enhanced routing
         enhanced_routing = None
         if self.settings.enable_enhanced_routing:
@@ -4513,262 +4245,6 @@ class BenchmarkOSChatbot:
             **deltas,
         )
         return getattr(summary, 'narrative', str(summary))
-
-    # ----------------------------------------------------------------------------------
-    # Fact and audit helpers
-    # ----------------------------------------------------------------------------------
-    def _handle_fact_command(self, text: str) -> str:
-        """Return detailed fact rows for the requested ticker/year."""
-        match = re.match(
-            r"fact\s+([A-Za-z0-9.-]+)\s+(?:FY)?(\d{4})(?:\s*Q([1-4]))?(?:\s+([A-Za-z0-9_]+))?",
-            text,
-            re.IGNORECASE,
-        )
-        if not match:
-            return "Usage: fact <TICKER> <YEAR>[Q#] [metric]"
-        raw_ticker = match.group(1).upper()
-        fiscal_year = int(match.group(2))
-        quarter_token = match.group(3)
-        quarter_label = f"Q{quarter_token}" if quarter_token else None
-        metric = match.group(4)
-        metric_key = metric.lower() if metric else None
-
-        resolution = self._resolve_tickers([raw_ticker])
-        if resolution.missing and not resolution.available:
-            return self._format_missing_message([raw_ticker], [])
-        ticker = resolution.available[0] if resolution.available else raw_ticker
-        resolved_note = None
-        if resolution.available and raw_ticker not in resolution.available and ticker != raw_ticker:
-            resolved_note = f"(resolved {raw_ticker} to {ticker})"
-
-        facts = self.analytics_engine.financial_facts(
-            ticker=ticker,
-            fiscal_year=fiscal_year,
-            metric=metric_key,
-            limit=20,
-        )
-        if metric_key:
-            facts = [fact for fact in facts if fact.metric.lower() == metric_key]
-        if quarter_label:
-            quarter_upper = quarter_label.upper()
-            facts = [
-                fact
-                for fact in facts
-                if (
-                    (fact.fiscal_period and quarter_upper in fact.fiscal_period.upper())
-                    or (fact.period and quarter_upper in fact.period.upper())
-                )
-            ]
-        if not facts:
-            if metric_key:
-                if quarter_label:
-                    return (
-                        f"No {metric_key} facts stored for {ticker} in FY{fiscal_year} {quarter_label}."
-                    )
-                return (
-                    f"No {metric_key} facts stored for {ticker} in FY{fiscal_year}."
-                )
-            if quarter_label:
-                return f"No financial facts stored for {ticker} in FY{fiscal_year} {quarter_label}."
-            return f"No financial facts stored for {ticker} in FY{fiscal_year}."
-
-        title_metric = metric_key.replace('_', ' ') if metric_key else 'financial facts'
-        heading = f"{title_metric.title()} for {ticker} FY{fiscal_year}"
-        if quarter_label:
-            heading += f" {quarter_label}"
-        if resolved_note:
-            heading += f" {resolved_note}"
-        lines_out = [heading + ":"]
-        for fact in facts:
-            label = fact.metric.replace('_', ' ')
-            value_text = self._format_fact_value(fact.value)
-            parts = [f"source={fact.source}"]
-            period_hint = fact.period or fact.fiscal_period
-            if period_hint:
-                parts.append(f"period={period_hint}")
-            if fact.adjusted:
-                parts.append("adjusted")
-            if fact.adjustment_note:
-                parts.append(f"note: {fact.adjustment_note}")
-            detail = ", ".join(parts)
-            lines_out.append(f"- {label}: {value_text} ({detail})")
-        return "\n".join(lines_out)
-
-    def _handle_fact_range_command(self, text: str) -> str:
-        """Return year-over-year fact series for a ticker."""
-        match = re.match(
-            r"fact-range\s+([A-Za-z0-9.-]+)\s+(\d{4})-(\d{4})(?:\s+([A-Za-z0-9_]+))?",
-            text,
-            re.IGNORECASE,
-        )
-        if not match:
-            return "Usage: fact-range <TICKER> <START-END> [metric]"
-        raw_ticker = match.group(1).upper()
-        start_year = int(match.group(2))
-        end_year = int(match.group(3))
-        if end_year < start_year:
-            start_year, end_year = end_year, start_year
-        metric = match.group(4) or "revenue"
-        metric_key = metric.lower()
-
-        resolution = self._resolve_tickers([raw_ticker])
-        if resolution.missing and not resolution.available:
-            return self._format_missing_message([raw_ticker], [])
-        ticker = resolution.available[0] if resolution.available else raw_ticker
-        resolved_note = ""
-        if resolution.available and raw_ticker not in resolution.available and ticker != raw_ticker:
-            resolved_note = f" (resolved {raw_ticker} to {ticker})"
-
-        rows: List[tuple[int, Optional[str]]] = []
-        for year in range(start_year, end_year + 1):
-            facts = self.analytics_engine.financial_facts(
-                ticker=ticker,
-                fiscal_year=year,
-                metric=metric_key,
-                limit=20,
-            )
-            if metric_key:
-                facts = [fact for fact in facts if fact.metric.lower() == metric_key]
-            value_display: Optional[str] = None
-            for fact in facts:
-                if fact.fiscal_period and fact.fiscal_period.upper().startswith("Q"):
-                    continue
-                value_display = self._format_fact_value(fact.value)
-                break
-            if value_display is None and facts:
-                value_display = self._format_fact_value(facts[0].value)
-            rows.append((year, value_display))
-
-        if not any(value for _, value in rows):
-            metric_label = metric_key.replace("_", " ")
-            return (
-                f"No {metric_label} facts stored for {ticker} between FY{start_year} and FY{end_year}."
-            )
-
-        metric_label = metric_key.replace('_', ' ')
-        lines = [
-            f"{metric_label.title()} for {ticker} FY{start_year}-{end_year}{resolved_note}:",
-            "Year | Value",
-            "-----|------",
-        ]
-        for year, value in rows:
-            value_display = value if value is not None else "n/a"
-            lines.append(f"{year} | {value_display}")
-        return "\n".join(lines)
-
-    def _handle_audit_command(self, text: str) -> str:
-        """Summarise audit events for a given ticker."""
-        match = re.match(r"audit\s+([A-Za-z0-9.-]+)(?:\s+(?:FY)?(\d{4}))?", text, re.IGNORECASE)
-        if not match:
-            return "Usage: audit <TICKER> [YEAR]"
-        raw_ticker = match.group(1).upper()
-        year_token = match.group(2)
-        fiscal_year = int(year_token) if year_token else None
-
-        resolution = self._resolve_tickers([raw_ticker])
-        if resolution.missing and not resolution.available:
-            return self._format_missing_message([raw_ticker], [])
-        ticker = resolution.available[0] if resolution.available else raw_ticker
-
-        events = self.analytics_engine.audit_events(
-            ticker,
-            fiscal_year=fiscal_year,
-            limit=10,
-        )
-        if not events:
-            suffix = f" in FY{fiscal_year}" if fiscal_year else ""
-            return f"No audit events recorded for {ticker}{suffix}."
-
-        header = f"Audit trail for {ticker}"
-        if fiscal_year:
-            header += f" FY{fiscal_year}"
-        lines_out = [header + ":"]
-        for event in events:
-            timestamp = event.created_at.strftime("%Y-%m-%d %H:%M")
-            entity = f" [{event.entity_id}]" if event.entity_id else ""
-            lines_out.append(
-                f"- {timestamp}{entity} ({event.event_type}) {event.details} [by {event.created_by}]"
-            )
-        return "\n".join(lines_out)
-
-    # ----------------------------------------------------------------------------------
-    # Parsing helpers
-    # ----------------------------------------------------------------------------------
-    @staticmethod
-    def _parse_percent(value: str) -> float:
-        """Interpret percentage tokens and return them as floats."""
-        value = value.strip().rstrip("%")
-        try:
-            return float(value) / 100.0
-        except ValueError:
-            return 0.0
-
-    def _parse_metrics_request(self, text: str) -> Optional["BenchmarkOSChatbot._MetricsRequest"]:
-        """Convert free-form text into a structured metrics request."""
-        match = _METRICS_PATTERN.match(text.strip())
-        if not match:
-            return None
-        remainder = match.group(1)
-        remainder = remainder.replace(",", " ")
-        remainder = remainder.replace(" vs ", " ")
-        remainder = remainder.replace(" and ", " ")
-        tokens = [token for token in remainder.split() if token]
-        tickers, period_filters = self._split_tickers_and_periods(tokens)
-        return BenchmarkOSChatbot._MetricsRequest(
-            tickers=tickers,
-            period_filters=period_filters,
-        )
-
-    def _split_tickers_and_periods(
-        self, tokens: Sequence[str]
-    ) -> tuple[List[str], Optional[List[tuple[int, int]]]]:
-        """Separate ticker symbols from potential period filters."""
-        period_filters: List[tuple[int, int]] = []
-        tickers: List[str] = []
-        for token in tokens:
-            parsed = self._parse_period_token(token)
-            if parsed:
-                period_filters.append(parsed)
-                continue
-            cleaned = token.strip().upper().rstrip(',')
-            if not cleaned or cleaned in {"VS", "AND", "FOR"}:
-                continue
-            tickers.append(cleaned)
-        return tickers, (period_filters or None)
-
-    @staticmethod
-    def _parse_period_token(token: str) -> Optional[tuple[int, int]]:
-        """Convert textual period filters into numeric start/end years."""
-        cleaned = token.strip().upper().rstrip(',')
-        if cleaned.startswith('FY'):
-            cleaned = cleaned[2:]
-        cleaned = cleaned.strip()
-        if not cleaned:
-            return None
-        match = re.fullmatch(r"(\d{4})(?:\s*[-/]\s*(\d{4}))?", cleaned)
-        if not match:
-            return None
-        start = int(match.group(1))
-        end = int(match.group(2)) if match.group(2) else start
-        if end < start:
-            start, end = end, start
-        return (start, end)
-
-    # ----------------------------------------------------------------------------------
-    # Metrics formatting helpers
-    # ----------------------------------------------------------------------------------
-    @dataclass
-    class _MetricsRequest:
-        """Structured representation of a parsed metrics request."""
-        tickers: List[str]
-        period_filters: Optional[List[tuple[int, int]]]
-
-    @dataclass
-    class _TickerResolution:
-        """Tracks which tickers resolved successfully versus missing."""
-        available: List[str]
-        missing: List[str]
-
     def _resolve_tickers(self, subjects: Sequence[str]) -> "BenchmarkOSChatbot._TickerResolution":
         """Resolve tickers against the dataset, recording missing entries."""
         subjects_list = list(subjects)
@@ -5566,7 +5042,6 @@ class BenchmarkOSChatbot:
         if cache_key:
             self._store_cached_context(cache_key, final_context)
         return final_context
-
     def _build_portfolio_context(self, user_input: str) -> Optional[str]:
         """Build comprehensive portfolio context for portfolio-related queries."""
         import re
@@ -5961,92 +5436,6 @@ class BenchmarkOSChatbot:
         except Exception as e:
             LOGGER.exception(f"Could not build portfolio context: {e}")
             return None
-    
-    def _detect_forecast_followup(self, user_input: str) -> Optional[Dict[str, Any]]:
-        """
-        Detect if user is asking a follow-up question about an active forecast.
-        
-        Returns:
-            Dictionary with 'type' and optionally 'details' if follow-up detected, else None
-            Types: 'explainability', 'drivers', 'confidence', 'breakdown', 'parameters', 
-                   'scenario', 'save', 'compare', 'model_switch'
-        """
-        if not self.conversation.get_active_forecast():
-            return None  # No active forecast to follow up on
-        
-        lowered = user_input.strip().lower()
-        
-        # Simple "Why?" questions
-        if lowered in ["why", "why?", "how come", "how come?", "explain", "explain this"]:
-            return {"type": "explainability"}
-        
-        # "Why is it [increasing/decreasing/changing]?"
-        if re.search(r"\bwhy\s+(?:is\s+)?(?:it|this|the\s+forecast)?\s*(?:increasing|decreasing|going\s+up|going\s+down|rising|falling|changing|growing)", lowered):
-            return {"type": "explainability", "focus": "trend"}
-        
-        # "What's driving this?" or "What are the drivers?"
-        if re.search(r"what(?:'s|\s+is|\s+are)?\s+(?:the\s+)?(?:driving|drivers?|main\s+factors?|top\s+factors?|key\s+factors?)", lowered):
-            return {"type": "drivers"}
-        
-        # "How confident?" or "What's the uncertainty?"
-        if re.search(r"how\s+confident|(?:what(?:'s|\s+is))?\s+(?:the\s+)?(?:confidence|uncertainty|confidence\s+interval|prediction\s+interval)", lowered):
-            return {"type": "confidence"}
-        
-        # "Show me the breakdown" or "Break it down"
-        if re.search(r"(?:show\s+(?:me\s+)?the\s+)?(?:breakdown|break\s+it\s+down|components?|decomposition)", lowered):
-            return {"type": "breakdown"}
-        
-        # "What are the top drivers?" or "Which factors matter most?"
-        if re.search(r"(?:top|main|most\s+important)\s+(?:\d+\s+)?(?:drivers?|factors?|features?)|which\s+(?:factors?|features?)\s+matter", lowered):
-            return {"type": "drivers", "focus": "top"}
-        
-        # Parameter adjustments: "Change horizon to X years"
-        horizon_match = re.search(r"(?:change|set|use|make\s+it)\s+(?:the\s+)?(?:forecast\s+)?horizon\s+(?:to\s+)?(\d+)", lowered)
-        if horizon_match:
-            return {"type": "parameters", "parameter": "horizon", "value": int(horizon_match.group(1))}
-        
-        # Parameter adjustments: "Forecast for X years"
-        years_match = re.search(r"(?:forecast|predict|project)\s+(?:for\s+)?(\d+)\s+years?", lowered)
-        if years_match:
-            return {"type": "parameters", "parameter": "horizon", "value": int(years_match.group(1))}
-        
-        # Model switching: "Switch to [model]" or "Use [model] instead"
-        model_match = re.search(r"(?:switch|change|use)\s+(?:to\s+)?(?:the\s+)?(arima|prophet|ets|lstm|gru|transformer|ensemble)", lowered)
-        if model_match:
-            return {"type": "model_switch", "model": model_match.group(1)}
-        
-        # Scenario testing: "What if [assumption]?"
-        if re.search(r"what\s+if|suppose|assuming|imagine\s+if", lowered):
-            # Try to parse specific scenario parameters
-            scenario_details = self._parse_scenario_parameters(user_input)
-            return {"type": "scenario", "query": user_input, "details": scenario_details}
-        
-        # Save forecast: "Save this as [name]"
-        save_match = re.search(r"(?:save|store|remember)\s+(?:this|the\s+forecast)\s+(?:as\s+)?['\"]?([a-zA-Z0-9_\-\s]+)['\"]?", lowered)
-        if save_match:
-            name = save_match.group(1).strip()
-            return {"type": "save", "name": name}
-        
-        # Compare forecasts: "Compare to [name]" or "How does this compare to [name]?"
-        compare_match = re.search(r"(?:compare|comparison)\s+(?:to|with|vs\.?)\s+['\"]?([a-zA-Z0-9_\-\s]+)['\"]?", lowered)
-        if compare_match:
-            name = compare_match.group(1).strip()
-            return {"type": "compare", "name": name}
-        
-        # Exclude data: "Exclude 2020" or "Remove 2020 as outlier"
-        exclude_match = re.search(r"(?:exclude|remove|drop|ignore)\s+(\d{4})", lowered)
-        if exclude_match:
-            return {"type": "parameters", "parameter": "exclude_year", "value": int(exclude_match.group(1))}
-        
-        # Generic pronoun reference: "it", "this", "the forecast", "the model"
-        # If user says something with these pronouns, it's likely a follow-up
-        if re.search(r"\b(?:it|this|that|the\s+forecast|the\s+model|the\s+prediction)\b", lowered):
-            # Check if it's a question or statement about the forecast
-            if re.search(r"\?|how|what|why|when|where|explain|show|tell", lowered):
-                return {"type": "explainability", "generic": True}
-        
-        return None
-    
     def _parse_scenario_parameters(self, user_input: str) -> Dict[str, Any]:
         """
         Parse specific parameters from scenario questions.
@@ -6218,1701 +5607,3 @@ class BenchmarkOSChatbot:
                 LOGGER.warning(f"Scenario validation warnings: {warnings}")
         
         return result
-    
-    def _build_forecast_followup_context(self, user_input: str, followup: Dict[str, Any]) -> str:
-        """
-        Build specialized context for forecast follow-up questions.
-        
-        Args:
-            user_input: Original user query
-            followup: Detected follow-up information from _detect_forecast_followup
-            
-        Returns:
-            Formatted context string for LLM
-        """
-        active_forecast = self.conversation.get_active_forecast()
-        if not active_forecast:
-            return "⚠️ No active forecast found. Please generate a forecast first."
-        
-        followup_type = followup.get("type")
-        ticker = active_forecast.get("ticker")
-        metric = active_forecast.get("metric")
-        method = active_forecast.get("method")
-        forecast_result = active_forecast.get("forecast_result")
-        explainability = active_forecast.get("explainability", {})
-        parameters = active_forecast.get("parameters", {})
-        
-        context_lines = [
-            "=" * 80,
-            f"🎯 FORECAST FOLLOW-UP CONTEXT - {ticker} {metric.upper()}",
-            "=" * 80,
-            "",
-            f"**User is asking a follow-up question about the active forecast:**",
-            f"- Company: {ticker}",
-            f"- Metric: {metric}",
-            f"- Method: {method.upper()}",
-            f"- Follow-up Type: {followup_type}",
-            "",
-            "=" * 80,
-            "📊 ACTIVE FORECAST DATA",
-            "=" * 80,
-            ""
-        ]
-        
-        # Include forecast predictions
-        if forecast_result and hasattr(forecast_result, 'predicted_values'):
-            context_lines.append("**Forecasted Values:**")
-            for i, (year, value) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                low = forecast_result.confidence_intervals_low[i]
-                high = forecast_result.confidence_intervals_high[i]
-                context_lines.append(f"  - Year {year}: ${value/1e9:.2f}B (95% CI: ${low/1e9:.2f}B - ${high/1e9:.2f}B)")
-            context_lines.append("")
-        
-        # Handle different follow-up types
-        if followup_type in ["explainability", "drivers", "breakdown"]:
-            context_lines.extend([
-                "=" * 80,
-                "🔍 FORECAST EXPLAINABILITY",
-                "=" * 80,
-                "",
-                "**📊 CRITICAL: The user wants to understand WHY the forecast is what it is.**",
-                "**You MUST provide detailed driver analysis using the information below.**",
-                ""
-            ])
-            
-            # Extract and format drivers
-            drivers = explainability.get("drivers", {})
-            if drivers:
-                context_lines.append("**Key Drivers and Components:**")
-                
-                # Feature importance
-                features = drivers.get("features", {})
-                if features:
-                    context_lines.append("")
-                    context_lines.append("**Feature Importance (Top Drivers):**")
-                    sorted_features = sorted(features.items(), key=lambda x: abs(x[1]), reverse=True)[:10]
-                    for feat_name, importance in sorted_features:
-                        context_lines.append(f"  - {feat_name}: {importance:.4f}")
-                    context_lines.append("")
-                
-                # Component breakdown (for Prophet, ARIMA, etc.)
-                components = drivers.get("components", {})
-                if components:
-                    context_lines.append("**Forecast Component Breakdown:**")
-                    for component_name, value in components.items():
-                        context_lines.append(f"  - {component_name}: {value}")
-                    context_lines.append("")
-                
-                # Prophet-specific components
-                prophet_components = drivers.get("prophet", {})
-                if prophet_components:
-                    context_lines.append("**Prophet Model Components:**")
-                    for comp_name, comp_value in prophet_components.items():
-                        context_lines.append(f"  - {comp_name}: {comp_value}")
-                    context_lines.append("")
-            
-            # Model confidence and performance
-            confidence = explainability.get("confidence", 0)
-            context_lines.append(f"**Model Confidence:** {confidence:.1%}")
-            context_lines.append("")
-            
-            # Performance metrics
-            performance = explainability.get("performance", {})
-            if performance:
-                context_lines.append("**Model Performance Metrics:**")
-                for metric_name, metric_value in performance.items():
-                    if isinstance(metric_value, float):
-                        context_lines.append(f"  - {metric_name}: {metric_value:.6f}")
-                    else:
-                        context_lines.append(f"  - {metric_name}: {metric_value}")
-                context_lines.append("")
-            
-            context_lines.extend([
-                "**🎯 YOUR TASK:**",
-                "1. Explain the TOP 3-5 DRIVERS of this forecast using the data above",
-                "2. For each driver, include:",
-                "   - What it is (clear explanation)",
-                "   - How it impacts the forecast (increase/decrease, magnitude)",
-                "   - Why it matters (business context)",
-                "3. Use specific numbers from the data above (don't generalize)",
-                "4. Present in a structured format with emojis:",
-                "   📈 for positive drivers, 📉 for negative drivers, 📊 for neutral factors",
-                "5. Keep the explanation clear but detailed (aim for 400-600 words)",
-                ""
-            ])
-        
-        elif followup_type == "confidence":
-            context_lines.extend([
-                "=" * 80,
-                "📊 CONFIDENCE & UNCERTAINTY ANALYSIS",
-                "=" * 80,
-                "",
-                "**The user wants to understand the confidence and uncertainty in the forecast.**",
-                ""
-            ])
-            
-            # Confidence intervals
-            if forecast_result and hasattr(forecast_result, 'confidence_intervals_low'):
-                context_lines.append("**Confidence Intervals (95%):**")
-                for i, year in enumerate(forecast_result.periods):
-                    pred = forecast_result.predicted_values[i]
-                    low = forecast_result.confidence_intervals_low[i]
-                    high = forecast_result.confidence_intervals_high[i]
-                    width = high - low
-                    pct_width = (width / pred) * 100 if pred > 0 else 0
-                    context_lines.append(f"  - Year {year}:")
-                    context_lines.append(f"      Forecast: ${pred/1e9:.2f}B")
-                    context_lines.append(f"      Range: ${low/1e9:.2f}B to ${high/1e9:.2f}B")
-                    context_lines.append(f"      Interval Width: ${width/1e9:.2f}B ({pct_width:.1f}% of forecast)")
-                context_lines.append("")
-            
-            # Model confidence
-            confidence = explainability.get("confidence", 0)
-            context_lines.append(f"**Overall Model Confidence:** {confidence:.1%}")
-            context_lines.append("")
-            
-            # Performance metrics (indicate reliability)
-            performance = explainability.get("performance", {})
-            if performance:
-                context_lines.append("**Model Performance Indicators:**")
-                for metric_name, metric_value in performance.items():
-                    if isinstance(metric_value, float):
-                        context_lines.append(f"  - {metric_name}: {metric_value:.6f}")
-                context_lines.append("")
-            
-            context_lines.extend([
-                "**🎯 YOUR TASK:**",
-                "1. Explain what the confidence intervals mean in plain language",
-                "2. Interpret the interval width (narrow = more confident, wide = less confident)",
-                "3. Explain the overall model confidence score",
-                "4. Mention any factors that might increase or decrease uncertainty",
-                "5. Be transparent about limitations",
-                ""
-            ])
-        
-        elif followup_type == "parameters":
-            parameter = followup.get("parameter")
-            value = followup.get("value")
-            
-            context_lines.extend([
-                "=" * 80,
-                "⚙️ PARAMETER ADJUSTMENT - FORECAST REGENERATION",
-                "=" * 80,
-                "",
-                f"**User wants to adjust: {parameter} = {value}**",
-                "",
-                "**Baseline Forecast (Before Adjustment):**"
-            ])
-            
-            # Show baseline forecast values
-            if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                for i, (year, value_baseline) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                    context_lines.append(f"  - Year {year}: ${value_baseline/1e9:.2f}B")
-                context_lines.append("")
-            
-            context_lines.extend([
-                "**Current Parameters:**"
-            ])
-            
-            for param_name, param_value in parameters.items():
-                context_lines.append(f"  - {param_name}: {param_value}")
-            
-            # Try to regenerate forecast with new parameters
-            context_lines.append("")
-            context_lines.append("**🔄 Regenerating Forecast with Adjusted Parameters...**")
-            context_lines.append("")
-            
-            try:
-                # Build new parameters
-                new_periods = value if parameter == "horizon" else parameters.get("periods", 3)
-                new_method = parameters.get("method", method)
-                
-                # Import ML forecaster
-                from .ml_forecasting import get_ml_forecaster
-                ml_forecaster = get_ml_forecaster(self.settings.database_path)
-                
-                # Generate new forecast
-                new_forecast = ml_forecaster.forecast(
-                    ticker=ticker,
-                    metric=metric,
-                    periods=new_periods,
-                    method=new_method
-                )
-                
-                if new_forecast:
-                    context_lines.append("**✅ New Forecast Generated Successfully**")
-                    context_lines.append("")
-                    context_lines.append("**Adjusted Forecast (After Parameter Change):**")
-                    
-                    for i, (year, new_value) in enumerate(zip(new_forecast.periods, new_forecast.predicted_values)):
-                        low = new_forecast.confidence_intervals_low[i]
-                        high = new_forecast.confidence_intervals_high[i]
-                        context_lines.append(f"  - Year {year}: ${new_value/1e9:.2f}B (95% CI: ${low/1e9:.2f}B - ${high/1e9:.2f}B)")
-                    
-                    context_lines.append("")
-                    context_lines.append("**📊 Before vs. After Comparison:**")
-                    context_lines.append("")
-                    
-                    # Create comparison table data
-                    context_lines.append("| Year | Baseline | Adjusted | Delta ($) | Delta (%) |")
-                    context_lines.append("|------|----------|----------|-----------|-----------|")
-                    
-                    # Compare overlapping years
-                    baseline_periods = set(forecast_result.periods) if forecast_result else set()
-                    new_periods_set = set(new_forecast.periods)
-                    common_years = sorted(baseline_periods & new_periods_set)
-                    
-                    for year in common_years:
-                        baseline_idx = list(forecast_result.periods).index(year)
-                        new_idx = list(new_forecast.periods).index(year)
-                        
-                        baseline_val = forecast_result.predicted_values[baseline_idx]
-                        new_val = new_forecast.predicted_values[new_idx]
-                        delta_abs = new_val - baseline_val
-                        delta_pct = (delta_abs / baseline_val * 100) if baseline_val != 0 else 0
-                        
-                        context_lines.append(
-                            f"| {year} | ${baseline_val/1e9:.2f}B | ${new_val/1e9:.2f}B | "
-                            f"${delta_abs/1e9:+.2f}B | {delta_pct:+.1f}% |"
-                        )
-                    
-                    # Add new years that weren't in baseline
-                    new_only_years = sorted(new_periods_set - baseline_periods)
-                    if new_only_years:
-                        for year in new_only_years:
-                            new_idx = list(new_forecast.periods).index(year)
-                            new_val = new_forecast.predicted_values[new_idx]
-                            context_lines.append(
-                                f"| {year} | — | ${new_val/1e9:.2f}B | New | New |"
-                            )
-                    
-                    context_lines.append("")
-                    
-                    # Update the active forecast to the new one
-                    self.conversation.set_active_forecast(
-                        ticker=ticker,
-                        metric=metric,
-                        method=new_method,
-                        periods=new_periods,
-                        forecast_result=new_forecast,
-                        explainability={},  # Would need to extract from new forecast
-                        parameters={"periods": new_periods, "method": new_method, parameter: value}
-                    )
-                    
-                    context_lines.extend([
-                        "**🎯 YOUR TASK:**",
-                        "1. Present the ADJUSTED FORECAST VALUES prominently",
-                        "2. Show the BEFORE VS. AFTER COMPARISON TABLE above",
-                        "3. Explain the impact of the parameter change:",
-                        f"   - What changed: {parameter} = {value}",
-                        "   - Impact on forecast (quantitative analysis using the table)",
-                        "   - Key insights from the comparison",
-                        "4. Note that the adjusted forecast is now the ACTIVE forecast",
-                        "5. Suggest further adjustments or scenarios to explore",
-                        ""
-                    ])
-                else:
-                    context_lines.extend([
-                        "**⚠️ Forecast Regeneration Failed**",
-                        "",
-                        "**🎯 YOUR TASK:**",
-                        f"1. Acknowledge the parameter adjustment request: {parameter} = {value}",
-                        "2. Apologize that forecast regeneration encountered an error",
-                        "3. Explain possible causes (insufficient data, model limitations)",
-                        "4. Suggest alternative approaches",
-                        ""
-                    ])
-                    
-            except Exception as e:
-                LOGGER.error(f"Failed to regenerate forecast with adjusted parameters: {e}", exc_info=True)
-                context_lines.extend([
-                    f"**⚠️ Error Regenerating Forecast: {str(e)[:100]}**",
-                    "",
-                    "**🎯 YOUR TASK:**",
-                    f"1. Acknowledge the parameter adjustment request: {parameter} = {value}",
-                    "2. Explain that an error occurred during forecast regeneration",
-                    "3. Provide the technical error details",
-                    "4. Suggest the user try again or use a different approach",
-                    ""
-                ])
-        
-        elif followup_type == "model_switch":
-            new_model = followup.get("model")
-            
-            context_lines.extend([
-                "=" * 80,
-                "🔄 MODEL SWITCH - FORECAST REGENERATION",
-                "=" * 80,
-                "",
-                f"**User wants to switch from {method.upper()} to {new_model.upper()}**",
-                "",
-                f"**Baseline Model:** {method.upper()}",
-                f"**Requested Model:** {new_model.upper()}",
-                "",
-                "**Baseline Forecast:**"
-            ])
-            
-            # Show baseline forecast values
-            if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                for i, (year, value_baseline) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                    context_lines.append(f"  - Year {year}: ${value_baseline/1e9:.2f}B")
-                context_lines.append("")
-            
-            # Try to regenerate forecast with new model
-            context_lines.append("**🔄 Refitting with New Model...**")
-            context_lines.append("")
-            
-            try:
-                # Import ML forecaster
-                from .ml_forecasting import get_ml_forecaster
-                ml_forecaster = get_ml_forecaster(self.settings.database_path)
-                
-                # Generate new forecast with different model
-                new_forecast = ml_forecaster.forecast(
-                    ticker=ticker,
-                    metric=metric,
-                    periods=parameters.get("periods", 3),
-                    method=new_model
-                )
-                
-                if new_forecast:
-                    context_lines.append("**✅ New Forecast Generated with " + new_model.upper() + "**")
-                    context_lines.append("")
-                    context_lines.append(f"**{new_model.upper()} Forecast:**")
-                    
-                    for i, (year, new_value) in enumerate(zip(new_forecast.periods, new_forecast.predicted_values)):
-                        low = new_forecast.confidence_intervals_low[i]
-                        high = new_forecast.confidence_intervals_high[i]
-                        context_lines.append(f"  - Year {year}: ${new_value/1e9:.2f}B (95% CI: ${low/1e9:.2f}B - ${high/1e9:.2f}B)")
-                    
-                    context_lines.append("")
-                    context_lines.append(f"**📊 Model Comparison: {method.upper()} vs. {new_model.upper()}**")
-                    context_lines.append("")
-                    
-                    # Create comparison table
-                    context_lines.append(f"| Year | {method.upper()} | {new_model.upper()} | Delta ($) | Delta (%) |")
-                    context_lines.append("|------|----------|----------|-----------|-----------|")
-                    
-                    for i, year in enumerate(forecast_result.periods if forecast_result else []):
-                        if i < len(new_forecast.periods):
-                            baseline_val = forecast_result.predicted_values[i]
-                            new_val = new_forecast.predicted_values[i]
-                            delta_abs = new_val - baseline_val
-                            delta_pct = (delta_abs / baseline_val * 100) if baseline_val != 0 else 0
-                            
-                            context_lines.append(
-                                f"| {year} | ${baseline_val/1e9:.2f}B | ${new_val/1e9:.2f}B | "
-                                f"${delta_abs/1e9:+.2f}B | {delta_pct:+.1f}% |"
-                            )
-                    
-                    context_lines.append("")
-                    
-                    # Model comparison metrics
-                    context_lines.append("**Model Performance Comparison:**")
-                    if forecast_result and hasattr(forecast_result, 'confidence'):
-                        context_lines.append(f"  - {method.upper()} Confidence: {forecast_result.confidence:.1%}")
-                    if new_forecast and hasattr(new_forecast, 'confidence'):
-                        context_lines.append(f"  - {new_model.upper()} Confidence: {new_forecast.confidence:.1%}")
-                    context_lines.append("")
-                    
-                    # Update the active forecast to the new model
-                    self.conversation.set_active_forecast(
-                        ticker=ticker,
-                        metric=metric,
-                        method=new_model,
-                        periods=parameters.get("periods", 3),
-                        forecast_result=new_forecast,
-                        explainability={},  # Would need to extract from new forecast
-                        parameters={"periods": parameters.get("periods", 3), "method": new_model}
-                    )
-                    
-                    context_lines.extend([
-                        "**🎯 YOUR TASK:**",
-                        f"1. Present the {new_model.upper()} FORECAST VALUES prominently",
-                        "2. Show the MODEL COMPARISON TABLE above",
-                        "3. Explain the key differences between the models:",
-                        f"   - How {method.upper()} works vs. how {new_model.upper()} works",
-                        "   - Which model is more confident (use confidence scores)",
-                        "   - Quantitative differences (use the comparison table)",
-                        "4. Provide recommendation on which model to trust",
-                        f"5. Note that {new_model.upper()} is now the ACTIVE model",
-                        "6. Suggest further exploration or model options",
-                        ""
-                    ])
-                else:
-                    context_lines.extend([
-                        "**⚠️ Model Switch Failed**",
-                        "",
-                        f"Possible reasons {new_model.upper()} could not be used:",
-                        f"  - Model dependencies missing (e.g., TensorFlow for LSTM, PyTorch for Transformer)",
-                        "  - Insufficient data for this model type",
-                        "  - Model training errors",
-                        "",
-                        "**🎯 YOUR TASK:**",
-                        f"1. Apologize that switching to {new_model.upper()} failed",
-                        "2. Explain possible causes (dependencies, data requirements)",
-                        "3. Suggest alternative models that might work",
-                        f"4. Keep the {method.upper()} forecast as the active forecast",
-                        ""
-                    ])
-                    
-            except Exception as e:
-                LOGGER.error(f"Failed to switch model from {method} to {new_model}: {e}", exc_info=True)
-                context_lines.extend([
-                    f"**⚠️ Error Switching Models: {str(e)[:100]}**",
-                    "",
-                    "**🎯 YOUR TASK:**",
-                    f"1. Acknowledge the model switch request to {new_model.upper()}",
-                    "2. Explain that an error occurred during model switching",
-                    "3. Provide technical error details for transparency",
-                    f"4. Keep the {method.upper()} forecast active",
-                    ""
-                ])
-        
-        elif followup_type == "save":
-            name = followup.get("name")
-            
-            # Try to save the forecast (with database persistence)
-            success = self.conversation.save_forecast(name, self.settings.database_path)
-            
-            context_lines.extend([
-                "=" * 80,
-                "💾 SAVE FORECAST REQUEST",
-                "=" * 80,
-                "",
-                f"**User wants to save this forecast as: '{name}'**",
-                "",
-                f"**Save Status:** {'✅ Success' if success else '❌ Failed'}",
-                ""
-            ])
-            
-            if success:
-                context_lines.extend([
-                    "**🎯 YOUR TASK:**",
-                    f"1. Confirm that the forecast has been saved as '{name}'",
-                    "2. Tell the user they can reference it later by saying:",
-                    f"   - 'Compare to {name}'",
-                    f"   - 'Load {name}'",
-                    f"   - 'How does this compare to {name}?'",
-                    "3. Ask if they'd like to explore other scenarios or make adjustments",
-                    ""
-                ])
-            else:
-                context_lines.extend([
-                    "**🎯 YOUR TASK:**",
-                    "1. Apologize that the forecast could not be saved",
-                    "2. Explain that there may not be an active forecast to save",
-                    "3. Suggest generating a new forecast first",
-                    ""
-                ])
-        
-        elif followup_type == "compare":
-            name = followup.get("name")
-            
-            # Try to load the comparison forecast (from memory or database)
-            comparison_forecast = self.conversation.load_forecast(name, self.settings.database_path)
-            
-            context_lines.extend([
-                "=" * 80,
-                "📊 FORECAST COMPARISON REQUEST",
-                "=" * 80,
-                "",
-                f"**User wants to compare current forecast to: '{name}'**",
-                ""
-            ])
-            
-            if comparison_forecast:
-                comp_result = comparison_forecast.get("forecast_result")
-                context_lines.extend([
-                    "**Comparison Forecast Found:**",
-                    f"  - Name: {name}",
-                    f"  - Company: {comparison_forecast.get('ticker')}",
-                    f"  - Metric: {comparison_forecast.get('metric')}",
-                    f"  - Method: {comparison_forecast.get('method')}",
-                    "",
-                    "**Comparison Forecast Values:**"
-                ])
-                
-                if comp_result and hasattr(comp_result, 'predicted_values'):
-                    for i, (year, value) in enumerate(zip(comp_result.periods, comp_result.predicted_values)):
-                        context_lines.append(f"  - Year {year}: ${value/1e9:.2f}B")
-                
-                context_lines.extend([
-                    "",
-                    "**🎯 YOUR TASK:**",
-                    "1. Create a side-by-side comparison table showing:",
-                    "   - Year",
-                    f"   - {name} (baseline)",
-                    "   - Current Forecast",
-                    "   - Delta ($ and %)",
-                    "2. Explain the key differences between the two forecasts",
-                    "3. Highlight which assumptions or parameters changed",
-                    "4. Provide insights on why the forecasts differ",
-                    ""
-                ])
-            else:
-                context_lines.extend([
-                    f"**⚠️ Comparison Forecast '{name}' Not Found**",
-                    "",
-                    "Available saved forecasts:",
-                ])
-                
-                saved_names = self.conversation.list_saved_forecasts(self.settings.database_path)
-                if saved_names:
-                    for saved_name in saved_names:
-                        context_lines.append(f"  - {saved_name}")
-                else:
-                    context_lines.append("  (No saved forecasts)")
-                
-                context_lines.extend([
-                    "",
-                    "**🎯 YOUR TASK:**",
-                    f"1. Inform the user that '{name}' was not found",
-                    "2. Show the list of available saved forecasts (if any)",
-                    "3. Suggest saving the current forecast first, or choosing an available forecast",
-                    ""
-                ])
-        
-        elif followup_type == "scenario":
-            scenario_details = followup.get("details", {})
-            scenario_params = scenario_details.get("parameters", {})
-            scenario_warnings = scenario_details.get("warnings", [])
-            is_multi_factor = scenario_details.get("is_multi_factor", False)
-            param_count = scenario_details.get("parameter_count", 0)
-            
-            context_lines.extend([
-                "=" * 80,
-                "🧪 SCENARIO TESTING - QUANTITATIVE ANALYSIS",
-                "=" * 80,
-                "",
-                f"**User wants to test a scenario: '{user_input}'**",
-                "",
-            ])
-            
-            # Show scenario metadata
-            if is_multi_factor:
-                context_lines.append(f"**⚠️ MULTI-FACTOR SCENARIO DETECTED ({param_count} factors)**")
-                context_lines.append("")
-            
-            context_lines.append("**Parsed Scenario Parameters:**")
-            
-            if scenario_params:
-                for param_name, param_value in scenario_params.items():
-                    if isinstance(param_value, float):
-                        context_lines.append(f"  - {param_name}: {param_value:+.1%}")
-                    else:
-                        context_lines.append(f"  - {param_name}: {param_value}")
-                context_lines.append("")
-                
-                # Show validation warnings if any
-                if scenario_warnings:
-                    context_lines.append("**⚠️ Validation Warnings:**")
-                    for warning in scenario_warnings:
-                        context_lines.append(f"  - {warning}")
-                    context_lines.append("")
-                    context_lines.append("**Note:** These assumptions are outside typical business ranges.")
-                    context_lines.append("**You should acknowledge these warnings in your response.**")
-                    context_lines.append("")
-            else:
-                context_lines.append("  - (No specific parameters detected - will provide qualitative analysis)")
-                context_lines.append("")
-            
-            context_lines.append("**Baseline Forecast:**")
-            
-            if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                baseline_total = sum(forecast_result.predicted_values)
-                for i, (year, value) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                    context_lines.append(f"  - Year {year}: ${value/1e9:.2f}B")
-                context_lines.append("")
-                context_lines.append(f"**Baseline Total ({len(forecast_result.periods)}-year):** ${baseline_total/1e9:.1f}B")
-                context_lines.append("")
-            
-            # If we have specific parameters, calculate scenario impact
-            if scenario_params:
-                context_lines.append("**🔢 Quantitative Scenario Impact:**")
-                context_lines.append("")
-                
-                # For multi-factor scenarios, calculate compound effects
-                if is_multi_factor and param_count > 1:
-                    context_lines.append(f"**🔗 Combined Impact ({param_count} factors):**")
-                    context_lines.append("**Note:** Factors interact and compound.")
-                    context_lines.append("")
-                
-                # Calculate impact based on parameters
-                if "revenue_growth" in scenario_params:
-                    growth_factor = 1 + scenario_params["revenue_growth"]
-                    context_lines.append(f"**Revenue Growth Impact ({scenario_params['revenue_growth']:+.1%}):**")
-                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                            adjusted_val = baseline_val * growth_factor
-                            delta = adjusted_val - baseline_val
-                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B (+${delta/1e9:.2f}B)")
-                    context_lines.append("")
-                
-                if "cogs_change" in scenario_params:
-                    cogs_impact = scenario_params["cogs_change"]
-                    # COGS impacts margin, which impacts revenue (simplified model)
-                    # For revenue forecast: higher COGS → lower margins → potentially lower revenue
-                    margin_impact = -cogs_impact * 0.5  # Simplified: 50% of COGS change affects margin
-                    context_lines.append(f"**COGS Change Impact ({cogs_impact:+.1%}):**")
-                    context_lines.append(f"  - Estimated Margin Impact: {margin_impact:+.2%}")
-                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                            adjusted_val = baseline_val * (1 + margin_impact)
-                            delta = adjusted_val - baseline_val
-                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
-                    context_lines.append("")
-                
-                if "margin_change" in scenario_params:
-                    margin_impact = scenario_params["margin_change"]
-                    # Direct margin change affects revenue proportionally
-                    context_lines.append(f"**Margin Change Impact ({margin_impact:+.2%}):**")
-                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                            # Margin change affects bottom line more than top line
-                            # For revenue forecast, margin expansion might indicate pricing power
-                            adjusted_val = baseline_val * (1 + margin_impact * 0.3)  # 30% of margin change affects revenue
-                            delta = adjusted_val - baseline_val
-                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
-                    context_lines.append("")
-                
-                if "volume_change" in scenario_params:
-                    volume_impact = scenario_params["volume_change"]
-                    context_lines.append(f"**Volume Change Impact ({volume_impact:+.1%}):**")
-                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                            # Volume directly impacts revenue (1:1 relationship for most companies)
-                            adjusted_val = baseline_val * (1 + volume_impact)
-                            delta = adjusted_val - baseline_val
-                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B (+${delta/1e9:.2f}B)")
-                    context_lines.append("")
-                
-                if "marketing_change" in scenario_params:
-                    marketing_impact = scenario_params["marketing_change"]
-                    # Marketing spend affects volume with diminishing returns
-                    # Simplified: 10% marketing increase → 2-3% volume increase
-                    volume_impact = marketing_impact * 0.25
-                    context_lines.append(f"**Marketing Spend Impact ({marketing_impact:+.1%}):**")
-                    context_lines.append(f"  - Estimated Volume Impact: {volume_impact:+.2%}")
-                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                            # Marketing affects revenue through volume
-                            adjusted_val = baseline_val * (1 + volume_impact)
-                            delta = adjusted_val - baseline_val
-                            # But also increases opex, reducing margin
-                            margin_hit = marketing_impact * 0.1  # 10% of marketing spend hits margin
-                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B (+${delta/1e9:.2f}B)")
-                        context_lines.append(f"  - Trade-off: Operating margin decreases by ~{margin_hit:.2%}")
-                    context_lines.append("")
-                
-                if "gdp_change" in scenario_params:
-                    gdp_impact = scenario_params["gdp_change"]
-                    # GDP affects revenue with beta coefficient (typically 0.3-0.8 for most companies)
-                    revenue_sensitivity = 0.5  # Simplified: 50% sensitivity
-                    revenue_impact = gdp_impact * revenue_sensitivity
-                    context_lines.append(f"**GDP Change Impact ({gdp_impact:+.1%}):**")
-                    context_lines.append(f"  - Estimated Revenue Sensitivity: {revenue_sensitivity:.0%}")
-                    context_lines.append(f"  - Expected Revenue Impact: {revenue_impact:+.2%}")
-                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                            adjusted_val = baseline_val * (1 + revenue_impact)
-                            delta = adjusted_val - baseline_val
-                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
-                    context_lines.append("")
-                
-                if "price_change" in scenario_params:
-                    price_impact = scenario_params["price_change"]
-                    context_lines.append(f"**Price Change Impact ({price_impact:+.1%}):**")
-                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                            # Price directly affects revenue (assuming constant volume)
-                            adjusted_val = baseline_val * (1 + price_impact)
-                            delta = adjusted_val - baseline_val
-                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${adjusted_val/1e9:.2f}B ({delta/1e9:+.2f}B)")
-                    context_lines.append("")
-                
-                # If multi-factor, calculate compound impact
-                if is_multi_factor and param_count > 1:
-                    context_lines.append("**🔗 Compound Impact (All Factors Combined):**")
-                    context_lines.append("")
-                    
-                    # Calculate total multiplier from all factors
-                    total_multiplier = 1.0
-                    impact_breakdown = []
-                    
-                    if "revenue_growth" in scenario_params:
-                        total_multiplier *= (1 + scenario_params["revenue_growth"])
-                        impact_breakdown.append(f"Revenue growth: {scenario_params['revenue_growth']:+.1%}")
-                    
-                    if "volume_change" in scenario_params:
-                        total_multiplier *= (1 + scenario_params["volume_change"])
-                        impact_breakdown.append(f"Volume change: {scenario_params['volume_change']:+.1%}")
-                    
-                    if "price_change" in scenario_params:
-                        total_multiplier *= (1 + scenario_params["price_change"])
-                        impact_breakdown.append(f"Price change: {scenario_params['price_change']:+.1%}")
-                    
-                    if "cogs_change" in scenario_params:
-                        margin_effect = -scenario_params["cogs_change"] * 0.5
-                        total_multiplier *= (1 + margin_effect)
-                        impact_breakdown.append(f"COGS impact: {scenario_params['cogs_change']:+.1%} → margin {margin_effect:+.1%}")
-                    
-                    if "margin_change" in scenario_params:
-                        revenue_effect = scenario_params["margin_change"] * 0.3
-                        total_multiplier *= (1 + revenue_effect)
-                        impact_breakdown.append(f"Margin impact: {scenario_params['margin_change']:+.1%} → revenue {revenue_effect:+.1%}")
-                    
-                    if "marketing_change" in scenario_params:
-                        volume_effect = scenario_params["marketing_change"] * 0.25
-                        total_multiplier *= (1 + volume_effect)
-                        impact_breakdown.append(f"Marketing impact: {scenario_params['marketing_change']:+.1%} → volume {volume_effect:+.1%}")
-                    
-                    if "gdp_change" in scenario_params:
-                        revenue_effect = scenario_params["gdp_change"] * 0.5
-                        total_multiplier *= (1 + revenue_effect)
-                        impact_breakdown.append(f"GDP impact: {scenario_params['gdp_change']:+.1%} → revenue {revenue_effect:+.1%}")
-                    
-                    total_impact_pct = (total_multiplier - 1.0) * 100
-                    
-                    context_lines.append("**Factor Interactions:**")
-                    for breakdown_item in impact_breakdown:
-                        context_lines.append(f"  - {breakdown_item}")
-                    context_lines.append("")
-                    context_lines.append(f"**Total Compound Impact:** {total_impact_pct:+.2f}%")
-                    context_lines.append("")
-                    
-                    # Show combined forecast
-                    context_lines.append("**Combined Scenario Forecast:**")
-                    if forecast_result and hasattr(forecast_result, 'predicted_values'):
-                        for i, (year, baseline_val) in enumerate(zip(forecast_result.periods, forecast_result.predicted_values)):
-                            combined_val = baseline_val * total_multiplier
-                            delta = combined_val - baseline_val
-                            delta_pct = (delta / baseline_val * 100) if baseline_val != 0 else 0
-                            context_lines.append(f"  - Year {year}: ${baseline_val/1e9:.2f}B → ${combined_val/1e9:.2f}B ({delta/1e9:+.2f}B, {delta_pct:+.1f}%)")
-                    context_lines.append("")
-                
-                # Add warnings section if any
-                if scenario_warnings:
-                    context_lines.append("**⚠️ Scenario Validation Warnings:**")
-                    for warning in scenario_warnings:
-                        context_lines.append(f"  - {warning}")
-                    context_lines.append("")
-                    context_lines.append("**Important:** These assumptions are outside typical ranges.")
-                    context_lines.append("**You should discuss the plausibility of these assumptions in your response.**")
-                    context_lines.append("")
-                
-                context_lines.extend([
-                    "**🎯 YOUR TASK:**",
-                    "1. Present the SCENARIO IMPACT ANALYSIS above",
-                    "2. Create a SUMMARY COMPARISON TABLE showing:",
-                    "   | Year | Baseline | Scenario | Delta ($) | Delta (%) |",
-                ])
-                
-                # Add special instructions for multi-factor scenarios
-                if is_multi_factor and param_count > 1:
-                    context_lines.extend([
-                        "3. **CRITICAL:** This is a MULTI-FACTOR scenario - explain:",
-                        "   - Individual impacts of each factor (use the breakdown above)",
-                        "   - How factors interact and compound",
-                        f"   - Total compound impact: {total_impact_pct:+.2f}%",
-                        "   - Any conflicting effects (e.g., volume +10% but price -5%)",
-                    ])
-                else:
-                    context_lines.extend([
-                        "3. Explain the business logic behind the impact:",
-                        "   - Which assumption changed (use the parsed parameter)",
-                        "   - How it affects revenue (use the calculated impact)",
-                        "   - Any trade-offs or secondary effects",
-                    ])
-                
-                context_lines.extend([
-                    "4. Discuss confidence level in the scenario",
-                    "5. If validation warnings exist, acknowledge them and discuss plausibility",
-                    "6. Suggest related scenarios to explore",
-                    "",
-                    "**Note:** Calculations use simplified business models (e.g., volume → revenue 1:1,",
-                    "COGS → margin 0.5x). In production, company-specific sensitivities would be calibrated",
-                    "from historical data and industry benchmarks.",
-                    ""
-                ])
-            else:
-                # No specific parameters - provide qualitative analysis
-                context_lines.extend([
-                    "",
-                    "**🎯 YOUR TASK:**",
-                    "1. Acknowledge the scenario request",
-                    "2. Explain what assumptions would change in this scenario",
-                    "3. Provide a QUALITATIVE estimate of impact:",
-                    "   - Would revenue increase or decrease?",
-                    "   - By approximately how much (rough % range)?",
-                    "   - What are the key mechanisms driving the change?",
-                    "4. Suggest making the scenario more specific:",
-                    "   - 'What if revenue grows 10%?'",
-                    "   - 'What if COGS rises 5%?'",
-                    "   - 'What if volume increases 15%?'",
-                    "5. Explain that specific percentages enable quantitative analysis",
-                    ""
-                ])
-        
-        context_lines.extend([
-            "=" * 80,
-            "END OF FOLLOW-UP CONTEXT",
-            "=" * 80
-        ])
-        
-        return "\n".join(context_lines)
-    
-    def _build_enhanced_rag_context(self, user_input: str) -> Optional[str]:
-        """Enhanced RAG context building with comprehensive financial data."""
-        # FIRST: Check if this is a follow-up question about an active forecast
-        followup = self._detect_forecast_followup(user_input)
-        if followup:
-            return self._build_forecast_followup_context(user_input, followup)
-        
-        # Skip financial context for portfolio queries (they have their own context)
-        portfolio_id_pattern = r"\bport_[\w]{4,12}\b"
-        if re.search(portfolio_id_pattern, user_input, re.IGNORECASE):
-            return None
-        
-        # CRITICAL: Check if this is a filter/category query - provide company universe context
-        lowered = user_input.strip().lower()
-        # Comprehensive sector patterns with all variations
-        SECTOR_PATTERNS = (
-            r'tech|technology|software|hardware|semiconductor|semis?|chip|it\b',
-            r'financial?|finance|banking|banks?|insurance|fintech',
-            r'healthcare|health|pharma|pharmaceutical|biotech|medical|drug',
-            r'energy|oil|gas|petroleum|renewables?|clean energy',
-            r'consumer|retail|e-commerce|ecommerce|cpg|discretionary|staples',
-            r'industrial|manufacturing|aerospace|defense|machinery',
-            r'real estate|property|reit|reits',
-            r'utilit(?:y|ies)|power|electric|water|infrastructure',
-            r'materials?|mining|metals?|chemicals?|commodit(?:y|ies)',
-            r'communication|telecom|media|entertainment|broadcasting',
-        )
-        sector_pattern = '|'.join(f'(?:{p})' for p in SECTOR_PATTERNS)
-        
-        filter_patterns = [
-            # CRITICAL: Sector-to-sector comparison queries (e.g., "How does finance compare to tech?")
-            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
-            rf'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:{sector_pattern})\s+compare\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
-            rf'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)\s+(?:to|with|vs\.?)\s+(?:the\s+)?(?:{sector_pattern})',
-            rf'\b(?:{sector_pattern})\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)\s+(?:the\s+)?(?:{sector_pattern})',
-            # "Analyze the [sector] sector: which companies..." (sector mentioned earlier)
-            rf'\b(?:analyze|review|examine|assess)\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
-            # "Show/List/Find [sector] companies"
-            rf'\b(?:show|list|find|get|give)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:companies|stocks|firms)',
-            # "Which [sector] company"
-            rf'\bwhich\s+(?:{sector_pattern})\s+(?:company|stock|firm)',
-            # "Which companies in [sector]"
-            rf'\bwhich\s+(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})',
-            # "Companies in [sector] sector/industry"
-            rf'\b(?:companies|stocks|firms)\s+(?:in\s+)?(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry)',
-            # "[Sector] sector companies"
-            rf'\b(?:{sector_pattern})\s+(?:sector|industry).*\b(?:companies|stocks|firms)',
-            # "In the [sector] sector, which companies..."
-            rf'\bin\s+(?:the\s+)?(?:{sector_pattern})\s+(?:sector|industry).*\bwhich\s+(?:companies|stocks|firms)',
-            # Revenue/sales filters
-            r'\b(?:companies|stocks|firms)\s+with\s+(?:revenue|sales)\s+(?:around|about|near|over|under|above|below)',
-            # Growth filters
-            r'\b(?:companies|stocks|firms)\s+with\s+(?:growing|increasing|declining|decreasing)\s+(?:revenue|sales|earnings|profit)',
-            r'\b(?:growing|increasing|high-growth|fast-growing)\s+(?:companies|stocks|firms)',
-            # Market cap filters
-            r'\b(?:large|small|mid|mega)\s+cap\s+(?:companies|stocks)',
-            # Profit margin filters with conditions
-            r'\b(?:companies|stocks|firms)\s+(?:have|with)?\s+(?:profit\s+)?margins?\s+(?:above|over|greater than|>)',
-            # Multiple criteria (growth AND margin AND cash flow)
-            r'\b(?:companies|stocks|firms).*(?:margins?|growth|cash flow).*(?:above|over|>).*(?:and|,)',
-        ]
-        
-        is_filter_query = any(re.search(pattern, lowered) for pattern in filter_patterns)
-        
-        if is_filter_query:
-            # CRITICAL: This is a filter query - provide company universe context
-            # Must return early to prevent ticker extraction fallback (which causes hallucinations)
-            try:
-                from .context_builder import build_company_universe_context
-                universe_context = build_company_universe_context(self.settings.database_path)
-                if universe_context:
-                    LOGGER.info(f"Filter query detected - returning company universe context ({len(universe_context)} chars)")
-                    return universe_context
-                else:
-                    # Even if universe context is empty, return a basic instruction to prevent fallback ticker extraction
-                    LOGGER.warning(f"Filter query detected but universe context is empty - returning basic instruction")
-                    return (
-                        "USER QUERY IS A FILTER/CATEGORY QUERY\n"
-                        "The user is asking to filter companies by sector, metrics, or other criteria.\n"
-                        "Please provide a narrative response explaining that you can help with company filtering,\n"
-                        "but you need the company database to be available to provide specific results.\n"
-                        "Do NOT show company dashboards for filter queries.\n"
-                    )
-            except Exception as e:
-                LOGGER.error(f"Company universe context builder failed for filter query: {e}", exc_info=True)
-                # Return basic instruction to prevent fallback ticker extraction which causes hallucinations
-                return (
-                    "USER QUERY IS A FILTER/CATEGORY QUERY\n"
-                    "The user is asking to filter companies by sector, metrics, or other criteria.\n"
-                    "Please provide a narrative response explaining that you encountered an error loading the company database.\n"
-                    "Do NOT show company dashboards for filter queries.\n"
-                )
-        
-        # First, try the smart context builder for natural language formatting
-        try:
-            financial_context = build_financial_context(
-                query=user_input,
-                analytics_engine=self.analytics_engine,
-                database_path=str(self.settings.database_path),
-                max_tickers=3,
-                include_macro_context=self.settings.include_macro_context,
-            )
-            if financial_context:
-                # Check if a forecast was generated and store its metadata in conversation state
-                try:
-                    from .context_builder import get_last_forecast_metadata
-                    forecast_metadata = get_last_forecast_metadata()
-                    if forecast_metadata:
-                        LOGGER.info(f"Storing forecast metadata in conversation: {forecast_metadata['ticker']} {forecast_metadata['metric']}")
-                        self.conversation.set_active_forecast(
-                            ticker=forecast_metadata['ticker'],
-                            metric=forecast_metadata['metric'],
-                            method=forecast_metadata['method'],
-                            periods=forecast_metadata['periods'],
-                            forecast_result=forecast_metadata['forecast_result'],
-                            explainability=forecast_metadata.get('explainability'),
-                            parameters=forecast_metadata.get('parameters')
-                        )
-                except Exception as forecast_error:
-                    LOGGER.warning(f"Failed to store forecast metadata: {forecast_error}")
-                
-                return financial_context
-        except Exception as e:
-            LOGGER.debug(f"Smart context builder failed, falling back: {e}")
-        
-        # Fallback to existing context building
-        tickers = self._detect_tickers(user_input)
-        if not tickers:
-            return None
-        
-        # Normalize tickers
-        normalized_tickers: List[str] = []
-        seen_tickers: set[str] = set()
-        for ticker in tickers:
-            if not ticker:
-                continue
-            upper = ticker.upper()
-            if upper in seen_tickers:
-                continue
-            seen_tickers.add(upper)
-            normalized_tickers.append(upper)
-        
-        if normalized_tickers:
-            self._progress("context_sources_scan", f"Scanning enhanced context for {', '.join(normalized_tickers)}")
-        
-        tickers = normalized_tickers or tickers
-        cache_key = "|".join(sorted(normalized_tickers)) if normalized_tickers else None
-        
-        if cache_key:
-            cached = self._get_cached_context(cache_key)
-            if cached:
-                self._progress("context_cache_hit", "Reusing cached enhanced context bundle")
-                return cached
-        
-        context_sections: List[str] = []
-        
-        for ticker in tickers:
-            try:
-                records = self._fetch_metrics_cached(ticker)
-            except Exception:
-                continue
-            if not records:
-                continue
-            
-            latest = self._select_latest_records(
-                records, span_fn=self.analytics_engine._period_span
-            )
-            if not latest:
-                continue
-            
-            # Build enhanced context with categories
-            ticker_context = self._build_ticker_enhanced_context(ticker, latest)
-            if ticker_context:
-                context_sections.append(ticker_context)
-        
-        if not context_sections:
-            self._progress("context_sources_empty", "No enhanced context located")
-            return None
-        
-        combined = "\n".join(context_sections)
-        final_context = "Enhanced Financial Context:\n" + combined
-        
-        self._progress("context_sources_ready", f"Added {len(context_sections)} enhanced context sections")
-        if cache_key:
-            self._store_cached_context(cache_key, final_context)
-        
-        return final_context
-
-    def _build_ticker_enhanced_context(self, ticker: str, latest: Dict[str, database.MetricRecord]) -> str:
-        """Build enhanced context for a single ticker with categorized metrics."""
-        
-        spans = [
-            self.analytics_engine._period_span(record.period)
-            for record in latest.values()
-            if record.period
-        ]
-        descriptor = (
-            self._describe_period_filters(spans) if spans else "latest available"
-        )
-        
-        lines = [f"{ticker} ({descriptor})"]
-        
-        # Build context by category
-        for category, metrics in CONTEXT_CATEGORIES.items():
-            category_lines = []
-            for metric_name in metrics:
-                formatted = self._format_metric_value(metric_name, latest)
-                if formatted == "n/a":
-                    continue
-                label = _METRIC_LABEL_MAP.get(
-                    metric_name, metric_name.replace("_", " ").title()
-                )
-                category_lines.append(f"  • {label}: {formatted}")
-            
-            if category_lines:
-                lines.append(f"  {category}:")
-                lines.extend(category_lines)
-        
-        return "\n".join(lines) if len(lines) > 1 else ""
-
-    def _handle_enhanced_error(self, error_category: ErrorCategory, **kwargs) -> str:
-        """Handle errors with specific messages and suggestions."""
-        error_info = ERROR_MESSAGES.get(error_category, ERROR_MESSAGES[ErrorCategory.UNKNOWN_ERROR])
-        
-        message = error_info["message"].format(**kwargs)
-        suggestions = error_info["suggestions"]
-        
-        response = f"{message}\n\n"
-        if suggestions:
-            response += "Here are some suggestions:\n"
-            for i, suggestion in enumerate(suggestions, 1):
-                response += f"{i}. {suggestion}\n"
-        
-        return response
-
-    def _detect_ticker_error(self, ticker: str) -> Optional[ErrorCategory]:
-        """Detect if ticker is not found."""
-        try:
-            # Try to fetch metrics for the ticker
-            records = self._fetch_metrics_cached(ticker)
-            if not records:
-                return ErrorCategory.TICKER_NOT_FOUND
-        except Exception:
-            return ErrorCategory.TICKER_NOT_FOUND
-        return None
-
-    def _detect_metric_error(self, metric: str, ticker: str) -> Optional[ErrorCategory]:
-        """Detect if metric is not available."""
-        try:
-            records = self._fetch_metrics_cached(ticker)
-            if not records:
-                return ErrorCategory.METRIC_NOT_AVAILABLE
-            
-            # Check if metric exists in records
-            latest = self._select_latest_records(
-                records, span_fn=self.analytics_engine._period_span
-            )
-            if metric not in latest:
-                return ErrorCategory.METRIC_NOT_AVAILABLE
-        except Exception:
-            return ErrorCategory.METRIC_NOT_AVAILABLE
-        return None
-
-    def _detect_period_error(self, period: str) -> Optional[ErrorCategory]:
-        """Detect if period is invalid."""
-        # Basic period validation
-        if not period or period.strip() == "":
-            return ErrorCategory.INVALID_PERIOD
-        
-        # Check for valid year format
-        if re.match(r'^\d{4}$', period.strip()):
-            year = int(period.strip())
-            if year < 1900 or year > 2030:
-                return ErrorCategory.INVALID_PERIOD
-            return None
-        
-        # Check for valid quarter format
-        if re.match(r'^Q[1-4]\s+\d{4}$', period.strip(), re.IGNORECASE):
-            return None
-        
-        # Check for relative periods
-        if any(keyword in period.lower() for keyword in ['last', 'previous', 'recent']):
-            return None
-        
-        # If none of the above patterns match, it's likely invalid
-        return ErrorCategory.INVALID_PERIOD
-
-    # Enhanced Visual Formatting Methods
-    def _generate_line_chart(self, data: Dict[str, List[float]], title: str, 
-                            x_labels: List[str] = None) -> str:
-        """Generate line chart for time series data."""
-        if not data or not any(data.values()):
-            return ""
-        
-        # Create ASCII line chart
-        chart_lines = [f"📈 {title}", "=" * 50]
-        
-        # Find max value for scaling
-        max_value = max(max(values) for values in data.values() if values)
-        min_value = min(min(values) for values in data.values() if values)
-        range_value = max_value - min_value if max_value != min_value else 1
-        
-        # Create chart for each series
-        for series_name, values in data.items():
-            if not values:
-                continue
-                
-            chart_lines.append(f"\n{series_name}:")
-            chart_lines.append("┌" + "─" * 48 + "┐")
-            
-            # Create ASCII line chart
-            for i, value in enumerate(values):
-                if value is None:
-                    continue
-                    
-                # Scale value to 0-40 range
-                scaled_value = int((value - min_value) / range_value * 40) if range_value > 0 else 20
-                bar = "█" * scaled_value + " " * (40 - scaled_value)
-                
-                label = x_labels[i] if x_labels and i < len(x_labels) else f"Point {i+1}"
-                chart_lines.append(f"│ {bar} │ {label}: {value:,.1f}")
-            
-            chart_lines.append("└" + "─" * 48 + "┘")
-        
-        return "\n".join(chart_lines)
-
-    def _generate_bar_chart(self, data: Dict[str, float], title: str) -> str:
-        """Generate bar chart for comparison data."""
-        if not data:
-            return ""
-        
-        chart_lines = [f"📊 {title}", "=" * 50]
-        
-        # Find max value for scaling
-        max_value = max(data.values()) if data.values() else 1
-        min_value = min(data.values()) if data.values() else 0
-        range_value = max_value - min_value if max_value != min_value else 1
-        
-        # Create bar chart
-        for label, value in data.items():
-            if value is None:
-                continue
-                
-            # Scale value to 0-40 range
-            scaled_value = int((value - min_value) / range_value * 40) if range_value > 0 else 20
-            bar = "█" * scaled_value + " " * (40 - scaled_value)
-            
-            chart_lines.append(f"{label:20} │{bar}│ {value:,.1f}")
-        
-        return "\n".join(chart_lines)
-
-    def _generate_pie_chart(self, data: Dict[str, float], title: str) -> str:
-        """Generate pie chart for distribution data."""
-        if not data:
-            return ""
-        
-        chart_lines = [f"🥧 {title}", "=" * 50]
-        
-        # Calculate percentages
-        total = sum(data.values()) if data.values() else 1
-        percentages = {k: (v / total * 100) if total > 0 else 0 for k, v in data.items()}
-        
-        # Create pie chart representation
-        for label, value in data.items():
-            percentage = percentages[label]
-            bar_length = int(percentage / 2)  # Scale to 0-50 range
-            bar = "█" * bar_length + " " * (50 - bar_length)
-            
-            chart_lines.append(f"{label:20} │{bar}│ {percentage:.1f}% ({value:,.1f})")
-        
-        return "\n".join(chart_lines)
-
-    def _format_enhanced_table(self, headers: List[str], rows: List[List[str]], 
-                              title: str = None, chart_type: str = None) -> str:
-        """Format table with enhanced visual styling."""
-        if not headers or not rows:
-            return ""
-        
-        # Add title if provided
-        result_lines = []
-        if title:
-            result_lines.append(f"📋 {title}")
-            result_lines.append("=" * len(title) + "=" * 4)
-        
-        # Calculate column widths
-        col_widths = [len(str(header)) for header in headers]
-        for row in rows:
-            for i, cell in enumerate(row):
-                if i < len(col_widths):
-                    col_widths[i] = max(col_widths[i], len(str(cell)))
-        
-        # Create table header
-        header_line = "┌" + "┬".join("─" * (width + 2) for width in col_widths) + "┐"
-        result_lines.append(header_line)
-        
-        # Add header row
-        header_cells = [f" {str(header):<{col_widths[i]}} " for i, header in enumerate(headers)]
-        result_lines.append("│" + "│".join(header_cells) + "│")
-        
-        # Add separator
-        separator = "├" + "┼".join("─" * (width + 2) for width in col_widths) + "┤"
-        result_lines.append(separator)
-        
-        # Add data rows
-        for row in rows:
-            row_cells = []
-            for i, cell in enumerate(row):
-                if i < len(col_widths):
-                    row_cells.append(f" {str(cell):<{col_widths[i]}} ")
-                else:
-                    row_cells.append(" " * (col_widths[i] + 2))
-            
-            result_lines.append("│" + "│".join(row_cells) + "│")
-        
-        # Add footer
-        footer_line = "└" + "┴".join("─" * (width + 2) for width in col_widths) + "┘"
-        result_lines.append(footer_line)
-        
-        # Add chart if requested
-        if chart_type and len(rows) > 0:
-            result_lines.append("\n")
-            if chart_type == "line" and len(rows) > 1:
-                # Generate line chart for time series data
-                chart_data = {}
-                for i, row in enumerate(rows):
-                    if len(row) > 1:
-                        series_name = row[0]
-                        values = []
-                        for j in range(1, len(row)):
-                            try:
-                                value = float(row[j].replace(',', '').replace('%', ''))
-                                values.append(value)
-                            except (ValueError, IndexError):
-                                continue
-                        if values:
-                            chart_data[series_name] = values
-                if chart_data:
-                    result_lines.append(self._generate_line_chart(chart_data, f"{title} - Trend Analysis"))
-            
-            elif chart_type == "bar":
-                # Generate bar chart for comparison data
-                chart_data = {}
-                for row in rows:
-                    if len(row) >= 2:
-                        try:
-                            value = float(row[1].replace(',', '').replace('%', ''))
-                            chart_data[row[0]] = value
-                        except (ValueError, IndexError):
-                            continue
-                if chart_data:
-                    result_lines.append(self._generate_bar_chart(chart_data, f"{title} - Comparison"))
-        
-        return "\n".join(result_lines)
-
-    def _export_to_csv(self, data: Dict[str, Any], filename: str) -> str:
-        """Export data to CSV format."""
-        import csv
-        import io
-        
-        output = io.StringIO()
-        writer = csv.writer(output)
-        
-        # Write headers
-        if 'headers' in data:
-            writer.writerow(data['headers'])
-        
-        # Write rows
-        if 'rows' in data:
-            for row in data['rows']:
-                writer.writerow(row)
-        
-        csv_content = output.getvalue()
-        output.close()
-        
-        # Save to file
-        with open(filename, 'w', newline='', encoding='utf-8') as f:
-            f.write(csv_content)
-        
-        return f"📁 Data exported to {filename}"
-
-    def _export_to_pdf(self, data: Dict[str, Any], filename: str) -> str:
-        """Export data to PDF format."""
-        try:
-            try:
-                from reportlab.lib.pagesizes import letter  # type: ignore
-                from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer  # type: ignore
-                from reportlab.lib.styles import getSampleStyleSheet  # type: ignore
-                from reportlab.lib import colors  # type: ignore
-            except ImportError:
-                raise ImportError("reportlab is required for PDF export. Install it with: pip install reportlab")
-            
-            doc = SimpleDocTemplate(filename, pagesize=letter)
-            styles = getSampleStyleSheet()
-            story = []
-            
-            # Add title
-            if 'title' in data:
-                title = Paragraph(data['title'], styles['Title'])
-                story.append(title)
-                story.append(Spacer(1, 12))
-            
-            # Add table
-            if 'headers' in data and 'rows' in data:
-                table_data = [data['headers']] + data['rows']
-                table = Table(table_data)
-                table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 14),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ]))
-                story.append(table)
-            
-            doc.build(story)
-            return f"📄 PDF exported to {filename}"
-            
-        except ImportError:
-            return "❌ PDF export requires reportlab package. Install with: pip install reportlab"
-        except Exception as e:
-            return f"❌ PDF export failed: {str(e)}"
-
-    def _add_visual_indicators(self, text: str) -> str:
-        """Add visual indicators to text responses."""
-        # Add emojis and visual indicators
-        enhanced_text = text
-        
-        # Add indicators for different types of content
-        if "revenue" in text.lower():
-            enhanced_text = enhanced_text.replace("revenue", "💰 Revenue")
-        if "profit" in text.lower():
-            enhanced_text = enhanced_text.replace("profit", "📈 Profit")
-        if "growth" in text.lower():
-            enhanced_text = enhanced_text.replace("growth", "📊 Growth")
-        if "ratio" in text.lower():
-            enhanced_text = enhanced_text.replace("ratio", "📏 Ratio")
-        
-        return enhanced_text
-
-    def _format_financial_metrics(self, metrics: Dict[str, float]) -> str:
-        """Format financial metrics with visual enhancements."""
-        if not metrics:
-            return ""
-        
-        result_lines = ["📊 Financial Metrics Summary", "=" * 40]
-        
-        for metric, value in metrics.items():
-            if value is None:
-                continue
-                
-            # Add visual indicators based on metric type
-            if "revenue" in metric.lower():
-                indicator = "💰"
-            elif "profit" in metric.lower() or "income" in metric.lower():
-                indicator = "📈"
-            elif "ratio" in metric.lower():
-                indicator = "📏"
-            elif "growth" in metric.lower():
-                indicator = "📊"
-            else:
-                indicator = "📋"
-            
-            # Format value with appropriate precision
-            if isinstance(value, float):
-                if abs(value) >= 1e9:
-                    formatted_value = f"{value/1e9:.2f}B"
-                elif abs(value) >= 1e6:
-                    formatted_value = f"{value/1e6:.2f}M"
-                elif abs(value) >= 1e3:
-                    formatted_value = f"{value/1e3:.2f}K"
-                else:
-                    formatted_value = f"{value:.2f}"
-            else:
-                formatted_value = str(value)
-            
-            result_lines.append(f"{indicator} {metric.replace('_', ' ').title()}: {formatted_value}")
-        
-        return "\n".join(result_lines)
-
-    def _detect_tickers(self, text: str) -> List[str]:
-        """Best-effort ticker extraction from user text (tickers + company names)."""
-        candidates: List[str] = []
-        seen = set()
-        
-        # CRITICAL: Check if this is a sector comparison query
-        # If asking about "tech sector" or "finance sector", don't extract sector names as tickers
-        lowered = text.lower()
-        sector_context_patterns = [
-            r'\b(?:tech|technology|financial?|finance|healthcare|energy)\s+(?:sector|industry|companies)',
-            r'\b(?:the\s+)?(?:tech|technology|financial?|finance|healthcare|energy)\s+(?:sector|industry)',
-            r'\bsector.*compare|compare.*sector',
-            r'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:tech|technology|financial?|finance)\s+(?:sector|industry)\s+compare',
-            r'\b(?:how|what)\s+(?:does|do)\s+(?:the\s+)?(?:tech|technology|financial?|finance)\s+compare\s+(?:to|with|vs\.?)',
-            r'\b(?:compare|comparing|comparison)\s+(?:the\s+)?(?:tech|technology|financial?|finance)\s+(?:sector|industry)',
-            r'\b(?:tech|technology|financial?|finance)\s+(?:sector|industry)\s+(?:vs\.?|versus|compared to)',
-        ]
-        is_sector_query = any(re.search(pattern, lowered) for pattern in sector_context_patterns)
-
-        for token in _TICKER_TOKEN_PATTERN.findall(text.upper()):
-            normalized = token.upper()
-            if normalized in _COMMON_WORDS:
-                continue
-            
-            # CRITICAL: If this is a sector query, filter out sector names that are also tickers
-            if is_sector_query:
-                sector_names_as_tickers = {"TECH", "IT", "FINANCE", "OIL", "GAS", "RETAIL"}
-                if normalized in sector_names_as_tickers:
-                    continue
-            
-            if normalized not in seen:
-                seen.add(normalized)
-                candidates.append(normalized)
-
-        # Also resolve company phrases to tickers
-        for match in _COMPANY_PHRASE_PATTERN.findall(text):
-            phrase = match.strip()
-            if not phrase:
-                continue
-            phrase = re.sub(r"(?:'s|'s)$", "", phrase, flags=re.IGNORECASE).strip()
-            if phrase.upper() in _COMMON_WORDS:
-                continue
-            # Debug: log phrase resolution attempts
-            print(f"[DEBUG] Trying to resolve phrase: '{phrase}'")
-            ticker = self._name_to_ticker(phrase)
-            print(f"[DEBUG] Resolved '{phrase}' -> {ticker}")
-            if ticker and ticker not in seen:
-                seen.add(ticker)
-                candidates.append(ticker)
-
-        # Additional pass: try individual words in case multi-word phrases didn't resolve
-        # This helps when users say "dashboard apple microsoft" - try each word separately
-        command_words = {"dashboard", "show", "display", "compare", "view", "get", "give", "full", "comprehensive", "detailed"}
-        words = text.split()
-        for word in words:
-            word = word.strip()
-            if len(word) < 2:
-                continue
-            if word.lower() in command_words:
-                continue
-            if word.upper() in _COMMON_WORDS:
-                continue
-            if word.upper() in seen:
-                continue
-            # Try to resolve this individual word as a company name or ticker
-            print(f"[DEBUG] Trying individual word: '{word}'")
-            ticker = self._name_to_ticker(word)
-            print(f"[DEBUG] Resolved individual word '{word}' -> {ticker}")
-            if ticker and ticker not in seen:
-                seen.add(ticker)
-                candidates.append(ticker)
-
-        return candidates
-
-    def _compose_benchmark_summary(
-        self,
-        metrics_per_ticker: Dict[str, Dict[str, database.MetricRecord]],
-        *,
-        benchmark_label: Optional[str] = None,
-    ) -> List[str]:
-        """Summarise how tickers stack up against an optional benchmark column."""
-        if not metrics_per_ticker:
-            return []
-
-        contenders = {
-            ticker: records
-            for ticker, records in metrics_per_ticker.items()
-            if ticker != benchmark_label
-        }
-        if not contenders:
-            return []
-
-        benchmark_metrics = (
-            metrics_per_ticker.get(benchmark_label) if benchmark_label else None
-        )
-
-        highlights: List[str] = []
-        for metric, label in BENCHMARK_KEY_METRICS.items():
-            best_ticker: Optional[str] = None
-            best_value: Optional[float] = None
-            best_display: Optional[str] = None
-            for ticker, records in contenders.items():
-                record = records.get(metric)
-                if not record or record.value is None:
-                    continue
-                if best_value is None or record.value > best_value:
-                    best_value = record.value
-                    best_ticker = ticker
-                    best_display = self._format_metric_value(metric, records)
-            if best_ticker is None or best_value is None or best_display is None:
-                continue
-
-            line = f"{label}: {best_ticker} {best_display}"
-
-            benchmark_display: Optional[str] = None
-            benchmark_value: Optional[float] = None
-            if benchmark_metrics:
-                benchmark_record = benchmark_metrics.get(metric)
-                if benchmark_record and benchmark_record.value is not None:
-                    benchmark_value = benchmark_record.value
-                    benchmark_display = self._format_metric_value(metric, benchmark_metrics)
-
-            if benchmark_display:
-                benchmark_name = benchmark_label or "Benchmark"
-                line += f" vs {benchmark_name} {benchmark_display}"
-                delta_note = self._format_benchmark_delta(metric, best_value, benchmark_value)
-                if delta_note is not None and benchmark_value is not None:
-                    direction = "above" if (best_value - benchmark_value) >= 0 else "below"
-                    line += f" ({delta_note} {direction})"
-
-            highlights.append(line)
-        return highlights
-
-    def _format_benchmark_delta(
-        self,
-        metric_name: str,
-        best_value: Optional[float],
-        benchmark_value: Optional[float],
-    ) -> Optional[str]:
-        """Express the difference between the leader and benchmark in human terms."""
-        if best_value is None or benchmark_value is None:
-            return None
-        delta = best_value - benchmark_value
-        if abs(delta) < 1e-9:
-            return None
-        if metric_name in PERCENT_METRICS:
-            return f"{delta * 100:+.1f} pts"
-        if metric_name in MULTIPLE_METRICS:
-            return f"{delta:+.2f}x"
-        return f"{delta:+,.0f}"
-
-    @staticmethod
-    def _format_metric_value(
-        metric_name: str, metrics: Dict[str, database.MetricRecord]
-    ) -> str:
-        """Format metric values with appropriate precision and units."""
-        record = metrics.get(metric_name)
-        if not record or record.value is None:
-            return "n/a"
-        value = record.value
-        if metric_name in PERCENT_METRICS:
-            return f"{value:.1%}"
-        if metric_name in MULTIPLE_METRICS:
-            return f"{value:.2f}"
-        return f"{value:,.0f}"
-
-    @staticmethod
-    def _format_fact_value(value: float) -> str:
-        """Format fact values for display, preserving units where possible."""
-        absolute = abs(value)
-        if absolute >= 1_000_000:
-            return f"{value/1_000_000:,.2f}M"
-        if absolute >= 1_000:
-            return f"{value:,.0f}"
-        if absolute >= 10:
-            return f"{value:,.2f}"
-        return f"{value:.4f}"
-
-    @staticmethod
-    def _render_table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
-        """Render rows and headers into a markdown-style table."""
-        if not rows:
-            return "No data available."
-
-        alignments = ["left"] + ["right"] * (len(headers) - 1)
-        widths = [len(header) for header in headers]
-        for row in rows:
-            for idx, cell in enumerate(row):
-                widths[idx] = max(widths[idx], len(cell))
-
-        def format_row(values: Sequence[str]) -> str:
-            """Format a single row tuple for display in tables."""
-            formatted = []
-            for idx, value in enumerate(values):
-                if alignments[idx] == "left":
-                    formatted.append(value.ljust(widths[idx]))
-                else:
-                    formatted.append(value.rjust(widths[idx]))
-            return " | ".join(formatted)
-
-        header_line = format_row(headers)
-        separator = "-+-".join("-" * width for width in widths)
-        body = "\n".join(format_row(row) for row in rows)
-        return "\n".join([header_line, separator, body])
-
-    # Enhanced Error Handling Methods
-    def _detect_error_category(self, error_message: str) -> ErrorCategory:
-        """Detect error category based on error message content."""
-        error_lower = error_message.lower()
-        
-        if any(keyword in error_lower for keyword in ["not found", "missing", "unavailable"]):
-            return ErrorCategory.DATA_NOT_FOUND
-        elif any(keyword in error_lower for keyword in ["invalid", "incorrect", "wrong"]):
-            return ErrorCategory.INVALID_INPUT
-        elif any(keyword in error_lower for keyword in ["timeout", "connection", "network"]):
-            return ErrorCategory.NETWORK_ERROR
-        elif any(keyword in error_lower for keyword in ["permission", "access", "unauthorized"]):
-            return ErrorCategory.PERMISSION_ERROR
-        elif any(keyword in error_lower for keyword in ["limit", "quota", "exceeded"]):
-            return ErrorCategory.QUOTA_EXCEEDED
-        elif any(keyword in error_lower for keyword in ["server", "internal", "system"]):
-            return ErrorCategory.SERVER_ERROR
-        else:
-            return ErrorCategory.UNKNOWN_ERROR
-
-    def _format_error_message(self, error: Exception, context: str = "") -> str:
-        """Format error message with specific guidance based on error category."""
-        error_message = str(error)
-        category = self._detect_error_category(error_message)
-        
-        base_message = ERROR_MESSAGES.get(category, ERROR_MESSAGES[ErrorCategory.UNKNOWN_ERROR])
-        
-        # Add context-specific suggestions
-        suggestions = []
-        if context:
-            suggestions.append(f"Context: {context}")
-        
-        if category == ErrorCategory.DATA_NOT_FOUND:
-            suggestions.extend([
-                "• Try using a different company name or ticker symbol",
-                "• Check if the company is publicly traded",
-                "• Verify the time period is available"
-            ])
-        elif category == ErrorCategory.INVALID_INPUT:
-            suggestions.extend([
-                "• Check your query format",
-                "• Ensure ticker symbols are valid",
-                "• Verify time period format (e.g., 2023, Q1 2023)"
-            ])
-        elif category == ErrorCategory.NETWORK_ERROR:
-            suggestions.extend([
-                "• Check your internet connection",
-                "• Try again in a few moments",
-                "• Contact support if the issue persists"
-            ])
-        
-        if suggestions:
-            base_message += "\n\nSuggestions:\n" + "\n".join(suggestions)
-        
-        return base_message
-
-    # Enhanced Chart Generation Methods
-    def _generate_chart(self, data: Dict[str, List[float]], title: str, chart_type: str = "line") -> str:
-        """Generate various types of charts based on data."""
-        if chart_type == "line":
-            return self._generate_line_chart(data, title)
-        elif chart_type == "bar":
-            return self._generate_bar_chart(data, title)
-        elif chart_type == "pie":
-            return self._generate_pie_chart(data, title)
-        else:
-            return f"❌ Unsupported chart type: {chart_type}"

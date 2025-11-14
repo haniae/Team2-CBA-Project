@@ -768,6 +768,19 @@ def parse_periods(text: str, prefer_fiscal: bool = True) -> Dict[str, Any]:
             "warnings": warnings,
         }
 
+    # Check for FY pattern first (e.g., "FY2024", "FY24")
+    fy_match = FY_PATTERN.search(lower_text)
+    if fy_match:
+        year = _extract_year(fy_match.group(1))
+        warnings.append("fy_pattern_detected")
+        return {
+            "type": "single",
+            "granularity": "fiscal_year",
+            "items": [{"fy": year, "fq": None}],
+            "normalize_to_fiscal": True,  # FY always means fiscal
+            "warnings": warnings,
+        }
+    
     fiscal_match = FISCAL_PATTERN.search(lower_text)
     if fiscal_match:
         year = _extract_year(fiscal_match.group(1))

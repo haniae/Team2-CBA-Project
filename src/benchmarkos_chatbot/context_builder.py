@@ -792,6 +792,36 @@ def _extract_forecast_method(query: str) -> str:
     return "auto"
 
 
+def _extract_forecast_periods(query: str, default: int = 3, *, min_years: int = 1, max_years: int = 10) -> int:
+    """Extract requested forecast horizon (years) from the query."""
+    import re
+
+    query_lower = query.lower()
+    patterns = [
+        r'\bnext\s+(\d+)\s+years?\b',
+        r'\bfor\s+the\s+next\s+(\d+)\s+years?\b',
+        r'\bfor\s+(\d+)\s+years?\b',
+        r'\bover\s+the\s+next\s+(\d+)\s+years?\b',
+        r'\b(\d+)\s*-\s*year\s+(?:forecast|projection|outlook)\b',
+        r'\b(\d+)\s+year\s+(?:forecast|projection|outlook)\b',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, query_lower)
+        if match:
+            try:
+                years = int(match.group(1))
+            except (TypeError, ValueError):
+                continue
+            if years > 0:
+                return max(min_years, min(years, max_years))
+
+    if "next year" in query_lower or "upcoming year" in query_lower:
+        return max(min_years, 1)
+
+    return max(min_years, min(default, max_years))
+
+
 def _build_mandatory_data_block(ticker: str, latest_records: dict, period_label: str) -> str:
     """
     Build a prominent mandatory data block that LLM MUST use.
@@ -3469,161 +3499,174 @@ def build_financial_context(
                         period_label = _format_period_label(record)
                         break
                 
-                # Get filing sources for citation with SEC URLs
-                filing_sources = _get_filing_sources(ticker, database_path)
-                source_citation = ""
-                sec_urls = []
+                # CRITICAL: Check if this is a forecasting query BEFORE building historical context
+                # For forecasting queries, we'll skip historical context and only use ML forecast
+                is_forecasting_local = _is_forecasting_query(query)
+                forecast_metric_local = _extract_forecast_metric(query) if is_forecasting_local else None
                 
-                if filing_sources:
-                    # Get most recent filings (up to 3) for comprehensive sourcing
-                    recent_filings = filing_sources[:3]
+                # Only build historical context if NOT a forecasting query
+                if not (is_forecasting_local and forecast_metric_local):
+                    # Get filing sources for citation with SEC URLs
+                    filing_sources = _get_filing_sources(ticker, database_path)
+                    source_citation = ""
+                    sec_urls = []
                     
-                    for filing in recent_filings:
-                        form_type = filing.get("form_type", "SEC filing")
-                        fy = filing.get("fiscal_year")
-                        fp = filing.get("fiscal_period")
-                        sec_url = filing.get("sec_url")
+                    if filing_sources:
+                        # Get most recent filings (up to 3) for comprehensive sourcing
+                        recent_filings = filing_sources[:3]
                         
-                        if sec_url:
-                            # Format as markdown link: [10-K FY2023](URL)
-                            if fy and fp:
-                                link_text = f"{form_type} FY{fy} {fp}"
-                                sec_urls.append(f"[{link_text}]({sec_url})")
-                            elif fy:
-                                link_text = f"{form_type} FY{fy}"
-                                sec_urls.append(f"[{link_text}]({sec_url})")
-                            else:
-                                sec_urls.append(f"[{form_type}]({sec_url})")
+                        for filing in recent_filings:
+                            form_type = filing.get("form_type", "SEC filing")
+                            fy = filing.get("fiscal_year")
+                            fp = filing.get("fiscal_period")
+                            sec_url = filing.get("sec_url")
+                            
+                            if sec_url:
+                                # Format as markdown link: [10-K FY2023](URL)
+                                if fy and fp:
+                                    link_text = f"{form_type} FY{fy} {fp}"
+                                    sec_urls.append(f"[{link_text}]({sec_url})")
+                                elif fy:
+                                    link_text = f"{form_type} FY{fy}"
+                                    sec_urls.append(f"[{link_text}]({sec_url})")
+                                else:
+                                    sec_urls.append(f"[{form_type}]({sec_url})")
+                        
+                        # Use first filing for header citation
+                        first_filing = recent_filings[0]
+                        form_type = first_filing.get("form_type", "SEC filing")
+                        fy = first_filing.get("fiscal_year")
+                        fp = first_filing.get("fiscal_period")
+                        if fy and fp:
+                            source_citation = f" (per {form_type} FY{fy} {fp})"
+                        elif fy:
+                            source_citation = f" (per {form_type} FY{fy})"
                     
-                    # Use first filing for header citation
-                    first_filing = recent_filings[0]
-                    form_type = first_filing.get("form_type", "SEC filing")
-                    fy = first_filing.get("fiscal_year")
-                    fp = first_filing.get("fiscal_period")
-                    if fy and fp:
-                        source_citation = f" (per {form_type} FY{fy} {fp})"
-                    elif fy:
-                        source_citation = f" (per {form_type} FY{fy})"
+                    # Build mandatory data block FIRST - this is critical for accuracy
+                    LOGGER.critical(f"🔍 DEBUG: Building mandatory block for {ticker}, latest_records keys: {list(latest_records.keys()) if latest_records else 'EMPTY'}")
+                    mandatory_block = _build_mandatory_data_block(ticker, latest_records, period_label)
+                    LOGGER.critical(f"🔍 DEBUG: Mandatory block length: {len(mandatory_block)} chars")
+                    LOGGER.critical(f"🔍 DEBUG: Mandatory block preview:\n{mandatory_block[:500]}")
+                    
+                    # Build comprehensive ticker context with SEC URLs prominently displayed
+                    ticker_context = mandatory_block  # Start with mandatory block
+                    ticker_context += f"\n{'='*80}\n"
+                    ticker_context += f"{company_name} ({ticker}) - {period_label}{source_citation}\n"
+                    ticker_context += f"{'='*80}\n\n"
+                    
+                    # Add SEC Filing Sources section at the top for easy access
+                    if sec_urls:
+                        ticker_context += "📄 **SEC FILING SOURCES (Markdown Links)** - Copy these to your Sources section:\n"
+                        for url_info in sec_urls:
+                            ticker_context += f"  • {url_info}\n"
+                        ticker_context += "⚠️ These are already formatted as markdown [text](url). Copy them EXACTLY to your Sources section.\n\n"
+                    
+                    # Income Statement Metrics
+                    income_metrics = []
+                    if latest_records.get("revenue"):
+                        income_metrics.append(f"Revenue: {format_currency(latest_records['revenue'].value)}")
+                    if latest_records.get("net_income"):
+                        income_metrics.append(f"Net Income: {format_currency(latest_records['net_income'].value)}")
+                    if latest_records.get("ebitda"):
+                        income_metrics.append(f"EBITDA: {format_currency(latest_records['ebitda'].value)}")
+                    
+                    if income_metrics:
+                        ticker_context += "Income Statement:\n" + "\n".join(f"  • {m}" for m in income_metrics) + "\n\n"
+                    
+                    # Profitability Metrics
+                    margin_metrics = []
+                    if latest_records.get("ebitda_margin"):
+                        margin_metrics.append(f"EBITDA Margin: {format_percent(latest_records['ebitda_margin'].value)}")
+                    if latest_records.get("gross_margin"):
+                        margin_metrics.append(f"Gross Margin: {format_percent(latest_records['gross_margin'].value)}")
+                    if latest_records.get("operating_margin"):
+                        margin_metrics.append(f"Operating Margin: {format_percent(latest_records['operating_margin'].value)}")
+                    if latest_records.get("net_margin"):
+                        margin_metrics.append(f"Net Margin: {format_percent(latest_records['net_margin'].value)}")
+                    
+                    if margin_metrics:
+                        ticker_context += "Profitability Margins:\n" + "\n".join(f"  • {m}" for m in margin_metrics) + "\n\n"
+                    
+                    # Cash Flow Metrics
+                    cf_metrics = []
+                    if latest_records.get("free_cash_flow"):
+                        cf_metrics.append(f"Free Cash Flow: {format_currency(latest_records['free_cash_flow'].value)}")
+                    if latest_records.get("cash_operations"):
+                        cf_metrics.append(f"Cash from Operations: {format_currency(latest_records['cash_operations'].value)}")
+                    if latest_records.get("capex"):
+                        cf_metrics.append(f"Capital Expenditures: {format_currency(latest_records['capex'].value)}")
+                    
+                    if cf_metrics:
+                        ticker_context += "Cash Flow:\n" + "\n".join(f"  • {m}" for m in cf_metrics) + "\n\n"
+                    
+                    # Balance Sheet Metrics
+                    bs_metrics = []
+                    if latest_records.get("total_assets"):
+                        bs_metrics.append(f"Total Assets: {format_currency(latest_records['total_assets'].value)}")
+                    if latest_records.get("total_liabilities"):
+                        bs_metrics.append(f"Total Liabilities: {format_currency(latest_records['total_liabilities'].value)}")
+                    if latest_records.get("shareholders_equity"):
+                        bs_metrics.append(f"Shareholders' Equity: {format_currency(latest_records['shareholders_equity'].value)}")
+                    
+                    if bs_metrics:
+                        ticker_context += "Balance Sheet:\n" + "\n".join(f"  • {m}" for m in bs_metrics) + "\n\n"
+                    
+                    # Returns & Efficiency
+                    returns_metrics = []
+                    if latest_records.get("roe"):
+                        returns_metrics.append(f"Return on Equity: {format_percent(latest_records['roe'].value)}")
+                    if latest_records.get("roic"):
+                        returns_metrics.append(f"Return on Invested Capital: {format_percent(latest_records['roic'].value)}")
+                    if latest_records.get("roa"):
+                        returns_metrics.append(f"Return on Assets: {format_percent(latest_records['roa'].value)}")
+                    
+                    if returns_metrics:
+                        ticker_context += "Returns & Efficiency:\n" + "\n".join(f"  • {m}" for m in returns_metrics) + "\n\n"
+                    
+                    # Valuation Metrics
+                    valuation_metrics = []
+                    if latest_records.get("market_cap"):
+                        valuation_metrics.append(f"Market Cap: {format_currency(latest_records['market_cap'].value)}")
+                    if latest_records.get("ev_ebitda"):
+                        valuation_metrics.append(f"EV/EBITDA: {format_multiple(latest_records['ev_ebitda'].value)}")
+                    if latest_records.get("pe"):
+                        valuation_metrics.append(f"P/E Ratio: {format_multiple(latest_records['pe'].value)}")
+                    if latest_records.get("pb"):
+                        valuation_metrics.append(f"P/B Ratio: {format_multiple(latest_records['pb'].value)}")
+                    if latest_records.get("price"):
+                        valuation_metrics.append(f"Stock Price: ${latest_records['price'].value:.2f}")
+                    
+                    if valuation_metrics:
+                        ticker_context += "Valuation:\n" + "\n".join(f"  • {m}" for m in valuation_metrics) + "\n\n"
+                    
+                    # Per Share Metrics
+                    per_share_metrics = []
+                    if latest_records.get("eps_basic"):
+                        per_share_metrics.append(f"EPS (Basic): ${latest_records['eps_basic'].value:.2f}")
+                    if latest_records.get("eps_diluted"):
+                        per_share_metrics.append(f"EPS (Diluted): ${latest_records['eps_diluted'].value:.2f}")
+                    if latest_records.get("revenue_per_share"):
+                        per_share_metrics.append(f"Revenue per Share: ${latest_records['revenue_per_share'].value:.2f}")
+                    
+                    if per_share_metrics:
+                        ticker_context += "Per Share Data:\n" + "\n".join(f"  • {m}" for m in per_share_metrics) + "\n\n"
+                else:
+                    # For forecasting queries, create empty ticker_context - will be skipped
+                    ticker_context = ""
                 
-                # Build mandatory data block FIRST - this is critical for accuracy
-                LOGGER.critical(f"🔍 DEBUG: Building mandatory block for {ticker}, latest_records keys: {list(latest_records.keys()) if latest_records else 'EMPTY'}")
-                mandatory_block = _build_mandatory_data_block(ticker, latest_records, period_label)
-                LOGGER.critical(f"🔍 DEBUG: Mandatory block length: {len(mandatory_block)} chars")
-                LOGGER.critical(f"🔍 DEBUG: Mandatory block preview:\n{mandatory_block[:500]}")
-                
-                # Build comprehensive ticker context with SEC URLs prominently displayed
-                ticker_context = mandatory_block  # Start with mandatory block
-                ticker_context += f"\n{'='*80}\n"
-                ticker_context += f"{company_name} ({ticker}) - {period_label}{source_citation}\n"
-                ticker_context += f"{'='*80}\n\n"
-                
-                # Add SEC Filing Sources section at the top for easy access
-                if sec_urls:
-                    ticker_context += "📄 **SEC FILING SOURCES (Markdown Links)** - Copy these to your Sources section:\n"
-                    for url_info in sec_urls:
-                        ticker_context += f"  • {url_info}\n"
-                    ticker_context += "⚠️ These are already formatted as markdown [text](url). Copy them EXACTLY to your Sources section.\n\n"
-                
-                # Income Statement Metrics
-                income_metrics = []
-                if latest_records.get("revenue"):
-                    income_metrics.append(f"Revenue: {format_currency(latest_records['revenue'].value)}")
-                if latest_records.get("net_income"):
-                    income_metrics.append(f"Net Income: {format_currency(latest_records['net_income'].value)}")
-                if latest_records.get("ebitda"):
-                    income_metrics.append(f"EBITDA: {format_currency(latest_records['ebitda'].value)}")
-                
-                if income_metrics:
-                    ticker_context += "Income Statement:\n" + "\n".join(f"  • {m}" for m in income_metrics) + "\n\n"
-                
-                # Profitability Metrics
-                margin_metrics = []
-                if latest_records.get("ebitda_margin"):
-                    margin_metrics.append(f"EBITDA Margin: {format_percent(latest_records['ebitda_margin'].value)}")
-                if latest_records.get("gross_margin"):
-                    margin_metrics.append(f"Gross Margin: {format_percent(latest_records['gross_margin'].value)}")
-                if latest_records.get("operating_margin"):
-                    margin_metrics.append(f"Operating Margin: {format_percent(latest_records['operating_margin'].value)}")
-                if latest_records.get("net_margin"):
-                    margin_metrics.append(f"Net Margin: {format_percent(latest_records['net_margin'].value)}")
-                
-                if margin_metrics:
-                    ticker_context += "Profitability Margins:\n" + "\n".join(f"  • {m}" for m in margin_metrics) + "\n\n"
-                
-                # Cash Flow Metrics
-                cf_metrics = []
-                if latest_records.get("free_cash_flow"):
-                    cf_metrics.append(f"Free Cash Flow: {format_currency(latest_records['free_cash_flow'].value)}")
-                if latest_records.get("cash_operations"):
-                    cf_metrics.append(f"Cash from Operations: {format_currency(latest_records['cash_operations'].value)}")
-                if latest_records.get("capex"):
-                    cf_metrics.append(f"Capital Expenditures: {format_currency(latest_records['capex'].value)}")
-                
-                if cf_metrics:
-                    ticker_context += "Cash Flow:\n" + "\n".join(f"  • {m}" for m in cf_metrics) + "\n\n"
-                
-                # Balance Sheet Metrics
-                bs_metrics = []
-                if latest_records.get("total_assets"):
-                    bs_metrics.append(f"Total Assets: {format_currency(latest_records['total_assets'].value)}")
-                if latest_records.get("total_liabilities"):
-                    bs_metrics.append(f"Total Liabilities: {format_currency(latest_records['total_liabilities'].value)}")
-                if latest_records.get("shareholders_equity"):
-                    bs_metrics.append(f"Shareholders' Equity: {format_currency(latest_records['shareholders_equity'].value)}")
-                
-                if bs_metrics:
-                    ticker_context += "Balance Sheet:\n" + "\n".join(f"  • {m}" for m in bs_metrics) + "\n\n"
-                
-                # Returns & Efficiency
-                returns_metrics = []
-                if latest_records.get("roe"):
-                    returns_metrics.append(f"Return on Equity: {format_percent(latest_records['roe'].value)}")
-                if latest_records.get("roic"):
-                    returns_metrics.append(f"Return on Invested Capital: {format_percent(latest_records['roic'].value)}")
-                if latest_records.get("roa"):
-                    returns_metrics.append(f"Return on Assets: {format_percent(latest_records['roa'].value)}")
-                
-                if returns_metrics:
-                    ticker_context += "Returns & Efficiency:\n" + "\n".join(f"  • {m}" for m in returns_metrics) + "\n\n"
-                
-                # Valuation Metrics
-                valuation_metrics = []
-                if latest_records.get("market_cap"):
-                    valuation_metrics.append(f"Market Cap: {format_currency(latest_records['market_cap'].value)}")
-                if latest_records.get("ev_ebitda"):
-                    valuation_metrics.append(f"EV/EBITDA: {format_multiple(latest_records['ev_ebitda'].value)}")
-                if latest_records.get("pe"):
-                    valuation_metrics.append(f"P/E Ratio: {format_multiple(latest_records['pe'].value)}")
-                if latest_records.get("pb"):
-                    valuation_metrics.append(f"P/B Ratio: {format_multiple(latest_records['pb'].value)}")
-                if latest_records.get("price"):
-                    valuation_metrics.append(f"Stock Price: ${latest_records['price'].value:.2f}")
-                
-                if valuation_metrics:
-                    ticker_context += "Valuation:\n" + "\n".join(f"  • {m}" for m in valuation_metrics) + "\n\n"
-                
-                # Per Share Metrics
-                per_share_metrics = []
-                if latest_records.get("eps_basic"):
-                    per_share_metrics.append(f"EPS (Basic): ${latest_records['eps_basic'].value:.2f}")
-                if latest_records.get("eps_diluted"):
-                    per_share_metrics.append(f"EPS (Diluted): ${latest_records['eps_diluted'].value:.2f}")
-                if latest_records.get("revenue_per_share"):
-                    per_share_metrics.append(f"Revenue per Share: ${latest_records['revenue_per_share'].value:.2f}")
-                
-                if per_share_metrics:
-                    ticker_context += "Per Share Data:\n" + "\n".join(f"  • {m}" for m in per_share_metrics) + "\n\n"
-                
-                # Check if this is a forecasting query
+                # Check if this is a forecasting query FIRST - before building historical context
                 is_forecasting = _is_forecasting_query(query)
                 forecast_metric = None
                 forecast_method = "auto"
+                forecast_periods = 3
                 if is_forecasting:
                     forecast_metric = _extract_forecast_metric(query)
                     forecast_method = _extract_forecast_method(query)
+                    forecast_periods = _extract_forecast_periods(query)
                     LOGGER.info(f"Forecasting query detected for {ticker} {forecast_metric} using {forecast_method}")
                 
                 # Add ML forecasting context FIRST if this is a forecasting query (prioritize it)
+                # CRITICAL: Do this BEFORE building historical context to avoid confusion
                 if is_forecasting and forecast_metric:
                     LOGGER.info(f"Building ML forecast context for {ticker} {forecast_metric} using {forecast_method}")
                     LOGGER.info(f"  - Ticker: {ticker}")
@@ -3633,7 +3676,7 @@ def build_financial_context(
                         ticker=ticker,
                         metric=forecast_metric,
                         database_path=database_path,
-                        periods=3,
+                        periods=forecast_periods,
                         method=forecast_method
                     )
                     if ml_forecast_context:
@@ -3646,20 +3689,22 @@ def build_financial_context(
                         # Store forecast metadata for interactive forecasting
                         if forecast_result:
                             parameters = {
-                                "periods": 3,
+                                "periods": forecast_periods,
                                 "method": forecast_method,
                             }
                             _set_last_forecast_metadata(
                                 ticker=ticker,
                                 metric=forecast_metric,
                                 method=forecast_method,
-                                periods=3,
+                                periods=forecast_periods,
                                 forecast_result=forecast_result,
                                 explainability=explainability_data,
                                 parameters=parameters
                             )
                         LOGGER.info(f"  - Context length: {len(ml_forecast_context)} characters")
                         LOGGER.info(f"  - Contains 'ML FORECAST': {'ML FORECAST' in ml_forecast_context or 'CRITICAL: THIS IS THE PRIMARY ANSWER' in ml_forecast_context}")
+                        # Skip additional historical context for forecasting prompts
+                        continue
                     else:
                         LOGGER.warning(f"ML forecast context generation returned None for {ticker} {forecast_metric} using {forecast_method}")
                         LOGGER.warning(f"  - This might be because ML forecasting dependencies are missing or forecast generation failed")
@@ -3683,133 +3728,148 @@ def build_financial_context(
                         LOGGER.info(f"Skipping historical ticker context for forecasting query - using ML forecast error context only")
                         continue  # Skip to next ticker or end of loop
                 
-                context_parts.append(ticker_context)
-                
-                # Add comprehensive historical trend and growth analysis
-                try:
-                    growth_data = analytics_engine.compute_growth_metrics(ticker, latest_records)
-                    if growth_data:
-                        trend_context = "📈 **Growth & Trend Analysis**:\n"
-                        
-                        # Revenue trends
-                        revenue_items = []
-                        if growth_data.get("revenue_growth_yoy") is not None:
-                            revenue_items.append(f"Revenue Growth (YoY): {format_percent(growth_data['revenue_growth_yoy'])}")
-                        if growth_data.get("revenue_cagr_3y") is not None:
-                            revenue_items.append(f"Revenue CAGR (3Y): {format_percent(growth_data['revenue_cagr_3y'])}")
-                        if growth_data.get("revenue_cagr_5y") is not None:
-                            revenue_items.append(f"Revenue CAGR (5Y): {format_percent(growth_data['revenue_cagr_5y'])}")
-                        
-                        if revenue_items:
-                            trend_context += "  Revenue Trends:\n    - " + "\n    - ".join(revenue_items) + "\n"
-                        
-                        # Earnings trends
-                        earnings_items = []
-                        if growth_data.get("eps_growth_yoy") is not None:
-                            earnings_items.append(f"EPS Growth (YoY): {format_percent(growth_data['eps_growth_yoy'])}")
-                        if growth_data.get("eps_cagr_3y") is not None:
-                            earnings_items.append(f"EPS CAGR (3Y): {format_percent(growth_data['eps_cagr_3y'])}")
-                        if growth_data.get("net_income_growth_yoy") is not None:
-                            earnings_items.append(f"Net Income Growth (YoY): {format_percent(growth_data['net_income_growth_yoy'])}")
-                        
-                        if earnings_items:
-                            trend_context += "  Earnings Trends:\n    - " + "\n    - ".join(earnings_items) + "\n"
-                        
-                        # Margin trends
-                        margin_items = []
-                        if growth_data.get("margin_change_yoy") is not None:
-                            direction = "expansion" if growth_data["margin_change_yoy"] > 0 else "compression"
-                            margin_items.append(f"EBITDA Margin Change (YoY): {growth_data['margin_change_yoy']:+.0f} bps ({direction})")
-                        if growth_data.get("gross_margin_change_yoy") is not None:
-                            margin_items.append(f"Gross Margin Change (YoY): {growth_data['gross_margin_change_yoy']:+.0f} bps")
-                        
-                        if margin_items:
-                            trend_context += "  Profitability Trends:\n    - " + "\n    - ".join(margin_items) + "\n"
-                        
-                        # Cash flow trends
-                        cf_items = []
-                        if growth_data.get("fcf_growth_yoy") is not None:
-                            cf_items.append(f"Free Cash Flow Growth (YoY): {format_percent(growth_data['fcf_growth_yoy'])}")
-                        if growth_data.get("fcf_margin_change") is not None:
-                            cf_items.append(f"FCF Margin Change: {growth_data['fcf_margin_change']:+.0f} bps")
-                        
-                        if cf_items:
-                            trend_context += "  Cash Flow Trends:\n    - " + "\n    - ".join(cf_items) + "\n"
-                        
-                        trend_context += "\n"
-                        context_parts.append(trend_context)
-                        
-                except Exception as e:
-                    LOGGER.debug(f"Could not fetch growth data for {ticker}: {e}")
-                
-                # Add key financial ratios and efficiency metrics
-                try:
-                    ratios_context = "📊 **Key Financial Ratios & Efficiency**:\n"
-                    ratio_items = []
+                # Only append historical ticker context if it was built (not for forecasting queries)
+                # Also skip growth/ratios/valuation analysis for forecasting queries
+                if ticker_context:
+                    context_parts.append(ticker_context)
                     
-                    # Liquidity ratios
-                    if latest_records.get("current_ratio"):
-                        ratio_items.append(f"Current Ratio: {latest_records['current_ratio'].value:.2f}x (measures short-term liquidity)")
-                    if latest_records.get("quick_ratio"):
-                        ratio_items.append(f"Quick Ratio: {latest_records['quick_ratio'].value:.2f}x")
-                    
-                    # Leverage ratios
-                    if latest_records.get("debt_equity"):
-                        ratio_items.append(f"Debt-to-Equity: {latest_records['debt_equity'].value:.2f}x (measures financial leverage)")
-                    if latest_records.get("debt_ebitda"):
-                        ratio_items.append(f"Net Debt/EBITDA: {latest_records['debt_ebitda'].value:.2f}x (debt payback period)")
-                    if latest_records.get("interest_coverage"):
-                        ratio_items.append(f"Interest Coverage: {latest_records['interest_coverage'].value:.1f}x (ability to pay interest)")
-                    
-                    # Asset efficiency
-                    if latest_records.get("asset_turnover"):
-                        ratio_items.append(f"Asset Turnover: {latest_records['asset_turnover'].value:.2f}x (asset utilization efficiency)")
-                    if latest_records.get("inventory_turnover"):
-                        ratio_items.append(f"Inventory Turnover: {latest_records['inventory_turnover'].value:.1f}x")
-                    
-                    if ratio_items:
-                        ratios_context += "\n".join(f"  • {item}" for item in ratio_items) + "\n\n"
-                        context_parts.append(ratios_context)
-                        
-                except Exception as e:
-                    LOGGER.debug(f"Could not build ratios context for {ticker}: {e}")
-                
-                # Add valuation context with interpretation
-                try:
-                    if any(latest_records.get(m) for m in ["ev_ebitda", "pe", "pb", "peg"]):
-                        valuation_context = "💰 **Valuation Analysis**:\n"
-                        val_items = []
-                        
-                        if latest_records.get("ev_ebitda"):
-                            ev_ebitda = latest_records["ev_ebitda"].value
-                            val_items.append(f"EV/EBITDA: {ev_ebitda:.1f}x (typical range: 8-15x for mature companies)")
-                        
-                        if latest_records.get("pe"):
-                            pe = latest_records["pe"].value
-                            val_items.append(f"P/E Ratio: {pe:.1f}x (trailing earnings multiple)")
-                        
-                        if latest_records.get("pb"):
-                            pb = latest_records["pb"].value
-                            val_items.append(f"Price-to-Book: {pb:.1f}x (market value vs. book value)")
-                        
-                        if latest_records.get("peg"):
-                            peg = latest_records["peg"].value
-                            val_items.append(f"PEG Ratio: {peg:.2f} (P/E relative to growth; <1 may indicate undervaluation)")
-                        
-                        if latest_records.get("dividend_yield"):
-                            div_yield = latest_records["dividend_yield"].value
-                            val_items.append(f"Dividend Yield: {format_percent(div_yield)}")
-                        
-                        if val_items:
-                            valuation_context += "\n".join(f"  • {item}" for item in val_items) + "\n\n"
-                            context_parts.append(valuation_context)
+                    # Add comprehensive historical trend and growth analysis
+                    # CRITICAL: Only add for non-forecasting queries
+                    try:
+                        LOGGER.critical(f"🔍 DEBUG: Calling compute_growth_metrics for {ticker}, target_year={requested_fy}")
+                        growth_data = analytics_engine.compute_growth_metrics(ticker, latest_records, target_year=requested_fy)
+                        LOGGER.critical(f"🔍 DEBUG: Growth data returned: {growth_data}")
+                        if growth_data:
+                            trend_context = "📈 **Growth & Trend Analysis**:\n"
                             
-                except Exception as e:
-                    LOGGER.debug(f"Could not build valuation context for {ticker}: {e}")
+                            # Revenue trends
+                            revenue_items = []
+                            if growth_data.get("revenue_growth_yoy") is not None:
+                                revenue_items.append(f"Revenue Growth (YoY): {format_percent(growth_data['revenue_growth_yoy'])}")
+                            if growth_data.get("revenue_cagr_3y") is not None:
+                                revenue_items.append(f"Revenue CAGR (3Y): {format_percent(growth_data['revenue_cagr_3y'])}")
+                            if growth_data.get("revenue_cagr_5y") is not None:
+                                revenue_items.append(f"Revenue CAGR (5Y): {format_percent(growth_data['revenue_cagr_5y'])}")
+                            
+                            if revenue_items:
+                                trend_context += "  Revenue Trends:\n    - " + "\n    - ".join(revenue_items) + "\n"
+                            
+                            # Earnings trends
+                            earnings_items = []
+                            if growth_data.get("eps_growth_yoy") is not None:
+                                earnings_items.append(f"EPS Growth (YoY): {format_percent(growth_data['eps_growth_yoy'])}")
+                            if growth_data.get("eps_cagr_3y") is not None:
+                                earnings_items.append(f"EPS CAGR (3Y): {format_percent(growth_data['eps_cagr_3y'])}")
+                            if growth_data.get("net_income_growth_yoy") is not None:
+                                earnings_items.append(f"Net Income Growth (YoY): {format_percent(growth_data['net_income_growth_yoy'])}")
+                            
+                            if earnings_items:
+                                trend_context += "  Earnings Trends:\n    - " + "\n    - ".join(earnings_items) + "\n"
+                            
+                            # Margin trends
+                            margin_items = []
+                            if growth_data.get("margin_change_yoy") is not None:
+                                direction = "expansion" if growth_data["margin_change_yoy"] > 0 else "compression"
+                                margin_items.append(f"EBITDA Margin Change (YoY): {growth_data['margin_change_yoy']:+.0f} bps ({direction})")
+                            if growth_data.get("gross_margin_change_yoy") is not None:
+                                margin_items.append(f"Gross Margin Change (YoY): {growth_data['gross_margin_change_yoy']:+.0f} bps")
+                            
+                            if margin_items:
+                                trend_context += "  Profitability Trends:\n    - " + "\n    - ".join(margin_items) + "\n"
+                            
+                            # Cash flow trends
+                            cf_items = []
+                            if growth_data.get("fcf_growth_yoy") is not None:
+                                cf_items.append(f"Free Cash Flow Growth (YoY): {format_percent(growth_data['fcf_growth_yoy'])}")
+                            if growth_data.get("fcf_margin_change") is not None:
+                                cf_items.append(f"FCF Margin Change: {growth_data['fcf_margin_change']:+.0f} bps")
+                            
+                            if cf_items:
+                                trend_context += "  Cash Flow Trends:\n    - " + "\n    - ".join(cf_items) + "\n"
+                            
+                            trend_context += "\n"
+                            LOGGER.critical(f"🔍 DEBUG: Appending growth/trend context, length: {len(trend_context)}")
+                            LOGGER.critical(f"🔍 DEBUG: Trend context preview: {trend_context[:300]}")
+                            context_parts.append(trend_context)
+                        else:
+                            LOGGER.critical(f"🔍 DEBUG: Growth data was None or empty - no trend context added")
+                        
+                    except Exception as e:
+                        LOGGER.critical(f"❌ ERROR: Could not fetch growth data for {ticker}: {e}")
+                        import traceback
+                        LOGGER.critical(traceback.format_exc())
+                    
+                    # Add key financial ratios and efficiency metrics
+                    try:
+                        ratios_context = "📊 **Key Financial Ratios & Efficiency**:\n"
+                        ratio_items = []
+                        
+                        # Liquidity ratios
+                        if latest_records.get("current_ratio"):
+                            ratio_items.append(f"Current Ratio: {latest_records['current_ratio'].value:.2f}x (measures short-term liquidity)")
+                        if latest_records.get("quick_ratio"):
+                            ratio_items.append(f"Quick Ratio: {latest_records['quick_ratio'].value:.2f}x")
+                        
+                        # Leverage ratios
+                        if latest_records.get("debt_equity"):
+                            ratio_items.append(f"Debt-to-Equity: {latest_records['debt_equity'].value:.2f}x (measures financial leverage)")
+                        if latest_records.get("debt_ebitda"):
+                            ratio_items.append(f"Net Debt/EBITDA: {latest_records['debt_ebitda'].value:.2f}x (debt payback period)")
+                        if latest_records.get("interest_coverage"):
+                            ratio_items.append(f"Interest Coverage: {latest_records['interest_coverage'].value:.1f}x (ability to pay interest)")
+                        
+                        # Asset efficiency
+                        if latest_records.get("asset_turnover"):
+                            ratio_items.append(f"Asset Turnover: {latest_records['asset_turnover'].value:.2f}x (asset utilization efficiency)")
+                        if latest_records.get("inventory_turnover"):
+                            ratio_items.append(f"Inventory Turnover: {latest_records['inventory_turnover'].value:.1f}x")
+                        
+                        if ratio_items:
+                            ratios_context += "\n".join(f"  • {item}" for item in ratio_items) + "\n\n"
+                            context_parts.append(ratios_context)
+                            
+                    except Exception as e:
+                        LOGGER.debug(f"Could not build ratios context for {ticker}: {e}")
+                    
+                    # Add valuation context with interpretation
+                    try:
+                        if any(latest_records.get(m) for m in ["ev_ebitda", "pe", "pb", "peg"]):
+                            valuation_context = "💰 **Valuation Analysis**:\n"
+                            val_items = []
+                            
+                            if latest_records.get("ev_ebitda"):
+                                ev_ebitda = latest_records["ev_ebitda"].value
+                                val_items.append(f"EV/EBITDA: {ev_ebitda:.1f}x (typical range: 8-15x for mature companies)")
+                            
+                            if latest_records.get("pe"):
+                                pe = latest_records["pe"].value
+                                val_items.append(f"P/E Ratio: {pe:.1f}x (trailing earnings multiple)")
+                            
+                            if latest_records.get("pb"):
+                                pb = latest_records["pb"].value
+                                val_items.append(f"Price-to-Book: {pb:.1f}x (market value vs. book value)")
+                            
+                            if latest_records.get("peg"):
+                                peg = latest_records["peg"].value
+                                val_items.append(f"PEG Ratio: {peg:.2f} (P/E relative to growth; <1 may indicate undervaluation)")
+                            
+                            if latest_records.get("dividend_yield"):
+                                div_yield = latest_records["dividend_yield"].value
+                                val_items.append(f"Dividend Yield: {format_percent(div_yield)}")
+                            
+                            if val_items:
+                                valuation_context += "\n".join(f"  • {item}" for item in val_items) + "\n\n"
+                                context_parts.append(valuation_context)
+                                
+                    except Exception as e:
+                        LOGGER.debug(f"Could not build valuation context for {ticker}: {e}")
                 
             except Exception as e:
                 LOGGER.debug(f"Could not fetch metrics for {ticker}: {e}")
                 continue
+        
+        LOGGER.critical(f"🔍 DEBUG: Built {len(context_parts)} context parts")
+        LOGGER.critical(f"🔍 DEBUG: Context parts types: {[type(p).__name__ for p in context_parts]}")
         
         if not context_parts:
             # CRITICAL: Return explicit "no data" message instead of empty string
@@ -3851,11 +3911,33 @@ def build_financial_context(
                     LOGGER.warning(f"Could not fetch multi-source data for {ticker}: {e}")
         
         # Add comprehensive context header with detailed instructions
-        header = (
-            "╔═══════════════════════════════════════════════════════════════════════════════╗\n"
-            "║                    COMPREHENSIVE FINANCIAL DATA CONTEXT                      ║\n"
-            "╚═══════════════════════════════════════════════════════════════════════════════╝\n\n"
-            "📋 **DATA SOURCES**:\n"
+        # For forecasting queries, use a different header that emphasizes forecast data
+        if is_forecasting and any("ML FORECAST" in part or "CRITICAL: THIS IS THE PRIMARY ANSWER" in part for part in context_parts):
+            header = (
+                "╔═══════════════════════════════════════════════════════════════════════════════╗\n"
+                "║                    🚨 ML FORECAST CONTEXT - USE FORECAST DATA ONLY 🚨        ║\n"
+                "╚═══════════════════════════════════════════════════════════════════════════════╝\n\n"
+                "🚨 **CRITICAL INSTRUCTIONS FOR FORECASTING QUERIES**:\n"
+                "1. **USE ONLY THE FORECAST DATA PROVIDED BELOW** - Do NOT use historical snapshots or KPIs\n"
+                "2. **The ML forecast section contains the PRIMARY ANSWER** - Use those forecast values\n"
+                "3. **DO NOT provide historical data summaries** - The forecast REPLACES historical analysis\n"
+                "4. **Include ALL technical model details** from the forecast context\n"
+                "5. **Explain the forecast methodology** using the model details provided\n"
+                "6. **Show forecast values with confidence intervals** for each year\n"
+                "7. **Calculate and show growth rates** (YoY and CAGR) from the forecast values\n"
+                "8. **🚨 MANDATORY: Cite sources** - Include SEC filing links and model documentation links\n\n"
+                "**⚠️ DO NOT:**\n"
+                "- Provide historical snapshots or KPI summaries\n"
+                "- Use generic company data from training\n"
+                "- Ignore the forecast values in favor of historical trends\n\n"
+                "═══════════════════════════════════════════════════════════════════════════════\n\n"
+            )
+        else:
+            header = (
+                "╔═══════════════════════════════════════════════════════════════════════════════╗\n"
+                "║                    COMPREHENSIVE FINANCIAL DATA CONTEXT                      ║\n"
+                "╚═══════════════════════════════════════════════════════════════════════════════╝\n\n"
+                "📋 **DATA SOURCES**:\n"
             "SEC EDGAR filings (10-K, 10-Q), Yahoo Finance (real-time data, analyst ratings, news), "
             "FRED economic indicators (optional), and IMF macroeconomic data (optional). "
             "Each section includes source URLs formatted as markdown links [Source Name](URL).\n\n"
@@ -3881,7 +3963,17 @@ def build_financial_context(
             "═══════════════════════════════════════════════════════════════════════════════\n\n"
         )
         
-        return header + "\n".join(context_parts)
+        final_context = header + "\n".join(context_parts)
+        LOGGER.critical(f"🔍 DEBUG: Final context length: {len(final_context)}")
+        LOGGER.critical(f"🔍 DEBUG: Context contains 'Revenue Growth (YoY)': {'Revenue Growth (YoY)' in final_context}")
+        LOGGER.critical(f"🔍 DEBUG: Context contains growth data: {'Growth & Trend Analysis' in final_context}")
+        
+        # Log a sample of the context to verify growth data is included
+        if "Growth & Trend Analysis" in final_context:
+            start_idx = final_context.find("Growth & Trend Analysis")
+            LOGGER.critical(f"🔍 DEBUG: Growth section preview: {final_context[start_idx:start_idx+400]}")
+        
+        return final_context
         
     except Exception as e:
         LOGGER.error(f"Error building financial context: {e}")

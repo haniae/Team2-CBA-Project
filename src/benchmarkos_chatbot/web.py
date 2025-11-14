@@ -1,4 +1,4 @@
-"""FastAPI service exposing the BenchmarkOS chatbot, analytics API, and web UI."""
+"""FastAPI service exposing the Finalyze chatbot, analytics API, and web UI."""
 
 from __future__ import annotations
 
@@ -187,7 +187,7 @@ except Exception as e:
     LOGGER.warning(f"Could not read .allowed_origins file: {e}. Using default CORS settings.")
     ALLOWED_ORIGINS = []
 
-app = FastAPI(title="BenchmarkOS Analyst Copilot", version="1.1.0")
+app = FastAPI(title="Finalyze Analyst Copilot", version="1.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS or ["*"],
@@ -1022,7 +1022,7 @@ def health():
 def chrome_devtools_config() -> Dict[str, Any]:
     """Handle Chrome DevTools configuration request to prevent 404 errors."""
     return {
-        "name": "BenchmarkOS Chatbot",
+        "name": "Finalyze Chatbot",
         "version": "1.1.0",
         "type": "web"
     }
@@ -1030,7 +1030,7 @@ def chrome_devtools_config() -> Dict[str, Any]:
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
-    """Proxy chat submissions to the BenchmarkOS chatbot."""
+    """Proxy chat submissions to the Finalyze chatbot."""
     if not request.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty.")
 

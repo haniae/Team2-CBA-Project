@@ -221,11 +221,7 @@ class LSTMForecaster(BaseForecaster):
         model.add(Dense(1))  # Single output for each forecast step
         
         # Compile
-        # Get hyperparameters from kwargs if available
-        units = kwargs.get('units', layers[0] if layers else 50)
-        dropout = kwargs.get('dropout', 0.2)
-        learning_rate = kwargs.get('learning_rate', learning_rate)
-        
+        # Use the learning_rate parameter that was passed to the method
         optimizer = Adam(learning_rate=learning_rate)
         model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
         
@@ -267,10 +263,27 @@ class LSTMForecaster(BaseForecaster):
             return None
         
         try:
-            # Get historical data
-            ts = self._get_historical_data(ticker, metric, min_periods=lookback_window + periods + 5)
+            # Get historical data with adaptive requirements
+            min_history_required = max(periods + 5, 10)
+            ts = self._get_historical_data(ticker, metric, min_periods=min_history_required)
             if ts is None:
                 return None
+
+            available_points = len(ts)
+            min_lookback = 4
+            max_lookback = max(min_lookback, available_points - periods - 1)
+            if max_lookback < min_lookback:
+                LOGGER.warning(
+                    f"Insufficient historical data for {ticker} {metric}: "
+                    f"{available_points} periods available, need at least {min_lookback + periods + 1}"
+                )
+                return None
+            if lookback_window > max_lookback:
+                LOGGER.info(
+                    f"Reducing lookback window from {lookback_window} to {max_lookback} "
+                    f"due to limited history ({available_points} periods)"
+                )
+                lookback_window = max_lookback
             
             # Check for feature engineering
             use_technical_indicators = kwargs.get('use_technical_indicators', False)
@@ -575,4 +588,3 @@ def get_lstm_forecaster(database_path: str) -> Optional[LSTMForecaster]:
     except Exception as e:
         LOGGER.error(f"Failed to create LSTMForecaster: {e}")
         return None
-

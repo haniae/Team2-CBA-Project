@@ -10,9 +10,21 @@ readme = "README.md"
 authors = [{ name = "BenchmarkOS" }]
 requires-python = ">=3.10"
 dependencies = [
+    # Core Framework
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
     "python-dotenv>=1.0.1",
-    "requests>=2.32.0",
+    # AI/ML
+    "openai>=1.35.0",
+    # Database
     "psycopg2-binary>=2.9.9",
+    # HTTP & API
+    "requests>=2.32.0",
+    # Financial Data Sources
+    "yfinance>=0.2.40",
+    # Data Processing
+    "pandas>=2.0.0",
+    "numpy>=1.26,<2.3",
 ]
 
 [tool.pytest.ini_options]
