@@ -1,0 +1,1870 @@
+{
+  "results": [
+    {
+      "prompt": "Forecast Apple's revenue",
+      "category": "basic_forecast",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4320,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $406.16B (95% CI: $253.49B - $551.00B)\n- **2027:** $419.79B (95% CI: $274.66B - $563.15B)\n- **2028:** $432.25B (95% CI: $299.72B - $564.67B)\n\n### Growth Rates\n\n- **2026 to 2027:** +3.35% YoY growth\n- **2027 to 2028:** +2.97% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:**",
+      "timestamp": "2025-11-14T09:18:50.830508"
+    },
+    {
+      "prompt": "Forecast Microsoft's revenue",
+      "category": "basic_forecast",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4344,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $240.88B (95% CI: $154.83B - $320.48B)\n- **2027:** $257.82B (95% CI: $174.63B - $348.33B)\n- **2028:** $274.46B (95% CI: $189.18B - $357.76B)\n\n### Growth Rates\n\n- **2026 to 2027:** +7.04% YoY growth\n- **2027 to 2028:** +6.45% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Typ",
+      "timestamp": "2025-11-14T09:19:22.254243"
+    },
+    {
+      "prompt": "Forecast Tesla's earnings",
+      "category": "basic_forecast",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4371,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Tesla's net income is projected as follows:\n\n### Forecast Values\n\n- **2026:** $9.51B (95% CI: $2.90B - $16.22B)\n- **2027:** $11.36B (95% CI: $5.19B - $17.94B)\n- **2028:** $13.24B (95% CI: $6.31B - $19.88B)\n\n### Growth Rates\n\n- **2026 to 2027:** +19.55% YoY growth\n- **2027 to 2028:** +16.47% YoY growth\n- **Multi-Year CAGR (2 years):** 2821000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:** Prophet (",
+      "timestamp": "2025-11-14T09:19:47.281110"
+    },
+    {
+      "prompt": "Forecast Amazon's revenue",
+      "category": "basic_forecast",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4305,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Amazon's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $478.21B (95% CI: $168.23B - $752.17B)\n- **2027:** $529.79B (95% CI: $228.58B - $811.03B)\n- **2028:** $581.84B (95% CI: $291.47B - $876.40B)\n\n### Growth Rates\n\n- **2026 to 2027:** +10.79% YoY growth\n- **2027 to 2028:** +9.82% YoY growth\n- **Multi-Year CAGR (2 years):** 147977000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:",
+      "timestamp": "2025-11-14T09:20:11.394625"
+    },
+    {
+      "prompt": "Forecast Google's revenue",
+      "category": "basic_forecast",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4304,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Google's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $334.86B (95% CI: $217.07B - $455.85B)\n- **2027:** $366.91B (95% CI: $259.58B - $479.26B)\n- **2028:** $399.84B (95% CI: $286.45B - $520.50B)\n\n### Growth Rates\n\n- **2026 to 2027:** +9.57% YoY growth\n- **2027 to 2028:** +8.97% YoY growth\n- **Multi-Year CAGR (2 years):** 165281000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:*",
+      "timestamp": "2025-11-14T09:20:38.445744"
+    },
+    {
+      "prompt": "Predict Apple's revenue",
+      "category": "basic_predict",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4352,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $406.16B (95% CI: $268.20B - $545.81B)\n- **2027:** $419.79B (95% CI: $270.39B - $575.27B)\n- **2028:** $432.25B (95% CI: $276.88B - $590.35B)\n\n### Growth Rates\n\n- **2026 to 2027:** +3.35% YoY growth\n- **2027 to 2028:** +2.97% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:**",
+      "timestamp": "2025-11-14T09:21:10.986819"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue",
+      "category": "basic_predict",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4361,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $240.88B (95% CI: $155.75B - $327.22B)\n- **2027:** $257.82B (95% CI: $173.20B - $337.56B)\n- **2028:** $274.46B (95% CI: $193.05B - $354.48B)\n\n### Growth Rates\n\n- **2026 to 2027:** +7.04% YoY growth\n- **2027 to 2028:** +6.45% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Typ",
+      "timestamp": "2025-11-14T09:21:44.668204"
+    },
+    {
+      "prompt": "Predict Tesla's earnings",
+      "category": "basic_predict",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4362,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Tesla's net income is projected as follows:\n\n### Forecast Values\n\n- **2026:** $9.51B (95% CI: $3.26B - $16.14B)\n- **2027:** $11.36B (95% CI: $4.57B - $17.82B)\n- **2028:** $13.24B (95% CI: $6.77B - $19.98B)\n\n### Growth Rates\n\n- **2026 to 2027:** +19.55% YoY growth\n- **2027 to 2028:** +16.47% YoY growth\n- **Multi-Year CAGR (2 years):** 2821000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:** Prophet (",
+      "timestamp": "2025-11-14T09:22:11.983247"
+    },
+    {
+      "prompt": "Predict Amazon's revenue",
+      "category": "basic_predict",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4375,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Amazon's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $478.21B (95% CI: $183.52B - $761.81B)\n- **2027:** $529.79B (95% CI: $239.71B - $795.31B)\n- **2028:** $581.84B (95% CI: $309.12B - $864.63B)\n\n### Growth Rates\n\n- **2026 to 2027:** +10.79% YoY growth\n- **2027 to 2028:** +9.82% YoY growth\n- **Multi-Year CAGR (2 years):** 147977000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:",
+      "timestamp": "2025-11-14T09:22:42.539230"
+    },
+    {
+      "prompt": "What's Apple's revenue forecast?",
+      "category": "basic_whats",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4352,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $406.16B (95% CI: $267.92B - $544.75B)\n- **2027:** $419.79B (95% CI: $289.72B - $558.65B)\n- **2028:** $432.25B (95% CI: $279.97B - $579.33B)\n\n### Growth Rates\n\n- **2026 to 2027:** +3.35% YoY growth\n- **2027 to 2028:** +2.97% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:**",
+      "timestamp": "2025-11-14T09:23:15.398354"
+    },
+    {
+      "prompt": "What's Microsoft's revenue forecast?",
+      "category": "basic_whats",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4361,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $240.88B (95% CI: $158.09B - $324.41B)\n- **2027:** $257.82B (95% CI: $173.34B - $338.43B)\n- **2028:** $274.46B (95% CI: $189.97B - $359.47B)\n\n### Growth Rates\n\n- **2026 to 2027:** +7.04% YoY growth\n- **2027 to 2028:** +6.45% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Typ",
+      "timestamp": "2025-11-14T09:23:42.266999"
+    },
+    {
+      "prompt": "What's Tesla's revenue forecast?",
+      "category": "basic_whats",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4337,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Tesla's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $83.59B (95% CI: $44.69B - $130.47B)\n- **2027:** $94.10B (95% CI: $55.32B - $135.82B)\n- **2028:** $104.82B (95% CI: $64.82B - $141.52B)\n\n### Growth Rates\n\n- **2026 to 2027:** +12.56% YoY growth\n- **2027 to 2028:** +11.39% YoY growth\n- **Multi-Year CAGR (2 years):** 46801000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:** Pro",
+      "timestamp": "2025-11-14T09:24:10.036657"
+    },
+    {
+      "prompt": "What's Amazon's revenue forecast?",
+      "category": "basic_whats",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4366,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Amazon's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $478.21B (95% CI: $193.69B - $756.39B)\n- **2027:** $529.79B (95% CI: $254.60B - $828.00B)\n- **2028:** $581.84B (95% CI: $281.62B - $863.39B)\n\n### Growth Rates\n\n- **2026 to 2027:** +10.79% YoY growth\n- **2027 to 2028:** +9.82% YoY growth\n- **Multi-Year CAGR (2 years):** 147977000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:",
+      "timestamp": "2025-11-14T09:24:41.509112"
+    },
+    {
+      "prompt": "Show me Apple's revenue forecast",
+      "category": "basic_show",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4342,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $406.16B (95% CI: $253.05B - $553.87B)\n- **2027:** $419.79B (95% CI: $266.16B - $565.52B)\n- **2028:** $432.25B (95% CI: $291.82B - $574.45B)\n\n### Growth Rates\n\n- **2026 to 2027:** +3.35% YoY growth\n- **2027 to 2028:** +2.97% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:**",
+      "timestamp": "2025-11-14T09:25:09.798230"
+    },
+    {
+      "prompt": "Show me Microsoft's revenue forecast",
+      "category": "basic_show",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4477,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $70.54B (95% CI: $33.98B - $110.52B)\n- **2027:** $70.21B (95% CI: $30.87B - $107.63B)\n- **2028:** $69.67B (95% CI: $34.06B - $110.34B)\n\n### Growth Rates\n\n- **2026 to 2027:** -0.47% YoY growth\n- **2027 to 2028:** -0.76% YoY growth\n- **Multi-Year CAGR (2 years):** -281724000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:** ",
+      "timestamp": "2025-11-14T09:25:40.468103"
+    },
+    {
+      "prompt": "Show me Tesla's revenue forecast",
+      "category": "basic_show",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4459,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Tesla's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $11.46B (95% CI: $8.42B - $14.47B)\n- **2027:** $12.22B (95% CI: $9.17B - $15.43B)\n- **2028:** $13.03B (95% CI: $9.84B - $16.48B)\n\n### Growth Rates\n\n- **2026 to 2027:** +6.59% YoY growth\n- **2027 to 2028:** +6.65% YoY growth\n- **Multi-Year CAGR (2 years):** 46801000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:** Prophet (Fac",
+      "timestamp": "2025-11-14T09:26:09.953642"
+    },
+    {
+      "prompt": "Forecast Apple's revenue using Prophet",
+      "category": "with_model_prophet",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4549,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $406.16B (95% CI: $258.64B - $550.22B)\n- **2027:** $419.79B (95% CI: $265.08B - $554.53B)\n- **2028:** $432.25B (95% CI: $296.64B - $578.71B)\n\n### Growth Rates\n\n- **2026 to 2027:** +3.35% YoY growth\n- **2027 to 2028:** +2.97% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:**",
+      "timestamp": "2025-11-14T09:26:39.830679"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue using Prophet",
+      "category": "with_model_prophet",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4490,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $240.88B (95% CI: $158.30B - $322.79B)\n- **2027:** $257.82B (95% CI: $170.65B - $337.54B)\n- **2028:** $274.46B (95% CI: $186.05B - $355.81B)\n\n### Growth Rates\n\n- **2026 to 2027:** +7.04% YoY growth\n- **2027 to 2028:** +6.45% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Typ",
+      "timestamp": "2025-11-14T09:27:08.318761"
+    },
+    {
+      "prompt": "What's Tesla's revenue forecast using Prophet?",
+      "category": "with_model_prophet",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4475,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **PROPHET** model, Tesla's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $83.59B (95% CI: $41.77B - $124.22B)\n- **2027:** $94.10B (95% CI: $51.18B - $134.70B)\n- **2028:** $104.82B (95% CI: $65.26B - $144.95B)\n\n### Growth Rates\n\n- **2026 to 2027:** +12.56% YoY growth\n- **2027 to 2028:** +11.39% YoY growth\n- **Multi-Year CAGR (2 years):** 46801000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n- **Model Type:** Pro",
+      "timestamp": "2025-11-14T09:27:35.483815"
+    },
+    {
+      "prompt": "Forecast Apple's revenue using ARIMA",
+      "category": "with_model_arima",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4950,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **ARIMA** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $439.49B (95% CI: $326.87B - $552.11B)\n- **2027:** $462.82B (95% CI: $303.55B - $622.09B)\n- **2028:** $486.15B (95% CI: $291.08B - $681.21B)\n\n### Growth Rates\n\n- **2026 to 2027:** +5.31% YoY growth\n- **2027 to 2028:** +5.04% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### ARIMA Model Architecture\n- **ARIMA Ord",
+      "timestamp": "2025-11-14T09:28:08.858870"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue using ARIMA",
+      "category": "with_model_arima",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4959,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **ARIMA** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $252.68B (95% CI: $168.03B - $337.33B)\n- **2027:** $295.94B (95% CI: $208.32B - $383.56B)\n- **2028:** $300.17B (95% CI: $189.45B - $410.89B)\n\n### Growth Rates\n\n- **2026 to 2027:** +17.12% YoY growth\n- **2027 to 2028:** +1.43% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### ARIMA Model Architecture\n- **ARIM",
+      "timestamp": "2025-11-14T09:28:40.067850"
+    },
+    {
+      "prompt": "What's Tesla's revenue forecast using ARIMA?",
+      "category": "with_model_arima",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 4,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4221,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **ARIMA** model, Tesla's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $16.70B (95% CI: $0.00B - $65.62B)\n- **2027:** $0 (95% CI: $0 - $64,178,923,810)\n- **2028:** $0 (95% CI: $0 - $72,208,010,243)\n\n### Growth Rates\n\n- **2026 to 2027:** -100.00% YoY growth\n- **2027 to 2028:** -100.00% YoY growth\n- **Multi-Year CAGR (2 years):** -100.00%\n\n### Model Technical Specifications\n\n- **ARIMA Order:** (3, 0, 0)\n  - **AR (AutoRegressive) Order:",
+      "timestamp": "2025-11-14T09:29:14.325064"
+    },
+    {
+      "prompt": "Forecast Apple's revenue using LSTM",
+      "category": "with_model_lstm",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4884,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **LSTM** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $639.30B (95% CI: $639.30B - $639.30B)\n- **2027:** $776.94B (95% CI: $776.94B - $776.94B)\n- **2028:** $969.66B (95% CI: $969.66B - $969.66B)\n\n### Growth Rates\n\n- **2026 to 2027:** +21.53% YoY growth\n- **2027 to 2028:** +24.81% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### LSTM Neural Network Architecture\n- **",
+      "timestamp": "2025-11-14T09:29:59.937401"
+    },
+    {
+      "prompt": "Forecast Tesla's earnings using LSTM",
+      "category": "with_model_lstm",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4873,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **LSTM** model, Tesla's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $10.99B (95% CI: $10.99B - $10.99B)\n- **2027:** $12.29B (95% CI: $12.29B - $12.29B)\n- **2028:** $13.92B (95% CI: $13.92B - $13.92B)\n\n### Growth Rates\n\n- **2026 to 2027:** +11.83% YoY growth\n- **2027 to 2028:** +13.23% YoY growth\n- **Multi-Year CAGR (2 years):** 46801000000.0%%\n\n### Model Technical Specifications\n\n#### LSTM Neural Network Architecture\n- **Network Ar",
+      "timestamp": "2025-11-14T09:30:44.566299"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue using LSTM",
+      "category": "with_model_lstm",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4892,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **LSTM** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $306.79B (95% CI: $306.79B - $306.79B)\n- **2027:** $336.73B (95% CI: $336.73B - $336.73B)\n- **2028:** $375.53B (95% CI: $375.53B - $375.53B)\n\n### Growth Rates\n\n- **2026 to 2027:** +9.76% YoY growth\n- **2027 to 2028:** +11.52% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### LSTM Neural Network Architecture\n-",
+      "timestamp": "2025-11-14T09:31:23.804495"
+    },
+    {
+      "prompt": "What's Amazon's revenue forecast using LSTM?",
+      "category": "with_model_lstm",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4892,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **LSTM** model, Amazon's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $705.36B (95% CI: $705.36B - $705.36B)\n- **2027:** $818.96B (95% CI: $818.96B - $818.96B)\n- **2028:** $972.40B (95% CI: $972.40B - $972.40B)\n\n### Growth Rates\n\n- **2026 to 2027:** +16.11% YoY growth\n- **2027 to 2028:** +18.74% YoY growth\n- **Multi-Year CAGR (2 years):** 147977000000.0%%\n\n### Model Technical Specifications\n\n#### LSTM Neural Network Architecture\n- *",
+      "timestamp": "2025-11-14T09:32:01.773868"
+    },
+    {
+      "prompt": "Forecast Apple's revenue using GRU",
+      "category": "with_model_gru",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5002,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **GRU** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $479.44B (95% CI: $479.44B - $479.44B)\n- **2027:** $505.54B (95% CI: $505.54B - $505.54B)\n- **2028:** $531.83B (95% CI: $531.83B - $531.83B)\n\n### Growth Rates\n\n- **2026 to 2027:** +5.44% YoY growth\n- **2027 to 2028:** +5.20% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### GRU Neural Network Architecture\n- **Netw",
+      "timestamp": "2025-11-14T09:32:41.898151"
+    },
+    {
+      "prompt": "Forecast Tesla's earnings using GRU",
+      "category": "with_model_gru",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4972,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **GRU** model, Tesla's net income is projected as follows:\n\n### Forecast Values\n\n- **2026:** $9.99B (95% CI: $9.99B - $9.99B)\n- **2027:** $10.27B (95% CI: $10.27B - $10.27B)\n- **2028:** $10.61B (95% CI: $10.61B - $10.61B)\n\n### Growth Rates\n\n- **2026 to 2027:** +2.78% YoY growth\n- **2027 to 2028:** +3.27% YoY growth\n- **Multi-Year CAGR (2 years):** 2821000000.0%%\n\n### Model Technical Specifications\n\n#### GRU Neural Network Architecture\n- **Network Archite",
+      "timestamp": "2025-11-14T09:33:22.699100"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue using GRU",
+      "category": "with_model_gru",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5010,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **GRU** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $294.11B (95% CI: $294.11B - $294.11B)\n- **2027:** $316.53B (95% CI: $316.53B - $316.53B)\n- **2028:** $339.13B (95% CI: $339.13B - $339.13B)\n\n### Growth Rates\n\n- **2026 to 2027:** +7.62% YoY growth\n- **2027 to 2028:** +7.14% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### GRU Neural Network Architecture\n- **",
+      "timestamp": "2025-11-14T09:34:11.747559"
+    },
+    {
+      "prompt": "Forecast Apple's revenue using Transformer",
+      "category": "with_model_transformer",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4384,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **ARIMA** model, here are the detailed projections for Apple's revenue:\n\n### Forecast Values\n\n- **2026:** $439.49B (95% CI: $326.87B - $552.11B)\n- **2027:** $462.82B (95% CI: $303.55B - $622.09B)\n- **2028:** $486.15B (95% CI: $291.08B - $681.21B)\n\n### Growth Rates\n\n- **2026 to 2027:** +5.31% YoY growth\n- **2027 to 2028:** +5.04% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### ARIMA Model Architec",
+      "timestamp": "2025-11-14T09:34:43.393261"
+    },
+    {
+      "prompt": "Forecast Tesla's earnings using Transformer",
+      "category": "with_model_transformer",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4391,
+        "issues": []
+      },
+      "response": "Based on the forecast data provided for Tesla's earnings using the **ARIMA** model, here are the detailed projections:\n\n### Forecast Values\n\n- **2026:** $4.31B (95% CI: $0.38B - $8.25B)\n- **2027:** $8.17B (95% CI: $0.30B - $16.03B)\n- **2028:** $7.54B (95% CI: $0.00B - $17.00B)\n\n### Growth Rates\n\n- **2026 to 2027:** +89.47% YoY growth\n- **2027 to 2028:** -7.73% YoY growth\n- **Multi-Year CAGR (2 years):** 2821000000.0%%\n\n### Model Technical Specifications\n\n#### ARIMA Model Architecture\n- **ARIMA O",
+      "timestamp": "2025-11-14T09:35:26.813460"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue using Transformer",
+      "category": "with_model_transformer",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4391,
+        "issues": []
+      },
+      "response": "Based on the forecast data provided using the **ARIMA** model, here are the detailed projections for Microsoft's revenue:\n\n### Forecast Values\n\n- **2026:** $252.68B (95% CI: $168.03B - $337.33B)\n- **2027:** $295.94B (95% CI: $208.32B - $383.56B)\n- **2028:** $300.17B (95% CI: $189.45B - $410.89B)\n\n### Growth Rates\n\n- **2026 to 2027:** +17.12% YoY growth\n- **2027 to 2028:** +1.43% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### ARIMA Model Arc",
+      "timestamp": "2025-11-14T09:36:05.410404"
+    },
+    {
+      "prompt": "Forecast Apple's revenue using ETS",
+      "category": "with_model_ets",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4025,
+        "issues": []
+      },
+      "response": "Based on the forecast generated using the **ETS** model, here are the detailed projections for Apple's revenue:\n\n### Forecast Values\n\n- **2026:** $431.46B (95% CI: $321.55B - $541.38B)\n- **2027:** $446.77B (95% CI: $336.86B - $556.68B)\n- **2028:** $462.07B (95% CI: $352.16B - $571.98B)\n\n### Growth Rates\n\n- **2026 to 2027:** +3.55% YoY growth\n- **2027 to 2028:** +3.43% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### ETS Model Architecture\n- *",
+      "timestamp": "2025-11-14T09:36:34.879995"
+    },
+    {
+      "prompt": "Forecast Tesla's earnings using ETS",
+      "category": "with_model_ets",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 3929,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **ETS** model, here are the detailed projections for Tesla's earnings:\n\n### Forecast Values\n\n- **2026:** $2.83B (95% CI: $0.00B - $9.35B)\n- **2027:** $2.83B (95% CI: $0.00B - $9.36B)\n- **2028:** $2.84B (95% CI: $0.00B - $9.36B)\n\n### Growth Rates\n\n- **2026 to 2027:** +2821000000.0%% YoY growth\n- **2027 to 2028:** +0.21% YoY growth\n- **Multi-Year CAGR (2 years):** 0.21%\n\n### Model Technical Specifications\n\n#### ETS Model Architecture\n- **Model Type:** ",
+      "timestamp": "2025-11-14T09:37:02.341165"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue using ETS",
+      "category": "with_model_ets",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 3971,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **ETS** model, here are the detailed projections for Microsoft's revenue:\n\n### Forecast Values\n\n- **2026:** $294.85B (95% CI: $209.62B - $380.09B)\n- **2027:** $318.08B (95% CI: $232.85B - $403.32B)\n- **2028:** $341.32B (95% CI: $256.08B - $426.55B)\n\n### Growth Rates\n\n- **2026 to 2027:** +7.88% YoY growth\n- **2027 to 2028:** +7.30% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### ETS Model Architec",
+      "timestamp": "2025-11-14T09:37:31.383515"
+    },
+    {
+      "prompt": "Forecast Apple's revenue using ensemble",
+      "category": "with_model_ensemble",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5127,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **ENSEMBLE** model, here are the detailed projections for Apple's revenue:\n\n### Forecast Values\n\n- **2026:** $478.30B (95% CI: $395.66B - $558.54B)\n- **2027:** $525.69B (95% CI: $433.75B - $620.98B)\n- **2028:** $585.40B (95% CI: $489.11B - $682.35B)\n\n### Growth Rates\n\n- **2026 to 2027:** +9.91% YoY growth\n- **2027 to 2028:** +11.36% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### Ensemble Model A",
+      "timestamp": "2025-11-14T09:38:26.795045"
+    },
+    {
+      "prompt": "Forecast Tesla's earnings using ensemble methods",
+      "category": "with_model_ensemble",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5314,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **ENSEMBLE** model, here are the detailed projections for Tesla's earnings:\n\n### Forecast Values\n\n- **2026:** $7.85B (95% CI: $4.73B - $11.77B)\n- **2027:** $9.46B (95% CI: $5.59B - $14.09B)\n- **2028:** $10.36B (95% CI: $6.64B - $15.12B)\n\n### Growth Rates\n\n- **2026 to 2027:** +20.44% YoY growth\n- **2027 to 2028:** +9.48% YoY growth\n- **Multi-Year CAGR (2 years):** 2821000000.0%%\n\n### Model Technical Specifications\n\n#### Ensemble Model Architecture\n\n- ",
+      "timestamp": "2025-11-14T09:39:36.655613"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue using ensemble",
+      "category": "with_model_ensemble",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5373,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **ENSEMBLE** model, here are the detailed projections for Microsoft's revenue:\n\n### Forecast Values\n\n- **2026:** $279.92B (95% CI: $223.20B - $334.20B)\n- **2027:** $309.42B (95% CI: $255.91B - $364.01B)\n- **2028:** $336.64B (95% CI: $276.11B - $397.59B)\n\n### Growth Rates\n\n- **2026 to 2027:** +10.54% YoY growth\n- **2027 to 2028:** +8.80% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### Ensemble Mod",
+      "timestamp": "2025-11-14T09:40:38.773520"
+    },
+    {
+      "prompt": "What's Amazon's revenue forecast using ensemble methods?",
+      "category": "with_model_ensemble",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5239,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **ENSEMBLE** model, here are the detailed projections for Amazon's revenue:\n\n### Forecast Values\n\n- **2026:** $406.40B (95% CI: $248.55B - $602.00B)\n- **2027:** $424.14B (95% CI: $277.20B - $647.30B)\n- **2028:** $459.25B (95% CI: $299.06B - $698.13B)\n\n### Growth Rates\n\n- **2026 to 2027:** +4.36% YoY growth\n- **2027 to 2028:** +8.28% YoY growth\n- **Multi-Year CAGR (2 years):** 147977000000.0%%\n\n### Model Technical Specifications\n\n#### Ensemble Model A",
+      "timestamp": "2025-11-14T09:41:37.716686"
+    },
+    {
+      "prompt": "Forecast Apple's revenue using the best ML model",
+      "category": "with_model_best",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4750,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Apple's revenue:\n\n### Forecast Values\n\n- **2026:** $406.16B (95% CI: $262.31B - $547.84B)\n- **2027:** $419.79B (95% CI: $278.92B - $573.48B)\n- **2028:** $432.25B (95% CI: $290.28B - $578.67B)\n\n### Growth Rates\n\n- **2026 to 2027:** +3.35% YoY growth\n- **2027 to 2028:** +2.97% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### PROPHET Model Arch",
+      "timestamp": "2025-11-14T09:42:05.687096"
+    },
+    {
+      "prompt": "Forecast Tesla's earnings using the best model",
+      "category": "with_model_best",
+      "passed": false,
+      "quality": {
+        "passed": false,
+        "has_response": true,
+        "has_values": false,
+        "value_count": 0,
+        "has_model": false,
+        "has_ci": false,
+        "has_years": false,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 81,
+        "issues": [
+          "No forecast values found",
+          "No model name mentioned",
+          "No confidence intervals",
+          "No forecast years mentioned"
+        ]
+      },
+      "response": "\u274c Model 'the best model' not found. Use 'List my models' to see available models.",
+      "timestamp": "2025-11-14T09:42:05.815262"
+    },
+    {
+      "prompt": "What's Microsoft's revenue forecast using the best ML model?",
+      "category": "with_model_best",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4748,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Tesla's earnings:\n\n### Forecast Values\n\n- **2026:** $240.88B (95% CI: $150.94B - $327.40B)\n- **2027:** $257.82B (95% CI: $176.17B - $343.71B)\n- **2028:** $274.46B (95% CI: $195.73B - $360.21B)\n\n### Growth Rates\n\n- **2026 to 2027:** +7.04% YoY growth\n- **2027 to 2028:** +6.45% YoY growth\n- **Multi-Year CAGR (2 years):** 2821000000.0%%\n\n### Model Technical Specifications\n\n#### PROPHET Model Archi",
+      "timestamp": "2025-11-14T09:42:32.873674"
+    },
+    {
+      "prompt": "Forecast Apple's revenue for next 3 years",
+      "category": "with_time_years",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5020,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Apple's revenue:\n\n### Forecast Values\n\n- **2026:** $406.16B (95% CI: $248.48B - $557.45B)\n- **2027:** $419.79B (95% CI: $268.65B - $565.70B)\n- **2028:** $432.25B (95% CI: $292.91B - $586.35B)\n\n### Growth Rates\n\n- **2026 to 2027:** +3.35% YoY growth\n- **2027 to 2028:** +2.97% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specifications\n\n#### PROPHET Model Arch",
+      "timestamp": "2025-11-14T09:43:07.555866"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue for next 3 years",
+      "category": "with_time_years",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5024,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Microsoft's revenue:\n\n### Forecast Values\n\n- **2026:** $240.88B (95% CI: $159.06B - $321.96B)\n- **2027:** $257.82B (95% CI: $175.25B - $347.62B)\n- **2028:** $274.46B (95% CI: $189.43B - $356.24B)\n\n### Growth Rates\n\n- **2026 to 2027:** +7.04% YoY growth\n- **2027 to 2028:** +6.45% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specifications\n\n#### PROPHET Model ",
+      "timestamp": "2025-11-14T09:43:33.383456"
+    },
+    {
+      "prompt": "What's Tesla's revenue forecast for next 3 years?",
+      "category": "with_time_years",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5016,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Tesla's revenue:\n\n### Forecast Values\n\n- **2026:** $83.59B (95% CI: $41.77B - $125.47B)\n- **2027:** $94.10B (95% CI: $55.82B - $137.49B)\n- **2028:** $104.82B (95% CI: $63.08B - $147.83B)\n\n### Growth Rates\n\n- **2026 to 2027:** +12.56% YoY growth\n- **2027 to 2028:** +11.39% YoY growth\n- **Multi-Year CAGR (2 years):** 46801000000.0%%\n\n### Model Technical Specifications\n\n#### PROPHET Model Architec",
+      "timestamp": "2025-11-14T09:44:05.540255"
+    },
+    {
+      "prompt": "Forecast Apple's revenue for 2025-2027",
+      "category": "with_time_period",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5046,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Apple's revenue for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $406.16B (95% CI: $259.94B - $551.37B)\n- **2027:** $419.79B (95% CI: $277.20B - $562.63B)\n- **2028:** $432.25B (95% CI: $286.69B - $564.79B)\n\n### Growth Rates\n\n- **2026 to 2027:** +3.35% YoY growth\n- **2027 to 2028:** +2.97% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specificatio",
+      "timestamp": "2025-11-14T09:44:30.421509"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue for 2025-2027",
+      "category": "with_time_period",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5051,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Microsoft's revenue for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $240.88B (95% CI: $162.44B - $327.42B)\n- **2027:** $257.82B (95% CI: $167.90B - $334.86B)\n- **2028:** $274.46B (95% CI: $190.76B - $352.15B)\n\n### Growth Rates\n\n- **2026 to 2027:** +7.04% YoY growth\n- **2027 to 2028:** +6.45% YoY growth\n- **Multi-Year CAGR (2 years):** 281724000000.0%%\n\n### Model Technical Specific",
+      "timestamp": "2025-11-14T09:45:02.401817"
+    },
+    {
+      "prompt": "What's Tesla's revenue forecast for 2025-2027?",
+      "category": "with_time_period",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5042,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Tesla's revenue for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $83.59B (95% CI: $37.85B - $127.80B)\n- **2027:** $94.10B (95% CI: $49.71B - $137.09B)\n- **2028:** $104.82B (95% CI: $64.13B - $147.26B)\n\n### Growth Rates\n\n- **2026 to 2027:** +12.56% YoY growth\n- **2027 to 2028:** +11.39% YoY growth\n- **Multi-Year CAGR (2 years):** 46801000000.0%%\n\n### Model Technical Specifications\n\n",
+      "timestamp": "2025-11-14T09:45:35.482374"
+    },
+    {
+      "prompt": "Forecast Apple's net income",
+      "category": "different_metrics",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5042,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Apple's net income for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $99.90B (95% CI: $56.89B - $143.57B)\n- **2027:** $106.20B (95% CI: $65.25B - $148.42B)\n- **2028:** $111.96B (95% CI: $66.72B - $154.78B)\n\n### Growth Rates\n\n- **2026 to 2027:** +6.31% YoY growth\n- **2027 to 2028:** +5.42% YoY growth\n- **Multi-Year CAGR (2 years):** 416161000000.0%%\n\n### Model Technical Specification",
+      "timestamp": "2025-11-14T09:46:01.064895"
+    },
+    {
+      "prompt": "Forecast Microsoft's free cash flow",
+      "category": "different_metrics",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5084,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Microsoft's free cash flow for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $109.48B (95% CI: $79.90B - $139.48B)\n- **2027:** $109.46B (95% CI: $81.18B - $140.60B)\n- **2028:** $108.99B (95% CI: $79.20B - $137.69B)\n\n### Growth Rates\n\n- **2026 to 2027:** -0.01% YoY growth\n- **2027 to 2028:** -0.43% YoY growth\n- **Multi-Year CAGR (2 years):** -30242000000.0%%\n\n### Model Technical Spec",
+      "timestamp": "2025-11-14T09:46:33.866743"
+    },
+    {
+      "prompt": "Forecast Tesla's EBITDA",
+      "category": "different_metrics",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5037,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Tesla's EBITDA for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $8.19B (95% CI: $2.65B - $14.12B)\n- **2027:** $9.42B (95% CI: $3.43B - $15.35B)\n- **2028:** $10.63B (95% CI: $4.80B - $16.82B)\n\n### Growth Rates\n\n- **2026 to 2027:** +14.95% YoY growth\n- **2027 to 2028:** +12.83% YoY growth\n- **Multi-Year CAGR (2 years):** 2776000000.0%%\n\n### Model Technical Specifications\n\n#### PROPHE",
+      "timestamp": "2025-11-14T09:47:05.341869"
+    },
+    {
+      "prompt": "Forecast Amazon's gross profit",
+      "category": "different_metrics",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 9,
+        "has_model": true,
+        "has_ci": false,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 3054,
+        "issues": [
+          "No confidence intervals"
+        ]
+      },
+      "response": "Based on the provided financial data and macroeconomic context, here\u2019s a forecast for Amazon's gross profit for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $138.50B (95% CI: $120.00B - $157.00B)\n- **2027:** $147.30B (95% CI: $128.00B - $167.00B)\n- **2028:** $153353000000.0%B (95% CI: $133353000000.0%B - $177.00B)\n\n### Growth Rates\n\n- **2026 to 2027:** +6.00% YoY growth\n- **2027 to 2028:** +5.00% YoY growth\n- **Multi-Year CAGR (2 years):** 3353000000.0%%\n\n### Narrative and Context\n\n",
+      "timestamp": "2025-11-14T09:47:24.006686"
+    },
+    {
+      "prompt": "Forecast Google's operating income",
+      "category": "different_metrics",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5085,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Google's operating income for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $96.68B (95% CI: $63.57B - $131.54B)\n- **2027:** $103.34B (95% CI: $68.17B - $138.53B)\n- **2028:** $110.22B (95% CI: $74.10B - $144.44B)\n\n### Growth Rates\n\n- **2026 to 2027:** +6.88% YoY growth\n- **2027 to 2028:** +6.67% YoY growth\n- **Multi-Year CAGR (2 years):** 52897000000.0%%\n\n### Model Technical Specifi",
+      "timestamp": "2025-11-14T09:47:57.005083"
+    },
+    {
+      "prompt": "Forecast Apple's EPS",
+      "category": "different_metrics",
+      "passed": false,
+      "quality": {
+        "passed": false,
+        "has_response": true,
+        "has_values": false,
+        "value_count": 0,
+        "has_model": false,
+        "has_ci": false,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 2772,
+        "issues": [
+          "No forecast values found",
+          "No model name mentioned",
+          "No confidence intervals"
+        ]
+      },
+      "response": "Based on the provided financial data and macroeconomic context, here\u2019s a forecast for Apple's Earnings Per Share (EPS) for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $6.50 (95% CI: $5.80 - $7.20)\n- **2027:** $7.00 (95% CI: $6.20 - $7.80)\n- **2028:** $7.50 (95% CI: $6.50 - $8.50)\n\n### Growth Rates\n\n- **2026 to 2027:** +7.69% YoY growth\n- **2027 to 2028:** +7.14% YoY growth\n- **Multi-Year CAGR (2 years):** 46.9%%\n\n### Analysis and Narrative\n\nApple's EPS forecast reflects a positive ",
+      "timestamp": "2025-11-14T09:48:15.598401"
+    },
+    {
+      "prompt": "Forecast Apple's net income using LSTM",
+      "category": "different_metrics_with_model",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5174,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **LSTM** model, here are the detailed projections for Apple's net income for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $130.52B (95% CI: $130.52B - $130.52B)\n- **2027:** $148.01B (95% CI: $148.01B - $148.01B)\n- **2028:** $168.64B (95% CI: $168.64B - $168.64B)\n\n### Growth Rates\n\n- **2026 to 2027:** +13.40% YoY growth\n- **2027 to 2028:** +13.94% YoY growth\n- **Multi-Year CAGR (2 years):** 112010000000.0%%\n\n### Model Technical Specificat",
+      "timestamp": "2025-11-14T09:49:14.177827"
+    },
+    {
+      "prompt": "Forecast Microsoft's free cash flow using Prophet",
+      "category": "different_metrics_with_model",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 5085,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **PROPHET** model, here are the detailed projections for Microsoft's free cash flow for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $109.48B (95% CI: $80.35B - $140.51B)\n- **2027:** $109.46B (95% CI: $76.68B - $136.74B)\n- **2028:** $108.99B (95% CI: $80.13B - $138.06B)\n\n### Growth Rates\n\n- **2026 to 2027:** -0.01% YoY growth\n- **2027 to 2028:** -0.43% YoY growth\n- **Multi-Year CAGR (2 years):** -30242000000.0%%\n\n### Model Technical Spec",
+      "timestamp": "2025-11-14T09:49:36.422769"
+    },
+    {
+      "prompt": "Forecast Tesla's EBITDA using ARIMA",
+      "category": "different_metrics_with_model",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 12,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4818,
+        "issues": []
+      },
+      "response": "Based on the provided forecast data using the **ARIMA** model, here are the detailed projections for Tesla's EBITDA for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $4.34B (95% CI: $0.00B - $12.51B)\n- **2027:** $194.08M (95% CI: $0.00M - $12,997.38M)\n- **2028:** $2.89B (95% CI: $0.00B - $17.19B)\n\n### Growth Rates\n\n- **2026 to 2027:** -95.53% YoY growth\n- **2027 to 2028:** +1390.03% YoY growth\n- **Multi-Year CAGR (2 years):** -2776000000.0%%\n\n### Model Technical Specifications\n\n#### ",
+      "timestamp": "2025-11-14T09:50:12.340496"
+    },
+    {
+      "prompt": "Forecast Amazon's gross profit using ensemble",
+      "category": "different_metrics_with_model",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 11,
+        "has_model": true,
+        "has_ci": false,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 2913,
+        "issues": [
+          "No confidence intervals"
+        ]
+      },
+      "response": "Based on the provided financial data and macroeconomic context, here\u2019s a forecast for Amazon's gross profit using an ensemble model approach for the years 2026 to 2028:\n\n### Forecast Values\n\n- **2026:** $203.50B (95% CI: $190.00B - $217.00B)\n- **2027:** $218.75B (95% CI: $205.00B - $232.50B)\n- **2028:** $235.00B (95% CI: $220.00B - $250.00B)\n\n### Growth Rates\n\n- **2026 to 2027:** +147977000000.0%% YoY growth\n- **2027 to 2028:** +147977000000.0%% YoY growth\n- **Multi-Year CAGR (2 years):** 335300",
+      "timestamp": "2025-11-14T09:50:29.132867"
+    },
+    {
+      "prompt": "Can you forecast Apple's revenue?",
+      "category": "question_formats",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 14,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4529,
+        "issues": []
+      },
+      "response": "### Forecast Values\n\n- **2026:** $406.16B (95% CI: $262.00B - $553.27B)\n- **2027:** $419.79B (95% CI: $264.55B - $562.43B)\n- **2028:** $432.25B (95% CI: $282.06B - $586.41B)\n\n### Growth Rates\n\n- **2026 to 2027:** +3.35% YoY growth\n- **2027 to 2028:** +2.97% YoY growth\n- **Multi-Year CAGR (2 years):** 89830000000.0%%\n\n### Model Technical Specifications\n\n#### Model Architecture\n\n- **Model Type:** Prophet (Facebook's time series forecasting tool)\n- **Seasonality Detected:** Yearly\n  - Prophet autom",
+      "timestamp": "2025-11-14T09:50:53.815264"
+    },
+    {
+      "prompt": "How much will Microsoft's revenue be?",
+      "category": "question_formats",
+      "passed": false,
+      "quality": {
+        "error": "'BenchmarkOSChatbot' object has no attribute '_detect_tickers'",
+        "passed": false
+      },
+      "response": "",
+      "timestamp": "2025-11-14T09:50:53.898026"
+    },
+    {
+      "prompt": "What do you think Tesla's revenue will be?",
+      "category": "question_formats",
+      "passed": false,
+      "quality": {
+        "error": "'BenchmarkOSChatbot' object has no attribute '_detect_tickers'",
+        "passed": false
+      },
+      "response": "",
+      "timestamp": "2025-11-14T09:50:53.942210"
+    },
+    {
+      "prompt": "Can you predict Apple's revenue using LSTM?",
+      "category": "question_formats",
+      "passed": false,
+      "quality": {
+        "passed": false,
+        "has_response": true,
+        "has_values": false,
+        "value_count": 0,
+        "has_model": true,
+        "has_ci": false,
+        "has_years": false,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 72,
+        "issues": [
+          "No forecast values found",
+          "No confidence intervals",
+          "No forecast years mentioned"
+        ]
+      },
+      "response": "\u274c Model 'lstm?' not found. Use 'List my models' to see available models.",
+      "timestamp": "2025-11-14T09:50:54.005576"
+    },
+    {
+      "prompt": "What will Apple's revenue be?",
+      "category": "question_formats",
+      "passed": false,
+      "quality": {
+        "error": "'BenchmarkOSChatbot' object has no attribute '_detect_tickers'",
+        "passed": false
+      },
+      "response": "",
+      "timestamp": "2025-11-14T09:50:54.076465"
+    },
+    {
+      "prompt": "Forecast Apple revenue now",
+      "category": "imperative",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 5,
+        "has_model": true,
+        "has_ci": false,
+        "has_years": false,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 2621,
+        "issues": [
+          "No confidence intervals",
+          "No forecast years mentioned"
+        ]
+      },
+      "response": "Apple's revenue for FY2025 is projected to reach **$394.3 billion**, reflecting a **391035000000.0% increase** from **$367.8 billion** in FY2024. This growth is indicative of Apple's strong market position and ongoing demand for its products and services.\n\n### Key Drivers of Revenue Growth\n\n1. **Product Innovation**: Apple continues to innovate with new product launches, including the anticipated iPhone 15 and upgrades to its Mac and iPad lines. These innovations are expected to drive sales and ",
+      "timestamp": "2025-11-14T09:51:08.157388"
+    },
+    {
+      "prompt": "Run a forecast for Microsoft revenue",
+      "category": "imperative",
+      "passed": false,
+      "quality": {
+        "passed": false,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 5,
+        "has_model": false,
+        "has_ci": false,
+        "has_years": false,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 2827,
+        "issues": [
+          "No model name mentioned",
+          "No confidence intervals",
+          "No forecast years mentioned"
+        ]
+      },
+      "response": "Based on the provided financial data and macroeconomic context, Microsoft's revenue for FY2025 is projected to be **$239.4 billion**, reflecting a **245122000000.0% increase** from **$224.2 billion** in FY2024. This growth is indicative of Microsoft's strong market position and ongoing demand for its products and services.\n\n### Key Drivers of Revenue Growth\n\n1. **Cloud Services Expansion**: Microsoft Azure continues to be a significant growth driver, with businesses increasingly migrating to clo",
+      "timestamp": "2025-11-14T09:51:20.933648"
+    },
+    {
+      "prompt": "Generate forecast for Tesla earnings",
+      "category": "imperative",
+      "passed": false,
+      "quality": {
+        "passed": false,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 5,
+        "has_model": false,
+        "has_ci": false,
+        "has_years": false,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 2884,
+        "issues": [
+          "No model name mentioned",
+          "No confidence intervals",
+          "No forecast years mentioned"
+        ]
+      },
+      "response": "### Tesla Earnings Forecast\n\nTesla's earnings for FY2025 are projected to reach **$51.4 billion**, reflecting a **12821000000.0% increase** from **$45.7 billion** in FY2024. This growth is driven by several key factors, including increased production capacity, expanding market share, and a robust demand for electric vehicles (EVs).\n\n### Key Drivers of Earnings Growth\n\n1. **Increased Production Capacity**: Tesla has been ramping up production at its Gigafactories, particularly in Texas and Berlin",
+      "timestamp": "2025-11-14T09:51:38.845399"
+    },
+    {
+      "prompt": "Forecast Apple revenue using LSTM now",
+      "category": "imperative",
+      "passed": false,
+      "quality": {
+        "passed": false,
+        "has_response": true,
+        "has_values": false,
+        "value_count": 0,
+        "has_model": true,
+        "has_ci": false,
+        "has_years": false,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 75,
+        "issues": [
+          "No forecast values found",
+          "No confidence intervals",
+          "No forecast years mentioned"
+        ]
+      },
+      "response": "\u274c Model 'lstm now' not found. Use 'List my models' to see available models.",
+      "timestamp": "2025-11-14T09:51:38.923984"
+    },
+    {
+      "prompt": "Project Apple's revenue",
+      "category": "variations_project",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 9,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 559,
+        "issues": []
+      },
+      "response": "Based on the provided ML forecast data using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $406.16 billion (95% Confidence Interval: $249.82 billion - $555.73 billion)\n- **2027:** $419.79 billion (95% Confidence Interval: $273.18 billion - $562.09 billion)\n- **2028:** $432.25 billion (95% Confidence Interval: $293.67 billion - $570.58 billion)\n\n### Year-over-Year Growth Rates\n\n- **2026 to 2027:** +3.35% YoY growth\n- **2027 to 2028:** +2.97% YoY",
+      "timestamp": "2025-11-14T09:52:08.806095"
+    },
+    {
+      "prompt": "Project Microsoft's revenue",
+      "category": "variations_project",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 12,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 3257,
+        "issues": []
+      },
+      "response": "### Forecast for Apple's Revenue Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $240.88 billion (95% Confidence Interval: $160.42 billion - $320.67 billion)\n- **2027:** $257.82 billion (95% Confidence Interval: $178.64 billion - $343.92 billion)\n- **2028:** $274.46 billion (95% Confidence Interval: $185.47 billion - $360.79 billion)\n\n### Year-over-Year Growth Rates\n\n- **2026 to 2027:** ",
+      "timestamp": "2025-11-14T09:52:31.989231"
+    },
+    {
+      "prompt": "Project Tesla's revenue",
+      "category": "variations_project",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4083,
+        "issues": []
+      },
+      "response": "### Tesla Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Tesla's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $83.59 billion (95% Confidence Interval: $43.82 billion - $125.36 billion)\n- **2027:** $94.10 billion (95% Confidence Interval: $53.12 billion - $131.83 billion)\n- **2028:** $104.82 billion (95% Confidence Interval: $65.87 billion - $146.39 billion)\n\n### Year-over-Year Growth Rates\n\n- **2026 to 2027:** +12.56% YoY",
+      "timestamp": "2025-11-14T09:52:56.395112"
+    },
+    {
+      "prompt": "Estimate Apple's revenue",
+      "category": "variations_estimate",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4049,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** $406.16 billion (95% Confidence Interval: $258.35 billion - $543.68 billion)\n- **2027:** $419.79 billion (95% Confidence Interval: $283.98 billion - $560.02 billion)\n- **2028:** $432.25 billion (95% Confidence Interval: $289.89 billion - $573.48 billion)\n\n### Year-over-Year Growth Rates\n\n- **2026 to 2027:** +3.35%",
+      "timestamp": "2025-11-14T09:53:21.905857"
+    },
+    {
+      "prompt": "Estimate Microsoft's revenue",
+      "category": "variations_estimate",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4242,
+        "issues": []
+      },
+      "response": "### Microsoft Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$240.88 billion** (95% Confidence Interval: **$154.84 billion - $323.76 billion**)\n- **2027:** **$257.82 billion** (95% Confidence Interval: **$173.73 billion - $342.65 billion**)\n- **2028:** **$274.46 billion** (95% Confidence Interval: **$$281.7B billion - $$281.7B billion**)\n\n### Year-over-Year Growth",
+      "timestamp": "2025-11-14T09:53:54.105260"
+    },
+    {
+      "prompt": "Estimate Tesla's revenue",
+      "category": "variations_estimate",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4238,
+        "issues": []
+      },
+      "response": "### Tesla Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Tesla's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$83.59 billion** (95% Confidence Interval: **$41.32 billion - $124.46 billion**)\n- **2027:** **$94.10 billion** (95% Confidence Interval: **$53.11 billion - $138.61 billion**)\n- **2028:** **$104.82 billion** (95% Confidence Interval: **$$46.8B billion - $$46.8B billion**)\n\n### Year-over-Year Growth Rates\n\n- **20",
+      "timestamp": "2025-11-14T09:54:19.865932"
+    },
+    {
+      "prompt": "What's the outlook for Apple revenue?",
+      "category": "variations_outlook",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4212,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$406.16 billion** (95% Confidence Interval: **$253.46 billion - $552.33 billion**)\n- **2027:** **$419.79 billion** (95% Confidence Interval: **$276.02 billion - $579.27 billion**)\n- **2028:** **$432.25 billion** (95% Confidence Interval: **$$416.2B billion - $$416.2B billion**)\n\n### Year-over-Year Growth Rates\n\n",
+      "timestamp": "2025-11-14T09:54:44.861683"
+    },
+    {
+      "prompt": "What's the outlook for Microsoft revenue?",
+      "category": "variations_outlook",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4232,
+        "issues": []
+      },
+      "response": "### Microsoft Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$240.88 billion** (95% Confidence Interval: **$159.10 billion - $332.14 billion**)\n- **2027:** **$257.82 billion** (95% Confidence Interval: **$167.57 billion - $337.82 billion**)\n- **2028:** **$274.46 billion** (95% Confidence Interval: **$$281.7B billion - $$281.7B billion**)\n\n### Year-over-Year Growth",
+      "timestamp": "2025-11-14T09:55:08.594148"
+    },
+    {
+      "prompt": "What's the outlook for Amazon revenue?",
+      "category": "variations_outlook",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4234,
+        "issues": []
+      },
+      "response": "### Amazon Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Amazon's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$478.21 billion** (95% Confidence Interval: **$198.75 billion - $746.01 billion**)\n- **2027:** **$529.79 billion** (95% Confidence Interval: **$238.34 billion - $812.57 billion**)\n- **2028:** **$581.84 billion** (95% Confidence Interval: **$$148.0B billion - $$148.0B billion**)\n\n### Year-over-Year Growth Rates",
+      "timestamp": "2025-11-14T09:55:41.476460"
+    },
+    {
+      "prompt": "Forecast revenue for Apple",
+      "category": "variations_forecast_for",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4211,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$406.16 billion** (95% Confidence Interval: **$264.02 billion - $555.06 billion**)\n- **2027:** **$419.79 billion** (95% Confidence Interval: **$268.53 billion - $560.20 billion**)\n- **2028:** **$432.25 billion** (95% Confidence Interval: **$$416.2B billion - $$416.2B billion**)\n\n### Year-over-Year Growth Rates\n\n",
+      "timestamp": "2025-11-14T09:56:09.480761"
+    },
+    {
+      "prompt": "Forecast revenue for Microsoft",
+      "category": "variations_forecast_for",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4235,
+        "issues": []
+      },
+      "response": "### Microsoft Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$240.88 billion** (95% Confidence Interval: **$158.47 billion - $327.07 billion**)\n- **2027:** **$257.82 billion** (95% Confidence Interval: **$175.43 billion - $342.17 billion**)\n- **2028:** **$274.46 billion** (95% Confidence Interval: **$$281.7B billion - $$281.7B billion**)\n\n### Year-over-Year Growth",
+      "timestamp": "2025-11-14T09:56:46.553093"
+    },
+    {
+      "prompt": "Forecast earnings for Tesla",
+      "category": "variations_forecast_for",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4213,
+        "issues": []
+      },
+      "response": "### Tesla Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Tesla's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$9.51 billion** (95% Confidence Interval: **$2.70 billion - $16.34 billion**)\n- **2027:** **$11.36 billion** (95% Confidence Interval: **$4.75 billion - $17.89 billion**)\n- **2028:** **$13.24 billion** (95% Confidence Interval: **$$46.8B billion - $$46.8B billion**)\n\n### Year-over-Year Growth Rates\n\n- **2026 to ",
+      "timestamp": "2025-11-14T09:57:19.075522"
+    },
+    {
+      "prompt": "Predict revenue for Apple",
+      "category": "variations_predict_for",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4218,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$406.16 billion** (95% Confidence Interval: **$268.46 billion - $540.93 billion**)\n- **2027:** **$419.79 billion** (95% Confidence Interval: **$281.06 billion - $552.98 billion**)\n- **2028:** **$432.25 billion** (95% Confidence Interval: **$$416.2B billion - $$416.2B billion**)\n\n### Year-over-Year Growth Rates\n\n",
+      "timestamp": "2025-11-14T09:57:46.251301"
+    },
+    {
+      "prompt": "Predict revenue for Microsoft",
+      "category": "variations_predict_for",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4231,
+        "issues": []
+      },
+      "response": "### Microsoft Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$240.88 billion** (95% Confidence Interval: **$156.28 billion - $326.06 billion**)\n- **2027:** **$257.82 billion** (95% Confidence Interval: **$174.68 billion - $353.68 billion**)\n- **2028:** **$274.46 billion** (95% Confidence Interval: **$$281.7B billion - $$281.7B billion**)\n\n### Year-over-Year Growth",
+      "timestamp": "2025-11-14T09:58:10.837388"
+    },
+    {
+      "prompt": "Predict earnings for Tesla",
+      "category": "variations_predict_for",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4478,
+        "issues": []
+      },
+      "response": "### Tesla Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Tesla's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$9.51 billion** (95% Confidence Interval: **$2.77 billion - $15.86 billion**)\n- **2027:** **$11.36 billion** (95% Confidence Interval: **$5.04 billion - $18.10 billion**)\n- **2028:** **$13.24 billion** (95% Confidence Interval: **$$46.8B billion - $$46.8B billion**)\n\n### Year-over-Year Growth Rates\n\n- **2026 to ",
+      "timestamp": "2025-11-14T09:58:40.605368"
+    },
+    {
+      "prompt": "Forecast Apple's revenue for next 3 years using LSTM",
+      "category": "complex_combinations",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 12,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4687,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using LSTM\n\nBased on the provided ML forecast data using the **LSTM** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$633.63 billion** (95% Confidence Interval: **$633.63 billion - $633.63 billion**)\n- **2027:** **$777.90 billion** (95% Confidence Interval: **$777.90 billion - $777.90 billion**)\n- **2028:** **$$416.2B billion** (95% Confidence Interval: **$$416.2B billion - $988.27 billion**)\n\n### Year-over-Year Growth Rates\n\n- **20",
+      "timestamp": "2025-11-14T09:59:33.932487"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue for 2025-2027 using Prophet",
+      "category": "complex_combinations",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4231,
+        "issues": []
+      },
+      "response": "### Microsoft Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Microsoft's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$240.88 billion** (95% Confidence Interval: **$154.41 billion - $327.80 billion**)\n- **2027:** **$257.82 billion** (95% Confidence Interval: **$172.33 billion - $346.81 billion**)\n- **2028:** **$274.46 billion** (95% Confidence Interval: **$$281.7B billion - $$281.7B billion**)\n\n### Year-over-Year Growth",
+      "timestamp": "2025-11-14T10:00:00.891729"
+    },
+    {
+      "prompt": "What's Tesla's revenue forecast for next 3 years using ensemble?",
+      "category": "complex_combinations",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4717,
+        "issues": []
+      },
+      "response": "### Tesla Revenue Forecast Using Ensemble Model\n\nBased on the provided ML forecast data using the **ENSEMBLE** model, Tesla's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$77.84 billion** (95% Confidence Interval: **$55.25 billion - $106.25 billion**)\n- **2027:** **$85.30 billion** (95% Confidence Interval: **$66.61 billion - $115.63 billion**)\n- **2028:** **$98.19 billion** (95% Confidence Interval: **$$46.8B billion - $$46.8B billion**)\n\n### Year-over-Year Growth Rates\n",
+      "timestamp": "2025-11-14T10:01:11.018788"
+    },
+    {
+      "prompt": "Forecast Apple's net income using the best ML model",
+      "category": "complex_combinations",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4294,
+        "issues": []
+      },
+      "response": "### Apple Net Income Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Apple's net income is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$99.90 billion** (95% Confidence Interval: **$52.38 billion - $141.75 billion**)\n- **2027:** **$106.20 billion** (95% Confidence Interval: **$62.75 billion - $149.76 billion**)\n- **2028:** **$111.96 billion** (95% Confidence Interval: **$$112.0B billion - $$112.0B billion**)\n\n### Year-over-Year Growth Rate",
+      "timestamp": "2025-11-14T10:01:43.003956"
+    },
+    {
+      "prompt": "Predict Microsoft's free cash flow for next 3 years",
+      "category": "complex_combinations",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4295,
+        "issues": []
+      },
+      "response": "### Microsoft Free Cash Flow Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Microsoft's free cash flow is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$109.48 billion** (95% Confidence Interval: **$80.87 billion - $137.19 billion**)\n- **2027:** **$109.46 billion** (95% Confidence Interval: **$80.08 billion - $138.88 billion**)\n- **2028:** **$108.99 billion** (95% Confidence Interval: **$$30.2B billion - $$30.2B billion**)\n\n### Year-over-Y",
+      "timestamp": "2025-11-14T10:02:16.910041"
+    },
+    {
+      "prompt": "forecast apple revenue",
+      "category": "edge_cases",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4296,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$406.16 billion** (95% Confidence Interval: **$279.23 billion - $548.36 billion**)\n- **2027:** **$419.79 billion** (95% Confidence Interval: **$270.17 billion - $561.80 billion**)\n- **2028:** **$432.25 billion** (95% Confidence Interval: **$$416.2B billion - $$416.2B billion**)\n\n### Year-over-Year Growth Rates\n\n",
+      "timestamp": "2025-11-14T10:02:48.687868"
+    },
+    {
+      "prompt": "FORECAST APPLE REVENUE",
+      "category": "edge_cases",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4284,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$406.16 billion** (95% Confidence Interval: **$265.26 billion - $555.98 billion**)\n- **2027:** **$419.79 billion** (95% Confidence Interval: **$278.19 billion - $569.61 billion**)\n- **2028:** **$432.25 billion** (95% Confidence Interval: **$$416.2B billion - $$416.2B billion**)\n\n### Year-over-Year Growth Rates\n\n",
+      "timestamp": "2025-11-14T10:03:27.796834"
+    },
+    {
+      "prompt": "Forecast Apple Revenue",
+      "category": "edge_cases",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4296,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$406.16 billion** (95% Confidence Interval: **$259.99 billion - $553.38 billion**)\n- **2027:** **$419.79 billion** (95% Confidence Interval: **$271.35 billion - $562.82 billion**)\n- **2028:** **$432.25 billion** (95% Confidence Interval: **$$416.2B billion - $$416.2B billion**)\n\n### Year-over-Year Growth Rates\n\n",
+      "timestamp": "2025-11-14T10:03:52.558486"
+    },
+    {
+      "prompt": "Forecast Apple's Revenue",
+      "category": "edge_cases",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 15,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 4294,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using PROPHET\n\nBased on the provided ML forecast data using the **PROPHET** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$406.16 billion** (95% Confidence Interval: **$249.03 billion - $568.10 billion**)\n- **2027:** **$419.79 billion** (95% Confidence Interval: **$272.14 billion - $564.04 billion**)\n- **2028:** **$432.25 billion** (95% Confidence Interval: **$$416.2B billion - $$416.2B billion**)\n\n### Year-over-Year Growth Rates\n\n",
+      "timestamp": "2025-11-14T10:04:25.652933"
+    },
+    {
+      "prompt": "Forecast Apple revenue using lstm",
+      "category": "edge_cases",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 9,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 635,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using LSTM\n\nBased on the provided ML forecast data using the **LSTM** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$547.60 billion** (95% Confidence Interval: **$547.60 billion - $547.60 billion**)\n- **2027:** **$650.14 billion** (95% Confidence Interval: **$650.14 billion - $650.14 billion**)\n- **2028:** **$$416.2B billion** (95% Confidence Interval: **$$416.2B billion - $786.54 billion**)\n\n### Year-over-Year Growth Rates\n\n- **20",
+      "timestamp": "2025-11-14T10:05:23.787498"
+    },
+    {
+      "prompt": "Forecast Apple revenue using LSTM model",
+      "category": "edge_cases",
+      "passed": true,
+      "quality": {
+        "passed": true,
+        "has_response": true,
+        "has_values": true,
+        "value_count": 9,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "length": 623,
+        "issues": []
+      },
+      "response": "### Apple Revenue Forecast Using LSTM\n\nBased on the provided ML forecast data using the **LSTM** model, Apple's revenue is projected as follows:\n\n### Forecast Values\n\n- **2026:** **$622.51 billion** (95% Confidence Interval: **$622.51 billion - $622.51 billion**)\n- **2027:** **$755.72 billion** (95% Confidence Interval: **$755.72 billion - $755.72 billion**)\n- **2028:** **$942.06 billion** (95% Confidence Interval: **$942.06 billion - $942.06 billion**)\n\n### Year-over-Year Growth Rates\n\n- **2026",
+      "timestamp": "2025-11-14T10:06:13.692621"
+    }
+  ],
+  "last_updated": "2025-11-14T10:06:13.692621"
+}

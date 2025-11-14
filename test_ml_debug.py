@@ -15,6 +15,11 @@ TEST_PROMPTS = [
     "Forecast Apple's revenue using LSTM",
     "Predict Microsoft's revenue using Prophet",
     "What's Tesla's revenue forecast?",
+    "Forecast Apple's revenue using GRU",
+    "Forecast Apple's revenue using Transformer",
+    "Forecast Apple's revenue using ETS",
+    "Forecast Apple's revenue using ensemble methods",
+    "Forecast Apple's revenue using the best ML model",
 ]
 
 def main():

@@ -2260,6 +2260,45 @@ class BenchmarkOSChatbot:
         """Detect if the prompt is about creating or using custom models."""
         lowered = text.lower()
         live_flag = self._intent_requests_live_data(text)
+        standard_ml_models = {
+            "prophet",
+            "arima",
+            "ets",
+            "lstm",
+            "gru",
+            "transformer",
+            "ensemble",
+            "ensemble methods",
+            "best",
+            "best model",
+            "best ml model",
+            "best machine learning model",
+            "auto",
+            "automatic",
+            "ml",
+            "ml model",
+            "machine learning",
+            "machine learning model",
+        }
+
+        def _is_standard_ml_model(name: Optional[str]) -> bool:
+            if not name:
+                return False
+            import re as _re
+
+            normalized = name.lower().strip()
+            normalized = _re.sub(r'[\-_]+', ' ', normalized)
+            normalized = normalized.replace("forecast", "").strip()
+            normalized = normalized.replace("plugin", "").strip()
+            if normalized.endswith("model"):
+                normalized = normalized[:-5].strip()
+            if normalized.endswith("methods"):
+                normalized = normalized[:-7].strip()
+            if normalized in standard_ml_models:
+                return True
+            if "best" in normalized and ("ml" in normalized or "machine" in normalized):
+                return True
+            return False
         
         # Patterns for creating models
         create_patterns = [
@@ -2293,6 +2332,9 @@ class BenchmarkOSChatbot:
                 ticker = match.group(1).strip().upper()
                 metric = match.group(2).strip()
                 model_name = match.group(3).strip() if len(match.groups()) > 2 else None
+                if _is_standard_ml_model(model_name):
+                    # This is an ML forecasting prompt (Prophet/ARIMA/etc.), not a custom model intent.
+                    continue
                 return {
                     "action": "forecast",
                     "ticker": ticker,
