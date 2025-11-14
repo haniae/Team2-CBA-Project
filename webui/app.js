@@ -1289,7 +1289,6 @@ async function renderCompanyUniverseSection({ container } = {}) {
 
   container.innerHTML = `
     <div class="company-universe" role="region" aria-live="polite">
-      <h3 class="company-universe__title">Company Universe</h3>
       <div class="company-universe__controls">
         <label class="sr-only" for="company-universe-search-input">Search companies</label>
         <input
@@ -1360,6 +1359,12 @@ async function renderCompanyUniverseSection({ container } = {}) {
       </div>
     </div>
   `;
+
+  const companyUniverseDiv = container.querySelector(".company-universe");
+  if (companyUniverseDiv) {
+    const hero = buildCompanyUniverseHero();
+    companyUniverseDiv.insertBefore(hero, companyUniverseDiv.firstChild);
+  }
 
   companySearchInput = container.querySelector("[data-role='company-universe-search']");
   companySectorSelect = container.querySelector("[data-role='company-universe-sector']");
@@ -2743,7 +2748,7 @@ function buildKpiLibraryHero(data) {
 
   const title = document.createElement("h3");
   title.className = "kpi-library__title";
-  title.textContent = data.library_name || "KPI Library";
+  title.textContent = "KPI Library";
 
   const subtitle = document.createElement("p");
   subtitle.className = "kpi-library__subtitle";
@@ -2755,6 +2760,93 @@ function buildKpiLibraryHero(data) {
 
   copy.append(title);
   copy.append(subtitle);
+
+  hero.append(badge);
+  hero.append(copy);
+  return hero;
+}
+
+function buildCompanyUniverseHero() {
+  const hero = document.createElement("section");
+  hero.className = "company-universe__hero";
+
+  const badge = document.createElement("div");
+  badge.className = "company-universe__badge";
+  badge.textContent = "🏢";
+
+  const copy = document.createElement("div");
+  copy.className = "company-universe__hero-copy";
+
+  const title = document.createElement("h3");
+  title.className = "company-universe__title";
+  title.textContent = "Company Universe";
+
+  const subtitle = document.createElement("p");
+  subtitle.className = "company-universe__subtitle";
+  subtitle.textContent =
+    "Explore coverage across every tracked company, segment results, and monitor ingestion progress inside this financial dataset view.";
+
+  const context = document.createElement("p");
+  context.className = "company-universe__context";
+  context.textContent = "Coverage includes all S&P 500 firms and major tech leaders, refreshed weekly.";
+
+  const status = document.createElement("div");
+  status.className = "company-universe__status";
+
+  // Universe status card
+  const universeCard = document.createElement("div");
+  universeCard.className = "company-universe__status-card";
+  universeCard.setAttribute("role", "status");
+  universeCard.innerHTML = `
+    <span class="company-universe__status-icon" aria-hidden="true">📈</span>
+    <div class="company-universe__status-text">
+      <span class="company-universe__status-label">Universe</span>
+      <span class="company-universe__status-value" data-role="company-universe-meta-universe">Loading...</span>
+    </div>
+  `;
+
+  // Sectors status card
+  const sectorsCard = document.createElement("div");
+  sectorsCard.className = "company-universe__status-card";
+  sectorsCard.setAttribute("role", "status");
+  sectorsCard.innerHTML = `
+    <span class="company-universe__status-icon" aria-hidden="true">🏭</span>
+    <div class="company-universe__status-text">
+      <span class="company-universe__status-label">Sectors</span>
+      <span class="company-universe__status-value" data-role="company-universe-meta-sectors">Loading...</span>
+    </div>
+  `;
+
+  // Latest filing status card
+  const latestCard = document.createElement("div");
+  latestCard.className = "company-universe__status-card";
+  latestCard.setAttribute("role", "status");
+  latestCard.innerHTML = `
+    <span class="company-universe__status-icon" aria-hidden="true">🗓</span>
+    <div class="company-universe__status-text">
+      <span class="company-universe__status-label">Latest filing</span>
+      <span class="company-universe__status-value" data-role="company-universe-meta-latest">Loading...</span>
+    </div>
+  `;
+
+  // Coverage mix status card
+  const coverageCard = document.createElement("div");
+  coverageCard.className = "company-universe__status-card";
+  coverageCard.setAttribute("role", "status");
+  coverageCard.innerHTML = `
+    <span class="company-universe__status-icon" aria-hidden="true">✅</span>
+    <div class="company-universe__status-text">
+      <span class="company-universe__status-label">Coverage mix</span>
+      <span class="company-universe__status-value" data-role="company-universe-meta-coverage">Loading...</span>
+    </div>
+  `;
+
+  status.append(universeCard, sectorsCard, latestCard, coverageCard);
+
+  copy.append(title);
+  copy.append(subtitle);
+  copy.append(context);
+  copy.append(status);
 
   hero.append(badge);
   hero.append(copy);
@@ -3634,12 +3726,12 @@ const UTILITY_SECTIONS = {
     html: HELP_GUIDE_HTML,
   },
   "kpi-library": {
-    title: "KPI Library",
+    title: "",
     html: `<div class="utility-loading">Đang tải KPI library…</div>`,
     render: renderKpiLibrarySection,
   },
   "company-universe": {
-    title: "Company Universe",
+    title: "",
     html: `<div class="utility-loading">Loading company universe…</div>`,
     render: renderCompanyUniverseSection,
   },
@@ -7581,6 +7673,45 @@ function updateCompanyUniverseMeta({
   
   if (companyUniverseStatSectors) {
     companyUniverseStatSectors.textContent = sectorsCount.toLocaleString();
+  }
+
+  // Update status cards in hero box
+  const heroBox = document.querySelector(".company-universe__hero");
+  if (heroBox) {
+    const universeEl = heroBox.querySelector("[data-role='company-universe-meta-universe']");
+    if (universeEl) {
+      universeEl.textContent = `${totalCount.toLocaleString()} companies tracked`;
+    }
+
+    const sectorsEl = heroBox.querySelector("[data-role='company-universe-meta-sectors']");
+    if (sectorsEl) {
+      sectorsEl.textContent = `${sectorsCount.toLocaleString()} sectors in view`;
+    }
+
+    const latestEl = heroBox.querySelector("[data-role='company-universe-meta-latest']");
+    if (latestEl) {
+      if (latestRecord && latestRecord.latest_filing) {
+        const dateStr = formatDateHuman(latestRecord.latest_filing);
+        const ticker = latestRecord.ticker || "";
+        latestEl.textContent = ticker ? `${dateStr} | ${ticker}` : dateStr;
+      } else {
+        latestEl.textContent = "—";
+      }
+    }
+
+    const coverageEl = heroBox.querySelector("[data-role='company-universe-meta-coverage']");
+    if (coverageEl && coverage) {
+      const { complete = 0, partial = 0, missing = 0 } = coverage;
+      const total = complete + partial + missing;
+      if (total > 0) {
+        const completePercent = Math.round((complete / total) * 100);
+        const partialCount = partial > 0 ? `, ${partial} partial` : "";
+        const missingCount = missing > 0 ? `, ${missing} missing` : "";
+        coverageEl.textContent = `${completePercent}% complete (${complete}${partialCount}${missingCount})`;
+      } else {
+        coverageEl.textContent = "—";
+      }
+    }
   }
 }
 
