@@ -1641,17 +1641,18 @@ function renderHelpGuide(content) {
   const article = document.createElement("article");
   article.className = "help-guide";
 
-  const hero = document.createElement("header");
+  // Hero box (summary card)
+  const hero = document.createElement("section");
   hero.className = "help-guide__hero";
 
-  const badge = document.createElement("span");
+  const badge = document.createElement("div");
   badge.className = "help-guide__badge";
   badge.textContent = "📘";
 
   const heroCopy = document.createElement("div");
   heroCopy.className = "help-guide__hero-copy";
 
-  const title = document.createElement("h2");
+  const title = document.createElement("h3");
   title.className = "help-guide__title";
   title.textContent = "Finalyze Copilot — Quick Reference";
 
@@ -1659,21 +1660,97 @@ function renderHelpGuide(content) {
   subtitle.className = "help-guide__subtitle";
   subtitle.textContent = "Ask natural prompts and I will translate them into institutional-grade analysis.";
 
-  const promptList = document.createElement("ul");
-  promptList.className = "help-guide__prompts";
-  content.prompts.forEach((prompt) => {
-    const item = document.createElement("li");
-    item.className = "help-guide__prompt";
-    item.textContent = prompt;
-    promptList.append(item);
-  });
-
-  heroCopy.append(title, subtitle, promptList);
+  heroCopy.append(title, subtitle);
   hero.append(badge, heroCopy);
-  article.append(hero);
+
+  // Search Form (similar to KPI Library)
+  const controls = document.createElement("div");
+  controls.className = "help-guide__filters";
+  
+  const searchGroup = document.createElement("div");
+  searchGroup.className = "help-guide__filter help-guide__filter--search";
+  const searchInput = document.createElement("input");
+  searchInput.type = "search";
+  searchInput.placeholder = "Search by command, purpose, or example";
+  searchInput.autocomplete = "off";
+  searchInput.className = "help-guide__search";
+  searchGroup.append(searchInput);
+  controls.append(searchGroup);
+
+  const categoryGroup = document.createElement("div");
+  categoryGroup.className = "help-guide__filter";
+  const categorySelect = document.createElement("select");
+  categorySelect.className = "help-guide__select";
+  categorySelect.innerHTML = `<option value="">All categories</option>`;
+  const categories = Array.from(
+    new Set(content.sections.map((section) => section.title || "").filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+  categories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category;
+    option.textContent = category;
+    categorySelect.append(option);
+  });
+  categoryGroup.append(categorySelect);
+  controls.append(categoryGroup);
+
+  // Create sticky container for hero + filters
+  const stickyContainer = document.createElement("div");
+  stickyContainer.className = "help-guide__sticky-container";
+  stickyContainer.append(hero);
+  stickyContainer.append(controls);
+  article.append(stickyContainer);
 
   const sectionGrid = document.createElement("div");
   sectionGrid.className = "help-guide__grid";
+
+  // Filter function
+  const filterCards = () => {
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    const selectedCategory = categorySelect.value;
+
+    const cards = sectionGrid.querySelectorAll(".help-guide__card");
+    let visibleCount = 0;
+
+    cards.forEach((card) => {
+      const title = card.querySelector(".help-guide__card-title")?.textContent || "";
+      const command = card.querySelector(".help-guide__value")?.textContent || "";
+      const purpose = Array.from(card.querySelectorAll(".help-guide__value")).map(el => el.textContent).join(" ") || "";
+      const examples = Array.from(card.querySelectorAll(".help-guide__list li")).map(el => el.textContent).join(" ") || "";
+      
+      const matchesSearch = !searchTerm || 
+        title.toLowerCase().includes(searchTerm) ||
+        command.toLowerCase().includes(searchTerm) ||
+        purpose.toLowerCase().includes(searchTerm) ||
+        examples.toLowerCase().includes(searchTerm);
+      
+      const matchesCategory = !selectedCategory || title === selectedCategory;
+
+      if (matchesSearch && matchesCategory) {
+        card.style.display = "";
+        visibleCount++;
+      } else {
+        card.style.display = "none";
+      }
+    });
+
+    // Show empty state if no cards visible
+    let emptyState = sectionGrid.querySelector(".help-guide__empty");
+    if (visibleCount === 0) {
+      if (!emptyState) {
+        emptyState = document.createElement("div");
+        emptyState.className = "help-guide__empty";
+        emptyState.textContent = "No results match your search.";
+        sectionGrid.append(emptyState);
+      }
+      emptyState.style.display = "";
+    } else if (emptyState) {
+      emptyState.style.display = "none";
+    }
+  };
+
+  searchInput.addEventListener("input", filterCards);
+  categorySelect.addEventListener("change", filterCards);
 
   content.sections.forEach((section) => {
     const card = document.createElement("section");
@@ -1763,6 +1840,30 @@ function appendHelpLine(container, label, value, { tokens = false } = {}) {
       const pill = document.createElement("span");
       pill.className = "help-guide__token";
       pill.textContent = token;
+      pill.setAttribute("role", "button");
+      pill.setAttribute("tabindex", "0");
+      pill.setAttribute("aria-label", `Use command: ${token}`);
+      pill.title = `Click to copy: ${token}`;
+      // Add click handler to copy command
+      pill.addEventListener("click", () => {
+        navigator.clipboard.writeText(token).then(() => {
+          const originalText = pill.textContent;
+          pill.textContent = "✓ Copied!";
+          pill.style.color = "#16a34a";
+          setTimeout(() => {
+            pill.textContent = originalText;
+            pill.style.color = "";
+          }, 1500);
+        }).catch(() => {
+          // Fallback: insert into chat input if available
+          const chatInput = document.querySelector("#chat-input, .chat-input, textarea[placeholder*='Ask']");
+          if (chatInput) {
+            chatInput.value = token;
+            chatInput.focus();
+            chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        });
+      });
       tokenGroup.append(pill);
     });
     line.append(tokenGroup);
@@ -3505,17 +3606,18 @@ function renderHelpGuide(content) {
   const article = document.createElement("article");
   article.className = "help-guide";
 
-  const hero = document.createElement("header");
+  // Hero box (summary card)
+  const hero = document.createElement("section");
   hero.className = "help-guide__hero";
 
-  const badge = document.createElement("span");
+  const badge = document.createElement("div");
   badge.className = "help-guide__badge";
   badge.textContent = "📘";
 
   const heroCopy = document.createElement("div");
   heroCopy.className = "help-guide__hero-copy";
 
-  const title = document.createElement("h2");
+  const title = document.createElement("h3");
   title.className = "help-guide__title";
   title.textContent = "Finalyze Copilot — Quick Reference";
 
@@ -3523,21 +3625,97 @@ function renderHelpGuide(content) {
   subtitle.className = "help-guide__subtitle";
   subtitle.textContent = "Ask natural prompts and I will translate them into institutional-grade analysis.";
 
-  const promptList = document.createElement("ul");
-  promptList.className = "help-guide__prompts";
-  content.prompts.forEach((prompt) => {
-    const item = document.createElement("li");
-    item.className = "help-guide__prompt";
-    item.textContent = prompt;
-    promptList.append(item);
-  });
-
-  heroCopy.append(title, subtitle, promptList);
+  heroCopy.append(title, subtitle);
   hero.append(badge, heroCopy);
-  article.append(hero);
+
+  // Search Form (similar to KPI Library)
+  const controls = document.createElement("div");
+  controls.className = "help-guide__filters";
+  
+  const searchGroup = document.createElement("div");
+  searchGroup.className = "help-guide__filter help-guide__filter--search";
+  const searchInput = document.createElement("input");
+  searchInput.type = "search";
+  searchInput.placeholder = "Search by command, purpose, or example";
+  searchInput.autocomplete = "off";
+  searchInput.className = "help-guide__search";
+  searchGroup.append(searchInput);
+  controls.append(searchGroup);
+
+  const categoryGroup = document.createElement("div");
+  categoryGroup.className = "help-guide__filter";
+  const categorySelect = document.createElement("select");
+  categorySelect.className = "help-guide__select";
+  categorySelect.innerHTML = `<option value="">All categories</option>`;
+  const categories = Array.from(
+    new Set(content.sections.map((section) => section.title || "").filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+  categories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category;
+    option.textContent = category;
+    categorySelect.append(option);
+  });
+  categoryGroup.append(categorySelect);
+  controls.append(categoryGroup);
+
+  // Create sticky container for hero + filters
+  const stickyContainer = document.createElement("div");
+  stickyContainer.className = "help-guide__sticky-container";
+  stickyContainer.append(hero);
+  stickyContainer.append(controls);
+  article.append(stickyContainer);
 
   const sectionGrid = document.createElement("div");
   sectionGrid.className = "help-guide__grid";
+
+  // Filter function
+  const filterCards = () => {
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    const selectedCategory = categorySelect.value;
+
+    const cards = sectionGrid.querySelectorAll(".help-guide__card");
+    let visibleCount = 0;
+
+    cards.forEach((card) => {
+      const title = card.querySelector(".help-guide__card-title")?.textContent || "";
+      const command = card.querySelector(".help-guide__value")?.textContent || "";
+      const purpose = Array.from(card.querySelectorAll(".help-guide__value")).map(el => el.textContent).join(" ") || "";
+      const examples = Array.from(card.querySelectorAll(".help-guide__list li")).map(el => el.textContent).join(" ") || "";
+      
+      const matchesSearch = !searchTerm || 
+        title.toLowerCase().includes(searchTerm) ||
+        command.toLowerCase().includes(searchTerm) ||
+        purpose.toLowerCase().includes(searchTerm) ||
+        examples.toLowerCase().includes(searchTerm);
+      
+      const matchesCategory = !selectedCategory || title === selectedCategory;
+
+      if (matchesSearch && matchesCategory) {
+        card.style.display = "";
+        visibleCount++;
+      } else {
+        card.style.display = "none";
+      }
+    });
+
+    // Show empty state if no cards visible
+    let emptyState = sectionGrid.querySelector(".help-guide__empty");
+    if (visibleCount === 0) {
+      if (!emptyState) {
+        emptyState = document.createElement("div");
+        emptyState.className = "help-guide__empty";
+        emptyState.textContent = "No results match your search.";
+        sectionGrid.append(emptyState);
+      }
+      emptyState.style.display = "";
+    } else if (emptyState) {
+      emptyState.style.display = "none";
+    }
+  };
+
+  searchInput.addEventListener("input", filterCards);
+  categorySelect.addEventListener("change", filterCards);
 
   content.sections.forEach((section) => {
     const card = document.createElement("section");
@@ -3627,6 +3805,30 @@ function appendHelpLine(container, label, value, { tokens = false } = {}) {
       const pill = document.createElement("span");
       pill.className = "help-guide__token";
       pill.textContent = token;
+      pill.setAttribute("role", "button");
+      pill.setAttribute("tabindex", "0");
+      pill.setAttribute("aria-label", `Use command: ${token}`);
+      pill.title = `Click to copy: ${token}`;
+      // Add click handler to copy command
+      pill.addEventListener("click", () => {
+        navigator.clipboard.writeText(token).then(() => {
+          const originalText = pill.textContent;
+          pill.textContent = "✓ Copied!";
+          pill.style.color = "#16a34a";
+          setTimeout(() => {
+            pill.textContent = originalText;
+            pill.style.color = "";
+          }, 1500);
+        }).catch(() => {
+          // Fallback: insert into chat input if available
+          const chatInput = document.querySelector("#chat-input, .chat-input, textarea[placeholder*='Ask']");
+          if (chatInput) {
+            chatInput.value = token;
+            chatInput.focus();
+            chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        });
+      });
       tokenGroup.append(pill);
     });
     line.append(tokenGroup);
@@ -4512,6 +4714,7 @@ async function renderFilingViewerSection({ container } = {}) {
 
   container.innerHTML = `
     <div class="filing-viewer">
+      <div class="filing-viewer__sticky-container">
       <section class="filing-viewer__hero">
         <div class="filing-viewer__badge">📄</div>
         <div class="filing-viewer__hero-copy">
@@ -4561,6 +4764,7 @@ async function renderFilingViewerSection({ container } = {}) {
           <button type="submit">Fetch filings</button>
         </div>
       </form>
+      </div>
       <div class="filing-viewer__notice">
         <p>Pull SEC-backed facts to validate every KPI. Supply a ticker, then refine by metric or year.</p>
       </div>
