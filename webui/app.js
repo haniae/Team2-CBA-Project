@@ -3301,7 +3301,7 @@ async function renderFilingViewerSection({ container } = {}) {
   container.innerHTML = `
     <div class="filing-viewer">
       <section class="filing-viewer__hero">
-        <div class="filing-viewer__badge">FS</div>
+        <div class="filing-viewer__badge">📄</div>
         <div class="filing-viewer__hero-copy">
           <h3 class="filing-viewer__title">Filing Source Viewer</h3>
           <p class="filing-viewer__subtitle">
@@ -3736,7 +3736,7 @@ const UTILITY_SECTIONS = {
     render: renderCompanyUniverseSection,
   },
   "filing-viewer": {
-    title: "Filing Source Viewer",
+    title: "",
     html: `<div class="filing-viewer" data-role="filing-viewer-root"></div>`,
     render: renderFilingViewerSection,
   },
@@ -3763,7 +3763,7 @@ const UTILITY_SECTIONS = {
     render: renderSettingsSection,
   },
   portfolio: {
-    title: "Portfolio Management",
+    title: "",
     html: `<div class="portfolio-management-panel" data-role="portfolio-management-root">
       <div class="utility-loading">Loading portfolio management...</div>
     </div>`,
