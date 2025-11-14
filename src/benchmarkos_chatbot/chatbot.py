@@ -802,6 +802,7 @@ SYSTEM_PROMPT = (
     "**YOU MUST FOLLOW THESE RULES EXACTLY - NO EXCEPTIONS:**\n\n"
     "1. **THE FORECAST IS THE ONLY ANSWER** - When a forecast is provided, you MUST use ONLY the ML forecast values. DO NOT provide historical snapshots, KPIs, or generic company data.\n"
     "2. **DO NOT PROVIDE GENERIC SNAPSHOTS** - If a forecast is provided, DO NOT return a standard company snapshot or historical data summary. The forecast REPLACES the snapshot.\n"
+    "2a. **🚨 CRITICAL: NEVER INCLUDE 'Growth Snapshot' OR 'Margin Snapshot' SECTIONS** - These sections are FORBIDDEN in forecast responses. If you see historical growth or margin data in the context, DO NOT format it as a 'Growth Snapshot' or 'Margin Snapshot' section. These are ONLY for historical data queries, NEVER for forecasts.\n"
     "3. **YOU MUST INCLUDE ALL TECHNICAL DETAILS** - When ML forecast context is provided, you MUST include ALL technical details in your response:\n"
     "   - **USE EXACT VALUES FROM CONTEXT** - Do NOT generalize or estimate - use the EXACT numbers provided\n"
     "   - **DO NOT say 'the model has layers' - say 'the model has {X} layers' using the EXACT number from context**\n"
@@ -839,7 +840,9 @@ SYSTEM_PROMPT = (
     "    - Third paragraph: Model details and confidence\n"
     "    - Fourth paragraph: Brief historical context (optional)\n"
     "    - Sources section (mandatory) - include model documentation links\n"
-    "    - DO NOT include KPI snapshots or Phase 1/Phase 2 KPIs\n\n"
+    "    - DO NOT include KPI snapshots or Phase 1/Phase 2 KPIs\n"
+    "    - 🚨 NEVER include '📈 Growth Snapshot' or '📊 Margin Snapshot' sections - these are FORBIDDEN\n"
+    "    - 🚨 NEVER include sections titled 'Growth Snapshot' or 'Margin Snapshot' - these are historical data only\n\n"
     
     "**Example for forecasting queries:**\n"
     "If asked 'Forecast Apple's revenue using LSTM', your response should:\n"
@@ -3385,7 +3388,9 @@ class BenchmarkOSChatbot:
                     # Forecasting patterns (also questions)
                     r'\b(?:forecast|predict|estimate|project)\b',
                 ]
-                is_question = any(re.search(pattern, lowered_input) for pattern in question_patterns)
+                # Use module-level re import explicitly
+                import re as re_module
+                is_question = any(re_module.search(pattern, lowered_input) for pattern in question_patterns)
                 
                 # CRITICAL: Check for filter queries - these should NEVER generate dashboards
                 # Comprehensive sector patterns with all variations
@@ -3787,40 +3792,39 @@ class BenchmarkOSChatbot:
             elif is_forecasting_for_cache:
                 emit("cache_skip", "Skipping cache for forecasting query - need fresh ML forecast context")
 
-            # FINAL SAFEGUARD: Check if reply contains snapshot text for forecasting queries
-            # This prevents returning snapshots even if they somehow got generated
-            # TEMPORARILY DISABLED - Let's see what the LLM actually generates
-            # TODO: Re-enable with more specific checks once we verify LLM behavior
+            # FINAL SAFEGUARD: Remove Growth Snapshot and Margin Snapshot sections from forecast responses
+            # These sections should NEVER appear in forecast responses
             try:
                 from .context_builder import _is_forecasting_query
-                if _is_forecasting_query(user_input):
-                    # Only flag very specific snapshot patterns that clearly indicate historical data
-                    # Allow the LLM to generate forecast responses even if they mention "snapshot" in a different context
-                    is_snapshot = False
-                    if reply:
-                        reply_lower = reply.lower()
-                        # Only check for very specific Phase 1/Phase 2 KPI patterns
-                        # These are clear indicators of historical snapshot data
-                        snapshot_indicators = [
-                            "phase1 kpis" in reply_lower,
-                            "phase 1 kpis" in reply_lower,
-                            "phase 2 kpis" in reply_lower,
-                            # Only flag if it's clearly a historical snapshot section, not forecast-related
-                            (reply_lower.count("growth snapshot") > 0 and 
-                             "forecast" not in reply_lower and 
-                             "revenue growth (yoy)" in reply_lower),
-                            (reply_lower.count("margin snapshot") > 0 and 
-                             "forecast" not in reply_lower and 
-                             "net margin" in reply_lower),
-                        ]
-                        is_snapshot = any(snapshot_indicators)
-                    
-                    if is_snapshot:
-                        LOGGER.warning(f"Forecasting query may have returned snapshot. Query: {user_input}, Reply preview: {reply[:500]}")
-                        # Don't replace - just log for now to see what's happening
-                        # reply = "I apologize, but I encountered an issue generating the forecast..."
-                        emit("forecasting_snapshot_warning", "Forecasting query may have returned snapshot - check logs")
-            except ImportError:
+                if _is_forecasting_query(user_input) and reply:
+                    # re is already imported at module level
+                    original_reply = reply
+                    # Remove Growth Snapshot section (with emoji variations)
+                    # Matches: "📈 Growth Snapshot (TICKER – PERIOD)" and everything until next section or end
+                    # Pattern: emoji + "Growth Snapshot" + optional text + newline + all content until next section
+                    reply = re.sub(
+                        r'(?i)(?:📈\s*)?Growth\s+Snapshot[^\n]*(?:\n|$).*?(?=\n\n📊\s*Margin|\n📊\s*Margin|\n\n|$)',
+                        '',
+                        reply,
+                        flags=re.DOTALL
+                    )
+                    # Remove Margin Snapshot section (with emoji variations)
+                    # Matches: "📊 Margin Snapshot (TICKER – PERIOD)" and everything until end
+                    # Pattern: emoji + "Margin Snapshot" + optional text + newline + all content until end
+                    reply = re.sub(
+                        r'(?i)(?:📊\s*)?Margin\s+Snapshot[^\n]*(?:\n|$).*?(?=\n\n|$)',
+                        '',
+                        reply,
+                        flags=re.DOTALL
+                    )
+                    # Clean up any double newlines that might result
+                    reply = re.sub(r'\n{3,}', '\n\n', reply)
+                    # Log if we removed anything
+                    if reply != original_reply:
+                        LOGGER.warning(f"Removed Growth/Margin Snapshot sections from forecast response for query: {user_input}")
+                        emit("forecasting_snapshot_removed", "Removed Growth/Margin Snapshot sections from forecast response")
+            except (ImportError, Exception) as e:
+                LOGGER.debug(f"Error in snapshot removal safeguard: {e}")
                 pass
 
             # CRITICAL: Fix malformed markdown tables before returning

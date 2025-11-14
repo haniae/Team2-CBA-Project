@@ -59,6 +59,7 @@ I've created **6 comprehensive test scripts** to test ALL possible ML forecastin
 The test suite covers **ALL possible ways** users might ask for ML forecasts:
 
 ### Prompt Patterns (30+ variations)
+
 - Basic: "Forecast X's Y"
 - With model: "Forecast X's Y using Z"
 - With time: "Forecast X's Y for next 3 years"

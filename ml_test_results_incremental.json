@@ -111,17 +111,335 @@
         "passed": false
       },
       "timestamp": "2025-11-13T20:51:48.804636"
+    },
+    {
+      "prompt": "What's Amazon's revenue forecast using GRU?",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:52:25.050479"
+    },
+    {
+      "prompt": "Forecast Google's revenue using Transformer",
+      "passed": false,
+      "quality": {
+        "has_values": false,
+        "has_model": true,
+        "has_ci": false,
+        "has_years": false,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": false
+      },
+      "timestamp": "2025-11-13T20:52:25.111144"
+    },
+    {
+      "prompt": "Predict Apple's revenue using ETS",
+      "passed": false,
+      "quality": {
+        "has_values": false,
+        "has_model": true,
+        "has_ci": false,
+        "has_years": false,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": false
+      },
+      "timestamp": "2025-11-13T20:52:25.154444"
+    },
+    {
+      "prompt": "Forecast Microsoft's revenue using ensemble",
+      "passed": false,
+      "quality": {
+        "has_values": false,
+        "has_model": true,
+        "has_ci": false,
+        "has_years": false,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": false
+      },
+      "timestamp": "2025-11-13T20:52:25.226049"
+    },
+    {
+      "prompt": "What's Tesla's revenue forecast using the best ML model?",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:52:46.654617"
+    },
+    {
+      "prompt": "Forecast Apple's revenue for next 3 years",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:53:10.002175"
+    },
+    {
+      "prompt": "Predict Microsoft's revenue for 2025-2027",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:53:34.514317"
+    },
+    {
+      "prompt": "What's Tesla's revenue forecast for next 3 years using Prophet?",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:53:48.274673"
+    },
+    {
+      "prompt": "Forecast Apple's net income using LSTM",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:54:39.890078"
+    },
+    {
+      "prompt": "Predict Microsoft's free cash flow using Prophet",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:55:04.119039"
+    },
+    {
+      "prompt": "What's Tesla's EBITDA forecast using ARIMA?",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:55:26.634383"
+    },
+    {
+      "prompt": "Forecast Amazon's gross profit using ensemble",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:55:47.126886"
+    },
+    {
+      "prompt": "Can you forecast Apple's revenue?",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:55:57.953040"
+    },
+    {
+      "prompt": "How much will Microsoft's revenue be?",
+      "passed": false,
+      "error": "'BenchmarkOSChatbot' object has no attribute '_detect_tickers'"
+    },
+    {
+      "prompt": "What do you think Tesla's revenue will be?",
+      "passed": false,
+      "error": "'BenchmarkOSChatbot' object has no attribute '_detect_tickers'"
+    },
+    {
+      "prompt": "Can you predict Apple's revenue using LSTM?",
+      "passed": false,
+      "quality": {
+        "has_values": false,
+        "has_model": true,
+        "has_ci": false,
+        "has_years": false,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": false
+      },
+      "timestamp": "2025-11-13T20:55:58.019697"
+    },
+    {
+      "prompt": "Forecast Apple revenue now",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:56:07.111838"
+    },
+    {
+      "prompt": "Run a forecast for Microsoft revenue",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:56:18.778662"
+    },
+    {
+      "prompt": "Generate forecast for Tesla earnings",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:56:27.737068"
+    },
+    {
+      "prompt": "What will Apple's revenue be?",
+      "passed": false,
+      "error": "'BenchmarkOSChatbot' object has no attribute '_detect_tickers'"
+    },
+    {
+      "prompt": "Project Microsoft's revenue",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:56:47.774648"
+    },
+    {
+      "prompt": "Estimate Tesla's revenue",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:56:57.715748"
+    },
+    {
+      "prompt": "What's the outlook for Amazon revenue?",
+      "passed": true,
+      "quality": {
+        "has_values": true,
+        "has_model": true,
+        "has_ci": true,
+        "has_years": true,
+        "has_snapshot": false,
+        "has_error": false,
+        "passed": true
+      },
+      "timestamp": "2025-11-13T20:57:22.783514"
     }
   ],
   "tested_prompts": [
-    "Forecast Apple's revenue using Prophet",
+    "Predict Microsoft's free cash flow using Prophet",
+    "Forecast Amazon's gross profit using ensemble",
     "Predict Microsoft's revenue using ARIMA",
-    "Forecast Tesla's earnings using LSTM",
+    "How much will Microsoft's revenue be?",
+    "Run a forecast for Microsoft revenue",
+    "Estimate Tesla's revenue",
+    "Forecast Apple's net income using LSTM",
+    "Forecast Apple revenue now",
+    "What's the outlook for Amazon revenue?",
+    "Forecast Microsoft's revenue using ensemble",
     "Show me Amazon's revenue forecast",
+    "What will Apple's revenue be?",
+    "Predict Microsoft's revenue for 2025-2027",
+    "Forecast Apple's revenue using Prophet",
+    "Predict Apple's revenue using ETS",
+    "Forecast Apple's revenue for next 3 years",
     "What's Tesla's revenue forecast?",
+    "Can you forecast Apple's revenue?",
+    "What do you think Tesla's revenue will be?",
+    "Forecast Tesla's earnings using LSTM",
+    "Generate forecast for Tesla earnings",
+    "Project Microsoft's revenue",
+    "What's Tesla's revenue forecast for next 3 years using Prophet?",
     "Forecast Apple's revenue",
+    "What's Amazon's revenue forecast using GRU?",
     "Predict Microsoft's revenue",
-    "Forecast Google's earnings"
+    "What's Tesla's revenue forecast using the best ML model?",
+    "What's Tesla's EBITDA forecast using ARIMA?",
+    "Forecast Google's revenue using Transformer",
+    "Forecast Google's earnings",
+    "Can you predict Apple's revenue using LSTM?"
   ],
-  "last_updated": "2025-11-13T20:51:48.804636"
+  "last_updated": "2025-11-13T20:57:22.783514"
 }
