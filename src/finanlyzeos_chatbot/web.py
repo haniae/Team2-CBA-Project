@@ -1087,6 +1087,7 @@ def chat(request: ChatRequest) -> ChatResponse:
 
     progress_snapshot = _progress_snapshot(request_id)
     structured = getattr(bot, "last_structured_response", {}) or {}
+    active_forecast = getattr(bot, "active_forecast", None) or {}
     
     # CRITICAL: Filter out None/empty dashboards - if dashboard is None, don't send it
     dashboard_data = structured.get("dashboard")
@@ -1109,6 +1110,49 @@ def chat(request: ChatRequest) -> ChatResponse:
     exports = [
         ExportPayload(**payload) for payload in structured.get("exports") or []
     ]
+
+    # Enforce universal ML formatting for ML forecasts when available
+    try:
+        if active_forecast and active_forecast.get("forecast_result"):
+            fr = active_forecast.get("forecast_result") or {}
+            from .universal_ml_formatter import format_ml_forecast
+            from .rewrite_formatter import rewrite_forecast_output
+            # Attempt to get sector info from bot
+            sector = None
+            try:
+                ticker_for_sector = active_forecast.get("ticker", "")
+                if ticker_for_sector and hasattr(bot, "ticker_sector_map"):
+                    sector = (bot.ticker_sector_map.get(ticker_for_sector, {}) or {}).get("sector")
+            except Exception:
+                sector = None
+            formatted = format_ml_forecast(
+                ticker=active_forecast.get("ticker", ""),
+                metric=active_forecast.get("metric", ""),
+                model_name=active_forecast.get("method", ""),
+                sector=sector,
+                periods=getattr(fr, "periods", []) or [],
+                predicted=getattr(fr, "predicted_values", []) or [],
+                ci_low=getattr(fr, "confidence_intervals_low", []) or [],
+                ci_high=getattr(fr, "confidence_intervals_high", []) or [],
+                confidence=getattr(fr, "confidence", None),
+                scenario_style=(active_forecast.get("parameters") or {}).get("style"),
+                data_sources=(active_forecast.get("parameters") or {}).get("sources") or [],
+            )
+            if formatted:
+                # Universal rewrite step: send through rewrite prompt to LLM to polish wording
+                rewrite_prompt = rewrite_forecast_output(formatted)
+                try:
+                    reply = bot.llm_client.generate_reply(
+                        [{"role": "system", "content": "You are a finance assistant that strictly follows formatting instructions."},
+                         {"role": "user", "content": rewrite_prompt}],
+                        temperature=0.2,
+                        max_tokens=2000
+                    )
+                except Exception:
+                    reply = formatted  # fallback to already formatted version
+    except Exception:
+        # Graceful fallback to existing reply if formatting fails
+        pass
     return ChatResponse(
         conversation_id=bot.conversation.conversation_id,
         reply=reply,
@@ -1121,6 +1165,12 @@ def chat(request: ChatRequest) -> ChatResponse:
         dashboard=dashboard_data,  # Use filtered dashboard (None if cleared)
         progress_events=progress_snapshot.events,
     )
+
+
+# Optional: compatibility endpoint for clients calling /api/chat
+@app.post("/api/chat", response_model=ChatResponse)
+def api_chat(request: ChatRequest) -> ChatResponse:
+    return chat(request)
 
 
 @app.get("/help-content")

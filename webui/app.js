@@ -5590,6 +5590,26 @@ function pushProgressEventsInternal(tracker, events) {
     return;
   }
   const container = tracker.container;
+  // Suppress progress UI for universally-formatted ML forecasts
+  try {
+    // If any event indicates the universal formatter, hide progress
+    const hasUniversalFormatterEvent = events.some(
+      (e) => e && typeof e.stage === "string" && e.stage.indexOf("forecast_formatter") !== -1
+    );
+    // Or if the assistant message already contains the institutional sections, hide progress
+    const contentNode = tracker.wrapper?.querySelector(".message-content");
+    const contentText = contentNode ? contentNode.textContent || "" : "";
+    const looksLikeInstitutionalReport =
+      contentText.indexOf("### 1. Executive Summary") !== -1 ||
+      contentText.indexOf("### 2. Forecast Table") !== -1;
+    if (hasUniversalFormatterEvent || looksLikeInstitutionalReport) {
+      container.classList.remove("active", "pending");
+      container.style.display = "none";
+      return;
+    }
+  } catch (err) {
+    // non-fatal; continue rendering progress if detection fails
+  }
   container.classList.add("active");
   container.classList.remove("pending");
   const typingIndicator = tracker.wrapper?.querySelector(".typing-indicator");

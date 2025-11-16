@@ -2024,6 +2024,7 @@ class FinanlyzeOSChatbot:
         Fix malformed markdown tables:
         1. Separator row concatenated to header row
         2. Bold formatting within table cells (breaks alignment)
+        3. Collapsed tables where row breaks/newlines were lost
         
         Example malformed table:
             | Company | Ticker | Margin ||---|---|---|
@@ -4160,9 +4161,145 @@ class FinanlyzeOSChatbot:
                     context_detail or ("Context compiled" if context else "Context not required"),
                 )
                 
-                # Pass is_forecasting flag and user_query to message preparation
-                messages = self._prepare_llm_messages(context, is_forecasting=is_forecasting, user_query=user_input)
-                LOGGER.debug(f"Prepared {len(messages)} messages for LLM")
+                # NEW: Context-parse fallback — enforce formatter whenever context contains ML FORECAST markers
+                # even if the forecasting flag wasn't set earlier.
+                if not reply and context and ("ML FORECAST" in context or "CRITICAL: THIS IS THE PRIMARY ANSWER" in context):
+                    try:
+                        from .context_builder import get_last_forecast_metadata
+                        from .universal_ml_formatter import format_ml_forecast
+                        meta = get_last_forecast_metadata()
+                        fr = None
+                        if meta and meta.get("forecast_result"):
+                            fr = meta["forecast_result"]
+                            sector = None
+                            try:
+                                sector = (self.ticker_sector_map.get(meta.get("ticker",""), {}) or {}).get("sector")
+                            except Exception:
+                                sector = None
+                            reply = format_ml_forecast(
+                                ticker=meta.get("ticker", ""),
+                                metric=meta.get("metric", ""),
+                                model_name=meta.get("method", ""),
+                                sector=sector,
+                                periods=getattr(fr, "periods", []) or [],
+                                predicted=getattr(fr, "predicted_values", []) or [],
+                                ci_low=getattr(fr, "confidence_intervals_low", []) or [],
+                                ci_high=getattr(fr, "confidence_intervals_high", []) or [],
+                                confidence=getattr(fr, "confidence", None),
+                                scenario_style=meta.get("parameters", {}).get("style"),
+                                data_sources=meta.get("parameters", {}).get("sources") or [],
+                            )
+                            if reply:
+                                emit("forecast_formatter", "Enforced by context marker (metadata)")
+                        # Fallback to active_forecast if metadata missing
+                        if not reply:
+                            active = self.get_active_forecast()
+                            if active and active.get("forecast_result"):
+                                fr = active.get("forecast_result")
+                                sector = None
+                                try:
+                                    sector = (self.ticker_sector_map.get(active.get("ticker",""), {}) or {}).get("sector")
+                                except Exception:
+                                    sector = None
+                                reply = format_ml_forecast(
+                                    ticker=active.get("ticker", ""),
+                                    metric=active.get("metric", ""),
+                                    model_name=active.get("method", ""),
+                                    sector=sector,
+                                    periods=getattr(fr, "periods", []) or [],
+                                    predicted=getattr(fr, "predicted_values", []) or [],
+                                    ci_low=getattr(fr, "confidence_intervals_low", []) or [],
+                                    ci_high=getattr(fr, "confidence_intervals_high", []) or [],
+                                    confidence=getattr(fr, "confidence", None),
+                                    scenario_style=(active.get("parameters") or {}).get("style"),
+                                    data_sources=(active.get("parameters") or {}).get("sources") or [],
+                                )
+                                if reply:
+                                    emit("forecast_formatter", "Enforced by context marker (active_forecast)")
+                    except Exception:
+                        # If anything goes wrong, continue with normal flow
+                        pass
+                
+                # Attempt universal ML formatting for forecasting queries before invoking LLM
+                reply = None
+                if is_forecasting:
+                    try:
+                        from .context_builder import get_last_forecast_metadata
+                        from .universal_ml_formatter import format_ml_forecast
+                        meta = get_last_forecast_metadata()
+                        if meta and meta.get("forecast_result"):
+                            fr = meta["forecast_result"]
+                            # Persist for API consumers
+                            try:
+                                self.set_active_forecast(
+                                    ticker=meta.get("ticker", ""),
+                                    metric=meta.get("metric", ""),
+                                    method=meta.get("method", ""),
+                                    periods=meta.get("parameters", {}).get("periods", 0),
+                                    forecast_result=fr,
+                                    explainability=meta.get("explainability") or {},
+                                    parameters=meta.get("parameters") or {},
+                                )
+                            except Exception:
+                                pass
+                            # Determine sector for company-specific drivers
+                            sector = None
+                            try:
+                                sector = (self.ticker_sector_map.get(meta.get("ticker",""), {}) or {}).get("sector")
+                            except Exception:
+                                sector = None
+                            reply = format_ml_forecast(
+                                ticker=meta.get("ticker", ""),
+                                metric=meta.get("metric", ""),
+                                model_name=meta.get("method", ""),
+                                sector=sector,
+                                periods=getattr(fr, "periods", []) or [],
+                                predicted=getattr(fr, "predicted_values", []) or [],
+                                ci_low=getattr(fr, "confidence_intervals_low", []) or [],
+                                ci_high=getattr(fr, "confidence_intervals_high", []) or [],
+                                confidence=getattr(fr, "confidence", None),
+                                scenario_style=meta.get("parameters", {}).get("style"),
+                                data_sources=meta.get("parameters", {}).get("sources") or [],
+                            )
+                            if reply:
+                                emit("forecast_formatter", "Universal ML formatter applied")
+                    except Exception as e:
+                        LOGGER.debug(f"Universal ML formatter unavailable or failed: {e}", exc_info=True)
+
+                    # Strict fallback: if no metadata but an active forecast exists, format from it
+                    if not reply:
+                        try:
+                            active = self.get_active_forecast()
+                            if active and active.get("forecast_result"):
+                                fr = active.get("forecast_result")
+                                sector = None
+                                try:
+                                    sector = (self.ticker_sector_map.get(active.get("ticker",""), {}) or {}).get("sector")
+                                except Exception:
+                                    sector = None
+                                reply = format_ml_forecast(  # type: ignore[name-defined]
+                                    ticker=active.get("ticker", ""),
+                                    metric=active.get("metric", ""),
+                                    model_name=active.get("method", ""),
+                                    sector=sector,
+                                    periods=getattr(fr, "periods", []) or [],
+                                    predicted=getattr(fr, "predicted_values", []) or [],
+                                    ci_low=getattr(fr, "confidence_intervals_low", []) or [],
+                                    ci_high=getattr(fr, "confidence_intervals_high", []) or [],
+                                    confidence=getattr(fr, "confidence", None),
+                                    scenario_style=(active.get("parameters") or {}).get("style"),
+                                    data_sources=(active.get("parameters") or {}).get("sources") or [],
+                                )
+                                if reply:
+                                    emit("forecast_formatter", "Universal ML formatter applied via active_forecast fallback")
+                        except Exception:
+                            pass
+                
+                # If no preformatted reply, prepare LLM messages
+                if not reply:
+                    # Pass is_forecasting flag and user_query to message preparation
+                    messages = self._prepare_llm_messages(context, is_forecasting=is_forecasting, user_query=user_input)
+                    LOGGER.debug(f"Prepared {len(messages)} messages for LLM")
                 
                 # Log context details for debugging
                 if context:
@@ -4182,21 +4319,28 @@ class FinanlyzeOSChatbot:
                             sample_start = context[:500] if len(context) > 500 else context
                             LOGGER.debug(f"Context sample (first 500 chars): {sample_start}")
                 
-                emit("llm_query_start", "Composing explanation")
+                # If reply already composed by universal formatter, skip LLM
+                if reply:
+                    emit("llm_query_start", "Universal formatter composed response")
+                    emit("llm_query_complete", "Explanation drafted")
+                    LOGGER.info(f"Generated reply length: {len(reply)} characters (universal formatter)")
+                else:
+                    emit("llm_query_start", "Composing explanation")
                 
                 # is_forecasting is already set above, reuse it
                 
                 # Use lower temperature and higher max_tokens for forecasting queries
                 # Lower temperature = more deterministic, follows instructions better
                 # Higher max_tokens = allows for detailed responses
-                if is_forecasting:
-                    reply = self.llm_client.generate_reply(
-                        messages,
-                        temperature=0.3,  # Lower temperature for more deterministic, instruction-following behavior
-                        max_tokens=4000,  # Higher max_tokens to allow detailed responses
-                    )
-                else:
-                    reply = self.llm_client.generate_reply(messages)
+                if not reply:
+                    if is_forecasting:
+                        reply = self.llm_client.generate_reply(
+                            messages,
+                            temperature=0.3,  # Lower temperature for more deterministic, instruction-following behavior
+                            max_tokens=4000,  # Higher max_tokens to allow detailed responses
+                        )
+                    else:
+                        reply = self.llm_client.generate_reply(messages)
                 
                 emit("llm_query_complete", "Explanation drafted")
                 LOGGER.info(f"Generated reply length: {len(reply) if reply else 0} characters")
@@ -4233,6 +4377,81 @@ class FinanlyzeOSChatbot:
                         LOGGER.debug("ML response verifier not available, skipping verification")
                     except Exception as e:
                         LOGGER.debug(f"ML response verification failed: {e}")
+                
+                # FINAL ENFORCEMENT: Overwrite with universal formatter if a forecast was generated
+                if is_forecasting:
+                    try:
+                        from .context_builder import get_last_forecast_metadata
+                        from .universal_ml_formatter import format_ml_forecast
+                        meta = get_last_forecast_metadata()
+                        if meta and meta.get("forecast_result"):
+                            fr = meta["forecast_result"]
+                            # Persist for API/UI consumers
+                            try:
+                                self.set_active_forecast(
+                                    ticker=meta.get("ticker", ""),
+                                    metric=meta.get("metric", ""),
+                                    method=meta.get("method", ""),
+                                    periods=meta.get("parameters", {}).get("periods", 0),
+                                    forecast_result=fr,
+                                    explainability=meta.get("explainability") or {},
+                                    parameters=meta.get("parameters") or {},
+                                )
+                            except Exception:
+                                pass
+                            # Determine sector for company-specific drivers
+                            sector = None
+                            try:
+                                sector = (self.ticker_sector_map.get(meta.get("ticker",""), {}) or {}).get("sector")
+                            except Exception:
+                                sector = None
+                            formatted = format_ml_forecast(
+                                ticker=meta.get("ticker", ""),
+                                metric=meta.get("metric", ""),
+                                model_name=meta.get("method", ""),
+                                sector=sector,
+                                periods=getattr(fr, "periods", []) or [],
+                                predicted=getattr(fr, "predicted_values", []) or [],
+                                ci_low=getattr(fr, "confidence_intervals_low", []) or [],
+                                ci_high=getattr(fr, "confidence_intervals_high", []) or [],
+                                confidence=getattr(fr, "confidence", None),
+                                scenario_style=meta.get("parameters", {}).get("style"),
+                                data_sources=meta.get("parameters", {}).get("sources") or [],
+                            )
+                            if formatted:
+                                reply = formatted
+                                emit("forecast_formatter", "Universal ML formatter enforced after generation")
+                        else:
+                            # Strict fallback: enforce formatting from active forecast if metadata missing
+                            try:
+                                active = self.get_active_forecast()
+                                if active and active.get("forecast_result"):
+                                    fr = active.get("forecast_result")
+                                    sector = None
+                                    try:
+                                        sector = (self.ticker_sector_map.get(active.get("ticker",""), {}) or {}).get("sector")
+                                    except Exception:
+                                        sector = None
+                                    formatted = format_ml_forecast(  # type: ignore[name-defined]
+                                        ticker=active.get("ticker", ""),
+                                        metric=active.get("metric", ""),
+                                        model_name=active.get("method", ""),
+                                        sector=sector,
+                                        periods=getattr(fr, "periods", []) or [],
+                                        predicted=getattr(fr, "predicted_values", []) or [],
+                                        ci_low=getattr(fr, "confidence_intervals_low", []) or [],
+                                        ci_high=getattr(fr, "confidence_intervals_high", []) or [],
+                                        confidence=getattr(fr, "confidence", None),
+                                        scenario_style=(active.get("parameters") or {}).get("style"),
+                                        data_sources=(active.get("parameters") or {}).get("sources") or [],
+                                    )
+                                    if formatted:
+                                        reply = formatted
+                                        emit("forecast_formatter", "Universal ML formatter enforced via active_forecast fallback")
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        LOGGER.debug(f"Universal formatter enforcement failed: {e}", exc_info=True)
                 
                 # NEW: Verify response accuracy (for all responses, not just ML forecasts)
                 if reply and self.settings.verification_enabled:
@@ -4423,7 +4642,34 @@ class FinanlyzeOSChatbot:
                 LOGGER.debug(f"Error in snapshot removal safeguard: {e}")
                 pass
 
-            # CRITICAL: Fix malformed markdown tables before returning
+            # Universal rewrite step for CLI/non-API path (forecasting or formatted forecast replies)
+            try:
+                from .context_builder import _is_forecasting_query
+                should_rewrite = False
+                try:
+                    should_rewrite = _is_forecasting_query(user_input)
+                except Exception:
+                    should_rewrite = False
+                if not should_rewrite and reply:
+                    # Heuristic: if already in 7-section format, we can still polish wording
+                    if ("### 1. Executive Summary" in reply and "### 7. Audit Trail" in reply) or ("ML FORECAST" in (context or "")):
+                        should_rewrite = True
+                if reply and should_rewrite:
+                    from .rewrite_formatter import rewrite_forecast_output
+                    rewrite_prompt = rewrite_forecast_output(reply)
+                    try:
+                        reply = self.llm_client.generate_reply(
+                            [{"role": "system", "content": "You are a finance assistant that strictly preserves numbers and follows formatting instructions."},
+                             {"role": "user", "content": rewrite_prompt}],
+                            temperature=0.2,
+                            max_tokens=2000
+                        )
+                    except Exception:
+                        pass  # keep original reply on rewrite failure
+            except Exception:
+                pass
+
+            # CRITICAL: Fix malformed markdown tables before returning (run after rewrite)
             if reply:
                 reply = self._fix_markdown_tables(reply)
             
