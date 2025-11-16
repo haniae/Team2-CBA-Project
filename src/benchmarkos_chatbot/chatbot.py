@@ -1061,8 +1061,14 @@ SYSTEM_PROMPT = (
     "2. **DO NOT use your training data** - Even if you remember Apple's FY2024 revenue was $391B, use the context values\n"
     "3. **INCLUDE THE PERIOD** - Always specify which fiscal year/quarter (FY2025, Q3 2024, etc.)\n"
     "4. **VERIFY YOUR NUMBERS** - Before responding, check your values match the 'FINANCIAL DATA' section\n"
-    "5. **NO HALLUCINATION** - If you write a number not in the context, the response will fail verification\n"
-    "6. **CRITICAL:** When you see '🚨 MANDATORY DATA' or '🚨 USE THESE EXACT VALUES' sections, those are the ONLY values you should use\n\n"
+    "5. **NO HALLUCINATION - STRICT ENFORCEMENT** - If you write a number not in the context, the response will fail verification\n"
+    "   - **AUTOMATIC DETECTION**: Every number you write is automatically checked against context\n"
+    "   - **VERIFICATION FAILURE**: If a number doesn't match context, it will be flagged and corrected\n"
+    "   - **CONFIDENCE SCORING**: Responses with unverified numbers get lower confidence scores\n"
+    "   - **STRICT MODE**: In strict mode, responses with unverified facts are rejected entirely\n"
+    "6. **CRITICAL:** When you see '🚨 MANDATORY DATA' or '🚨 USE THESE EXACT VALUES' sections, those are the ONLY values you should use\n"
+    "7. **BEFORE WRITING ANY NUMBER, VERIFY IT EXISTS IN CONTEXT** - Scan the context for the exact number before including it\n"
+    "8. **IF YOU CAN'T FIND A NUMBER IN CONTEXT, DON'T WRITE IT** - Say 'data not available' instead of making it up\n\n"
     "## 🚨 CRITICAL: NO DATA = NO ANSWER!\n\n"
     "**If the context does NOT contain financial data for the requested company:**\n\n"
     "1. **DO NOT make up numbers from your training data!**\n"
@@ -1119,24 +1125,92 @@ SYSTEM_PROMPT = (
     
     "**Macro Economic Context (Use Correctly - These Are PERCENTAGES!):**\n"
     "- GDP growth rate (e.g., 2.5%) - NOT billions of dollars!\n"
-    "- Interest rates (e.g., Fed Funds 4.5%) - These are percentages!\n"
+    "- Interest rates (e.g., Fed Funds 4.5%, Treasury 10Y 4.5%) - These are percentages!\n"
     "- Inflation (e.g., CPI 3.2%) - This is a percentage!\n"
     "- Unemployment rate (e.g., 3.8%) - This is a percentage!\n"
+    "- VIX (e.g., 15.0) - Market volatility index (Points, not %)\n"
+    "- Consumer Confidence (e.g., 70.0) - Consumer sentiment index\n"
+    "- Manufacturing PMI (e.g., 50.0) - Manufacturing health (>50 = expansion, <50 = contraction)\n"
     "- ⚠️ **NEVER write 'GDP: $245B' or 'Fed Rate: $281B' - these are PERCENTAGES not company revenue!**\n"
     "- ⚠️ **NEVER format company revenue (e.g., $391B) as a percentage (e.g., 391035000000.0%)!**\n"
     "- ⚠️ **NEVER use Apple's revenue ($391B) as GDP Growth Rate - GDP is 2.5%, not $391B!**\n"
     "- ⚠️ **NEVER use Microsoft's revenue ($281B) as Fed Funds Rate - Fed Rate is 4.5%, not $281B!**\n"
     "- ⚠️ **NEVER use Amazon's revenue ($416B) as CPI Inflation - CPI is 3.2%, not $416B!**\n"
-    "- ⚠️ **If you see a percentage > 1000% in macro context, it's ALWAYS a bug - use the correct macro indicator values!**\n"
+    "- ⚠️ **If you see a percentage > 1000% in macro context, it's ALWAYS a bug - use the correct macro indicator values!**\n\n"
+    
+    "**HOW TO USE MACRO INDICATORS EFFECTIVELY:**\n\n"
+    
+    "**1. VALUATION ANALYSIS (10-Year Treasury Yield):**\n"
+    "- Compare earnings yield (1/P/E × 100) to Treasury 10Y yield\n"
+    "- Example: 'Apple's P/E is 30x (earnings yield 3.3%). With Treasury 10Y at 4.5%, the stock is expensive unless growth justifies premium.'\n"
+    "- Use for: P/E analysis, dividend yield comparisons, growth vs value discussions\n\n"
+    
+    "**2. RISK SENTIMENT (VIX):**\n"
+    "- VIX > 25 = Fear, elevated market volatility\n"
+    "- VIX < 12 = Complacency, calm markets\n"
+    "- Example: 'While Apple declined 5%, VIX at 28 indicates broader market concerns, suggesting the move reflects sentiment rather than Apple-specific issues.'\n"
+    "- Use for: Volatility explanations, market timing discussions, risk assessment\n\n"
+    
+    "**3. CONSUMER SPENDING (Consumer Confidence):**\n"
+    "- Confidence < 60 = Cautious spending, may impact consumer discretionary\n"
+    "- Confidence > 85 = Strong spending, supports consumer sectors\n"
+    "- Example: 'Target's 8% revenue growth is impressive given consumer confidence at 65, suggesting market share gains.'\n"
+    "- Use for: Retail, consumer discretionary, automotive, travel stocks\n\n"
+    
+    "**4. MANUFACTURING CYCLE (PMI):**\n"
+    "- PMI > 50 = Expansion\n"
+    "- PMI < 50 = Contraction\n"
+    "- PMI > 55 = Strong expansion\n"
+    "- Example: 'With PMI at 48 (contraction), Industrials may face headwinds, but Caterpillar's strong international exposure provides diversification.'\n"
+    "- Use for: Industrials, Materials, Energy (cyclical sectors)\n\n"
+    
+    "**5. INTEREST RATE IMPACT (Fed Funds Rate, Treasury 10Y):**\n"
+    "- High rates (> 4.5%) = Pressure on growth stocks, debt-heavy companies (REITs, Utilities)\n"
+    "- Low rates (< 2.0%) = Support for growth stocks, negative for banks\n"
+    "- Example: 'With Fed Funds at 5.25%, REITs face higher borrowing costs, compressing margins.'\n"
+    "- Use for: Real estate, utilities, banks, tech/growth stocks, debt analysis\n\n"
+    
+    "**6. GDP GROWTH CONTEXT:**\n"
+    "- Compare company revenue growth to GDP growth\n"
+    "- Growth > 2× GDP = Market share gains or strong sector dynamics\n"
+    "- Growth < GDP = Market share loss or sector headwinds\n"
+    "- Example: 'Tesla's 15% revenue growth significantly outpaces the 2.5% GDP growth, indicating market share gains.'\n\n"
+    
+    "**7. INFLATION IMPACT:**\n"
+    "- High inflation (> 4%) = Margin pressure if cannot pass through costs\n"
+    "- Low inflation (< 2%) = Cost stability, margin expansion potential\n"
+    "- Example: 'Elevated inflation (3.8%) may pressure margins if the company cannot fully pass through cost increases.'\n\n"
+    
+    "**8. UNEMPLOYMENT & SPENDING:**\n"
+    "- Low unemployment (< 4%) = Supports consumer spending, but may increase labor costs\n"
+    "- High unemployment (> 5.5%) = Constrains consumer spending\n"
+    "- Example: 'Low unemployment (3.7%) supports consumer spending for retail companies.'\n\n"
+    
+    "**9. COMBINED INSIGHTS - Always consider multiple indicators together:**\n"
+    "- Example: 'High VIX (28) + Low Consumer Confidence (62) + PMI contraction (48) suggests cautious economic outlook, which may impact consumer discretionary spending.'\n"
+    "- Example: 'Low rates (2.5%) + Strong GDP (3.2%) + High PMI (56) creates favorable environment for cyclical stocks.'\n\n"
+    
+    "**10. SECTOR-SPECIFIC GUIDANCE:**\n"
+    "- **Tech**: Interest rates (discount rate), GDP growth (enterprise spending)\n"
+    "- **Consumer**: Consumer confidence, unemployment, inflation\n"
+    "- **Financials**: Interest rates (Fed Funds, Treasury 10Y), yield curve\n"
+    "- **Industrials**: PMI, GDP growth, manufacturing trends\n"
+    "- **Energy**: Inflation, GDP growth (demand)\n"
+    "- **REITs**: Interest rates, Treasury yields, inflation\n\n"
+    
+    "**11. FORECASTING WITH MACRO:**\n"
+    "- Adjust revenue forecasts based on GDP growth, consumer confidence, PMI\n"
+    "- Adjust margin forecasts based on inflation, labor costs (unemployment)\n"
+    "- Adjust valuation forecasts based on interest rates (Treasury 10Y)\n"
+    "- Example: 'Forecasting Apple revenue growth at 8% for 2025, considering GDP growth of 2.5%, consumer confidence of 68, and sector trends.'\n\n"
+    
     "- **SECTOR BENCHMARKS** - compare company metrics to sector averages:\n"
     "  * Revenue CAGR vs. sector\n"
     "  * Margin performance vs. sector benchmarks\n"
     "  * ROIC vs. sector standards\n"
     "  * Leverage vs. sector norms\n"
     "- **ALWAYS explain company performance in macro context**\n"
-    "- Example: \"Tesla's 15% revenue growth significantly outpaces the 2.5% GDP growth\n"
-    "  and the 8% automotive sector average, driven by strong EV demand despite\n"
-    "  high interest rates (Fed Funds at 4.5%) that typically constrain auto purchases.\"\n\n"
+    "- **Use multiple indicators together for comprehensive analysis**\n\n"
     
     "## Length & Depth Requirements\n\n"
     "**Target Length:**\n"
@@ -1827,6 +1901,36 @@ class BenchmarkOSChatbot:
             )
             # Add context as a system message (NOT user message)
             messages.append({"role": "system", "content": context_with_marker})
+            
+            # NEW: Validate context completeness before generating response
+            if user_query and hasattr(self, 'settings') and self.settings.verification_enabled:
+                try:
+                    from .context_validator import validate_context_completeness, suggest_context_improvements
+                    
+                    completeness_check = validate_context_completeness(
+                        rag_context,
+                        user_query
+                    )
+                    
+                    if not completeness_check.is_complete:
+                        LOGGER.warning(
+                            f"Context completeness check failed: {len(completeness_check.missing_elements)} missing elements, "
+                            f"confidence: {completeness_check.confidence*100:.1f}%"
+                        )
+                        
+                        # Add warning to context if confidence is low
+                        if completeness_check.confidence < 0.5:
+                            warning_msg = suggest_context_improvements(completeness_check, user_query)
+                            if warning_msg:
+                                context_with_marker = (
+                                    f"⚠️ **CONTEXT COMPLETENESS WARNING:**\n{warning_msg}\n\n"
+                                    f"{context_with_marker}"
+                                )
+                                # Update the last system message (context message)
+                                messages[-1] = {"role": "system", "content": context_with_marker}
+                except (ImportError, AttributeError):
+                    pass  # context_validator not available or settings not accessible, skip check
+            
             messages.extend(chat_history)
         else:
             messages.extend(chat_history)
@@ -3677,8 +3781,8 @@ class BenchmarkOSChatbot:
                     context_detail or ("Context compiled" if context else "Context not required"),
                 )
                 
-                # Pass is_forecasting flag to message preparation
-                messages = self._prepare_llm_messages(context, is_forecasting=is_forecasting)
+                # Pass is_forecasting flag and user_query to message preparation
+                messages = self._prepare_llm_messages(context, is_forecasting=is_forecasting, user_query=user_input)
                 LOGGER.debug(f"Prepared {len(messages)} messages for LLM")
                 
                 # Log context details for debugging
@@ -3759,6 +3863,7 @@ class BenchmarkOSChatbot:
                         from .source_verifier import verify_all_sources
                         from .response_corrector import correct_response, add_verification_footer
                         from .data_validator import validate_context_data
+                        from .hallucination_detector import detect_hallucinations, add_hallucination_warning
                         
                         emit("verification_start", "Verifying response accuracy")
                         
@@ -3771,6 +3876,23 @@ class BenchmarkOSChatbot:
                             str(self.settings.database_path),
                             ticker_resolver=self._name_to_ticker if hasattr(self, '_name_to_ticker') else None
                         )
+                        
+                        # NEW: Detect hallucinations
+                        hallucination_report = detect_hallucinations(
+                            reply,
+                            context or "",
+                            verification_result.results,
+                            verification_result.facts
+                        )
+                        
+                        # Log hallucination detection
+                        if hallucination_report.has_hallucination:
+                            LOGGER.warning(
+                                f"Hallucination detected: {hallucination_report.critical_warnings} critical, "
+                                f"{hallucination_report.total_warnings} total warnings, "
+                                f"confidence: {hallucination_report.confidence_score*100:.1f}%"
+                            )
+                            emit("hallucination_detected", f"{hallucination_report.critical_warnings} critical warnings")
                         
                         # Cross-validate data
                         validation_issues = []
@@ -3825,6 +3947,14 @@ class BenchmarkOSChatbot:
                             # Add confidence footer
                             reply = add_confidence_footer(reply, confidence, include_details=False)
                             emit("verification_complete", f"Verified: {verification_result.correct_facts}/{verification_result.total_facts} facts verified, {confidence.score*100:.1f}% confidence")
+                        
+                        # NEW: Add hallucination warning if detected
+                        if hallucination_report.has_hallucination:
+                            reply = add_hallucination_warning(reply, hallucination_report)
+                            # In strict mode, reject responses with critical hallucinations
+                            if self.settings.verification_strict_mode and hallucination_report.critical_warnings > 0:
+                                reply = f"I apologize, but I detected critical data verification issues in my response. Please verify the information against source documents or try rephrasing your query."
+                                emit("hallucination_reject", "Response rejected due to critical hallucinations")
                         
                         # Log verification results
                         LOGGER.info(
