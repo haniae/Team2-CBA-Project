@@ -26,7 +26,7 @@ Contributors:  **Hania A.**  , **Van Nhi Vuong** , **Malcolm Muoriyarwa** & **De
 - [📖 Overview](#-overview)
 - [📊 Current Data Coverage](#-current-data-coverage)
 - [⚡ Core Capabilities](#-core-capabilities)
-- [🚀 Advanced Analytics (Phase 1 - NEW)](#-advanced-analytics-phase-1---new)
+- [🚀 Advanced Analytics](#-advanced-analytics)
 - [🤖 Machine Learning Stack](#-machine-learning-stack)
 - [📚 Retrieval-Augmented Generation](#-retrieval-augmented-generation)
 - [📊 Portfolio Management](#-portfolio-management)
