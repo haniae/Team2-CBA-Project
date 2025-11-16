@@ -129,6 +129,30 @@ class MacroDataProvider:
             "name": "PCE Inflation",
             "unit": "%",
             "description": "Personal Consumption Expenditures Price Index YoY (Fed's preferred inflation measure, broader than CPI)"
+        },
+        "dxy": {
+            "fred_series": "DTWEXBGS",  # Trade-Weighted U.S. Dollar Index: Broad, Goods and Services - Federal Reserve
+            "name": "Trade-Weighted USD Index",
+            "unit": "Index",
+            "description": "Trade-weighted U.S. dollar index (broad, goods and services) - measures USD strength against major trading partners"
+        },
+        "eur_usd": {
+            "fred_series": "DEXUSEU",  # U.S. / Euro Foreign Exchange Rate - Federal Reserve
+            "name": "EUR/USD Exchange Rate",
+            "unit": "USD per EUR",
+            "description": "U.S. dollars per Euro exchange rate (higher = stronger USD, weaker EUR)"
+        },
+        "cny_usd": {
+            "fred_series": "DEXCHUS",  # China / U.S. Foreign Exchange Rate - Federal Reserve
+            "name": "CNY/USD Exchange Rate",
+            "unit": "CNY per USD",
+            "description": "Chinese yuan per U.S. dollar exchange rate (higher = stronger USD, weaker CNY)"
+        },
+        "jpy_usd": {
+            "fred_series": "DEXJPUS",  # Japan / U.S. Foreign Exchange Rate - Federal Reserve
+            "name": "JPY/USD Exchange Rate",
+            "unit": "JPY per USD",
+            "description": "Japanese yen per U.S. dollar exchange rate (higher = stronger USD, weaker JPY)"
         }
     }
     
@@ -163,6 +187,10 @@ class MacroDataProvider:
             "nonfarm_payrolls": timedelta(hours=24),  # Monthly - update daily (BLS, released first Friday of month)
             "core_pce": timedelta(hours=24),      # Monthly - update daily (BEA, Fed's preferred)
             "pce": timedelta(hours=24),           # Monthly - update daily (BEA, Fed's preferred)
+            "dxy": timedelta(hours=6),            # Daily - update 4x per day (FX rates)
+            "eur_usd": timedelta(hours=6),        # Daily - update 4x per day (FX rates)
+            "cny_usd": timedelta(hours=6),        # Daily - update 4x per day (FX rates)
+            "jpy_usd": timedelta(hours=6),        # Daily - update 4x per day (FX rates)
         }
         
         self._cache: Dict[str, tuple[Any, datetime]] = {}
@@ -400,6 +428,22 @@ class MacroDataProvider:
                 # PCE YoY inflation (Fed's preferred measure, broader than CPI)
                 default_value = 2.5  # Updated: ~2.5% YoY (September 2025, Fed's preferred measure)
                 default_date = "2025-09"  # YoY September 2025
+            elif key == "dxy":
+                # Trade-Weighted USD Index (broad, goods and services) - Base year 2006=100
+                default_value = 120.0  # Approximate current level (varies, typically 110-130 range)
+                default_date = "2025-07"  # Daily (July 2025, approximate)
+            elif key == "eur_usd":
+                # EUR/USD exchange rate (USD per EUR)
+                default_value = 1.08  # Approximate current level (varies, typically 1.05-1.12 range)
+                default_date = "2025-07"  # Daily (July 2025, approximate)
+            elif key == "cny_usd":
+                # CNY/USD exchange rate (CNY per USD)
+                default_value = 7.25  # Approximate current level (varies, typically 7.0-7.5 range)
+                default_date = "2025-07"  # Daily (July 2025, approximate)
+            elif key == "jpy_usd":
+                # JPY/USD exchange rate (JPY per USD)
+                default_value = 155.0  # Approximate current level (varies, typically 140-160 range)
+                default_date = "2025-07"  # Daily (July 2025, approximate)
             
             # Try to fetch from FRED
             value = default_value
@@ -468,6 +512,8 @@ class MacroDataProvider:
                             max_age_days = 7  # Daily indicators - max 7 days old
                         elif key in ["inflation", "unemployment", "consumer_confidence", "manufacturing_pmi", "core_cpi", "nonfarm_payrolls", "core_pce", "pce"]:
                             max_age_days = 90  # Monthly indicators - max 90 days old
+                        elif key in ["dxy", "eur_usd", "cny_usd", "jpy_usd"]:
+                            max_age_days = 7  # FX rates - max 7 days old (daily data)
                         elif key == "gdp_growth":
                             max_age_days = 180  # Quarterly indicators - max 180 days old
                         
@@ -708,6 +754,30 @@ class MacroDataProvider:
                     if not (30 <= indicator.value <= 70):
                         logger.warning(f"🔧 Manufacturing PMI {indicator.value} is outside normal range (30 to 70), using default 50.0")
                         indicator.value = 50.0
+                        indicator.source = f"{indicator.source} (corrected from {original_value:.1f})"
+                elif key == "dxy":
+                    # Trade-Weighted USD Index typically 90-150 (base year 2006=100)
+                    if not (90 <= indicator.value <= 150):
+                        logger.warning(f"🔧 USD Index {indicator.value} is outside normal range (90 to 150), using default 120.0")
+                        indicator.value = 120.0
+                        indicator.source = f"{indicator.source} (corrected from {original_value:.1f})"
+                elif key == "eur_usd":
+                    # EUR/USD typically 0.8-1.4 (USD per EUR)
+                    if not (0.8 <= indicator.value <= 1.4):
+                        logger.warning(f"🔧 EUR/USD {indicator.value} is outside normal range (0.8 to 1.4), using default 1.08")
+                        indicator.value = 1.08
+                        indicator.source = f"{indicator.source} (corrected from {original_value:.2f})"
+                elif key == "cny_usd":
+                    # CNY/USD typically 6.0-8.0 (CNY per USD)
+                    if not (6.0 <= indicator.value <= 8.0):
+                        logger.warning(f"🔧 CNY/USD {indicator.value} is outside normal range (6.0 to 8.0), using default 7.25")
+                        indicator.value = 7.25
+                        indicator.source = f"{indicator.source} (corrected from {original_value:.2f})"
+                elif key == "jpy_usd":
+                    # JPY/USD typically 80-200 (JPY per USD)
+                    if not (80 <= indicator.value <= 200):
+                        logger.warning(f"🔧 JPY/USD {indicator.value} is outside normal range (80 to 200), using default 155.0")
+                        indicator.value = 155.0
                         indicator.source = f"{indicator.source} (corrected from {original_value:.1f})"
             
             # Format with clear structure - show VALIDATED LIVE value only
@@ -1366,6 +1436,10 @@ class MacroDataProvider:
             "vix": (5.0, 150.0, "VIX must be between 5 and 150"),
             "consumer_confidence": (30.0, 150.0, "Consumer Confidence must be between 30 and 150"),
             "manufacturing_pmi": (20.0, 80.0, "Manufacturing PMI must be between 20 and 80"),
+            "dxy": (90.0, 150.0, "USD Index must be between 90 and 150 (base year 2006=100)"),
+            "eur_usd": (0.8, 1.4, "EUR/USD must be between 0.8 and 1.4 (USD per EUR)"),
+            "cny_usd": (6.0, 8.0, "CNY/USD must be between 6.0 and 8.0 (CNY per USD)"),
+            "jpy_usd": (80.0, 200.0, "JPY/USD must be between 80 and 200 (JPY per USD)"),
         }
         
         if key in validation_ranges:
