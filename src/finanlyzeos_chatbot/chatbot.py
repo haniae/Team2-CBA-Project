@@ -2036,6 +2036,18 @@ class FinanlyzeOSChatbot:
             | Apple | AAPL | 25% |
         """
         import re
+
+        # Quick normalization: break concatenations like "| ... | |---" and "| ... | | 2026 |"
+        # by inserting a newline whenever we see "| |"
+        text = text.replace("| |", "|\n|")
+
+        # Pre-fix: expand collapsed tables where header separator and rows were stuck on one line
+        # Turn "... | Header | |---|---| ... | 2026 | ..." into proper newlines
+        # Newline between header and separator
+        text = re.sub(r'(\|[^|\n]+(?:\|[^|\n]+)+\|)\s*\|\s*([-:| \t]+)\|', r'\1\n|\2|', text)
+        # Newline before each subsequent row that looks like a row start: "| YYYY |" or generic cell start
+        text = re.sub(r'\|\s*\|\s*(\d{4}\s*\|)', r'|\n| \1', text)
+        text = re.sub(r'\|\s*\|\s*([A-Za-z0-9$].*?\|)', r'|\n| \1', text)
         
         # Fix 1: Pattern to match malformed tables where separator is concatenated to header
         # Matches: | Header1 | Header2 | Header3 ||---|---|---|

@@ -13,10 +13,12 @@ import math
 
 def _fmt_currency(value: float) -> str:
     abs_v = abs(value)
+    if abs_v >= 1_000_000_000_000:
+        return f"${value/1_000_000_000_000:.2f}T".replace(".00T", "T")
     if abs_v >= 1_000_000_000:
-        return f"${value/1_000_000_000:.1f}B"
+        return f"${value/1_000_000_000:.1f}B".replace(".0B", "B")
     if abs_v >= 1_000_000:
-        return f"${value/1_000_000:.1f}M"
+        return f"${value/1_000_000:.1f}M".replace(".0M", "M")
     return f"${value:,.0f}"
 
 
@@ -233,9 +235,14 @@ def format_ml_forecast(
     es.append(f"Context: {style} forecast using {model_name.upper()}.")
 
     # 2) Forecast Table
-    header = "| Year | Forecast | 95% CI Low | 95% CI High |\n|---:|---:|---:|---:|"
-    rows = [f"| {y} | {_fmt_currency(v)} | {_fmt_currency(lo)} | {_fmt_currency(hi)} |" for y, v, lo, hi in zip(years, values, lows, highs)]
-    forecast_table = "\n".join([header, *rows])
+    def _format_forecast_table_strict(years: Sequence[int], vals: Sequence[float], los: Sequence[float], his: Sequence[float]) -> str:
+        header = "| Year | Forecast | 95% CI Low | 95% CI High |"
+        bar =    "|------|----------|------------|-------------|"
+        lines = [header, bar]
+        for y, v, lo, hi in zip(years, vals, los, his):
+            lines.append(f"| {y} | {_fmt_currency(v)} | {_fmt_currency(lo)} | {_fmt_currency(hi)} |")
+        return "\n".join(lines)
+    forecast_table = _format_forecast_table_strict(years, values, lows, highs)
     # Short uncertainty sentence (always present)
     if len(lows) >= 2 and len(highs) >= 2:
         early_width = highs[0] - lows[0]
