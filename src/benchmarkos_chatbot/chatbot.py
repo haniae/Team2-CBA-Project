@@ -1123,6 +1123,11 @@ SYSTEM_PROMPT = (
     "- Inflation (e.g., CPI 3.2%) - This is a percentage!\n"
     "- Unemployment rate (e.g., 3.8%) - This is a percentage!\n"
     "- ⚠️ **NEVER write 'GDP: $245B' or 'Fed Rate: $281B' - these are PERCENTAGES not company revenue!**\n"
+    "- ⚠️ **NEVER format company revenue (e.g., $391B) as a percentage (e.g., 391035000000.0%)!**\n"
+    "- ⚠️ **NEVER use Apple's revenue ($391B) as GDP Growth Rate - GDP is 2.5%, not $391B!**\n"
+    "- ⚠️ **NEVER use Microsoft's revenue ($281B) as Fed Funds Rate - Fed Rate is 4.5%, not $281B!**\n"
+    "- ⚠️ **NEVER use Amazon's revenue ($416B) as CPI Inflation - CPI is 3.2%, not $416B!**\n"
+    "- ⚠️ **If you see a percentage > 1000% in macro context, it's ALWAYS a bug - use the correct macro indicator values!**\n"
     "- **SECTOR BENCHMARKS** - compare company metrics to sector averages:\n"
     "  * Revenue CAGR vs. sector\n"
     "  * Margin performance vs. sector benchmarks\n"
@@ -1807,23 +1812,22 @@ class BenchmarkOSChatbot:
                 pass
         
         if rag_context:
-            if is_forecasting and chat_history:
-                # For forecasting queries, prepend context to the last user message
-                # This ensures the LLM sees the context as part of the user's request
-                for i in range(len(chat_history) - 1, -1, -1):
-                    if chat_history[i].get("role") == "user":
-                        # Prepend context to user message
-                        original_content = chat_history[i].get("content", "")
-                        chat_history[i] = {
-                            "role": "user",
-                            "content": f"{rag_context}\n\n---\n\nUser Question: {original_content}"
-                        }
-                        break
-                messages.extend(chat_history)
-            else:
-                # For non-forecasting queries, add context as system message
-                messages.append({"role": "system", "content": rag_context})
-                messages.extend(chat_history)
+            # CRITICAL FIX: Always add context as a separate system message
+            # DO NOT prepend to user message - this causes "looped system prompt interpretation"
+            # LLM thinks the context is user input, not data to use
+            # Context should be clearly marked as system-provided data context
+            context_with_marker = (
+                "═══════════════════════════════════════════════════════════════════════════════\n"
+                "📊 SYSTEM DATA CONTEXT (Use this data to answer the user's question below)\n"
+                "═══════════════════════════════════════════════════════════════════════════════\n\n"
+                f"{rag_context}\n\n"
+                "═══════════════════════════════════════════════════════════════════════════════\n"
+                "End of system data context - User question follows below\n"
+                "═══════════════════════════════════════════════════════════════════════════════\n"
+            )
+            # Add context as a system message (NOT user message)
+            messages.append({"role": "system", "content": context_with_marker})
+            messages.extend(chat_history)
         else:
             messages.extend(chat_history)
         
@@ -1966,6 +1970,30 @@ class BenchmarkOSChatbot:
             return fuzzy[0][0].upper()
 
         return None
+
+    def _detect_tickers(self, text: str) -> List[str]:
+        """Detect tickers from user input text.
+        
+        Args:
+            text: User input text to extract tickers from
+            
+        Returns:
+            List of ticker symbols (uppercase) found in the text
+        """
+        from .parsing.alias_builder import resolve_tickers_freeform
+        
+        ticker_matches, _ = resolve_tickers_freeform(text)
+        tickers = []
+        
+        for match in ticker_matches:
+            if isinstance(match, dict):
+                ticker = match.get("ticker")
+                if ticker:
+                    ticker_upper = ticker.upper()
+                    if ticker_upper not in tickers:
+                        tickers.append(ticker_upper)
+        
+        return tickers
 
     @staticmethod
     def _load_sector_map() -> Dict[str, Dict[str, Optional[str]]]:
@@ -3689,6 +3717,23 @@ class BenchmarkOSChatbot:
                 
                 emit("llm_query_complete", "Explanation drafted")
                 LOGGER.info(f"Generated reply length: {len(reply) if reply else 0} characters")
+                
+                # CRITICAL: Fix astronomical percentages BEFORE verification
+                if reply:
+                    try:
+                        from .response_corrector import fix_astronomical_percentages
+                        LOGGER.debug(f"Calling fix_astronomical_percentages on reply (length: {len(reply)})")
+                        reply, fixes_applied = fix_astronomical_percentages(reply)
+                        if fixes_applied > 0:
+                            emit("percentage_fix", f"Fixed {fixes_applied} astronomical percentage(s)")
+                            LOGGER.warning(f"🔧 Fixed {fixes_applied} astronomical percentage(s) in response")
+                        else:
+                            LOGGER.debug("fix_astronomical_percentages found no fixes to apply")
+                    except ImportError as e:
+                        LOGGER.error(f"Response corrector not available: {e}", exc_info=True)
+                    except Exception as e:
+                        LOGGER.error(f"Percentage fix failed: {e}", exc_info=True)
+                        # Don't fail the request, just log the error
                 
                 # Post-process verification for ML forecast responses
                 if is_forecasting and reply:

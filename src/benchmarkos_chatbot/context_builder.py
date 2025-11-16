@@ -3408,7 +3408,11 @@ def build_financial_context(
         # Add macro economic context at the beginning
         if include_macro_context and MACRO_DATA_AVAILABLE:
             try:
-                macro_provider = get_macro_provider()
+                # Get FRED API key from environment if available
+                import os
+                fred_api_key = os.getenv('FRED_API_KEY')
+                macro_provider = get_macro_provider(fred_api_key=fred_api_key)
+                
                 # Attempt to determine company sector (first ticker)
                 company_sector = None
                 if tickers:
@@ -3418,7 +3422,9 @@ def build_financial_context(
                 
                 macro_context = macro_provider.build_macro_context(company_sector)
                 if macro_context:
-                    context_parts.append(f"{'='*80}\n📊 MACRO ECONOMIC CONTEXT\n{'='*80}\n{macro_context}\n\n")
+                    # Macro context already has its own separators and formatting
+                    # Just add it directly - no need for additional separators
+                    context_parts.append(macro_context)
             except Exception as e:
                 LOGGER.debug(f"Could not build macro context: {e}")
         elif not include_macro_context:
@@ -3926,42 +3932,38 @@ def build_financial_context(
                 "6. **Show forecast values with confidence intervals** for each year\n"
                 "7. **Calculate and show growth rates** (YoY and CAGR) from the forecast values\n"
                 "8. **🚨 MANDATORY: Cite sources** - Include SEC filing links and model documentation links\n\n"
+                "**⚠️ CRITICAL: MACRO ECONOMIC INDICATORS - USE CORRECT VALUES:**\n"
+                "- **GDP Growth Rate**: Use the EXACT percentage value from macro context (e.g., 2.5%) - NOT company revenue!\n"
+                "- **Federal Funds Rate**: Use the EXACT percentage value (e.g., 4.5%) - NOT company revenue!\n"
+                "- **CPI Inflation**: Use the EXACT percentage value (e.g., 3.2%) - NOT company revenue!\n"
+                "- **Unemployment Rate**: Use the EXACT percentage value (e.g., 3.8%) - NOT company revenue!\n"
+                "- ⚠️ **NEVER use company revenue numbers (e.g., $416B) as macro indicators!**\n"
+                "- ⚠️ **NEVER format dollar amounts as percentages (e.g., 416161000000.0%)!**\n"
+                "- ⚠️ **If you see a percentage > 1000% for macro indicators, it's ALWAYS wrong - use the correct macro values from context!**\n\n"
                 "**⚠️ DO NOT:**\n"
                 "- Provide historical snapshots or KPI summaries\n"
                 "- Use generic company data from training\n"
-                "- Ignore the forecast values in favor of historical trends\n\n"
+                "- Ignore the forecast values in favor of historical trends\n"
+                "- Confuse company revenue (in billions) with macro indicators (in percentages)\n\n"
                 "═══════════════════════════════════════════════════════════════════════════════\n\n"
             )
         else:
+            # CRITICAL FIX: Remove "RESPONSE INSTRUCTIONS" from data context
+            # Instructions should only be in SYSTEM_PROMPT, not in data context
+            # Data context should ONLY contain data, not instructions
+            # Otherwise LLM thinks user is providing new instructions, causing "looped system prompt interpretation"
             header = (
                 "╔═══════════════════════════════════════════════════════════════════════════════╗\n"
-                "║                    COMPREHENSIVE FINANCIAL DATA CONTEXT                      ║\n"
+                "║                         FINANCIAL DATA CONTEXT                                ║\n"
                 "╚═══════════════════════════════════════════════════════════════════════════════╝\n\n"
-                "📋 **DATA SOURCES**:\n"
-            "SEC EDGAR filings (10-K, 10-Q), Yahoo Finance (real-time data, analyst ratings, news), "
-            "FRED economic indicators (optional), and IMF macroeconomic data (optional). "
-            "Each section includes source URLs formatted as markdown links [Source Name](URL).\n\n"
-            "📖 **RESPONSE INSTRUCTIONS**:\n"
-            "1. **Write like ChatGPT**: Natural, conversational, engaging - not robotic or formal\n"
-            "2. **Use markdown formatting**: **bold** for emphasis, bullets, clear headers\n"
-            "3. **Answer first**: Lead with the direct answer, then explain\n"
-            "4. **Tell a story**: Connect metrics into a narrative, explain WHY things changed\n"
-            "5. **Add perspective**: Industry context, analyst views, market sentiment, trends, outlook\n"
-            "6. **🚨 MANDATORY: Cite ALL sources** - ALWAYS end your response with a '📊 Sources:' section containing:\n"
-            "   - At least 5-10 clickable markdown links: [Source Name](URL)\n"
-            "   - Include ALL SEC filing links provided in context\n"
-            "   - Include ALL Yahoo Finance links provided in context\n"
-            "   - Include FRED/IMF links when economic data is used\n"
-            "   - NEVER use placeholder URLs - only real URLs from context\n"
-            "   - Example: 📊 **Sources:**\n"
-            "     - [10-K FY2024](https://www.sec.gov/...)\n"
-            "     - [Yahoo Finance - Ticker](https://finance.yahoo.com/quote/TICKER)\n"
-            "7. **NEVER show full URLs**: Always use markdown link format [text](url)\n"
-            "8. **Incorporate diverse data**: Use SEC fundamentals, Yahoo metrics, analyst ratings, news, etc.\n\n"
-            "**⚠️ CRITICAL REMINDER**: Every response MUST include a '📊 Sources:' section with clickable links. "
-            "This is mandatory, not optional. If you don't include sources, your response is incomplete.\n\n"
-            "═══════════════════════════════════════════════════════════════════════════════\n\n"
-        )
+                "📋 **DATA SOURCES AVAILABLE**:\n"
+                "SEC EDGAR filings (10-K, 10-Q), Yahoo Finance (real-time data, analyst ratings, news), "
+                "FRED economic indicators (optional), and IMF macroeconomic data (optional). "
+                "Each section includes source URLs formatted as markdown links [Source Name](URL).\n\n"
+                "**⚠️ IMPORTANT**: Use the data below to answer the user's question. "
+                "Remember to cite all sources used in your response.\n\n"
+                "═══════════════════════════════════════════════════════════════════════════════\n\n"
+            )
         
         final_context = header + "\n".join(context_parts)
         LOGGER.critical(f"🔍 DEBUG: Final context length: {len(final_context)}")
