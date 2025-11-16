@@ -16,6 +16,28 @@
 
 </div>
 
+## 📚 Table of Contents
+
+- [🎓 Practicum Context](#-practicum-context)
+- [📖 Overview](#-overview)
+- [📊 Current Data Coverage](#-current-data-coverage)
+- [⚡ Core Capabilities](#-core-capabilities)
+- [🚀 Advanced Analytics (Phase 1 - NEW)](#-advanced-analytics-phase-1---new)
+- [🤖 Machine Learning Stack](#-machine-learning-stack)
+- [📚 Retrieval-Augmented Generation](#-retrieval-augmented-generation)
+- [📊 Portfolio Management](#-portfolio-management)
+- [🚀 Quick Start](#-quick-start)
+- [💬 Running FinalyzeOS](#-running-the-chatbot)
+- [📥 Data Ingestion Guide](#-data-ingestion-guide)
+- [⚙️ Configuration Reference](#-configuration-reference)
+- [🗄️ Database Schema](#-database-schema)
+- [📁 Project Layout](#-project-layout)
+- [📝 File Reference](#-file-reference)
+- [✅ Quality and Testing](#-quality-and-testing)
+- [🔧 Troubleshooting](#-troubleshooting)
+- [📚 Further Reading](#-further-reading)
+- [🧭 Full Docs Index](docs/README.md)
+
 ## 🎓 Practicum Context
 
 This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing FinalyzeOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
@@ -34,38 +56,7 @@ This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washin
 - 🛡️ **Resilient Pipelines** - Stand up KPI coverage pipelines that stay resilient when market data lags or filing assumptions drift
 - 📚 **Practitioner-Ready Documentation** - Deliver deployment runbooks and testing strategies so stakeholders can re-create the practicum outcomes after the semester concludes
 
-## 💼 User Story and Pain Points
 
-| Main group | Sub-group | Role / examples | Goals when using chatbot | Current pain points | Key needs from chatbot |
-|------------|-----------|----------------|-------------------------|-------------------|----------------------|
-| Financial industry (professional users) | CFO / FP&A / IR | CFOs, finance directors, investor relations leads | Generate peer comparisons in minutes; ensure KPI standardisation and source traceability | Data collection and reconciliation takes 3–5 days; KPI definitions drift; no audit trail for the board | Peer packets in under five minutes; standardised KPI dictionary with lineage; export-ready reports |
-| Corporate development / M&A teams | Corporate development, strategy, M&A analysts | Benchmark targets quickly for acquisitions; compare competitors by segment and geography | Manual benchmarking is slow; limited ability to expand peer sets | Dynamic peer set management; audit trail per KPI; override controls for peers, KPIs, and timeframes |
-| Consulting and advisory | Consulting analysts, advisory teams | Deliver rapid, credible benchmarks; produce slide-ready, verifiable outputs | Data gathering and normalisation are time-consuming; clients question credibility without lineage | KPI metrics with click-through lineage; segment normalisation; multi-dimensional benchmarking |
-| Non-financial users (non-professional) | Business decision makers | CEOs, COOs, heads of strategy | See competitor and market context without deep finance expertise; decide quickly | Financial data feels complex; no time to compute KPIs; reports lack actionable insights | Strategic summaries tied to KPIs; clear visuals; action-oriented insights |
-| Students and learners | Students, researchers, MBA learners | Learn to read 10-K/10-Q filings; understand KPI calculations | Unsure how to compute KPIs; do not know reliable data sources | Step-by-step KPI explanations; guided drill-down from KPI to tables to source filings |
-| Semi-professional users | Investors and analysts | Buy-side and sell-side analysts, individual investors | Make faster investment calls with peer benchmarks | Hard to compare multiple companies quickly; limited reliable data sources | Dynamic peer comparisons by ticker; exportable reports; transparent source traceability |
-
-## 📑 Table of Contents
-
-- [🎓 Practicum Context](#-practicum-context)
-- [📖 Overview](#-overview)
-- [📊 Current Data Coverage](#-current-data-coverage)
-- [⚡ Core Capabilities](#-core-capabilities)
-- [🚀 Advanced Analytics (Phase 1)](#-advanced-analytics-phase-1---new)
-- [🤖 Machine Learning Stack](#-machine-learning-stack)
-- [📚 Retrieval-Augmented Generation](#-retrieval-augmented-generation)
-- [🏗️ Architecture Map](#-architecture-map)
-- [🧠 Retrieval & ML Internals](#-retrieval--ml-internals)
-- [🚀 Quick Start](#-quick-start)
-- [💬 Running FinalyzeOS](#-running-the-chatbot)
-- [📥 Data Ingestion Guide](#-data-ingestion-guide)
-- [⚙️ Configuration Reference](#-configuration-reference)
-- [🗄️ Database Schema](#-database-schema)
-- [📁 Project Layout](#-project-layout)
-- [📝 File Reference](#-file-reference)
-- [✅ Quality and Testing](#-quality-and-testing)
-- [🔧 Troubleshooting](#-troubleshooting)
-- [📚 Further Reading](#-further-reading)
 
 ## 📖 Overview
 
@@ -234,6 +225,14 @@ Natural-language answers are grounded in auditable data through a layered RAG st
 - `src/finanlyzeos_chatbot/chatbot.py` – document-aware intent routing and context fusion.  
 - `src/finanlyzeos_chatbot/static/app.js` & `webui/app.js` – frontend upload orchestration with persistent `conversation_id`s.  
 - `src/finanlyzeos_chatbot/web.py` – backend API endpoint, validation, and database persistence.
+
+## 🔧 Troubleshooting
+
+- Virtual environment not activating (Windows PowerShell): run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then activate with `.\.venv\Scripts\Activate.ps1`.
+- SQLite locked errors: stop running servers/REPLs, wait a few seconds, try again. On Windows, ensure no other process (e.g., file indexers) holds the DB.
+- pip install issues: upgrade pip (`python -m pip install --upgrade pip`) and retry `pip install -r requirements.txt`.
+- Missing quotes/market data: re-run an ingestion command (e.g., `python scripts/ingestion/fill_data_gaps.py --years-back 3 --batch-size 10`) or narrow to specific tickers using `--ticker`.
+- Port already in use: change `--port` (e.g., `python app/serve_chatbot.py --port 8010`) or stop the conflicting process.
 
 ## 📊 Portfolio Management 
 
