@@ -58,7 +58,7 @@ Team2-CBA-Project/
 
 #### `src/` - Source Code
 ```
-src/benchmarkos_chatbot/
+src/finanlyzeos_chatbot/
 ├── Core Modules
 │   ├── chatbot.py              # Main chatbot logic
 │   ├── database.py             # Database operations
@@ -183,7 +183,7 @@ analysis/
 ```
 data/
 ├── sqlite/                      # SQLite database
-│   └── benchmarkos_chatbot.sqlite3
+│   └── finanlyzeos_chatbot.sqlite3
 │
 ├── tickers/                     # Ticker lists (4 files)
 │   ├── universe_sp500.txt
@@ -416,7 +416,7 @@ Your BenchmarkOS repository is:
 ### For Developers
 1. Read `CONTRIBUTING.md`
 2. Check `docs/architecture.md`
-3. Review `src/benchmarkos_chatbot/`
+3. Review `src/finanlyzeos_chatbot/`
 4. Run tests in `tests/`
 
 ### For Evaluators

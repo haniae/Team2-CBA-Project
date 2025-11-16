@@ -165,13 +165,13 @@ function sanitizePlotlyData(data) {
 Now every piece of data goes through FOUR sanitization layers:
 
 ### Layer 1: Backend Table Sanitization
-`_sanitize_table_values()` in `src/benchmarkos_chatbot/dashboard_utils.py`
+`_sanitize_table_values()` in `src/finanlyzeos_chatbot/dashboard_utils.py`
 
 ### Layer 2: Backend Chart Sanitization
-`_sanitize_chart_data()` in `src/benchmarkos_chatbot/dashboard_utils.py`
+`_sanitize_chart_data()` in `src/finanlyzeos_chatbot/dashboard_utils.py`
 
 ### Layer 3: Backend Recursive Sanitization
-`_sanitize_dict()` on entire payload in `src/benchmarkos_chatbot/dashboard_utils.py`
+`_sanitize_dict()` on entire payload in `src/finanlyzeos_chatbot/dashboard_utils.py`
 
 ### Layer 4: Frontend Universal Sanitization (NEW!)
 `sanitizePlotlyData()` applied to ALL `Plotly.newPlot()` calls in `webui/cfi_dashboard.js`
@@ -181,15 +181,15 @@ Now every piece of data goes through FOUR sanitization layers:
 1. **`webui/cfi_dashboard.js`**:
    - Fixed X/Y pairing in `plotValuationBar` (lines 1230-1240)
    - Added `sanitizePlotlyData()` to all 6 `Plotly.newPlot()` calls
-   - **Copied to**: `src/benchmarkos_chatbot/static/cfi_dashboard.js`
+   - **Copied to**: `src/finanlyzeos_chatbot/static/cfi_dashboard.js`
 
 2. **`webui/app.js`**:
    - Added cache-busting for `cfi_dashboard.js` in `resolveStaticAsset` function
-   - **Copied to**: `src/benchmarkos_chatbot/static/app.js`
+   - **Copied to**: `src/finanlyzeos_chatbot/static/app.js`
 
 3. **`webui/index.html`**:
    - Updated cache-busting versions to `?v=20241027k`
-   - **Copied to**: `src/benchmarkos_chatbot/static/index.html`
+   - **Copied to**: `src/finanlyzeos_chatbot/static/index.html`
 
 ## Testing Instructions
 

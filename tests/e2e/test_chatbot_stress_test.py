@@ -6,15 +6,15 @@ Tests all claimed functionality to ensure responses match documentation.
 import pytest
 import re
 from pathlib import Path
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
 
 
 @pytest.fixture
 def chatbot():
     """Create chatbot instance for testing."""
     settings = load_settings()
-    return BenchmarkOSChatbot.create(settings)
+    return FinanlyzeOSChatbot.create(settings)
 
 
 class TestNaturalLanguageQuestions:
@@ -262,8 +262,8 @@ class TestContextBuilding:
     
     def test_context_includes_multiple_sections(self, chatbot):
         """Test that context includes comprehensive sections."""
-        from benchmarkos_chatbot.context_builder import build_financial_context
-        from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+        from finanlyzeos_chatbot.context_builder import build_financial_context
+        from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
         
         settings = load_settings()
         engine = AnalyticsEngine(settings)
@@ -284,8 +284,8 @@ class TestContextBuilding:
     
     def test_context_includes_sec_sources(self, chatbot):
         """Test that context includes SEC filing sources."""
-        from benchmarkos_chatbot.context_builder import build_financial_context
-        from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+        from finanlyzeos_chatbot.context_builder import build_financial_context
+        from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
         
         settings = load_settings()
         engine = AnalyticsEngine(settings)

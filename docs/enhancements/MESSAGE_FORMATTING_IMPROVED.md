@@ -301,11 +301,11 @@ The elevated P/E is justified by:
 
 ## Files Modified
 
-1. ✅ `src/benchmarkos_chatbot/static/app.js`
+1. ✅ `src/finanlyzeos_chatbot/static/app.js`
    - Added `renderMarkdown()` function
    - Updated `createMessageElement()` to use markdown rendering
 
-2. ✅ `src/benchmarkos_chatbot/static/styles.css`
+2. ✅ `src/finanlyzeos_chatbot/static/styles.css`
    - Added `.message.bot .text` formatting styles
    - Headers, links, lists, paragraphs, code blocks
    - Color scheme and spacing system
@@ -316,7 +316,7 @@ The elevated P/E is justified by:
 
 1. Start the chatbot:
 ```bash
-python -m benchmarkos_chatbot.cli serve
+python -m finanlyzeos_chatbot.cli serve
 ```
 
 2. Open browser: `http://localhost:8000`

@@ -13,8 +13,8 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
 
 # Test prompts - all variations
 TEST_PROMPTS = [
@@ -188,7 +188,7 @@ def test_prompt_quality(prompt: str, index: int, total: int) -> Dict[str, Any]:
     
     try:
         settings = load_settings()
-        bot = BenchmarkOSChatbot.create(settings)
+        bot = FinanlyzeOSChatbot.create(settings)
         response = bot.ask(prompt)
         
         if response:

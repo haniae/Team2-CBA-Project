@@ -11,5 +11,5 @@ echo "Starting BenchmarkOS Chatbot Server..."
 echo "PYTHONPATH: $PYTHONPATH"
 echo ""
 
-python3 -m benchmarkos_chatbot.web
+python3 -m finanlyzeos_chatbot.web
 

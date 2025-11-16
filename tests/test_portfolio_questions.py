@@ -17,7 +17,7 @@ from typing import Dict, List, Tuple
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 try:
-    from benchmarkos_chatbot.routing.enhanced_router import enhance_structured_parse, EnhancedIntent
+    from finanlyzeos_chatbot.routing.enhanced_router import enhance_structured_parse, EnhancedIntent
     ROUTING_AVAILABLE = True
 except ImportError:
     ROUTING_AVAILABLE = False

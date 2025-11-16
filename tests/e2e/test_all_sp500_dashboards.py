@@ -11,13 +11,13 @@ if sys.platform == "win32":
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import Settings
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import Settings
 
 # Setup
-settings = Settings(database_path=Path("data/sqlite/benchmarkos_chatbot.sqlite3"))
+settings = Settings(database_path=Path("data/sqlite/finanlyzeos_chatbot.sqlite3"))
 print("Creating chatbot...")
-chatbot = BenchmarkOSChatbot.create(settings)
+chatbot = FinanlyzeOSChatbot.create(settings)
 
 # Get ALL companies from database
 print("\nFetching all S&P 500 companies from database...")

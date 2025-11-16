@@ -122,7 +122,7 @@ class KPIDefinitionLookup:
             description=description,
             source={
                 "type": source_hint,
-                "name": "BenchmarkOS KPI Library",
+                "name": "FinanlyzeOS KPI Library",
                 "kpi_id": entry.get("kpi_id"),
                 "last_updated": entry.get("last_updated"),
             },

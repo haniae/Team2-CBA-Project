@@ -15,9 +15,9 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='repla
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 
 print("="*80)
 print("COMPREHENSIVE 100-PROMPT ACCURACY TEST")
@@ -213,8 +213,8 @@ print(f"\nTesting {len(TEST_PROMPTS)} prompts...")
 print("="*80)
 
 # Test verification system on sample responses
-from benchmarkos_chatbot.response_verifier import extract_financial_numbers, verify_fact, FinancialFact
-from benchmarkos_chatbot.confidence_scorer import calculate_confidence
+from finanlyzeos_chatbot.response_verifier import extract_financial_numbers, verify_fact, FinancialFact
+from finanlyzeos_chatbot.confidence_scorer import calculate_confidence
 
 # Sample responses for testing
 sample_responses = [

@@ -5,10 +5,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from benchmarkos_chatbot import database
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
-from benchmarkos_chatbot.config import Settings
-from benchmarkos_chatbot.data_sources import FinancialFact, MarketQuote
+from finanlyzeos_chatbot import database
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.config import Settings
+from finanlyzeos_chatbot.data_sources import FinancialFact, MarketQuote
 
 
 def _fact(ticker: str, metric: str, year: int, value: float) -> FinancialFact:
@@ -204,7 +204,7 @@ def test_refresh_metrics_handles_alias_metrics_without_quotes(tmp_path, monkeypa
     database.bulk_upsert_financial_facts(db_path, facts)
 
     monkeypatch.setattr(
-        "benchmarkos_chatbot.analytics_engine.YahooFinanceClient.fetch_quotes",
+        "finanlyzeos_chatbot.analytics_engine.YahooFinanceClient.fetch_quotes",
         lambda self, tickers: [],
     )
 

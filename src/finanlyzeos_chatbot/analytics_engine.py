@@ -1,4 +1,4 @@
-"""Financial analytics utilities built on top of the BenchmarkOS datastore."""
+"""Financial analytics utilities built on top of the FinanlyzeOS datastore."""
 
 from __future__ import annotations
 

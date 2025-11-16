@@ -16,8 +16,8 @@ import yfinance as yf
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 
 
 def fetch_historical_quotes(db_path: str, tickers: list, days_back: int = 365) -> None:

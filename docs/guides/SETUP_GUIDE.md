@@ -43,7 +43,7 @@ cp .env.example .env
 ### 4. Database Setup
 ```bash
 # Initialize database
-python -c "from src.benchmarkos_chatbot.database import init_db; init_db()"
+python -c "from src.finanlyzeos_chatbot.database import init_db; init_db()"
 
 # Load sample data (optional)
 python scripts/utility/load_sample_data.py
@@ -95,9 +95,9 @@ OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4
 
 # Database Configuration
-DATABASE_URL=sqlite:///data/sqlite/benchmarkos_chatbot.sqlite3
+DATABASE_URL=sqlite:///data/sqlite/finanlyzeos_chatbot.sqlite3
 # For PostgreSQL:
-# DATABASE_URL=postgresql://user:password@localhost:5432/benchmarkos
+# DATABASE_URL=postgresql://user:password@localhost:5432/finanlyzeos
 
 # SEC API Configuration (optional)
 SEC_API_KEY=your_sec_api_key_here
@@ -116,7 +116,7 @@ LOG_FILE=logs/chatbot.log
 ### package.json (for webui)
 ```json
 {
-  "name": "benchmarkos-webui",
+  "name": "finanlyzeos-webui",
   "version": "1.0.0",
   "description": "BenchmarkOS Chatbot Web Interface",
   "main": "app.js",
@@ -142,7 +142,7 @@ LOG_FILE=logs/chatbot.log
 ```
 Team2-CBA-Project-1/
 ├── src/
-│   └── benchmarkos_chatbot/
+│   └── finanlyzeos_chatbot/
 │       ├── __init__.py
 │       ├── analytics_engine.py
 │       ├── chatbot.py
@@ -195,7 +195,7 @@ npm start
 ### Option 3: Development Mode
 ```bash
 # Start with auto-reload
-uvicorn src.benchmarkos_chatbot.web:app --reload --host 0.0.0.0 --port 8000
+uvicorn src.finanlyzeos_chatbot.web:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## 🔍 Troubleshooting
@@ -208,7 +208,7 @@ uvicorn src.benchmarkos_chatbot.web:app --reload --host 0.0.0.0 --port 8000
    ls -la data/sqlite/
    
    # Recreate database
-   python -c "from src.benchmarkos_chatbot.database import init_db; init_db()"
+   python -c "from src.finanlyzeos_chatbot.database import init_db; init_db()"
    ```
 
 2. **OpenAI API Error**

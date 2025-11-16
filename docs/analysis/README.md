@@ -83,7 +83,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the component diagram. Th
 BenchmarkOS combines deterministic data prep with retrieval-augmented generation (RAG) so every answer traces back to persisted facts.
 
 1. **Natural-language parsing (deterministic)**  
-   - `src/benchmarkos_chatbot/parsing/alias_builder.py` loads a generated `aliases.json` covering the S&P 500. It normalises free-text mentions, resolves ticker aliases, applies manual overrides (Alphabet, Berkshire share classes, JP Morgan, AT&T), and when needed performs a fuzzy fallback and emits warnings.  
+   - `src/finanlyzeos_chatbot/parsing/alias_builder.py` loads a generated `aliases.json` covering the S&P 500. It normalises free-text mentions, resolves ticker aliases, applies manual overrides (Alphabet, Berkshire share classes, JP Morgan, AT&T), and when needed performs a fuzzy fallback and emits warnings.  
    - `parse_to_structured` in `parsing/parse.py` orchestrates alias resolution, metric synonym detection, and the flexible time grammar (`time_grammar.py`). It returns a strict JSON intent schema that downstream planners consume and store (`conversation.last_structured_response["parser"]`).
 
 2. **Retrieval layer (RAG)**  
@@ -123,7 +123,7 @@ Copy-Item .env.example .env   # PowerShell
 ```
 
 ### 2. Configure environment defaults
-Open `.env` and update database paths, API keys, and provider toggles. Prefer not to store an OpenAI key in the repo? Put it in `~/.config/benchmarkos-chatbot/openai_api_key` and the loader will pick it up automatically.
+Open `.env` and update database paths, API keys, and provider toggles. Prefer not to store an OpenAI key in the repo? Put it in `~/.config/finanlyzeos-chatbot/openai_api_key` and the loader will pick it up automatically.
 
 ### 3. (Optional) Warm the datastore
 SQLite tables are created lazily, but you can preload metrics with:
@@ -156,7 +156,7 @@ Comparison responses append an “S&P 500 Avg” column highlighting how each ti
 ```bash
 python serve_chatbot.py --port 8000
 # or run the ASGI app directly
-uvicorn benchmarkos_chatbot.web:app --reload --port 8000
+uvicorn finanlyzeos_chatbot.web:app --reload --port 8000
 ```
 Navigate to `http://localhost:8000`. The SPA exposes:
 - Real-time request timeline (intent, cache, context, compose) with slow-step hints.
@@ -243,8 +243,8 @@ python scripts/ingestion/load_prices_yfinance.py
 
 $env:PYTHONPATH = (Resolve-Path .\src).Path
 python - <<'PY'
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 AnalyticsEngine(load_settings()).refresh_metrics(force=True)
 PY
 ```
@@ -269,7 +269,7 @@ export SEC_API_USER_AGENT="BenchmarkOSBot/1.0 (you@example.com)"
 ```
 
 ### Ingest the S&P 500 into SQLite
-SQLite path defaults to `data/sqlite/benchmarkos_chatbot.sqlite3` (configurable via `DATABASE_PATH`).
+SQLite path defaults to `data/sqlite/finanlyzeos_chatbot.sqlite3` (configurable via `DATABASE_PATH`).
 
 Pick one of the following forms (both equivalent if you ran `pip install -e .`).
 - Module form:
@@ -293,7 +293,7 @@ Verify counts:
 ```bash
 python - <<'PY'
 import sqlite3, json
-p='data/sqlite/benchmarkos_chatbot.sqlite3'
+p='data/sqlite/finanlyzeos_chatbot.sqlite3'
 con=sqlite3.connect(p)
 print(json.dumps({t: con.execute('select count(*) from '+t).fetchone()[0] for t in [
   'financial_facts','company_filings','market_quotes','metric_snapshots','audit_events','ticker_aliases'
@@ -306,7 +306,7 @@ Load via Yahoo Finance in batches to avoid rate limits. Example: load all ticker
 ```bash
 python - <<'PY'
 import os, time, sqlite3, subprocess
-db='data/sqlite/benchmarkos_chatbot.sqlite3'
+db='data/sqlite/finanlyzeos_chatbot.sqlite3'
 con=sqlite3.connect(db)
 tickers=[r[0] for r in con.execute("SELECT DISTINCT ticker FROM financial_facts ORDER BY ticker")]
 BATCH=50
@@ -321,8 +321,8 @@ PY
 Then refresh analytics snapshots to recalculate P/E, EV/EBITDA, dividend yield, TSR, etc. with the latest prices:
 ```bash
 python - <<'PY'
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 AnalyticsEngine(load_settings()).refresh_metrics(force=True)
 print('Refreshed metric_snapshots.')
 PY
@@ -332,7 +332,7 @@ Check the latest quote timestamp:
 ```bash
 python - <<'PY'
 import sqlite3
-con=sqlite3.connect('data/sqlite/benchmarkos_chatbot.sqlite3')
+con=sqlite3.connect('data/sqlite/finanlyzeos_chatbot.sqlite3')
 print('quotes=',con.execute('select count(*) from market_quotes').fetchone()[0])
 print('latest=',con.execute('select max(quote_time) from market_quotes').fetchone()[0])
 PY
@@ -344,7 +344,7 @@ PY
 ```powershell
 python scripts/ingestion/ingest_universe.py --universe sp500 --years 10 --chunk-size 25 --sleep 2
 ```
-- If you see `ModuleNotFoundError: benchmarkos_chatbot`, ensure you ran `pip install -e .` or set:
+- If you see `ModuleNotFoundError: finanlyzeos_chatbot`, ensure you ran `pip install -e .` or set:
 ```powershell
 $env:PYTHONPATH = (Resolve-Path .\src).Path
 ```
@@ -399,11 +399,11 @@ python scripts/generate_aliases.py
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `DATABASE_TYPE` | `sqlite` | Switch to `postgresql` for shared deployments. |
-| `DATABASE_PATH` | `./data/sqlite/benchmarkos_chatbot.sqlite3` | SQLite file location; created automatically. |
+| `DATABASE_PATH` | `./data/sqlite/finanlyzeos_chatbot.sqlite3` | SQLite file location; created automatically. |
 | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DATABASE`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | unset | Required when `DATABASE_TYPE=postgresql`; `POSTGRES_SCHEMA` overrides the default `sec`. |
 | `LLM_PROVIDER` | `local` | `local` uses the deterministic echo model; set to `openai` for real completions. |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Passed verbatim to the OpenAI Chat Completions API. |
-| `SEC_API_USER_AGENT` | `BenchmarkOSBot/1.0 (support@benchmarkos.com)` | Mandatory for SEC EDGAR requests. Customize it for your org. |
+| `SEC_API_USER_AGENT` | `BenchmarkOSBot/1.0 (support@finanlyzeos.com)` | Mandatory for SEC EDGAR requests. Customize it for your org. |
 | `EDGAR_BASE_URL` | `https://data.sec.gov` | Override if you proxy or mirror EDGAR. |
 | `YAHOO_QUOTE_URL` | `https://query1.finance.yahoo.com/v7/finance/quote` | Used to refresh quotes. |
 | `YAHOO_QUOTE_BATCH_SIZE` | `50` | Maximum tickers per Yahoo batch. |
@@ -412,7 +412,7 @@ python scripts/generate_aliases.py
 | `DATA_CACHE_DIR` | `./cache` | Stores downloaded filings, facts, and progress markers. |
 | `ENABLE_BLOOMBERG` | `false` | Toggle Bloomberg ingestion; requires host/port/timeout values. |
 | `BLOOMBERG_HOST`, `BLOOMBERG_PORT`, `BLOOMBERG_TIMEOUT` | unset | Only used if Bloomberg is enabled. |
-| `OPENAI_API_KEY` | unset | Looked up in env, then keyring, then `~/.config/benchmarkos-chatbot/openai_api_key`. |
+| `OPENAI_API_KEY` | unset | Looked up in env, then keyring, then `~/.config/finanlyzeos-chatbot/openai_api_key`. |
 
 Secrets belong in your local `.env`. Windows developers can rely on `keyring` so API keys live outside the repo.
 
@@ -471,7 +471,7 @@ Project/
 │       ├── data_sources_backup.py
 │       └── main.py
 ├── src/
-│   └── benchmarkos_chatbot/
+│   └── finanlyzeos_chatbot/
 │       ├── analytics_engine.py
 │       ├── chatbot.py
 │       ├── config.py
@@ -493,7 +493,7 @@ Project/
 │   └── ticker_names.md
 ├── data/
 │   ├── sample_financials.csv
-│   ├── sqlite/benchmarkos_chatbot.sqlite3 (created on demand)
+│   ├── sqlite/finanlyzeos_chatbot.sqlite3 (created on demand)
 │   └── tickers/
 │       ├── universe_sp500.txt
 │       ├── sec_top100.txt
@@ -522,7 +522,7 @@ Project/
 |------|-------------|
 | `scripts/utility/main.py` | Rich CLI wrapper exposing metrics/table commands, abbreviations, and scenario helpers. |
 | `run_chatbot.py` | Lightweight REPL entry point that calls `BenchmarkOSChatbot.create()`. |
-| `serve_chatbot.py` | Convenience launcher for the FastAPI app (`src/benchmarkos_chatbot/web.py`). |
+| `serve_chatbot.py` | Convenience launcher for the FastAPI app (`src/finanlyzeos_chatbot/web.py`). |
 | `scripts/ingestion/batch_ingest.py` | Loads the curated watch list with retry/backoff. |
 | `scripts/ingestion/ingest_universe.py` | Batch ingester with resume support; refreshes metrics after each chunk. |
 | `scripts/ingestion/ingest_frames.py` | Downloads SEC data frames into Postgres for benchmarking. |
@@ -560,14 +560,14 @@ Project/
 - **Parser & alias focus**: `pytest tests/test_alias_resolution.py tests/test_time_grammar.py tests/test_nl_parser.py`
 - **Target a single test**: `pytest tests/test_cli_tables.py::test_table_command_formats_rows`
 - **Manual sanity**: point `LLM_PROVIDER=local` to avoid burning API credits during smoke tests.
-- **Database reset**: delete `benchmarkos_chatbot.sqlite3` and rerun ingestion—migrations run automatically on startup.
+- **Database reset**: delete `finanlyzeos_chatbot.sqlite3` and rerun ingestion—migrations run automatically on startup.
 
 CI isn’t configured by default, but `pytest -ra` (preconfigured in `pyproject.toml`) surfaces skipped/xfail tests neatly. Consider adding `ruff` or `black` once your team standardises formatting.
 
 ---
 
 ## Troubleshooting
-- **“OpenAI API key not found”** – set `OPENAI_API_KEY`, store it via `keyring`, or create `~/.config/benchmarkos-chatbot/openai_api_key`.
+- **“OpenAI API key not found”** – set `OPENAI_API_KEY`, store it via `keyring`, or create `~/.config/finanlyzeos-chatbot/openai_api_key`.
 - **`WinError 10048` when starting the server** – another process is on the port. Run `Get-NetTCPConnection -LocalPort 8000` and terminate it, or start with `--port 8001`.
 - **Yahoo Finance 429 errors** – lower `YAHOO_QUOTE_BATCH_SIZE`, add delays between runs, or temporarily use `scripts/ingestion/load_prices_stooq.py`.
 - **PostgreSQL auth failures** – confirm SSL/network settings, then double-check `POSTGRES_*` vars; the DSN is logged at debug level when `DATABASE_TYPE=postgresql` is active.
@@ -577,7 +577,7 @@ CI isn’t configured by default, but `pytest -ra` (preconfigured in `pyproject.
 
 ## Further reading
 - `docs/orchestration_playbook.md` – outlines three ingestion/orchestration patterns (local queue, serverless fetchers, batch jobs) and how to wire them into `BenchmarkOSChatbot`.
-- Inline module docs across `src/benchmarkos_chatbot/` describe invariants, data contracts, and extension hooks.
+- Inline module docs across `src/finanlyzeos_chatbot/` describe invariants, data contracts, and extension hooks.
 - Consider versioning your `.env` templates and deployment runbooks alongside these docs as the project evolves.
 
 Happy building! 👋

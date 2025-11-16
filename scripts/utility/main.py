@@ -7,9 +7,9 @@ import string
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from benchmarkos_chatbot import AnalyticsEngine, BenchmarkOSChatbot, load_settings
-from benchmarkos_chatbot.analytics_engine import AGGREGATE_METRICS, BASE_METRICS, DERIVED_METRICS
-from benchmarkos_chatbot.table_renderer import render_table_command
+from finanlyzeos_chatbot import AnalyticsEngine, FinanlyzeOSChatbot, load_settings
+from finanlyzeos_chatbot.analytics_engine import AGGREGATE_METRICS, BASE_METRICS, DERIVED_METRICS
+from finanlyzeos_chatbot.table_renderer import render_table_command
 
 MAX_METRIC_COLUMNS = 6
 
@@ -374,7 +374,7 @@ def main() -> None:
     """Run the BenchmarkOS CLI tool for metrics lookup and comparison.
     """
     settings = load_settings()
-    chatbot = BenchmarkOSChatbot.create(settings)
+    chatbot = FinanlyzeOSChatbot.create(settings)
     analytics = AnalyticsEngine(settings)
 
     print("BenchmarkOS Chatbot (type 'exit' to quit)")

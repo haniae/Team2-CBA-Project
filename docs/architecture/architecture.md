@@ -134,11 +134,11 @@ Layer colors reinforce separation of concerns: yellow for front-end channels, gr
 | Component | Layer | Responsibilities | Key Implementations |
 | --- | --- | --- | --- |
 | Input prompt (CLI, Web UI, API) | Front-End | Capture user questions, enforce basic validation, forward payload to orchestrator | main.py, webui/app.js, REST /chat endpoint |
-| Prompt ingress | Back-End | Authenticate requests, bind conversation context, normalise prompt payloads | src/benchmarkos_chatbot/web.py::chat, BenchmarkOSChatbot |
-| Plan query | Back-End / LLM | Expand prompt into structured tasks and SQL plans | src/benchmarkos_chatbot/chatbot.py::_handle_*, AnalyticsEngine.metric_value |
+| Prompt ingress | Back-End | Authenticate requests, bind conversation context, normalise prompt payloads | src/finanlyzeos_chatbot/web.py::chat, BenchmarkOSChatbot |
+| Plan query | Back-End / LLM | Expand prompt into structured tasks and SQL plans | src/finanlyzeos_chatbot/chatbot.py::_handle_*, AnalyticsEngine.metric_value |
 | Execute analytics query | Analytics | Run SQL/metric lookups, compute derived metrics, fetch facts | AnalyticsEngine.refresh_metrics, database.fetch_* |
 | Analyse results | Insights / LLM | Interpret metrics, detect gaps, prepare narrative building blocks | chat_metrics.format_metrics_table, AnalyticsEngine.run_scenario |
-| Package reply | Insights | Assemble narrative, tables, charts, audit links | src/benchmarkos_chatbot/web.py::chat, response composer |
+| Package reply | Insights | Assemble narrative, tables, charts, audit links | src/finanlyzeos_chatbot/web.py::chat, response composer |
 | Render output & artifacts | Front-End | Stream reply to UI, generate downloads (CSV, PPTX) | webui/app.js, exporters under docs/ |
 
 ### End-to-End Timeline
@@ -151,7 +151,7 @@ Layer colors reinforce separation of concerns: yellow for front-end channels, gr
 7. **Artifact publishing** – the web UI renders the transcript, while optional exporters emit CSV extracts, slides, or PDF summaries for stakeholders.
 
 ### Operational Notes
-- **Concurrency & scalability** – uvicorn serves the FastAPI app asynchronously; labour-intensive ingests run in the background task manager (src/benchmarkos_chatbot/tasks.py).
+- **Concurrency & scalability** – uvicorn serves the FastAPI app asynchronously; labour-intensive ingests run in the background task manager (src/finanlyzeos_chatbot/tasks.py).
 - **Auditability** – every prompt, metric snapshot, audit event, and scenario result is persisted via database.py, enabling replay and compliance reporting.
 - **Extensibility** – LLM adapters live in llm_client.py; conforming to the LLMClient protocol allows swapping providers without touching orchestration code.
 - **Reliability** – ingestion scripts (ingest_*) implement exponential backoff, checkpointing, and resumability to keep the analytics cache aligned with market filings.

@@ -343,7 +343,7 @@ def build_help_text(tips: Sequence[str] | None = None) -> str:
 
     tips = list(tips or HELP_TIPS)
     lines: List[str] = [
-        "📘 BenchmarkOS Copilot — Quick Reference",
+        "📘 FinanlyzeOS Copilot — Quick Reference",
         "",
         "How to ask:",
     ]

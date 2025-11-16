@@ -107,7 +107,7 @@ This document provides technical details for developers working with the Benchma
 
 ### Phase 1: Preprocessing
 
-**File**: `src/benchmarkos_chatbot/spelling/correction_engine.py`
+**File**: `src/finanlyzeos_chatbot/spelling/correction_engine.py`
 
 ```python
 def correct_query(query: str) -> dict:
@@ -135,7 +135,7 @@ def correct_query(query: str) -> dict:
 
 ### Phase 2: Core Parsing
 
-**File**: `src/benchmarkos_chatbot/parsing/parse.py`
+**File**: `src/finanlyzeos_chatbot/parsing/parse.py`
 
 ```python
 def parse_to_structured(query: str, conversation_history: List = None) -> dict:
@@ -197,7 +197,7 @@ _TREND_ANALYZER = TrendAnalyzer()
 
 ### Phase 4: Response Generation
 
-**File**: `src/benchmarkos_chatbot/chatbot.py`
+**File**: `src/finanlyzeos_chatbot/chatbot.py`
 
 **Process**:
 1. **Routing Decision**:
@@ -225,7 +225,7 @@ _TREND_ANALYZER = TrendAnalyzer()
 
 ### 1. Spelling Correction
 
-**Location**: `src/benchmarkos_chatbot/spelling/`
+**Location**: `src/finanlyzeos_chatbot/spelling/`
 
 #### `correction_engine.py`
 - **Purpose**: Orchestrates spelling correction across all token types
@@ -267,7 +267,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 2. Comparative Language
 
-**File**: `src/benchmarkos_chatbot/parsing/comparative.py`
+**File**: `src/finanlyzeos_chatbot/parsing/comparative.py`
 
 **Class**: `ComparativeAnalyzer`
 
@@ -300,7 +300,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 3. Trend Direction Language
 
-**File**: `src/benchmarkos_chatbot/parsing/trends.py`
+**File**: `src/finanlyzeos_chatbot/parsing/trends.py`
 
 **Class**: `TrendAnalyzer`
 
@@ -335,7 +335,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 4. Contextual Metric Inference
 
-**File**: `src/benchmarkos_chatbot/parsing/metric_inference.py`
+**File**: `src/finanlyzeos_chatbot/parsing/metric_inference.py`
 
 **Class**: `MetricInferenceEngine`
 
@@ -371,7 +371,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 5. Negation Handling
 
-**File**: `src/benchmarkos_chatbot/parsing/negation.py`
+**File**: `src/finanlyzeos_chatbot/parsing/negation.py`
 
 **Class**: `NegationDetector`
 
@@ -406,7 +406,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 6. Multi-Intent Queries
 
-**File**: `src/benchmarkos_chatbot/parsing/multi_intent.py`
+**File**: `src/finanlyzeos_chatbot/parsing/multi_intent.py`
 
 **Class**: `MultiIntentDetector`
 
@@ -448,7 +448,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 7. Fuzzy Quantities & Approximations
 
-**File**: `src/benchmarkos_chatbot/parsing/fuzzy_quantities.py`
+**File**: `src/finanlyzeos_chatbot/parsing/fuzzy_quantities.py`
 
 **Class**: `FuzzyQuantityDetector`
 
@@ -483,7 +483,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 8. Natural Filtering
 
-**File**: `src/benchmarkos_chatbot/parsing/natural_filters.py`
+**File**: `src/finanlyzeos_chatbot/parsing/natural_filters.py`
 
 **Class**: `NaturalFilterDetector`
 
@@ -525,7 +525,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 9. Temporal Relationships
 
-**File**: `src/benchmarkos_chatbot/parsing/temporal_relationships.py`
+**File**: `src/finanlyzeos_chatbot/parsing/temporal_relationships.py`
 
 **Class**: `TemporalRelationshipDetector`
 
@@ -567,7 +567,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 10. Conditional Statements
 
-**File**: `src/benchmarkos_chatbot/parsing/conditionals.py`
+**File**: `src/finanlyzeos_chatbot/parsing/conditionals.py`
 
 **Class**: `ConditionalDetector`
 
@@ -605,7 +605,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 11. Sentiment Detection
 
-**File**: `src/benchmarkos_chatbot/parsing/sentiment.py`
+**File**: `src/finanlyzeos_chatbot/parsing/sentiment.py`
 
 **Class**: `SentimentDetector`
 
@@ -639,7 +639,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 12. Company Groups
 
-**File**: `src/benchmarkos_chatbot/parsing/company_groups.py`
+**File**: `src/finanlyzeos_chatbot/parsing/company_groups.py`
 
 **Class**: `CompanyGroupDetector`
 
@@ -672,7 +672,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 13. Abbreviations & Acronyms
 
-**File**: `src/benchmarkos_chatbot/parsing/abbreviations.py`
+**File**: `src/finanlyzeos_chatbot/parsing/abbreviations.py`
 
 **Class**: `AbbreviationDetector`
 
@@ -705,7 +705,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 ### 14. Question Chaining
 
-**File**: `src/benchmarkos_chatbot/parsing/question_chaining.py`
+**File**: `src/finanlyzeos_chatbot/parsing/question_chaining.py`
 
 **Class**: `QuestionChainDetector`
 
@@ -743,7 +743,7 @@ SOUNDEX_THRESHOLD = 0.90
 
 **Step 1: Create Feature Module**
 
-Create `src/benchmarkos_chatbot/parsing/my_feature.py`:
+Create `src/finanlyzeos_chatbot/parsing/my_feature.py`:
 
 ```python
 import re
@@ -802,11 +802,11 @@ class MyFeatureDetector:
 
 **Step 2: Integrate into Parse Pipeline**
 
-Edit `src/benchmarkos_chatbot/parsing/parse.py`:
+Edit `src/finanlyzeos_chatbot/parsing/parse.py`:
 
 ```python
 # At top of file
-from benchmarkos_chatbot.parsing.my_feature import MyFeatureDetector
+from finanlyzeos_chatbot.parsing.my_feature import MyFeatureDetector
 
 # Create singleton
 _MY_FEATURE_DETECTOR = MyFeatureDetector()
@@ -837,7 +837,7 @@ Create `tests/test_my_feature.py`:
 
 ```python
 import pytest
-from benchmarkos_chatbot.parsing.my_feature import MyFeatureDetector
+from finanlyzeos_chatbot.parsing.my_feature import MyFeatureDetector
 
 @pytest.fixture
 def detector():
@@ -866,7 +866,7 @@ def test_confidence_scoring(detector):
 
 **Step 4: Integrate into Chatbot Logic** (if needed)
 
-Edit `src/benchmarkos_chatbot/chatbot.py`:
+Edit `src/finanlyzeos_chatbot/chatbot.py`:
 
 ```python
 def ask(self, query: str) -> str:
@@ -972,14 +972,14 @@ pytest tests/test_performance_benchmarks.py -v
 pytest tests/test_integration_e2e.py -v
 
 # With coverage
-pytest tests/ --cov=src/benchmarkos_chatbot --cov-report=html
+pytest tests/ --cov=src/finanlyzeos_chatbot --cov-report=html
 ```
 
 ### Test Pattern
 
 ```python
 import pytest
-from benchmarkos_chatbot.parsing.feature import FeatureDetector
+from finanlyzeos_chatbot.parsing.feature import FeatureDetector
 
 @pytest.fixture
 def detector():

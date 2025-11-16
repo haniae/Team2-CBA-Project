@@ -9,9 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
-from benchmarkos_chatbot.config import Settings
-from benchmarkos_chatbot.database import Database
-from benchmarkos_chatbot.kpi_backfill import fill_missing_kpis
+from finanlyzeos_chatbot.config import Settings
+from finanlyzeos_chatbot.database import Database
+from finanlyzeos_chatbot.kpi_backfill import fill_missing_kpis
 
 
 def _load_tickers(database_path: Path, user_tickers: Sequence[str]) -> List[str]:

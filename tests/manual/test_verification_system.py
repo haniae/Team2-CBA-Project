@@ -7,12 +7,12 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot.response_verifier import extract_financial_numbers, verify_response
-from benchmarkos_chatbot.confidence_scorer import calculate_confidence
-from benchmarkos_chatbot.source_verifier import extract_cited_sources
-from benchmarkos_chatbot.response_corrector import correct_response
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.response_verifier import extract_financial_numbers, verify_response
+from finanlyzeos_chatbot.confidence_scorer import calculate_confidence
+from finanlyzeos_chatbot.source_verifier import extract_cited_sources
+from finanlyzeos_chatbot.response_corrector import correct_response
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 from unittest.mock import Mock
 
 print("=" * 60)
@@ -37,7 +37,7 @@ for i, source in enumerate(sources[:2], 1):
 
 # Test 3: Confidence Scoring
 print("\n3. Testing Confidence Scoring...")
-from benchmarkos_chatbot.response_verifier import VerificationResult, FinancialFact
+from finanlyzeos_chatbot.response_verifier import VerificationResult, FinancialFact
 
 # Create mock verification results
 fact = FinancialFact(
@@ -81,7 +81,7 @@ except Exception as e:
 # Test 5: Integration Check
 print("\n5. Testing Integration...")
 try:
-    from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
+    from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
     print("   ✓ Chatbot can be imported")
     print("   ✓ Verification code is integrated in chatbot.py")
 except Exception as e:

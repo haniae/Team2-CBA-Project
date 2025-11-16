@@ -26,12 +26,12 @@ All prompts successfully generate ML forecast context with:
 1. **Transformer Forecaster Bug** ✅ FIXED
    - **Issue:** `ReduceLROnPlateau.__init__()` got unexpected keyword argument 'verbose'
    - **Fix:** Removed `verbose=False` parameter (not supported in newer PyTorch versions)
-   - **File:** `src/benchmarkos_chatbot/ml_forecasting/transformer_forecaster.py`
+   - **File:** `src/finanlyzeos_chatbot/ml_forecasting/transformer_forecaster.py`
 
 2. **ModelBuilder Bug** ✅ FIXED
    - **Issue:** `ModelBuilder.__init__()` got unexpected keyword argument 'settings'
    - **Fix:** Removed `settings=self.settings` parameter (ModelBuilder only accepts `db_path`)
-   - **File:** `src/benchmarkos_chatbot/chatbot.py`
+   - **File:** `src/finanlyzeos_chatbot/chatbot.py`
 
 ## Tested Prompts
 

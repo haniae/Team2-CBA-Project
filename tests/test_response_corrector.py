@@ -1,13 +1,13 @@
 """Tests for response corrector - automatic correction of inaccuracies."""
 
 import pytest
-from benchmarkos_chatbot.response_corrector import (
+from finanlyzeos_chatbot.response_corrector import (
     correct_response,
     add_verification_footer,
     apply_corrections_with_notes,
     Correction
 )
-from benchmarkos_chatbot.response_verifier import (
+from finanlyzeos_chatbot.response_verifier import (
     VerificationResult,
     FinancialFact
 )

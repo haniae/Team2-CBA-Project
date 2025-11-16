@@ -303,13 +303,13 @@ Apply UI based on response type:
 ## Files to Reference
 
 1. **Backend Logic:**
-   - `src/benchmarkos_chatbot/chatbot.py` (lines 1565-1590, 2837-2864)
-   - `src/benchmarkos_chatbot/routing/enhanced_router.py` (lines 14-28)
-   - `src/benchmarkos_chatbot/dashboard_utils.py` (build_cfi_dashboard_payload)
+   - `src/finanlyzeos_chatbot/chatbot.py` (lines 1565-1590, 2837-2864)
+   - `src/finanlyzeos_chatbot/routing/enhanced_router.py` (lines 14-28)
+   - `src/finanlyzeos_chatbot/dashboard_utils.py` (build_cfi_dashboard_payload)
 
 2. **Frontend Rendering:**
    - `webui/app.js` (normaliseArtifacts, showCfiDashboard)
-   - `src/benchmarkos_chatbot/web.py` (ChatResponse model)
+   - `src/finanlyzeos_chatbot/web.py` (ChatResponse model)
 
 3. **Documentation:**
    - `RESPONSE_TYPES_GUIDE.md` (this guide)

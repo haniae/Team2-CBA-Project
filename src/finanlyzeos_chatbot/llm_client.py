@@ -66,8 +66,8 @@ def _resolve_openai_api_key() -> str:
 
     Resolution order:
     1. `OPENAI_API_KEY` environment variable.
-    2. Secret stored in the user's keyring under the "benchmarkos-chatbot" service.
-    3. Plain-text fallback file at ~/.config/benchmarkos-chatbot/openai_api_key.
+    2. Secret stored in the user's keyring under the "finanlyzeos-chatbot" service.
+    3. Plain-text fallback file at ~/.config/finanlyzeos-chatbot/openai_api_key.
 
     Raises
     ------
@@ -82,13 +82,13 @@ def _resolve_openai_api_key() -> str:
 
     if keyring is not None:
         try:
-            stored = keyring.get_password("benchmarkos-chatbot", "openai-api-key")
+            stored = keyring.get_password("finanlyzeos-chatbot", "openai-api-key")
         except Exception:  # pragma: no cover - defensive fallback
             stored = None
         if stored:
             return stored
 
-    fallback_path = Path.home() / ".config" / "benchmarkos-chatbot" / "openai_api_key"
+    fallback_path = Path.home() / ".config" / "finanlyzeos-chatbot" / "openai_api_key"
     try:
         fallback_text = fallback_path.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
@@ -100,7 +100,7 @@ def _resolve_openai_api_key() -> str:
 
     raise RuntimeError(
         "OpenAI API key not found. Set OPENAI_API_KEY, store it in your keyring "
-        "(service 'benchmarkos-chatbot'), or place it in "
+        "(service 'finanlyzeos-chatbot'), or place it in "
         f"{fallback_path}"
     )
 

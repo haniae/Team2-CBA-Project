@@ -35,7 +35,7 @@ Successfully pushed all changes to GitHub repository: `haniae/Team2-CBA-Project`
 9. `PDF_VISUAL_COMPARISON.md` - Before/after visual comparison
 
 **Files Modified:**
-- `src/benchmarkos_chatbot/static/cfi_dashboard.js` - Multi-ticker export support
+- `src/finanlyzeos_chatbot/static/cfi_dashboard.js` - Multi-ticker export support
 
 ---
 
@@ -160,8 +160,8 @@ https://github.com/haniae/Team2-CBA-Project/commit/cd7ea10
 
 All critical files are now safely committed:
 
-1. ✅ `src/benchmarkos_chatbot/export_pipeline.py` (2044 lines)
-2. ✅ `src/benchmarkos_chatbot/static/cfi_dashboard.js` (multi-ticker support)
+1. ✅ `src/finanlyzeos_chatbot/export_pipeline.py` (2044 lines)
+2. ✅ `src/finanlyzeos_chatbot/static/cfi_dashboard.js` (multi-ticker support)
 3. ✅ All PDF enhancement documentation (9 files)
 
 **Total protection:** 1,798 lines of new code + 9 documentation files

@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from benchmarkos_chatbot.help_content import DEFAULT_PROMPTS, DEFAULT_SECTIONS  # noqa: E402
+from finanlyzeos_chatbot.help_content import DEFAULT_PROMPTS, DEFAULT_SECTIONS  # noqa: E402
 
 
 OUTPUT_PATH = PROJECT_ROOT / "docs" / "accuracy" / "help_center_verification_tracker.csv"

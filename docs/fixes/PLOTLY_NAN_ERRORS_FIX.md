@@ -22,7 +22,7 @@ These errors occurred when `NaN` (Not a Number) values were passed to Plotly's c
 
 Implemented a **multi-layered defense** strategy to catch and sanitize `NaN` values at every level:
 
-### Layer 1: Backend Data Sanitization (`src/benchmarkos_chatbot/dashboard_utils.py`)
+### Layer 1: Backend Data Sanitization (`src/finanlyzeos_chatbot/dashboard_utils.py`)
 
 #### A. Enhanced `_sanitize_chart_data()` function:
 
@@ -184,7 +184,7 @@ To verify the fix works:
 
 ### Files Modified:
 
-1. **`src/benchmarkos_chatbot/dashboard_utils.py`**:
+1. **`src/finanlyzeos_chatbot/dashboard_utils.py`**:
    - Enhanced `_sanitize_chart_data()` with `is_valid_number()` helper
    - Removed duplicate validation logic
    - Applied sanitization to all data structures

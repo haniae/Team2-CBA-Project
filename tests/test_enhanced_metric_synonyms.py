@@ -6,7 +6,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from benchmarkos_chatbot.parsing.parse import parse_to_structured
+from finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 def test_natural_language_metrics():
     """Test that natural language metric expressions are recognized."""

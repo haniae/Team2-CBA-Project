@@ -19,8 +19,8 @@ The **Sources and References** panel at the bottom of dashboards has been restor
    - Changed `styles.css` version from `?v=20241027k` to `?v=20241027L`
 
 3. **Copied files** to static directory:
-   - ✅ `webui/styles.css` → `src/benchmarkos_chatbot/static/styles.css`
-   - ✅ `webui/index.html` → `src/benchmarkos_chatbot/static/index.html`
+   - ✅ `webui/styles.css` → `src/finanlyzeos_chatbot/static/styles.css`
+   - ✅ `webui/index.html` → `src/finanlyzeos_chatbot/static/index.html`
 
 4. **Restarted server**:
    - ✅ Old PID 30564 terminated

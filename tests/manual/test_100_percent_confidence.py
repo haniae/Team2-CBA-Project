@@ -8,10 +8,10 @@ from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
-from benchmarkos_chatbot.response_verifier import extract_financial_numbers, verify_response
-from benchmarkos_chatbot.confidence_scorer import calculate_confidence
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.response_verifier import extract_financial_numbers, verify_response
+from finanlyzeos_chatbot.confidence_scorer import calculate_confidence
 
 print("="*80)
 print("100% CONFIDENCE ACHIEVEMENT TEST")

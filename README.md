@@ -170,7 +170,7 @@ BenchmarkOS blends deterministic analytics with a modular ML layer so finance te
 ### Architecture Overview
 
 - **Data Foundation:** `analytics_engine.AnalyticsEngine.refresh_metrics()` normalises SEC filings into `metric_snapshots`. Forecast pipelines consume the same curated metrics, keeping model inputs aligned with what the dashboard renders.
-- **Model Registry:** Classical (Prophet, ARIMA/ETS) and ML estimators live under `src/benchmarkos_chatbot/ml_forecasting/`. Shared base classes (`ml_forecasting.ml_forecaster`) expose a consistent interface so new models can be dropped in with minimal wiring.
+- **Model Registry:** Classical (Prophet, ARIMA/ETS) and ML estimators live under `src/finanlyzeos_chatbot/ml_forecasting/`. Shared base classes (`ml_forecasting.ml_forecaster`) expose a consistent interface so new models can be dropped in with minimal wiring.
 - **Context Builder:** `context_builder.build_forecast_context()` assembles explicit data dumps (predictions, confidence bands, training diagnostics) that are injected verbatim into the LLM prompt. The bot cannot answer without citing these artefacts.
 
 ### Forecast Workflow
@@ -192,13 +192,13 @@ BenchmarkOS blends deterministic analytics with a modular ML layer so finance te
 - **Enable/Disable:** Toggle forecasting via the runtime settings object (`config.get_settings().forecasting_enabled`) or by exporting the matching environment variable (see `config.py` for names).  
 - **Refresh Data:** `python scripts/ingestion/fill_data_gaps.py --ticker AAPL --years-back 5` hydrates the metric store before training.  
 - **Unit Tests:** `pytest tests/unit/test_analytics_engine.py tests/unit/test_analysis_templates.py` cover metric hydration, forecast assembly, and verification hooks.  
-- **Interactive Checks:** In a Python shell run `from benchmarkos_chatbot.predictive_analytics import build_forecast_payload` to assemble the forecast dictionary for a given ticker/metric before handing it to the chatbot.
+- **Interactive Checks:** In a Python shell run `from finanlyzeos_chatbot.predictive_analytics import build_forecast_payload` to assemble the forecast dictionary for a given ticker/metric before handing it to the chatbot.
 
-- `src/benchmarkos_chatbot/context_builder.py` – forecast context orchestration.  
-- `src/benchmarkos_chatbot/predictive_analytics.py` – training/evaluation utilities and scenario generation.  
-- `src/benchmarkos_chatbot/ml_forecasting/` – individual model implementations and preprocessing helpers.  
-- `src/benchmarkos_chatbot/ml_response_verifier.py` – forecast-specific guardrails.  
-- `src/benchmarkos_chatbot/response_verifier.py` & `confidence_scorer.py` – cross-cutting verification and confidence scoring.
+- `src/finanlyzeos_chatbot/context_builder.py` – forecast context orchestration.  
+- `src/finanlyzeos_chatbot/predictive_analytics.py` – training/evaluation utilities and scenario generation.  
+- `src/finanlyzeos_chatbot/ml_forecasting/` – individual model implementations and preprocessing helpers.  
+- `src/finanlyzeos_chatbot/ml_response_verifier.py` – forecast-specific guardrails.  
+- `src/finanlyzeos_chatbot/response_verifier.py` & `confidence_scorer.py` – cross-cutting verification and confidence scoring.
 
 ## 📚 Retrieval-Augmented Generation
 
@@ -230,10 +230,10 @@ Natural-language answers are grounded in auditable data through a layered RAG st
 
 ### Key Modules
 
-- `src/benchmarkos_chatbot/document_context.py` – prompt-aware chunking and snippet assembly.  
-- `src/benchmarkos_chatbot/chatbot.py` – document-aware intent routing and context fusion.  
-- `src/benchmarkos_chatbot/static/app.js` & `webui/app.js` – frontend upload orchestration with persistent `conversation_id`s.  
-- `src/benchmarkos_chatbot/web.py` – backend API endpoint, validation, and database persistence.
+- `src/finanlyzeos_chatbot/document_context.py` – prompt-aware chunking and snippet assembly.  
+- `src/finanlyzeos_chatbot/chatbot.py` – document-aware intent routing and context fusion.  
+- `src/finanlyzeos_chatbot/static/app.js` & `webui/app.js` – frontend upload orchestration with persistent `conversation_id`s.  
+- `src/finanlyzeos_chatbot/web.py` – backend API endpoint, validation, and database persistence.
 
 ## 📊 Portfolio Management 
 
@@ -397,12 +397,12 @@ Portfolios are stored with the following structure:
 ### 🔧 Technical Implementation
 
 **Key Files:**
-- `src/benchmarkos_chatbot/portfolio.py` - Main portfolio management module
-- `src/benchmarkos_chatbot/portfolio_optimizer.py` - Portfolio optimization algorithms
-- `src/benchmarkos_chatbot/portfolio_risk_metrics.py` - Risk metric calculations
-- `src/benchmarkos_chatbot/portfolio_attribution.py` - Performance attribution (Brinson-Fachler)
-- `src/benchmarkos_chatbot/portfolio_scenarios.py` - Scenario analysis and stress testing
-- `src/benchmarkos_chatbot/portfolio_export.py` - Export functionality (PowerPoint, PDF, Excel)
+- `src/finanlyzeos_chatbot/portfolio.py` - Main portfolio management module
+- `src/finanlyzeos_chatbot/portfolio_optimizer.py` - Portfolio optimization algorithms
+- `src/finanlyzeos_chatbot/portfolio_risk_metrics.py` - Risk metric calculations
+- `src/finanlyzeos_chatbot/portfolio_attribution.py` - Performance attribution (Brinson-Fachler)
+- `src/finanlyzeos_chatbot/portfolio_scenarios.py` - Scenario analysis and stress testing
+- `src/finanlyzeos_chatbot/portfolio_export.py` - Export functionality (PowerPoint, PDF, Excel)
 
 **Documentation:** See `docs/guides/PORTFOLIO_QUESTIONS_GUIDE.md` for complete portfolio query examples and response formats.
 
@@ -576,7 +576,7 @@ The chatbot system prompt includes explicit instructions for ML forecasts:
 
 - **Complete Prompt Guide**: See `docs/guides/ALL_ML_FORECASTING_PROMPTS.md` for all working forecast prompts
 - **Quick Reference**: See `docs/guides/ML_FORECASTING_QUICK_REFERENCE.md` for quick reference guide
-- **Technical Details**: See `src/benchmarkos_chatbot/ml_forecasting/` for implementation details
+- **Technical Details**: See `src/finanlyzeos_chatbot/ml_forecasting/` for implementation details
 
 ## 🏗️ Architecture Map
 
@@ -588,7 +588,7 @@ BenchmarkOS combines **deterministic data prep** with **retrieval-augmented gene
 
 ### 🔤 Natural-Language Parsing (Deterministic)
 
-- src/benchmarkos_chatbot/parsing/alias_builder.py loads a generated aliases.json covering the S&P 500. It normalises free-text mentions, resolves ticker aliases, applies manual overrides (Alphabet, Berkshire share classes, JP Morgan, AT&T), and when needed performs a fuzzy fallback and emits warnings.
+- src/finanlyzeos_chatbot/parsing/alias_builder.py loads a generated aliases.json covering the S&P 500. It normalises free-text mentions, resolves ticker aliases, applies manual overrides (Alphabet, Berkshire share classes, JP Morgan, AT&T), and when needed performs a fuzzy fallback and emits warnings.
 - parse_to_structured in parsing/parse.py orchestrates alias resolution, metric synonym detection, and the flexible time grammar (time_grammar.py). It returns a strict JSON intent schema that downstream planners consume and store (conversation.last_structured_response["parser"]).
 - **Portfolio Detection**: The parser automatically detects portfolio-related queries and extracts portfolio identifiers (e.g., `port_abc123`) from user queries.
 - **ML Forecast Detection**: The parser detects forecast-related keywords (`forecast`, `predict`, `estimate`, `projection`, etc.) and routes queries to the ML forecasting system.
@@ -834,7 +834,7 @@ python --version
 python -c "import fastapi, openai, pandas, sqlalchemy; print('✅ Core packages installed')"
 
 # Run a quick test
-python -c "from benchmarkos_chatbot.config import load_settings; print('✅ BenchmarkOS imports successfully')"
+python -c "from finanlyzeos_chatbot.config import load_settings; print('✅ BenchmarkOS imports successfully')"
 ```
 
 #### Troubleshooting Installation
@@ -936,12 +936,12 @@ curl -o TSLA_data.xlsx "http://localhost:8000/api/export/cfi?format=xlsx&ticker=
 2. Ask: "Show me [Company Name]'s financial performance"
 3. Scroll to bottom of dashboard
 4. Click **"Export PowerPoint"** button
-5. File downloads automatically: `benchmarkos-{ticker}-{date}.pptx`
+5. File downloads automatically: `finanlyzeos-{ticker}-{date}.pptx`
 
 *Programmatic (Python SDK):*
 ```python
-from benchmarkos_chatbot import AnalyticsEngine, load_settings
-from benchmarkos_chatbot.export_pipeline import generate_dashboard_export
+from finanlyzeos_chatbot import AnalyticsEngine, load_settings
+from finanlyzeos_chatbot.export_pipeline import generate_dashboard_export
 
 # Initialize engine
 settings = load_settings()
@@ -975,7 +975,7 @@ with open("AAPL_analysis.pptx", "wb") as f:
 
 ### 2️⃣ Configure Environment Defaults
 
-Open `.env` and update database paths, API keys, and provider toggles. Prefer not to store an OpenAI key in the repo? Put it in `~/.config/benchmarkos-chatbot/openai_api_key` and the loader will pick it up automatically.
+Open `.env` and update database paths, API keys, and provider toggles. Prefer not to store an OpenAI key in the repo? Put it in `~/.config/finanlyzeos-chatbot/openai_api_key` and the loader will pick it up automatically.
 
 ### 3️⃣ (Optional) Warm the Datastore
 
@@ -1013,7 +1013,7 @@ Comparison responses append an "S&P 500 Avg" column highlighting how each ticker
 ```bash
 python serve_chatbot.py --port 8000
 # or run the ASGI app directly
-uvicorn benchmarkos_chatbot.web:app --reload --port 8000
+uvicorn finanlyzeos_chatbot.web:app --reload --port 8000
 ```
 
 Navigate to `http://localhost:8000`. The SPA exposes:
@@ -1135,10 +1135,10 @@ INGESTION COMPLETE
 Check your data:
 ```bash
 # View row counts per table
-python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/benchmarkos_chatbot.sqlite3'); cursor = conn.cursor(); tables = ['financial_facts', 'company_filings', 'metric_snapshots', 'kpi_values']; [print(f'{t}: {cursor.execute(f\"SELECT COUNT(*) FROM {t}\").fetchone()[0]:,}') for t in tables]; conn.close()"
+python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/finanlyzeos_chatbot.sqlite3'); cursor = conn.cursor(); tables = ['financial_facts', 'company_filings', 'metric_snapshots', 'kpi_values']; [print(f'{t}: {cursor.execute(f\"SELECT COUNT(*) FROM {t}\").fetchone()[0]:,}') for t in tables]; conn.close()"
 
 # Check year coverage
-python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/benchmarkos_chatbot.sqlite3'); cursor = conn.cursor(); cursor.execute('SELECT MIN(fiscal_year), MAX(fiscal_year), COUNT(DISTINCT ticker) FROM financial_facts'); print('Years: %s-%s | Companies: %s' % cursor.fetchone()); conn.close()"
+python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/finanlyzeos_chatbot.sqlite3'); cursor = conn.cursor(); cursor.execute('SELECT MIN(fiscal_year), MAX(fiscal_year), COUNT(DISTINCT ticker) FROM financial_facts'); print('Years: %s-%s | Companies: %s' % cursor.fetchone()); conn.close()"
 ```
 
 ### Alternative: Legacy Batch Scripts
@@ -1171,8 +1171,8 @@ python scripts/ingestion/load_prices_yfinance.py
 
 $env:PYTHONPATH = (Resolve-Path .\src).Path
 python - <<'PY'
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 AnalyticsEngine(load_settings()).refresh_metrics(force=True)
 PY
 ```
@@ -1198,7 +1198,7 @@ pip install -e .
 
 ### Ingest the S&P 500 into SQLite
 
-SQLite path defaults to data/sqlite/benchmarkos_chatbot.sqlite3 (configurable via DATABASE_PATH).
+SQLite path defaults to data/sqlite/finanlyzeos_chatbot.sqlite3 (configurable via DATABASE_PATH).
 
 Pick one of the following forms (both equivalent if you ran pip install -e .).
 
@@ -1226,7 +1226,7 @@ Verify counts:
 ```python
 python - <<'PY'
 import sqlite3, json
-p='data/sqlite/benchmarkos_chatbot.sqlite3'
+p='data/sqlite/finanlyzeos_chatbot.sqlite3'
 con=sqlite3.connect(p)
 print(json.dumps({t: con.execute('select count(*) from '+t).fetchone()[0] for t in [
   'financial_facts','company_filings','market_quotes','metric_snapshots','audit_events','ticker_aliases'
@@ -1241,7 +1241,7 @@ Load via Yahoo Finance in batches to avoid rate limits. Example: load all ticker
 ```python
 python - <<'PY'
 import os, time, sqlite3, subprocess
-db='data/sqlite/benchmarkos_chatbot.sqlite3'
+db='data/sqlite/finanlyzeos_chatbot.sqlite3'
 con=sqlite3.connect(db)
 tickers=[r[0] for r in con.execute("SELECT DISTINCT ticker FROM financial_facts ORDER BY ticker")]
 BATCH=50
@@ -1257,8 +1257,8 @@ Then refresh analytics snapshots to recalculate P/E, EV/EBITDA, dividend yield, 
 
 ```python
 python - <<'PY'
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 AnalyticsEngine(load_settings()).refresh_metrics(force=True)
 print('Refreshed metric_snapshots.')
 PY
@@ -1269,7 +1269,7 @@ Check the latest quote timestamp:
 ```python
 python - <<'PY'
 import sqlite3
-con=sqlite3.connect('data/sqlite/benchmarkos_chatbot.sqlite3')
+con=sqlite3.connect('data/sqlite/finanlyzeos_chatbot.sqlite3')
 print('quotes=',con.execute('select count(*) from market_quotes').fetchone()[0])
 print('latest=',con.execute('select max(quote_time) from market_quotes').fetchone()[0])
 PY
@@ -1282,7 +1282,7 @@ PY
   ```bash
   python scripts/ingestion/ingest_universe.py --universe sp500 --years 10 --chunk-size 25 --sleep 2
   ```
-- If you see ModuleNotFoundError: benchmarkos_chatbot, ensure you ran pip install -e . or set:
+- If you see ModuleNotFoundError: finanlyzeos_chatbot, ensure you ran pip install -e . or set:
   ```bash
   $env:PYTHONPATH = (Resolve-Path .\src).Path
   ```
@@ -1340,11 +1340,11 @@ python scripts/generate_aliases.py
 | Variable | Default | Notes |
 |----------|---------|-------|
 | DATABASE_TYPE | sqlite | Switch to postgresql for shared deployments. |
-| DATABASE_PATH | ./data/sqlite/benchmarkos_chatbot.sqlite3 | SQLite file location; created automatically. |
+| DATABASE_PATH | ./data/sqlite/finanlyzeos_chatbot.sqlite3 | SQLite file location; created automatically. |
 | POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DATABASE, POSTGRES_USER, POSTGRES_PASSWORD | unset | Required when DATABASE_TYPE=postgresql; POSTGRES_SCHEMA overrides the default sec. |
 | LLM_PROVIDER | local | local uses the deterministic echo model; set to openai for real completions. |
 | OPENAI_MODEL | gpt-4o-mini | Passed verbatim to the OpenAI Chat Completions API. |
-| SEC_API_USER_AGENT | BenchmarkOSBot/1.0 (support@benchmarkos.com) | Mandatory for SEC EDGAR requests. Customize it for your org. |
+| SEC_API_USER_AGENT | BenchmarkOSBot/1.0 (support@finanlyzeos.com) | Mandatory for SEC EDGAR requests. Customize it for your org. |
 | EDGAR_BASE_URL | https://data.sec.gov | Override if you proxy or mirror EDGAR. |
 | YAHOO_QUOTE_URL | https://query1.finance.yahoo.com/v7/finance/quote | Used to refresh quotes. |
 | YAHOO_QUOTE_BATCH_SIZE | 50 | Maximum tickers per Yahoo batch. |
@@ -1353,7 +1353,7 @@ python scripts/generate_aliases.py
 | DATA_CACHE_DIR | ./cache | Stores downloaded filings, facts, and progress markers. |
 | ENABLE_BLOOMBERG | false | Toggle Bloomberg ingestion; requires host/port/timeout values. |
 | BLOOMBERG_HOST, BLOOMBERG_PORT, BLOOMBERG_TIMEOUT | unset | Only used if Bloomberg is enabled. |
-| OPENAI_API_KEY | unset | Looked up in env, then keyring, then ~/.config/benchmarkos-chatbot/openai_api_key. |
+| OPENAI_API_KEY | unset | Looked up in env, then keyring, then ~/.config/finanlyzeos-chatbot/openai_api_key. |
 
 Secrets belong in your local .env. Windows developers can rely on keyring so API keys live outside the repo.
 
@@ -1437,7 +1437,7 @@ Project/
 │       └── main.py                    # Main utility CLI wrapper
 │
 ├── src/
-│   └── benchmarkos_chatbot/
+│   └── finanlyzeos_chatbot/
 │       │
 │       ├── Core Components:
 │       ├── analytics_engine.py        # Core analytics engine (KPI calculations)
@@ -1669,7 +1669,7 @@ Project/
 │   ├── external/
 │   │   └── imf_sector_kpis.json       # IMF sector KPI benchmarks
 │   ├── sqlite/
-│   │   └── benchmarkos_chatbot.sqlite3 # SQLite database (created on demand)
+│   │   └── finanlyzeos_chatbot.sqlite3 # SQLite database (created on demand)
 │   └── tickers/
 │       ├── universe_sp500.txt         # S&P 500 ticker list (475 companies)
 │       ├── sec_top100.txt             # Top 100 SEC companies
@@ -1830,7 +1830,7 @@ Project/
 | File | Description |
 |------|-------------|
 | run_chatbot.py | Lightweight REPL entry point that calls BenchmarkOSChatbot.create(). Provides interactive CLI for chatbot queries. |
-| serve_chatbot.py | Convenience launcher for the FastAPI app (src/benchmarkos_chatbot/web.py). Starts web server on specified port. |
+| serve_chatbot.py | Convenience launcher for the FastAPI app (src/finanlyzeos_chatbot/web.py). Starts web server on specified port. |
 | run_data_ingestion.ps1 | Windows PowerShell script for automated data ingestion. Wraps fill_data_gaps.py with Windows-specific settings. |
 | run_data_ingestion.sh | Unix/Linux script for automated data ingestion. Wraps fill_data_gaps.py with Unix-specific settings. |
 | pyproject.toml | Project metadata, dependencies, and pytest configuration. Adds src/ to PYTHONPATH for imports. |
@@ -1885,141 +1885,141 @@ Project/
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/analytics_engine.py | Core analytics engine performing KPI calculations, metric aggregations, and financial analysis. Central component for all financial calculations. |
-| src/benchmarkos_chatbot/chatbot.py | Main chatbot orchestration module. Integrates RAG layer, LLM client, context builder, and response verifier. Handles conversation flow and intent routing. |
-| src/benchmarkos_chatbot/config.py | Configuration management and settings loader. Reads environment variables, .env files, and provides default settings. |
-| src/benchmarkos_chatbot/database.py | Database abstraction layer supporting both SQLite and PostgreSQL. Handles schema migrations, connection pooling, and query execution. |
-| src/benchmarkos_chatbot/llm_client.py | LLM provider abstraction layer. Supports OpenAI API and local echo mode. Handles API calls, error handling, and response formatting. |
-| src/benchmarkos_chatbot/web.py | FastAPI web server providing REST API endpoints. Handles /chat, /metrics, /facts, /audit, and /health endpoints. Serves static files and web UI. |
+| src/finanlyzeos_chatbot/analytics_engine.py | Core analytics engine performing KPI calculations, metric aggregations, and financial analysis. Central component for all financial calculations. |
+| src/finanlyzeos_chatbot/chatbot.py | Main chatbot orchestration module. Integrates RAG layer, LLM client, context builder, and response verifier. Handles conversation flow and intent routing. |
+| src/finanlyzeos_chatbot/config.py | Configuration management and settings loader. Reads environment variables, .env files, and provides default settings. |
+| src/finanlyzeos_chatbot/database.py | Database abstraction layer supporting both SQLite and PostgreSQL. Handles schema migrations, connection pooling, and query execution. |
+| src/finanlyzeos_chatbot/llm_client.py | LLM provider abstraction layer. Supports OpenAI API and local echo mode. Handles API calls, error handling, and response formatting. |
+| src/finanlyzeos_chatbot/web.py | FastAPI web server providing REST API endpoints. Handles /chat, /metrics, /facts, /audit, and /health endpoints. Serves static files and web UI. |
 
 ### 📥 Data & Ingestion
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/data_ingestion.py | Data ingestion pipeline orchestrating SEC, Yahoo Finance, and Bloomberg data sources. Handles async ingestion, rate limiting, and error recovery. |
-| src/benchmarkos_chatbot/data_sources.py | Data source integrations for SEC EDGAR, Yahoo Finance, and Bloomberg. Provides client classes for each data source. |
-| src/benchmarkos_chatbot/external_data.py | External data providers for FRED (Federal Reserve Economic Data) and IMF (International Monetary Fund). Fetches macroeconomic indicators. |
-| src/benchmarkos_chatbot/macro_data.py | Macroeconomic data provider. Aggregates and normalizes macroeconomic indicators from multiple sources. |
-| src/benchmarkos_chatbot/multi_source_aggregator.py | Multi-source data aggregation. Combines data from multiple sources (SEC, Yahoo, FRED, IMF) into unified format. |
-| src/benchmarkos_chatbot/sec_bulk.py | SEC bulk data access. Provides caching and bulk access to SEC EDGAR data. |
-| src/benchmarkos_chatbot/secdb.py | SEC database utilities. Helper functions for SEC data access and normalization. |
+| src/finanlyzeos_chatbot/data_ingestion.py | Data ingestion pipeline orchestrating SEC, Yahoo Finance, and Bloomberg data sources. Handles async ingestion, rate limiting, and error recovery. |
+| src/finanlyzeos_chatbot/data_sources.py | Data source integrations for SEC EDGAR, Yahoo Finance, and Bloomberg. Provides client classes for each data source. |
+| src/finanlyzeos_chatbot/external_data.py | External data providers for FRED (Federal Reserve Economic Data) and IMF (International Monetary Fund). Fetches macroeconomic indicators. |
+| src/finanlyzeos_chatbot/macro_data.py | Macroeconomic data provider. Aggregates and normalizes macroeconomic indicators from multiple sources. |
+| src/finanlyzeos_chatbot/multi_source_aggregator.py | Multi-source data aggregation. Combines data from multiple sources (SEC, Yahoo, FRED, IMF) into unified format. |
+| src/finanlyzeos_chatbot/sec_bulk.py | SEC bulk data access. Provides caching and bulk access to SEC EDGAR data. |
+| src/finanlyzeos_chatbot/secdb.py | SEC database utilities. Helper functions for SEC data access and normalization. |
 
 ### 🧠 Context & RAG
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/context_builder.py | Financial context builder for RAG layer. Assembles ML forecast details, portfolio data, financial metrics, SEC filings, and macroeconomic context. Includes "EXPLICIT DATA DUMP" section for technical details. |
-| src/benchmarkos_chatbot/ml_response_verifier.py | ML forecast response verification and enhancement. Verifies LLM responses include all required technical details (model architecture, hyperparameters, training details). Automatically enhances responses if details are missing. |
-| src/benchmarkos_chatbot/followup_context.py | Follow-up question context management. Maintains conversation context for follow-up questions and pronoun resolution. |
-| src/benchmarkos_chatbot/intent_carryover.py | Intent carryover between conversations. Preserves user intent across conversation turns for better context understanding. |
+| src/finanlyzeos_chatbot/context_builder.py | Financial context builder for RAG layer. Assembles ML forecast details, portfolio data, financial metrics, SEC filings, and macroeconomic context. Includes "EXPLICIT DATA DUMP" section for technical details. |
+| src/finanlyzeos_chatbot/ml_response_verifier.py | ML forecast response verification and enhancement. Verifies LLM responses include all required technical details (model architecture, hyperparameters, training details). Automatically enhances responses if details are missing. |
+| src/finanlyzeos_chatbot/followup_context.py | Follow-up question context management. Maintains conversation context for follow-up questions and pronoun resolution. |
+| src/finanlyzeos_chatbot/intent_carryover.py | Intent carryover between conversations. Preserves user intent across conversation turns for better context understanding. |
 
 ### 🔤 Parsing & NLP
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/parsing/alias_builder.py | Ticker alias resolution for S&P 500. Normalizes company mentions, loads alias sets, applies overrides, and resolves tickers with fuzzy fallbacks. |
-| src/benchmarkos_chatbot/parsing/aliases.json | Generated ticker aliases covering S&P 500 companies. Consumed at runtime by parser for ticker resolution. |
-| src/benchmarkos_chatbot/parsing/ontology.py | Metric ontology defining KPI definitions, synonyms, and relationships. Provides structured knowledge base for financial metrics. |
-| src/benchmarkos_chatbot/parsing/parse.py | Natural language parser converting prompts into structured intents. Extracts tickers, metrics, periods, and warnings from user queries. |
-| src/benchmarkos_chatbot/parsing/time_grammar.py | Time period parser handling fiscal/calendar ranges, lists, quarters, and relative windows. Flexible grammar for temporal expressions. |
-| src/benchmarkos_chatbot/parsing/abbreviations.py | Abbreviation expansion. Expands common financial abbreviations (e.g., "rev" → "revenue"). |
-| src/benchmarkos_chatbot/parsing/company_groups.py | Company group detection. Identifies and handles company groups (e.g., "FAANG", "tech companies"). |
-| src/benchmarkos_chatbot/parsing/comparative.py | Comparative language parsing. Handles comparative queries (e.g., "better than", "higher than", "compare"). |
-| src/benchmarkos_chatbot/parsing/conditionals.py | Conditional statement parsing. Handles conditional queries (e.g., "if revenue > 100B", "when P/E < 20"). |
-| src/benchmarkos_chatbot/parsing/fuzzy_quantities.py | Fuzzy quantity parsing. Handles approximate quantities (e.g., "around 100B", "roughly 50%"). |
-| src/benchmarkos_chatbot/parsing/metric_inference.py | Metric inference from context. Infers missing metrics from conversation context and query patterns. |
-| src/benchmarkos_chatbot/parsing/multi_intent.py | Multi-intent detection. Identifies and handles queries with multiple intents (e.g., "compare AAPL and MSFT revenue and earnings"). |
-| src/benchmarkos_chatbot/parsing/natural_filters.py | Natural language filters. Converts natural language filters into structured query filters. |
-| src/benchmarkos_chatbot/parsing/negation.py | Negation handling. Properly handles negated queries (e.g., "not revenue", "excluding tech"). |
-| src/benchmarkos_chatbot/parsing/question_chaining.py | Question chaining detection. Identifies related questions and maintains context across question chains. |
-| src/benchmarkos_chatbot/parsing/sentiment.py | Sentiment analysis. Analyzes sentiment in user queries and financial data. |
-| src/benchmarkos_chatbot/parsing/temporal_relationships.py | Temporal relationship parsing. Handles temporal relationships (e.g., "before 2020", "after Q3", "during 2021-2023"). |
-| src/benchmarkos_chatbot/parsing/trends.py | Trend detection. Identifies trend-related queries (e.g., "increasing", "declining", "stable"). |
+| src/finanlyzeos_chatbot/parsing/alias_builder.py | Ticker alias resolution for S&P 500. Normalizes company mentions, loads alias sets, applies overrides, and resolves tickers with fuzzy fallbacks. |
+| src/finanlyzeos_chatbot/parsing/aliases.json | Generated ticker aliases covering S&P 500 companies. Consumed at runtime by parser for ticker resolution. |
+| src/finanlyzeos_chatbot/parsing/ontology.py | Metric ontology defining KPI definitions, synonyms, and relationships. Provides structured knowledge base for financial metrics. |
+| src/finanlyzeos_chatbot/parsing/parse.py | Natural language parser converting prompts into structured intents. Extracts tickers, metrics, periods, and warnings from user queries. |
+| src/finanlyzeos_chatbot/parsing/time_grammar.py | Time period parser handling fiscal/calendar ranges, lists, quarters, and relative windows. Flexible grammar for temporal expressions. |
+| src/finanlyzeos_chatbot/parsing/abbreviations.py | Abbreviation expansion. Expands common financial abbreviations (e.g., "rev" → "revenue"). |
+| src/finanlyzeos_chatbot/parsing/company_groups.py | Company group detection. Identifies and handles company groups (e.g., "FAANG", "tech companies"). |
+| src/finanlyzeos_chatbot/parsing/comparative.py | Comparative language parsing. Handles comparative queries (e.g., "better than", "higher than", "compare"). |
+| src/finanlyzeos_chatbot/parsing/conditionals.py | Conditional statement parsing. Handles conditional queries (e.g., "if revenue > 100B", "when P/E < 20"). |
+| src/finanlyzeos_chatbot/parsing/fuzzy_quantities.py | Fuzzy quantity parsing. Handles approximate quantities (e.g., "around 100B", "roughly 50%"). |
+| src/finanlyzeos_chatbot/parsing/metric_inference.py | Metric inference from context. Infers missing metrics from conversation context and query patterns. |
+| src/finanlyzeos_chatbot/parsing/multi_intent.py | Multi-intent detection. Identifies and handles queries with multiple intents (e.g., "compare AAPL and MSFT revenue and earnings"). |
+| src/finanlyzeos_chatbot/parsing/natural_filters.py | Natural language filters. Converts natural language filters into structured query filters. |
+| src/finanlyzeos_chatbot/parsing/negation.py | Negation handling. Properly handles negated queries (e.g., "not revenue", "excluding tech"). |
+| src/finanlyzeos_chatbot/parsing/question_chaining.py | Question chaining detection. Identifies related questions and maintains context across question chains. |
+| src/finanlyzeos_chatbot/parsing/sentiment.py | Sentiment analysis. Analyzes sentiment in user queries and financial data. |
+| src/finanlyzeos_chatbot/parsing/temporal_relationships.py | Temporal relationship parsing. Handles temporal relationships (e.g., "before 2020", "after Q3", "during 2021-2023"). |
+| src/finanlyzeos_chatbot/parsing/trends.py | Trend detection. Identifies trend-related queries (e.g., "increasing", "declining", "stable"). |
 
 ### ✏️ Spelling & Correction
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/spelling/company_corrector.py | Company name spelling correction. Corrects misspelled company names using fuzzy matching. |
-| src/benchmarkos_chatbot/spelling/correction_engine.py | Main spelling correction engine. Orchestrates spelling correction for companies, metrics, and other entities. |
-| src/benchmarkos_chatbot/spelling/fuzzy_matcher.py | Fuzzy string matching. Provides fuzzy matching algorithms for entity resolution. |
-| src/benchmarkos_chatbot/spelling/metric_corrector.py | Metric name spelling correction. Corrects misspelled metric names using fuzzy matching. |
+| src/finanlyzeos_chatbot/spelling/company_corrector.py | Company name spelling correction. Corrects misspelled company names using fuzzy matching. |
+| src/finanlyzeos_chatbot/spelling/correction_engine.py | Main spelling correction engine. Orchestrates spelling correction for companies, metrics, and other entities. |
+| src/finanlyzeos_chatbot/spelling/fuzzy_matcher.py | Fuzzy string matching. Provides fuzzy matching algorithms for entity resolution. |
+| src/finanlyzeos_chatbot/spelling/metric_corrector.py | Metric name spelling correction. Corrects misspelled metric names using fuzzy matching. |
 
 ### 🧭 Routing
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/routing/enhanced_router.py | Enhanced intent routing with dashboard detection. Routes queries to appropriate handlers (dashboard, chatbot, export, etc.). |
+| src/finanlyzeos_chatbot/routing/enhanced_router.py | Enhanced intent routing with dashboard detection. Routes queries to appropriate handlers (dashboard, chatbot, export, etc.). |
 
 ### 📊 Analytics Modules
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/sector_analytics.py | Sector benchmarking using GICS sectors. Compares company metrics against sector averages and peers. |
-| src/benchmarkos_chatbot/anomaly_detection.py | Anomaly detection using Z-score analysis. Identifies outliers in financial metrics. |
-| src/benchmarkos_chatbot/predictive_analytics.py | Predictive analytics including regression and CAGR calculations. Provides forward-looking analysis. |
-| src/benchmarkos_chatbot/advanced_kpis.py | Advanced KPI calculator with 30+ financial ratios. Calculates complex metrics like EV/EBITDA, ROIC, FCF yield, etc. |
+| src/finanlyzeos_chatbot/sector_analytics.py | Sector benchmarking using GICS sectors. Compares company metrics against sector averages and peers. |
+| src/finanlyzeos_chatbot/anomaly_detection.py | Anomaly detection using Z-score analysis. Identifies outliers in financial metrics. |
+| src/finanlyzeos_chatbot/predictive_analytics.py | Predictive analytics including regression and CAGR calculations. Provides forward-looking analysis. |
+| src/finanlyzeos_chatbot/advanced_kpis.py | Advanced KPI calculator with 30+ financial ratios. Calculates complex metrics like EV/EBITDA, ROIC, FCF yield, etc. |
 
 ### 💼 Portfolio Management
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/portfolio.py | Main portfolio management module (combined). Provides portfolio validation, enrichment, statistics, exposure analysis, attribution, scenarios, and risk metrics. Central module for all portfolio operations. |
-| src/benchmarkos_chatbot/portfolio_optimizer.py | Portfolio optimization using mean-variance optimization. Optimizes portfolios for maximum Sharpe ratio, minimum variance, or target return. |
-| src/benchmarkos_chatbot/portfolio_risk_metrics.py | Risk metrics calculation including CVaR, VaR, Sharpe ratio, Sortino ratio, tracking error, and beta. Provides comprehensive risk analysis. |
-| src/benchmarkos_chatbot/portfolio_attribution.py | Performance attribution using Brinson-Fachler model. Decomposes active return into allocation, selection, and interaction effects. |
-| src/benchmarkos_chatbot/portfolio_scenarios.py | Scenario analysis and stress testing. Runs equity drawdown scenarios, sector rotation scenarios, and custom scenarios. |
-| src/benchmarkos_chatbot/portfolio_exposure.py | Exposure analysis for sector and factor exposure. Calculates sector allocation, factor exposures (beta, momentum, value, size, quality), and concentration metrics. |
-| src/benchmarkos_chatbot/portfolio_calculations.py | Portfolio calculation utilities. Helper functions for portfolio calculations (weights, returns, correlations, etc.). |
-| src/benchmarkos_chatbot/portfolio_enrichment.py | Portfolio enrichment with fundamentals. Enriches portfolio holdings with P/E ratios, dividend yields, ROE, ROIC, and sector classifications. |
-| src/benchmarkos_chatbot/portfolio_enhancements.py | Portfolio enhancement utilities. Additional utilities for portfolio enhancements and transformations. |
-| src/benchmarkos_chatbot/portfolio_reporting.py | Portfolio reporting utilities. Generates portfolio reports and summaries. |
-| src/benchmarkos_chatbot/portfolio_trades.py | Trade recommendation utilities. Generates buy/sell recommendations for portfolio rebalancing. |
-| src/benchmarkos_chatbot/portfolio_export.py | Portfolio export functionality for PowerPoint, PDF, and Excel. Generates professional portfolio reports. |
-| src/benchmarkos_chatbot/portfolio_ppt_builder.py | Portfolio PowerPoint builder. Creates 12-slide professional portfolio presentations. |
+| src/finanlyzeos_chatbot/portfolio.py | Main portfolio management module (combined). Provides portfolio validation, enrichment, statistics, exposure analysis, attribution, scenarios, and risk metrics. Central module for all portfolio operations. |
+| src/finanlyzeos_chatbot/portfolio_optimizer.py | Portfolio optimization using mean-variance optimization. Optimizes portfolios for maximum Sharpe ratio, minimum variance, or target return. |
+| src/finanlyzeos_chatbot/portfolio_risk_metrics.py | Risk metrics calculation including CVaR, VaR, Sharpe ratio, Sortino ratio, tracking error, and beta. Provides comprehensive risk analysis. |
+| src/finanlyzeos_chatbot/portfolio_attribution.py | Performance attribution using Brinson-Fachler model. Decomposes active return into allocation, selection, and interaction effects. |
+| src/finanlyzeos_chatbot/portfolio_scenarios.py | Scenario analysis and stress testing. Runs equity drawdown scenarios, sector rotation scenarios, and custom scenarios. |
+| src/finanlyzeos_chatbot/portfolio_exposure.py | Exposure analysis for sector and factor exposure. Calculates sector allocation, factor exposures (beta, momentum, value, size, quality), and concentration metrics. |
+| src/finanlyzeos_chatbot/portfolio_calculations.py | Portfolio calculation utilities. Helper functions for portfolio calculations (weights, returns, correlations, etc.). |
+| src/finanlyzeos_chatbot/portfolio_enrichment.py | Portfolio enrichment with fundamentals. Enriches portfolio holdings with P/E ratios, dividend yields, ROE, ROIC, and sector classifications. |
+| src/finanlyzeos_chatbot/portfolio_enhancements.py | Portfolio enhancement utilities. Additional utilities for portfolio enhancements and transformations. |
+| src/finanlyzeos_chatbot/portfolio_reporting.py | Portfolio reporting utilities. Generates portfolio reports and summaries. |
+| src/finanlyzeos_chatbot/portfolio_trades.py | Trade recommendation utilities. Generates buy/sell recommendations for portfolio rebalancing. |
+| src/finanlyzeos_chatbot/portfolio_export.py | Portfolio export functionality for PowerPoint, PDF, and Excel. Generates professional portfolio reports. |
+| src/finanlyzeos_chatbot/portfolio_ppt_builder.py | Portfolio PowerPoint builder. Creates 12-slide professional portfolio presentations. |
 
 ### 🤖 ML Forecasting
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/ml_forecasting/ml_forecaster.py | Main ML forecaster with model selection. Orchestrates all ML forecasting models and selects best model based on historical performance. |
-| src/benchmarkos_chatbot/ml_forecasting/arima_forecaster.py | ARIMA model for statistical time series forecasting. Best for short-term forecasts and trend-following patterns. Automatically optimizes hyperparameters using AIC/BIC. |
-| src/benchmarkos_chatbot/ml_forecasting/prophet_forecaster.py | Prophet model for seasonal pattern forecasting. Best for seasonal patterns, holidays, and long-term trends. Handles missing data and outliers. |
-| src/benchmarkos_chatbot/ml_forecasting/ets_forecaster.py | ETS model for exponential smoothing. Best for smooth trends and exponential growth/decay patterns. Automatically selects from 30 possible configurations. |
-| src/benchmarkos_chatbot/ml_forecasting/lstm_forecaster.py | LSTM model for deep learning RNN forecasting. Best for complex patterns, non-linear relationships, and long-term dependencies. Multi-layer architecture with dropout and batch normalization. |
-| src/benchmarkos_chatbot/ml_forecasting/transformer_forecaster.py | Transformer model for attention-based forecasting. Best for long-term dependencies and complex patterns. Multi-head attention architecture with positional encoding. |
-| src/benchmarkos_chatbot/ml_forecasting/preprocessing.py | Data preprocessing for scaling, normalization, outlier handling, and missing data treatment. Prepares time series data for ML models. |
-| src/benchmarkos_chatbot/ml_forecasting/feature_engineering.py | Feature engineering utilities. Creates technical indicators, lag features, and other engineered features for ML models. |
-| src/benchmarkos_chatbot/ml_forecasting/hyperparameter_tuning.py | Hyperparameter optimization using Optuna. Optimizes model hyperparameters using Bayesian optimization. |
-| src/benchmarkos_chatbot/ml_forecasting/backtesting.py | Model backtesting utilities. Tests model performance on historical data with walk-forward validation. |
-| src/benchmarkos_chatbot/ml_forecasting/validation.py | Model validation utilities. Validates model performance using cross-validation and holdout sets. |
-| src/benchmarkos_chatbot/ml_forecasting/explainability.py | Model explainability using SHAP values and attention weights. Provides insights into model predictions. |
-| src/benchmarkos_chatbot/ml_forecasting/uncertainty.py | Uncertainty quantification. Calculates prediction intervals and confidence bounds for forecasts. |
-| src/benchmarkos_chatbot/ml_forecasting/regime_detection.py | Regime detection for identifying market states. Detects different market regimes (bull, bear, volatile) in time series data. |
-| src/benchmarkos_chatbot/ml_forecasting/technical_indicators.py | Technical indicators for feature engineering. Calculates RSI, MACD, Bollinger Bands, and other technical indicators. |
-| src/benchmarkos_chatbot/ml_forecasting/external_factors.py | External factor integration. Incorporates external factors (macroeconomic indicators, market sentiment) into forecasts. |
-| src/benchmarkos_chatbot/ml_forecasting/multivariate_forecaster.py | Multivariate forecasting. Handles forecasting with multiple input variables and dependencies. |
+| src/finanlyzeos_chatbot/ml_forecasting/ml_forecaster.py | Main ML forecaster with model selection. Orchestrates all ML forecasting models and selects best model based on historical performance. |
+| src/finanlyzeos_chatbot/ml_forecasting/arima_forecaster.py | ARIMA model for statistical time series forecasting. Best for short-term forecasts and trend-following patterns. Automatically optimizes hyperparameters using AIC/BIC. |
+| src/finanlyzeos_chatbot/ml_forecasting/prophet_forecaster.py | Prophet model for seasonal pattern forecasting. Best for seasonal patterns, holidays, and long-term trends. Handles missing data and outliers. |
+| src/finanlyzeos_chatbot/ml_forecasting/ets_forecaster.py | ETS model for exponential smoothing. Best for smooth trends and exponential growth/decay patterns. Automatically selects from 30 possible configurations. |
+| src/finanlyzeos_chatbot/ml_forecasting/lstm_forecaster.py | LSTM model for deep learning RNN forecasting. Best for complex patterns, non-linear relationships, and long-term dependencies. Multi-layer architecture with dropout and batch normalization. |
+| src/finanlyzeos_chatbot/ml_forecasting/transformer_forecaster.py | Transformer model for attention-based forecasting. Best for long-term dependencies and complex patterns. Multi-head attention architecture with positional encoding. |
+| src/finanlyzeos_chatbot/ml_forecasting/preprocessing.py | Data preprocessing for scaling, normalization, outlier handling, and missing data treatment. Prepares time series data for ML models. |
+| src/finanlyzeos_chatbot/ml_forecasting/feature_engineering.py | Feature engineering utilities. Creates technical indicators, lag features, and other engineered features for ML models. |
+| src/finanlyzeos_chatbot/ml_forecasting/hyperparameter_tuning.py | Hyperparameter optimization using Optuna. Optimizes model hyperparameters using Bayesian optimization. |
+| src/finanlyzeos_chatbot/ml_forecasting/backtesting.py | Model backtesting utilities. Tests model performance on historical data with walk-forward validation. |
+| src/finanlyzeos_chatbot/ml_forecasting/validation.py | Model validation utilities. Validates model performance using cross-validation and holdout sets. |
+| src/finanlyzeos_chatbot/ml_forecasting/explainability.py | Model explainability using SHAP values and attention weights. Provides insights into model predictions. |
+| src/finanlyzeos_chatbot/ml_forecasting/uncertainty.py | Uncertainty quantification. Calculates prediction intervals and confidence bounds for forecasts. |
+| src/finanlyzeos_chatbot/ml_forecasting/regime_detection.py | Regime detection for identifying market states. Detects different market regimes (bull, bear, volatile) in time series data. |
+| src/finanlyzeos_chatbot/ml_forecasting/technical_indicators.py | Technical indicators for feature engineering. Calculates RSI, MACD, Bollinger Bands, and other technical indicators. |
+| src/finanlyzeos_chatbot/ml_forecasting/external_factors.py | External factor integration. Incorporates external factors (macroeconomic indicators, market sentiment) into forecasts. |
+| src/finanlyzeos_chatbot/ml_forecasting/multivariate_forecaster.py | Multivariate forecasting. Handles forecasting with multiple input variables and dependencies. |
 
 ### 📤 Export & Presentation
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/export_pipeline.py | Export pipeline for PDF, PPTX, and Excel generation. Orchestrates export generation for dashboards and reports. |
-| src/benchmarkos_chatbot/cfi_ppt_builder.py | CFI-style PowerPoint builder generating 12-slide professional presentations. Creates investment-grade presentations with charts and analysis. |
-| src/benchmarkos_chatbot/table_renderer.py | ASCII table rendering for CLI output. Formats financial data into readable tables. |
+| src/finanlyzeos_chatbot/export_pipeline.py | Export pipeline for PDF, PPTX, and Excel generation. Orchestrates export generation for dashboards and reports. |
+| src/finanlyzeos_chatbot/cfi_ppt_builder.py | CFI-style PowerPoint builder generating 12-slide professional presentations. Creates investment-grade presentations with charts and analysis. |
+| src/finanlyzeos_chatbot/table_renderer.py | ASCII table rendering for CLI output. Formats financial data into readable tables. |
 
 ### 🛠️ Utilities
 
 | File | Description |
 |------|-------------|
-| src/benchmarkos_chatbot/tasks.py | Task queue management. Handles background tasks, async operations, and task scheduling. |
-| src/benchmarkos_chatbot/help_content.py | Help content and documentation. Provides help text and documentation for chatbot features. |
-| src/benchmarkos_chatbot/dashboard_utils.py | Dashboard utility functions. Helper functions for dashboard generation and data formatting. |
-| src/benchmarkos_chatbot/document_processor.py | Document processing utilities. Extracts text from PDFs, Word documents, and other file formats. |
-| src/benchmarkos_chatbot/imf_proxy.py | IMF data proxy. Provides proxy access to IMF data sources. |
-| src/benchmarkos_chatbot/kpi_backfill.py | KPI backfill utilities. Backfills missing KPI values using interpolation and extrapolation. |
-| src/benchmarkos_chatbot/backfill_policy.py | Backfill policy management. Defines policies for data backfilling and gap filling. |
-| src/benchmarkos_chatbot/ticker_universe.py | Ticker universe management. Manages ticker universes (S&P 500, custom, etc.) and provides ticker lists. |
+| src/finanlyzeos_chatbot/tasks.py | Task queue management. Handles background tasks, async operations, and task scheduling. |
+| src/finanlyzeos_chatbot/help_content.py | Help content and documentation. Provides help text and documentation for chatbot features. |
+| src/finanlyzeos_chatbot/dashboard_utils.py | Dashboard utility functions. Helper functions for dashboard generation and data formatting. |
+| src/finanlyzeos_chatbot/document_processor.py | Document processing utilities. Extracts text from PDFs, Word documents, and other file formats. |
+| src/finanlyzeos_chatbot/imf_proxy.py | IMF data proxy. Provides proxy access to IMF data sources. |
+| src/finanlyzeos_chatbot/kpi_backfill.py | KPI backfill utilities. Backfills missing KPI values using interpolation and extrapolation. |
+| src/finanlyzeos_chatbot/backfill_policy.py | Backfill policy management. Defines policies for data backfilling and gap filling. |
+| src/finanlyzeos_chatbot/ticker_universe.py | Ticker universe management. Manages ticker universes (S&P 500, custom, etc.) and provides ticker lists. |
 
 ### 🌐 Web Assets
 
@@ -2041,17 +2041,17 @@ Project/
 | webui/cfi_dense.html | CFI dense view HTML. Compact dashboard view. |
 | webui/cfi_dense.js | CFI dense view JavaScript. Dense view logic. |
 | webui/cfi_dense.css | CFI dense view styling. Dense view-specific CSS. |
-| src/benchmarkos_chatbot/static/app.js | Frontend application logic (SPA). Main JavaScript for web UI. |
-| src/benchmarkos_chatbot/static/styles.css | UI styling (markdown, progress indicator). Comprehensive CSS for all UI components. |
-| src/benchmarkos_chatbot/static/index.html | Web UI entry point. Main HTML file. |
-| src/benchmarkos_chatbot/static/favicon.svg | Favicon. |
-| src/benchmarkos_chatbot/static/cfi_dashboard.html | CFI dashboard HTML. |
-| src/benchmarkos_chatbot/static/cfi_dashboard.js | CFI dashboard JavaScript. |
-| src/benchmarkos_chatbot/static/cfi_dashboard.css | CFI dashboard styling. |
-| src/benchmarkos_chatbot/static/portfolio_dashboard.html | Portfolio dashboard HTML. Portfolio analysis dashboard. |
-| src/benchmarkos_chatbot/static/portfolio_dashboard.js | Portfolio dashboard JavaScript. Portfolio dashboard logic. |
-| src/benchmarkos_chatbot/static/data/company_universe.json | Company universe metadata. Precompiled company data for web UI. |
-| src/benchmarkos_chatbot/static/data/kpi_library.json | KPI library definitions. Precompiled KPI definitions for web UI. |
+| src/finanlyzeos_chatbot/static/app.js | Frontend application logic (SPA). Main JavaScript for web UI. |
+| src/finanlyzeos_chatbot/static/styles.css | UI styling (markdown, progress indicator). Comprehensive CSS for all UI components. |
+| src/finanlyzeos_chatbot/static/index.html | Web UI entry point. Main HTML file. |
+| src/finanlyzeos_chatbot/static/favicon.svg | Favicon. |
+| src/finanlyzeos_chatbot/static/cfi_dashboard.html | CFI dashboard HTML. |
+| src/finanlyzeos_chatbot/static/cfi_dashboard.js | CFI dashboard JavaScript. |
+| src/finanlyzeos_chatbot/static/cfi_dashboard.css | CFI dashboard styling. |
+| src/finanlyzeos_chatbot/static/portfolio_dashboard.html | Portfolio dashboard HTML. Portfolio analysis dashboard. |
+| src/finanlyzeos_chatbot/static/portfolio_dashboard.js | Portfolio dashboard JavaScript. Portfolio dashboard logic. |
+| src/finanlyzeos_chatbot/static/data/company_universe.json | Company universe metadata. Precompiled company data for web UI. |
+| src/finanlyzeos_chatbot/static/data/kpi_library.json | KPI library definitions. Precompiled KPI definitions for web UI. |
 
 ### 🧪 Tests
 
@@ -2144,7 +2144,7 @@ Project/
 - Parser & alias focus: `pytest tests/test_alias_resolution.py tests/test_time_grammar.py tests/test_nl_parser.py`
 - Target a single test: `pytest tests/test_cli_tables.py::test_table_command_formats_rows`
 - Manual sanity: point LLM_PROVIDER=local to avoid burning API credits during smoke tests.
-- Database reset: delete benchmarkos_chatbot.sqlite3 and rerun ingestion—migrations run automatically on startup.
+- Database reset: delete finanlyzeos_chatbot.sqlite3 and rerun ingestion—migrations run automatically on startup.
 
 CI isn't configured by default, but pytest -ra (preconfigured in pyproject.toml) surfaces skipped/xfail tests neatly. Consider adding ruff or black once your team standardises formatting.
 
@@ -2152,7 +2152,7 @@ CI isn't configured by default, but pytest -ra (preconfigured in pyproject.toml)
 
 ### ⚠️ General Issues
 
-- **"OpenAI API key not found"** – set OPENAI_API_KEY, store it via keyring, or create ~/.config/benchmarkos-chatbot/openai_api_key.
+- **"OpenAI API key not found"** – set OPENAI_API_KEY, store it via keyring, or create ~/.config/finanlyzeos-chatbot/openai_api_key.
 - **WinError 10048 when starting the server** – another process is on the port. Run `Get-NetTCPConnection -LocalPort 8000` and terminate it, or start with `--port 8001`.
 - **PostgreSQL auth failures** – confirm SSL/network settings, then double-check POSTGRES_* vars; the DSN is logged at debug level when DATABASE_TYPE=postgresql is active.
 - **Pytest cannot locate modules** – run from the repo root so the pythonpath = ["src", "."] entry in pyproject.toml kicks in.
@@ -2163,7 +2163,7 @@ CI isn't configured by default, but pytest -ra (preconfigured in pyproject.toml)
 **Cause:** Metrics need to be refreshed after data ingestion.
 **Solution:**
 ```bash
-python -c "from benchmarkos_chatbot.config import load_settings; from benchmarkos_chatbot.analytics_engine import AnalyticsEngine; AnalyticsEngine(load_settings()).refresh_metrics(force=True)"
+python -c "from finanlyzeos_chatbot.config import load_settings; from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine; AnalyticsEngine(load_settings()).refresh_metrics(force=True)"
 ```
 The `fill_data_gaps.py` script does this automatically, but manual ingestion scripts may not.
 
@@ -2208,14 +2208,14 @@ If you see new batches completing, the script is working correctly.
 **Cause:** Default database path may differ from your configuration.
 **Solution:** Check your `.env` file for `DATABASE_PATH`:
 ```bash
-DATABASE_PATH=./data/sqlite/benchmarkos_chatbot.sqlite3
+DATABASE_PATH=./data/sqlite/finanlyzeos_chatbot.sqlite3
 ```
 Or use the full path:
 ```bash
-DATABASE_PATH=C:/Users/YOUR_USERNAME/Documents/GitHub/Project/benchmarkos_chatbot.sqlite3
+DATABASE_PATH=C:/Users/YOUR_USERNAME/Documents/GitHub/Project/finanlyzeos_chatbot.sqlite3
 ```
 
-#### "ModuleNotFoundError: benchmarkos_chatbot"
+#### "ModuleNotFoundError: finanlyzeos_chatbot"
 **Cause:** Package not installed in editable mode.
 **Solution:**
 ```bash
@@ -2231,10 +2231,10 @@ After ingestion completes, verify your data:
 
 ```bash
 # 1. Check total row counts
-python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/benchmarkos_chatbot.sqlite3'); cursor = conn.cursor(); print(f'financial_facts: {cursor.execute(\"SELECT COUNT(*) FROM financial_facts\").fetchone()[0]:,}'); print(f'metric_snapshots: {cursor.execute(\"SELECT COUNT(*) FROM metric_snapshots\").fetchone()[0]:,}'); conn.close()"
+python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/finanlyzeos_chatbot.sqlite3'); cursor = conn.cursor(); print(f'financial_facts: {cursor.execute(\"SELECT COUNT(*) FROM financial_facts\").fetchone()[0]:,}'); print(f'metric_snapshots: {cursor.execute(\"SELECT COUNT(*) FROM metric_snapshots\").fetchone()[0]:,}'); conn.close()"
 
 # 2. Check year coverage
-python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/benchmarkos_chatbot.sqlite3'); cursor = conn.cursor(); cursor.execute('SELECT MIN(fiscal_year), MAX(fiscal_year), COUNT(DISTINCT ticker) FROM financial_facts'); print('Years: %s-%s | Companies: %s' % cursor.fetchone()); conn.close()"
+python -c "import sqlite3; conn = sqlite3.connect('C:/Users/YOUR_PATH/finanlyzeos_chatbot.sqlite3'); cursor = conn.cursor(); cursor.execute('SELECT MIN(fiscal_year), MAX(fiscal_year), COUNT(DISTINCT ticker) FROM financial_facts'); print('Years: %s-%s | Companies: %s' % cursor.fetchone()); conn.close()"
 
 # 3. Test a specific company
 python run_chatbot.py
@@ -2256,7 +2256,7 @@ python run_chatbot.py
 ## 📚 Further Reading
 
 - 📖 [`docs/orchestration_playbook.md`](docs/orchestration_playbook.md) – Three ingestion/orchestration patterns (local queue, serverless fetchers, batch jobs) and how to wire them into BenchmarkOSChatbot
-- 💻 **Inline Module Documentation** - Comprehensive docs across `src/benchmarkos_chatbot/` describe invariants, data contracts, and extension hooks
+- 💻 **Inline Module Documentation** - Comprehensive docs across `src/finanlyzeos_chatbot/` describe invariants, data contracts, and extension hooks
 - 🔧 **Versioning Best Practices** - Consider versioning your `.env` templates and deployment runbooks alongside these docs as the project evolves
 
 ## 🎓 System Overview (Professor Summary)
@@ -2266,9 +2266,9 @@ python run_chatbot.py
 |-------|----------|-----------|
 | Experiences | Web dashboard, CLI, REST API | webui/, 
 un_chatbot.py, serve_chatbot.py |
-| Parsing | Ticker/period normalisation | src/benchmarkos_chatbot/parsing/alias_builder.py, 	ime_grammar.py |
-| Retrieval & Analytics | KPI calculations, scenarios | src/benchmarkos_chatbot/analytics_engine.py, database.py, data_ingestion.py |
-| RAG Orchestration | Prompt assembly, LLM calls | src/benchmarkos_chatbot/chatbot.py, llm_client.py |
+| Parsing | Ticker/period normalisation | src/finanlyzeos_chatbot/parsing/alias_builder.py, 	ime_grammar.py |
+| Retrieval & Analytics | KPI calculations, scenarios | src/finanlyzeos_chatbot/analytics_engine.py, database.py, data_ingestion.py |
+| RAG Orchestration | Prompt assembly, LLM calls | src/finanlyzeos_chatbot/chatbot.py, llm_client.py |
 | Data Acquisition | SEC ingests, quotes, macro baselines | scripts/ingestion/*.py, xternal_data.py |
 
 ### Processing Workflow

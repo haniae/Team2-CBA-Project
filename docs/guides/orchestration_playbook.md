@@ -32,16 +32,16 @@ Each section below explains the architecture, the moving parts, and how to integ
 5. Chatbot polls the job status; once complete, it re-runs `get_metrics` and responds with numbers.
 
 ### Implementation Tips
-- Start with an in-process executor (see `src/benchmarkos_chatabot/tasks.py`).
+- Start with an in-process executor (see `src/finanlyzeos_chatabot/tasks.py`).
 - Configure rate limits via a simple `asyncio.Semaphore` or `time.sleep` between jobs (e.g., no more than 1 job / 2 seconds).
 - Add `TaskStatus` enumeration (`pending`, `running`, `succeeded`, `failed`).
 - Persist job history in SQLite (`jobs` table) for traceability.
 - For concurrency beyond a single machine, plug in Redis + RQ, Celery, Dramatiq, or Airflow.
 
 ### Files to Review
-- `src/benchmarkos_chatbot/tasks.py` – starter queue implementation.
-- `src/benchmarkos_chatbot/chatbot.py` – you can swap the direct ingest call with `TaskManager.submit_ingest`.
-- `src/benchmarkos_chatbot/analytics_engine.py` – add polling logic that checks job completion before returning a final answer.
+- `src/finanlyzeos_chatbot/tasks.py` – starter queue implementation.
+- `src/finanlyzeos_chatbot/chatbot.py` – you can swap the direct ingest call with `TaskManager.submit_ingest`.
+- `src/finanlyzeos_chatbot/analytics_engine.py` – add polling logic that checks job completion before returning a final answer.
 
 ---
 
@@ -96,7 +96,7 @@ For teams that prefer daily/weekly refreshes, a simple script can ingest a curat
 ## Where to Look Next
 - `docs/` – you can expand this playbook with your own runbooks.
 - `batch_ingest.py` – the ad-hoc batch example.
-- `src/benchmarkos_chatbot/tasks.py` – scaffolding for the local queue.
+- `src/finanlyzeos_chatbot/tasks.py` – scaffolding for the local queue.
 - `README.md` – updated instructions on setting API user-agent and running the scripts.
 
 Feel free to adjust these patterns to match your data licensing and infrastructure. Combine them if you like: e.g., a daily batch for high-priority tickers plus on-demand jobs for long-tail symbols.

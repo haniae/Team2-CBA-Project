@@ -53,7 +53,7 @@ class Settings:
     llm_provider:
         Which language model integration to use. Options: ``"local"`` for a
         lightweight echo model (default) or ``"openai"`` for the
-        :class:`~benchmarkos_chatbot.llm_client.OpenAILLMClient`.
+        :class:`~finanlyzeos_chatbot.llm_client.OpenAILLMClient`.
     openai_model:
         The chat completion model name to request from the OpenAI API when the
         provider is set to ``"openai"``.
@@ -78,7 +78,7 @@ class Settings:
     """
 
     database_type: DatabaseType = "sqlite"
-    database_path: Path = field(default_factory=lambda: Path("benchmarkos_chatbot.sqlite3"))
+    database_path: Path = field(default_factory=lambda: Path("finanlyzeos_chatbot.sqlite3"))
     postgres_host: Optional[str] = None
     postgres_port: Optional[int] = None
     postgres_database: Optional[str] = None
@@ -87,7 +87,7 @@ class Settings:
     postgres_schema: str = "sec"
     llm_provider: LLMProvider = "local"
     openai_model: str = "gpt-4o-mini"
-    sec_api_user_agent: str = "BenchmarkOSBot/1.0 (support@benchmarkos.com)"
+    sec_api_user_agent: str = "FinanlyzeOSBot/1.0 (support@finanlyzeos.com)"
     edgar_base_url: str = "https://data.sec.gov"
     yahoo_quote_url: str = "https://query1.finance.yahoo.com/v7/finance/quote"
     yahoo_quote_batch_size: int = 50
@@ -190,7 +190,7 @@ def load_settings() -> Settings:
         )
     database_type: DatabaseType = database_type_env  # type: ignore[assignment]
 
-    default_sqlite_path = Path.cwd() / "data" / "sqlite" / "benchmarkos_chatbot.sqlite3"
+    default_sqlite_path = Path.cwd() / "data" / "sqlite" / "finanlyzeos_chatbot.sqlite3"
     database_path = Path(os.getenv("DATABASE_PATH", default_sqlite_path)).expanduser()
     database_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -227,7 +227,7 @@ def load_settings() -> Settings:
         )
 
     sec_user_agent = os.getenv("SEC_API_USER_AGENT", 
-        "BenchmarkOSBot/1.0 (support@benchmarkos.com)"
+        "FinanlyzeOSBot/1.0 (support@finanlyzeos.com)"
     ).strip()
     if not sec_user_agent:
         raise ValueError("SEC_API_USER_AGENT must not be empty.")

@@ -20,8 +20,8 @@ Demonstrate that your ML forecasting system is:
 ## 📋 **Pre-Demo Checklist**
 
 ### **Before Starting:**
-- [ ] Server is running: `python -m benchmarkos_chatbot.web`
-- [ ] Database has data (check: `data/benchmarkos.db` > 0 bytes)
+- [ ] Server is running: `python -m finanlyzeos_chatbot.web`
+- [ ] Database has data (check: `data/finanlyzeos.db` > 0 bytes)
 - [ ] Browser cache cleared (Ctrl+Shift+Delete)
 - [ ] ChatGPT UI open at `http://localhost:8000` (or ngrok URL)
 - [ ] Practice script 2-3 times beforehand

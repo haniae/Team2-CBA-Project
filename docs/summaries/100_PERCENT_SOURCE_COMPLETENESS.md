@@ -210,7 +210,7 @@ python test_all_sp500_dashboards.py
 
 ## Files Modified
 
-1. **`src/benchmarkos_chatbot/dashboard_utils.py`**
+1. **`src/finanlyzeos_chatbot/dashboard_utils.py`**
    - Enhanced `_collect_sources()` with calculation formulas
    - Added `_get_calculation_info()` function with 11 formulas
    - Added fiscal year fallback logic (tries FY, FY-1, FY-2)

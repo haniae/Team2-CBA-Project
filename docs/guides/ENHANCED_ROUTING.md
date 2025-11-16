@@ -75,7 +75,7 @@ ENABLE_ENHANCED_ROUTING=true
 ### Option 3: Programmatically
 
 ```python
-from benchmarkos_chatbot.config import Settings
+from finanlyzeos_chatbot.config import Settings
 
 settings = Settings(
     enable_enhanced_routing=True,
@@ -150,8 +150,8 @@ EnhancedRouting(
 ### Test Pattern Matching
 
 ```python
-from benchmarkos_chatbot.routing import enhance_structured_parse
-from benchmarkos_chatbot.parsing.parse import parse_to_structured
+from finanlyzeos_chatbot.routing import enhance_structured_parse
+from finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 # Test input
 text = "Show Apple KPIs for 2023"
@@ -167,8 +167,8 @@ print(f"Force text only: {routing.force_text_only}")
 ### Test End-to-End
 
 ```python
-from benchmarkos_chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import Settings
+from finanlyzeos_chatbot import BenchmarkOSChatbot
+from finanlyzeos_chatbot.config import Settings
 
 # Enable enhanced routing
 settings = Settings(enable_enhanced_routing=True)

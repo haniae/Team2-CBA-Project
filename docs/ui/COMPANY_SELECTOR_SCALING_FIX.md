@@ -22,7 +22,7 @@ Implemented an adaptive UI that automatically switches between buttons and a sea
 
 ## Changes Made
 
-### 1. JavaScript Updates (`webui/app.js` and `src/benchmarkos_chatbot/static/app.js`)
+### 1. JavaScript Updates (`webui/app.js` and `src/finanlyzeos_chatbot/static/app.js`)
 
 #### Adaptive UI Logic (lines 2914-3011)
 ```javascript
@@ -55,7 +55,7 @@ if (useDropdown) {
 }
 ```
 
-### 2. CSS Styling (`webui/styles.css` and `src/benchmarkos_chatbot/static/styles.css`)
+### 2. CSS Styling (`webui/styles.css` and `src/finanlyzeos_chatbot/static/styles.css`)
 
 Added dropdown styles (lines 4180-4262):
 - `.message-dashboard__dropdown-container` - Container layout
@@ -166,9 +166,9 @@ Compare Companies (3 of 500):
 
 ## Files Modified
 1. `webui/app.js` (lines 2900-3123)
-2. `src/benchmarkos_chatbot/static/app.js` (lines 2900-3123)
+2. `src/finanlyzeos_chatbot/static/app.js` (lines 2900-3123)
 3. `webui/styles.css` (lines 4180-4262)
-4. `src/benchmarkos_chatbot/static/styles.css` (lines 4180-4262)
+4. `src/finanlyzeos_chatbot/static/styles.css` (lines 4180-4262)
 
 ## Backwards Compatibility
 ✅ **Fully backward compatible** - small lists still use buttons, large lists automatically upgrade to dropdown

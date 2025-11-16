@@ -18,8 +18,8 @@ from datetime import datetime
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
 import sqlite3
 
 
@@ -135,7 +135,7 @@ def check_portfolio_data_usage(response: str, portfolio_id: Optional[str] = None
     return checks
 
 
-def test_portfolio_prompt(chatbot: BenchmarkOSChatbot, prompt: str, category: str, 
+def test_portfolio_prompt(chatbot: FinanlyzeOSChatbot, prompt: str, category: str, 
                           portfolio_id: Optional[str] = None) -> Dict[str, any]:
     """Test a single portfolio prompt."""
     print(f"\n{'='*80}")
@@ -224,7 +224,7 @@ def run_stress_test():
     print("1. Loading chatbot...")
     try:
         settings = load_settings()
-        chatbot = BenchmarkOSChatbot.create(settings)
+        chatbot = FinanlyzeOSChatbot.create(settings)
         print("   ✓ Chatbot loaded successfully")
     except Exception as e:
         print(f"   ❌ Failed to load chatbot: {e}")

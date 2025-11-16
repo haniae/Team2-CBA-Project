@@ -6,7 +6,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from benchmarkos_chatbot import BenchmarkOSChatbot, load_settings
+from finanlyzeos_chatbot import FinanlyzeOSChatbot, load_settings
 
 def test_pronoun_resolution():
     """Test that pronouns are resolved to last mentioned tickers."""
@@ -18,7 +18,7 @@ def test_pronoun_resolution():
     
     # Create chatbot instance
     settings = load_settings()
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     
     test_scenarios = [
         {
@@ -60,7 +60,7 @@ def test_pronoun_resolution():
         print('='*80)
         
         # Reset bot for each scenario
-        bot = BenchmarkOSChatbot.create(settings)
+        bot = FinanlyzeOSChatbot.create(settings)
         
         for i, (query, expected_pattern) in enumerate(scenario['queries'], 1):
             print(f"\nQuery {i}: {query}")

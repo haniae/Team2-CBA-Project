@@ -3,10 +3,10 @@
 
 import sys
 from pathlib import Path
-from benchmarkos_chatbot import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
-from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
-from benchmarkos_chatbot.ticker_universe import load_ticker_universe
+from finanlyzeos_chatbot import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.data_ingestion import ingest_live_tickers
+from finanlyzeos_chatbot.ticker_universe import load_ticker_universe
 
 def main():
     """Re-ingest existing companies with extended history."""

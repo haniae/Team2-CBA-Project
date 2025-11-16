@@ -7,7 +7,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot import BenchmarkOSChatbot, load_settings
+from finanlyzeos_chatbot import FinanlyzeOSChatbot, load_settings
 
 def main():
     """Run chatbot in terminal with test queries."""
@@ -18,7 +18,7 @@ def main():
     
     # Create chatbot instance
     settings = load_settings()
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     
     # Test queries
     test_queries = [

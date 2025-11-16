@@ -19,9 +19,9 @@ try:
 except ImportError:  # pragma: no cover
     psycopg2 = None  # type: ignore
 
-from benchmarkos_chatbot import database
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.data_sources import MarketQuote
+from finanlyzeos_chatbot import database
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.data_sources import MarketQuote
 
 DEFAULT_TICKERS = "MSFT,GE,AAPL,AMZN"
 MAX_RETRIES = 3

@@ -148,7 +148,7 @@ even in a competitive market.
 - **100% ChatGPT-style formatting** in responses
 
 ## Files Changed
-- `src/benchmarkos_chatbot/chatbot.py`
+- `src/finanlyzeos_chatbot/chatbot.py`
   - Updated question patterns in `_handle_financial_intent()` (line ~1698)
   - Updated question patterns in `ask()` method (line ~1570)
 

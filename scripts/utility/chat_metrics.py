@@ -6,10 +6,10 @@ import argparse
 import re
 from typing import Dict, List, Sequence
 
-from benchmarkos_chatbot import BenchmarkOSChatbot, AnalyticsEngine, load_settings
-from benchmarkos_chatbot.analytics_engine import METRIC_DEFINITIONS
-from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
-from benchmarkos_chatbot.database import MetricRecord
+from finanlyzeos_chatbot import FinanlyzeOSChatbot, AnalyticsEngine, load_settings
+from finanlyzeos_chatbot.analytics_engine import METRIC_DEFINITIONS
+from finanlyzeos_chatbot.data_ingestion import ingest_live_tickers
+from finanlyzeos_chatbot.database import MetricRecord
 
 # Metric formatting categories reused from the analytics summary.
 PERCENT_METRICS = {
@@ -59,14 +59,14 @@ def ingest_if_requested(tickers: Sequence[str], years: int) -> None:
     )
 
 
-def build_chatbot() -> tuple[BenchmarkOSChatbot, AnalyticsEngine]:
+def build_chatbot() -> tuple[FinanlyzeOSChatbot, AnalyticsEngine]:
     """Construct the chatbot and analytics engine backing the CLI session.
 
     Returns:
         Tuple ``(chatbot, engine)`` primed with refreshed metrics.
     """
     settings = load_settings()
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     engine = AnalyticsEngine(settings)
     engine.refresh_metrics(force=True)
     return bot, engine
@@ -98,7 +98,7 @@ def run_chatbot(tickers: Sequence[str], years: int) -> None:
         print(f"Bot: {response}\n")
 
 
-def dispatch_prompt(prompt: str, bot: BenchmarkOSChatbot, engine: AnalyticsEngine) -> str:
+def dispatch_prompt(prompt: str, bot: FinanlyzeOSChatbot, engine: AnalyticsEngine) -> str:
     """Route a user prompt to metrics, ingestion, scenario, or LLM handlers.
 
     Args:

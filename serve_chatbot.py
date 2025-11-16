@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> NoReturn:
     try:
         # Test import before starting server
         try:
-            from benchmarkos_chatbot.web import app
+            from finanlyzeos_chatbot.web import app
             print(f"✓ Successfully imported FastAPI app")
         except Exception as e:
             print(f"✗ Failed to import FastAPI app: {e}")
@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> NoReturn:
         print(f"📝 API docs available at http://{args.host}:{args.port}/docs")
         
         uvicorn.run(
-            "benchmarkos_chatbot.web:app",
+            "finanlyzeos_chatbot.web:app",
             host=args.host,
             port=args.port,
             reload=args.reload,

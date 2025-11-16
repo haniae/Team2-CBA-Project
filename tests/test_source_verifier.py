@@ -2,14 +2,14 @@
 
 import pytest
 from unittest.mock import Mock, patch
-from benchmarkos_chatbot.source_verifier import (
+from finanlyzeos_chatbot.source_verifier import (
     extract_cited_sources,
     verify_source_citation,
     verify_all_sources,
     SourceCitation,
     SourceIssue
 )
-from benchmarkos_chatbot.response_verifier import FinancialFact
+from finanlyzeos_chatbot.response_verifier import FinancialFact
 
 
 class TestExtractCitedSources:
@@ -90,10 +90,10 @@ class TestVerifySourceCitation:
             position=0
         )
     
-    @patch('benchmarkos_chatbot.source_verifier.database.fetch_financial_facts')
+    @patch('finanlyzeos_chatbot.source_verifier.database.fetch_financial_facts')
     def test_verify_valid_citation(self, mock_fetch, sample_citation, sample_fact):
         """Test verification of valid citation."""
-        from benchmarkos_chatbot.database import FinancialFactRecord
+        from finanlyzeos_chatbot.database import FinancialFactRecord
         from datetime import datetime
         
         # Mock filing record

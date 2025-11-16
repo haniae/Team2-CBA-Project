@@ -9,7 +9,7 @@
 ## Issues Found
 
 ### Critical Issue: Database Function Not Available
-- **Error:** `module 'benchmarkos_chatbot.database' has no attribute 'fetch_portfolio_holdings'`
+- **Error:** `module 'finanlyzeos_chatbot.database' has no attribute 'fetch_portfolio_holdings'`
 - **Impact:** Portfolio context cannot be built for queries with explicit portfolio IDs
 - **Affected Prompts:**
   - "Analyze portfolio port_a13acb30"

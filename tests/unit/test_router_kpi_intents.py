@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from benchmarkos_chatbot.parsing.parse import parse_to_structured
-from benchmarkos_chatbot.routing import EnhancedIntent, enhance_structured_parse
+from finanlyzeos_chatbot.parsing.parse import parse_to_structured
+from finanlyzeos_chatbot.routing import EnhancedIntent, enhance_structured_parse
 
 
 def test_router_compute_kpi_financial_year():

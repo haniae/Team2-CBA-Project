@@ -12,10 +12,10 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from benchmarkos_chatbot.context_builder import _build_ml_forecast_context
-from benchmarkos_chatbot.ml_forecasting.ml_forecaster import MLForecaster
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.settings import load_settings
+from finanlyzeos_chatbot.context_builder import _build_ml_forecast_context
+from finanlyzeos_chatbot.ml_forecasting.ml_forecaster import MLForecaster
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.settings import load_settings
 
 
 # Test data
@@ -40,7 +40,7 @@ class TestMLDetailedAnswers:
     @pytest.fixture(scope="class")
     def chatbot(self, settings):
         """Create chatbot instance."""
-        return BenchmarkOSChatbot.create(settings)
+        return FinanlyzeOSChatbot.create(settings)
     
     def test_arima_forecast_has_all_details(self, ml_forecaster):
         """Test that ARIMA forecast includes all required technical details."""

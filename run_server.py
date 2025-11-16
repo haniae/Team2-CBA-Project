@@ -23,7 +23,7 @@ if __name__ == "__main__":
     print()
     
     uvicorn.run(
-        "benchmarkos_chatbot.web:app",
+        "finanlyzeos_chatbot.web:app",
         host="0.0.0.0",
         port=8000,
         reload=False,

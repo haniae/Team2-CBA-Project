@@ -998,7 +998,7 @@ def build_cfi_dashboard_payload(
         "recommendation": recommendation,
         "target_price": price_target,
         "scenario": "Consensus",
-        "report_tag": "BenchmarkOS Equity Research",
+        "report_tag": "FinanlyzeOS Equity Research",
         "date": _date.today().isoformat(),
     }
 

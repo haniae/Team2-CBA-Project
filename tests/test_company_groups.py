@@ -3,12 +3,12 @@ Tests for company group detection (Phase 4.1).
 """
 
 import pytest
-from src.benchmarkos_chatbot.parsing.company_groups import (
+from src.finanlyzeos_chatbot.parsing.company_groups import (
     CompanyGroupDetector,
     GroupType,
     CompanyGroup,
 )
-from src.benchmarkos_chatbot.parsing.parse import parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestTechAcronymGroups:

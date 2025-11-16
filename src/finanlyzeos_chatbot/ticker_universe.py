@@ -1,4 +1,4 @@
-"""Predefined ticker universes used by the BenchmarkOS chatbot."""
+"""Predefined ticker universes used by the FinanlyzeOS chatbot."""
 
 from __future__ import annotations
 

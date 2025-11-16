@@ -14,9 +14,9 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.context_builder import _is_forecasting_query, _extract_forecast_metric, _extract_forecast_method
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.context_builder import _is_forecasting_query, _extract_forecast_metric, _extract_forecast_method
 
 # ALL POSSIBLE ML FORECASTING PROMPTS
 # Organized by category for comprehensive coverage
@@ -263,8 +263,8 @@ def test_prompt(prompt: str, index: int, total: int) -> Dict[str, Any]:
         
         # Test 2: Context Generation
         try:
-            from benchmarkos_chatbot.context_builder import build_financial_context
-            from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+            from finanlyzeos_chatbot.context_builder import build_financial_context
+            from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
             
             settings = load_settings()
             engine = AnalyticsEngine(settings)
@@ -287,7 +287,7 @@ def test_prompt(prompt: str, index: int, total: int) -> Dict[str, Any]:
         
         # Test 3: Chatbot Response
         settings = load_settings()
-        bot = BenchmarkOSChatbot.create(settings)
+        bot = FinanlyzeOSChatbot.create(settings)
         response = bot.ask(prompt)
         
         if response:

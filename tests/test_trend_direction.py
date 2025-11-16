@@ -13,13 +13,13 @@ Tests:
 """
 
 import pytest
-from src.benchmarkos_chatbot.parsing.trends import (
+from src.finanlyzeos_chatbot.parsing.trends import (
     TrendAnalyzer,
     TrendDirection,
     TrendVelocity,
     TrendIntent,
 )
-from src.benchmarkos_chatbot.parsing.parse import parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestPositiveTrends:

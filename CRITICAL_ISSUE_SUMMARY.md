@@ -139,10 +139,10 @@ else:
 
 ### Check if Data is Fetched:
 ```python
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
-from benchmarkos_chatbot.config import Settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.config import Settings
 
-settings = Settings(database_path="data/benchmarkos.db")
+settings = Settings(database_path="data/finanlyzeos.db")
 engine = AnalyticsEngine(settings)
 
 records = engine.fetch_metrics("AAPL", metrics=["revenue"])
@@ -153,12 +153,12 @@ for r in records:
 
 ### Check if Context is Built:
 ```python
-from benchmarkos_chatbot.context_builder import build_financial_context
+from finanlyzeos_chatbot.context_builder import build_financial_context
 
 context = build_financial_context(
     "What is Apple's revenue?",
     engine,
-    "data/benchmarkos.db"
+    "data/finanlyzeos.db"
 )
 print(f"Context length: {len(context)}")
 print(context[:1000])

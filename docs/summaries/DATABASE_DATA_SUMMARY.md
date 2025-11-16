@@ -139,7 +139,7 @@ The most common financial metrics in the database:
 
 **Primary Database:**
 ```
-data/sqlite/benchmarkos_chatbot.sqlite3
+data/sqlite/finanlyzeos_chatbot.sqlite3
 ```
 
 **Environment Variable Override:**

@@ -7,13 +7,13 @@
 | Component | Description | Main Functions | Key Files |
 |-----------|-------------|----------------|-----------|
 | **Frontend Layer** | User Interface | Web Dashboard, CLI, REST API | `webui/`, `run_chatbot.py`, `serve_chatbot.py` |
-| **Chat Orchestrator** | Conversation Management | Context management, validation, routing | `src/benchmarkos_chatbot/chatbot.py` |
-| **Intent Parser** | Intent Analysis | Natural language to command conversion | `src/benchmarkos_chatbot/parsing/` |
-| **Analytics Engine** | Financial Analytics | KPI calculations, scenario planning | `src/benchmarkos_chatbot/analytics_engine.py` |
-| **LLM Client** | AI Integration | OpenAI or local LLM integration | `src/benchmarkos_chatbot/llm_client.py` |
-| **Database Layer** | Data Storage | Financial data storage, caching | `src/benchmarkos_chatbot/database.py` |
+| **Chat Orchestrator** | Conversation Management | Context management, validation, routing | `src/finanlyzeos_chatbot/chatbot.py` |
+| **Intent Parser** | Intent Analysis | Natural language to command conversion | `src/finanlyzeos_chatbot/parsing/` |
+| **Analytics Engine** | Financial Analytics | KPI calculations, scenario planning | `src/finanlyzeos_chatbot/analytics_engine.py` |
+| **LLM Client** | AI Integration | OpenAI or local LLM integration | `src/finanlyzeos_chatbot/llm_client.py` |
+| **Database Layer** | Data Storage | Financial data storage, caching | `src/finanlyzeos_chatbot/database.py` |
 | **Data Ingestion** | Data Collection | Import from SEC, Yahoo Finance, Bloomberg | `scripts/ingestion/` |
-| **RAG System** | RAG Enhancement | Context enhancement with knowledge base | `src/benchmarkos_chatbot/` |
+| **RAG System** | RAG Enhancement | Context enhancement with knowledge base | `src/finanlyzeos_chatbot/` |
 
 ### Processing Workflow
 

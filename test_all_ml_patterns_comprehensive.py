@@ -14,8 +14,8 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
 
 # ALL POSSIBLE PROMPT PATTERNS - Comprehensive coverage
 PROMPT_PATTERNS = {
@@ -268,7 +268,7 @@ def check_response_quality(response: str, prompt: str) -> Dict:
         "issues": issues,
     }
 
-def test_prompt(bot: BenchmarkOSChatbot, prompt: str) -> Tuple[bool, Dict, str]:
+def test_prompt(bot: FinanlyzeOSChatbot, prompt: str) -> Tuple[bool, Dict, str]:
     """Test a single prompt."""
     try:
         response = bot.ask(prompt)
@@ -292,7 +292,7 @@ def main():
             existing_results = {r["prompt"]: r for r in existing_data.get("results", [])}
     
     settings = load_settings()
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     
     all_results = []
     category_results = {}

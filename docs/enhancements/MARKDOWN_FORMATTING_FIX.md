@@ -107,19 +107,19 @@ Key drivers:
 
 ### Files Modified:
 
-1. **`src/benchmarkos_chatbot/web.py`**
+1. **`src/finanlyzeos_chatbot/web.py`**
    - Added `@app.get("/")` - serves `index.html` with no-cache headers
    - Added `@app.get("/static/app.js")` - serves `app.js` with no-cache headers
    - Added `@app.get("/static/styles.css")` - serves `styles.css` with no-cache headers
 
-2. **`src/benchmarkos_chatbot/static/index.html`**
+2. **`src/finanlyzeos_chatbot/static/index.html`**
    - Updated cache-busting versions: `?v=20251026`
 
-3. **`src/benchmarkos_chatbot/static/app.js`**
+3. **`src/finanlyzeos_chatbot/static/app.js`**
    - Already has `renderMarkdown()` function (lines 190-265)
    - Already configured to render bot messages as HTML (line 178)
 
-4. **`src/benchmarkos_chatbot/static/styles.css`**
+4. **`src/finanlyzeos_chatbot/static/styles.css`**
    - Already has comprehensive markdown styling (lines 800-1000+)
 
 ### Why This Works:

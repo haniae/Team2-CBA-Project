@@ -308,7 +308,7 @@ innovation and strategic market positioning.
 
 ## Files Changed
 
-### `src/benchmarkos_chatbot/chatbot.py`
+### `src/finanlyzeos_chatbot/chatbot.py`
 **Lines ~540-657:** Complete SYSTEM_PROMPT rewrite
 
 **Key Changes:**
@@ -328,8 +328,8 @@ innovation and strategic market positioning.
 ```bash
 # Test with your exact query
 python -c "
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
+from finanlyzeos_chatbot.chatbot import BenchmarkOSChatbot
+from finanlyzeos_chatbot.config import load_settings
 
 chatbot = BenchmarkOSChatbot.create(load_settings())
 response = chatbot.ask('How has Apple\\'s revenue changed over time?')
@@ -342,7 +342,7 @@ print(f'Link Count: {response.count(\"]](\")}')
 "
 
 # Or use the CLI
-python -m benchmarkos_chatbot.cli chat
+python -m finanlyzeos_chatbot.cli chat
 ```
 
 ### Try These Queries:

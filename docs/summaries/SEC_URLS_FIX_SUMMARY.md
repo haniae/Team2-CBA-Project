@@ -133,7 +133,7 @@ Tests all SP500 companies and generates a comprehensive report showing:
 
 ## Files Modified
 
-1. `src/benchmarkos_chatbot/dashboard_utils.py`
+1. `src/finanlyzeos_chatbot/dashboard_utils.py`
    - Enhanced `_collect_sources()` function
    - Added fiscal year fallback logic
    - Standardized SEC URL formats

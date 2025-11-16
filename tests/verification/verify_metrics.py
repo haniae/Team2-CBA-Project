@@ -3,7 +3,7 @@
 import sqlite3
 from pathlib import Path
 
-db_path = Path("data/sqlite/benchmarkos_chatbot.sqlite3")
+db_path = Path("data/sqlite/finanlyzeos_chatbot.sqlite3")
 conn = sqlite3.connect(db_path)
 
 print("="*60)

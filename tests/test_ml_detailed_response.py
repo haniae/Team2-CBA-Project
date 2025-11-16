@@ -12,10 +12,10 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='repla
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.context_builder import build_financial_context, _is_forecasting_query
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.context_builder import build_financial_context, _is_forecasting_query
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 import logging
 
 # Set up logging
@@ -92,13 +92,13 @@ def test_message_preparation():
     print("="*80)
     
     settings = load_settings()
-    chatbot = BenchmarkOSChatbot.create(settings)
+    chatbot = FinanlyzeOSChatbot.create(settings)
     
     query = "Forecast Apple's revenue using LSTM"
     chatbot.conversation.messages.append({"role": "user", "content": query})
     
     # Build context
-    from benchmarkos_chatbot.context_builder import build_financial_context
+    from finanlyzeos_chatbot.context_builder import build_financial_context
     context = build_financial_context(
         query=query,
         analytics_engine=chatbot.analytics_engine,
@@ -144,7 +144,7 @@ def test_full_response():
     print("="*80)
     
     settings = load_settings()
-    chatbot = BenchmarkOSChatbot.create(settings)
+    chatbot = FinanlyzeOSChatbot.create(settings)
     
     query = "Forecast Apple's revenue using LSTM"
     
@@ -224,7 +224,7 @@ def test_verifier():
     print("="*80)
     
     try:
-        from benchmarkos_chatbot.ml_response_verifier import verify_ml_forecast_response
+        from finanlyzeos_chatbot.ml_response_verifier import verify_ml_forecast_response
         
         # Create a mock response that's missing details
         mock_response = """

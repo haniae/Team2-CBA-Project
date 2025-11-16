@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot import database, load_settings
+from finanlyzeos_chatbot import database, load_settings
 
 def monitor():
     settings = load_settings()

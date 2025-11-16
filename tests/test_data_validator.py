@@ -2,13 +2,13 @@
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch
-from benchmarkos_chatbot.data_validator import (
+from finanlyzeos_chatbot.data_validator import (
     cross_validate_metric,
     validate_context_data,
     ValidationResult,
     DataIssue
 )
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 
 
 class TestCrossValidateMetric:
@@ -22,7 +22,7 @@ class TestCrossValidateMetric:
     
     def test_cross_validate_consistent_data(self, mock_analytics_engine):
         """Test cross-validation with consistent data."""
-        from benchmarkos_chatbot.database import MetricRecord
+        from finanlyzeos_chatbot.database import MetricRecord
         from datetime import datetime
         
         # Mock SEC value
@@ -69,7 +69,7 @@ class TestCrossValidateMetric:
     
     def test_cross_validate_discrepancy(self, mock_analytics_engine):
         """Test cross-validation with data discrepancy."""
-        from benchmarkos_chatbot.database import MetricRecord
+        from finanlyzeos_chatbot.database import MetricRecord
         from datetime import datetime
         
         # Mock SEC value
@@ -113,7 +113,7 @@ class TestValidateContextData:
         """Test validation of context with financial data."""
         context = "AAPL revenue: $394.3B (FY2024)"
         
-        from benchmarkos_chatbot.database import MetricRecord
+        from finanlyzeos_chatbot.database import MetricRecord
         from datetime import datetime
         
         mock_record = MetricRecord(

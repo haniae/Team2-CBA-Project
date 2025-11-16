@@ -101,7 +101,7 @@ Team2-CBA-Project/
 │   └── utility/ (14 utility scripts)
 │
 ├── 💻 src/
-│   └── benchmarkos_chatbot/ (37 source files)
+│   └── finanlyzeos_chatbot/ (37 source files)
 │
 ├── 🧪 tests/
 │   ├── regression/ (5 regression tests)

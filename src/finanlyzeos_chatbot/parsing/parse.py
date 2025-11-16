@@ -1,4 +1,4 @@
-"""Natural-language parsing utilities for the BenchmarkOS chatbot."""
+"""Natural-language parsing utilities for the FinanlyzeOS chatbot."""
 
 from __future__ import annotations
 

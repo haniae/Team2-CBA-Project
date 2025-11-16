@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from benchmarkos_chatbot import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
-from benchmarkos_chatbot.data_sources import QuoteLoader
+from finanlyzeos_chatbot import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.data_sources import QuoteLoader
 
 
 def main() -> None:

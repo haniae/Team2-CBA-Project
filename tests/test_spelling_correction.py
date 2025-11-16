@@ -12,15 +12,15 @@ Tests:
 """
 
 import pytest
-from src.benchmarkos_chatbot.spelling import (
+from src.finanlyzeos_chatbot.spelling import (
     SpellingCorrectionEngine,
     CorrectionResult,
     FuzzyMatcher,
     calculate_similarity,
 )
-from src.benchmarkos_chatbot.spelling.company_corrector import CompanyCorrector
-from src.benchmarkos_chatbot.spelling.metric_corrector import MetricCorrector
-from src.benchmarkos_chatbot.spelling.fuzzy_matcher import (
+from src.finanlyzeos_chatbot.spelling.company_corrector import CompanyCorrector
+from src.finanlyzeos_chatbot.spelling.metric_corrector import MetricCorrector
+from src.finanlyzeos_chatbot.spelling.fuzzy_matcher import (
     levenshtein_distance,
     soundex,
     TypoPatternMatcher,

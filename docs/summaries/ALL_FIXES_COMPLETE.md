@@ -180,7 +180,7 @@ innovation and strategic market positioning.
 
 ### Changes Made
 
-#### 1. SYSTEM_PROMPT Enhancement (`src/benchmarkos_chatbot/chatbot.py`)
+#### 1. SYSTEM_PROMPT Enhancement (`src/finanlyzeos_chatbot/chatbot.py`)
 
 **Added Mandatory Requirements Section:**
 ```python
@@ -271,7 +271,7 @@ The chatbot now provides:
 ### Test Queries:
 ```bash
 # Use the CLI
-python -m benchmarkos_chatbot.cli chat
+python -m finanlyzeos_chatbot.cli chat
 
 # Then try:
 > How has Apple's revenue changed over time?

@@ -10,7 +10,7 @@ from typing import Iterable, List
 
 import requests
 
-from benchmarkos_chatbot import database, load_settings
+from finanlyzeos_chatbot import database, load_settings
 
 SEC_TICKER_LIST = "https://www.sec.gov/files/company_tickers.json"
 

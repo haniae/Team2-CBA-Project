@@ -6,7 +6,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from benchmarkos_chatbot.parsing.time_grammar import parse_periods
+from finanlyzeos_chatbot.parsing.time_grammar import parse_periods
 
 def test_natural_language_time_periods():
     """Test that natural language time expressions are correctly parsed."""

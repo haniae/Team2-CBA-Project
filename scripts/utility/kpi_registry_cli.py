@@ -18,10 +18,10 @@ try:  # pragma: no cover - optional dependency
 except ImportError:  # pragma: no cover
     yaml = None
 
-from benchmarkos_chatbot import load_settings
-from benchmarkos_chatbot.custom_kpis import CustomKPICalculator
-from benchmarkos_chatbot.template_processor import TemplateProcessor
-from benchmarkos_chatbot.analytics_workspace import DataSourcePreferencesManager
+from finanlyzeos_chatbot import load_settings
+from finanlyzeos_chatbot.custom_kpis import CustomKPICalculator
+from finanlyzeos_chatbot.template_processor import TemplateProcessor
+from finanlyzeos_chatbot.analytics_workspace import DataSourcePreferencesManager
 
 
 def _default_database_path() -> Path:

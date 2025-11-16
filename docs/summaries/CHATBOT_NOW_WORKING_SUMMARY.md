@@ -21,7 +21,7 @@ But **missed** questions like:
 - ❌ "How **will** they perform?"
 
 ## The Fix ✅
-Updated question patterns in `src/benchmarkos_chatbot/chatbot.py`:
+Updated question patterns in `src/finanlyzeos_chatbot/chatbot.py`:
 
 ```python
 # OLD (incomplete)
@@ -184,15 +184,15 @@ Verify the fix yourself:
 ```bash
 # Test question detection patterns
 python -c "
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
+from finanlyzeos_chatbot.chatbot import BenchmarkOSChatbot
+from finanlyzeos_chatbot.config import load_settings
 
 chatbot = BenchmarkOSChatbot.create(load_settings())
 print(chatbot.ask('How has Apple\\'s revenue changed over time?'))
 "
 
 # Or use the CLI
-python -m benchmarkos_chatbot.cli chat
+python -m finanlyzeos_chatbot.cli chat
 
 # Then try these:
 # > How has Microsoft's revenue grown?

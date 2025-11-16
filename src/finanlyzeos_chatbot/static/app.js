@@ -4,9 +4,9 @@
 console.log("🚀🚀🚀 [Upload] SCRIPT LOADED - FILE UPLOAD CODE IS RUNNING! 🚀🚀🚀");
 
 const API_BASE = window.API_BASE || "";
-const STORAGE_KEY = "benchmarkos.chatHistory.v2";
-const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
-const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
+const STORAGE_KEY = "finanlyzeos.chatHistory.v2";
+const LEGACY_STORAGE_KEYS = ["finanlyzeos.chatHistory.v1"];
+const ACTIVE_CONVERSATION_KEY = "finanlyzeos.activeConversationId";
 const CHAT_FILE_INPUT_ID = "chat-file-upload";
 const CHAT_FILE_BUTTON_ID = "chat-file-upload-btn";
 const LEGACY_BUTTON_ID = "upload-button";
@@ -413,7 +413,7 @@ const FOLLOW_UP_SUGGESTION_LIBRARY = {
   KPI: "List the KPI definitions and calculation lineage referenced in this analysis."
 };
 const MAX_PROMPT_SUGGESTIONS = 5;
-const ALERT_PREFS_KEY = "benchmarkos.alertPreferences";
+const ALERT_PREFS_KEY = "finanlyzeos.alertPreferences";
 const DEFAULT_ALERT_PREFERENCES = {
   digest: "immediate",
   quietHours: {
@@ -636,7 +636,7 @@ let companyUniverseMetaCoverage = null;
 
 const KPI_LIBRARY_PATH = "/static/data/kpi_library.json";
 const COMPANY_UNIVERSE_PATH = "/static/data/company_universe.json";
-const SETTINGS_STORAGE_KEY = "benchmarkos.userSettings.v1";
+const SETTINGS_STORAGE_KEY = "finanlyzeos.userSettings.v1";
 let kpiLibraryCache = null;
 let kpiLibraryLoadPromise = null;
 let companyUniversePromise = null;
@@ -2221,9 +2221,9 @@ function buildKpiLibraryHero(data) {
 // ============================================
 console.log("🚀🚀🚀 [Upload] SCRIPT LOADED - FILE UPLOAD CODE IS RUNNING! 🚀🚀🚀");
 const API_BASE = window.API_BASE || "";
-const STORAGE_KEY = "benchmarkos.chatHistory.v2";
-const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
-const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
+const STORAGE_KEY = "finanlyzeos.chatHistory.v2";
+const LEGACY_STORAGE_KEYS = ["finanlyzeos.chatHistory.v1"];
+const ACTIVE_CONVERSATION_KEY = "finanlyzeos.activeConversationId";
 
 // Initialize file upload handler immediately - run at top level
 (function initFileUploadImmediate() {
@@ -2574,7 +2574,7 @@ const FOLLOW_UP_SUGGESTION_LIBRARY = {
   KPI: "List the KPI definitions and calculation lineage referenced in this analysis."
 };
 const MAX_PROMPT_SUGGESTIONS = 5;
-const ALERT_PREFS_KEY = "benchmarkos.alertPreferences";
+const ALERT_PREFS_KEY = "finanlyzeos.alertPreferences";
 const DEFAULT_ALERT_PREFERENCES = {
   digest: "immediate",
   quietHours: {
@@ -2797,7 +2797,7 @@ let companyUniverseMetaCoverage = null;
 
 const KPI_LIBRARY_PATH = "/static/data/kpi_library.json";
 const COMPANY_UNIVERSE_PATH = "/static/data/company_universe.json";
-const SETTINGS_STORAGE_KEY = "benchmarkos.userSettings.v1";
+const SETTINGS_STORAGE_KEY = "finanlyzeos.userSettings.v1";
 let kpiLibraryCache = null;
 let kpiLibraryLoadPromise = null;
 let companyUniversePromise = null;

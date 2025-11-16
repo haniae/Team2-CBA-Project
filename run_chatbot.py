@@ -74,7 +74,7 @@ def start_chatbot():
     
     try:
         # Import and start the chatbot
-        from benchmarkos_chatbot.web import app
+        from finanlyzeos_chatbot.web import app
         
         import uvicorn
         

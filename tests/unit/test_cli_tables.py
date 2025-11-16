@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from benchmarkos_chatbot import database
+from finanlyzeos_chatbot import database
 from main import _try_table_command
 
 

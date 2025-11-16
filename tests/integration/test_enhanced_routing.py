@@ -1,13 +1,13 @@
 """Tests for enhanced routing system."""
 
 import pytest
-from benchmarkos_chatbot.routing import (
+from finanlyzeos_chatbot.routing import (
     enhance_structured_parse,
     should_build_dashboard,
     EnhancedIntent,
     EnhancedRouting,
 )
-from benchmarkos_chatbot.parsing.parse import parse_to_structured
+from finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestEnhancedRouting:

@@ -8,7 +8,7 @@
 
 ```bash
 # 1. Start server
-python -m benchmarkos_chatbot.web
+python -m finanlyzeos_chatbot.web
 
 # 2. Open browser → http://localhost:8000
 
@@ -291,19 +291,19 @@ Time Savings: 98.75% (40 min → 30 sec)
 
 ### **Core Implementation:**
 ```
-✅ src/benchmarkos_chatbot/chatbot.py (+1,300 lines)
+✅ src/finanlyzeos_chatbot/chatbot.py (+1,300 lines)
    - Follow-up detection (15+ patterns)
    - Scenario parsing (10 parameter types)
    - Context builders (7 specialized)
    - Conversation state management
    - Database integration
 
-✅ src/benchmarkos_chatbot/database.py (+170 lines)
+✅ src/finanlyzeos_chatbot/database.py (+170 lines)
    - ml_forecasts table schema
    - save/load/list functions
    - Transaction management
 
-✅ src/benchmarkos_chatbot/context_builder.py (+90 lines)
+✅ src/finanlyzeos_chatbot/context_builder.py (+90 lines)
    - Explainability extraction
    - Forecast metadata storage
 ```
@@ -423,7 +423,7 @@ Status: READY FOR DEPLOYMENT
 # (Follow steps in QUICK_TEST_GUIDE.md)
 
 # Check database
-sqlite3 data/benchmarkos.db "SELECT * FROM ml_forecasts LIMIT 5;"
+sqlite3 data/finanlyzeos.db "SELECT * FROM ml_forecasts LIMIT 5;"
 
 # View logs
 tail -f logs/app.log | grep -E "(INFO|WARNING|ERROR)"

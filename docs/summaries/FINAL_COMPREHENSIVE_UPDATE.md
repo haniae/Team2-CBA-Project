@@ -214,19 +214,19 @@ by its 24.3% profit margin and 30% operating margin.
 
 ### Files Modified:
 
-1. **`src/benchmarkos_chatbot/multi_source_aggregator.py`**
+1. **`src/finanlyzeos_chatbot/multi_source_aggregator.py`**
    - Added 50+ Yahoo Finance data points
    - Expanded FRED from 7 to 27 indicators
    - Enhanced formatting functions
    - ~200 lines added
 
-2. **`src/benchmarkos_chatbot/chatbot.py`**
+2. **`src/finanlyzeos_chatbot/chatbot.py`**
    - Updated SYSTEM_PROMPT with multi-source instructions
    - Added "MULTI-SOURCE DATA INTEGRATION" section
    - Provided examples of integration
    - ~50 lines added
 
-3. **`src/benchmarkos_chatbot/context_builder.py`**
+3. **`src/finanlyzeos_chatbot/context_builder.py`**
    - Already calls `get_multi_source_context()`
    - Integrates Yahoo Finance + FRED + SEC data
    - No changes needed (already compatible)

@@ -10,13 +10,13 @@ from datetime import datetime
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.analytics_engine import (
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.analytics_engine import (
     AnalyticsEngine, BASE_METRICS, DERIVED_METRICS,
     AGGREGATE_METRICS, SUPPLEMENTAL_METRICS, CURRENCY_METRICS,
     PERCENTAGE_METRICS, MULTIPLE_METRICS
 )
-from benchmarkos_chatbot.response_verifier import _identify_metric_from_context
+from finanlyzeos_chatbot.response_verifier import _identify_metric_from_context
 
 print("="*80)
 print("STRESS TEST 2: ALL-METRICS VERIFICATION (68 METRICS)")

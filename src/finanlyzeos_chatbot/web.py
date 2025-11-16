@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import AnalyticsEngine, BenchmarkOSChatbot, database, load_settings
+from . import AnalyticsEngine, FinanlyzeOSChatbot, database, load_settings
 from .custom_kpis import CustomKPICalculator
 from .analytics_workspace import DataSourcePreferencesManager
 from .source_tracer import SourceTracer
@@ -692,10 +692,10 @@ def get_database() -> Path:
     return get_settings().database_path
 
 
-def build_bot(conversation_id: Optional[str] = None) -> BenchmarkOSChatbot:
+def build_bot(conversation_id: Optional[str] = None) -> FinanlyzeOSChatbot:
     """Create a chatbot instance and hydrate it with stored history when provided."""
     settings = get_settings()
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     if conversation_id:
         history = list(
             database.fetch_conversation(settings.database_path, conversation_id)

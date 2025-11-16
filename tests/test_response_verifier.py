@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch
-from benchmarkos_chatbot.response_verifier import (
+from finanlyzeos_chatbot.response_verifier import (
     extract_financial_numbers,
     verify_fact,
     verify_response,
@@ -10,8 +10,8 @@ from benchmarkos_chatbot.response_verifier import (
     VerificationResult,
     VerifiedResponse
 )
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
-from benchmarkos_chatbot.config import Settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.config import Settings
 
 
 class TestExtractFinancialNumbers:
@@ -103,7 +103,7 @@ class TestVerifyFact:
     def test_verify_correct_fact(self, mock_analytics_engine, sample_fact):
         """Test verification of correct fact."""
         # Mock metric record
-        from benchmarkos_chatbot.database import MetricRecord
+        from finanlyzeos_chatbot.database import MetricRecord
         from datetime import datetime
         
         mock_record = MetricRecord(
@@ -131,7 +131,7 @@ class TestVerifyFact:
     
     def test_verify_incorrect_fact(self, mock_analytics_engine, sample_fact):
         """Test verification of incorrect fact."""
-        from benchmarkos_chatbot.database import MetricRecord
+        from finanlyzeos_chatbot.database import MetricRecord
         from datetime import datetime
         
         # Actual value is different
@@ -210,7 +210,7 @@ class TestVerifyResponse:
         user_input = "What is Apple's revenue?"
         
         # Mock metrics
-        from benchmarkos_chatbot.database import MetricRecord
+        from finanlyzeos_chatbot.database import MetricRecord
         from datetime import datetime
         
         mock_records = [

@@ -6,8 +6,8 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
 
 # Test a few key prompts
 TEST_PROMPTS = [
@@ -28,7 +28,7 @@ def main():
     print("=" * 80)
     
     settings = load_settings()
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     
     for prompt in TEST_PROMPTS:
         print(f"\n{'='*80}")

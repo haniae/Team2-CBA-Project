@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from benchmarkos_chatbot import web
+from finanlyzeos_chatbot import web
 
 
 def main() -> None:

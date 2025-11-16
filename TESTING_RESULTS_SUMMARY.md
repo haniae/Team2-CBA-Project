@@ -72,7 +72,7 @@ Growth rate query failed:
 
 ### **2. Database Connection (✅ FIXED)**  
 - **Before**: Tests failed with "no such table" error
-- **After**: Correctly connects to `data/sqlite/benchmarkos_chatbot.sqlite3`
+- **After**: Correctly connects to `data/sqlite/finanlyzeos_chatbot.sqlite3`
 - **Impact**: All 439 records for AAPL now accessible
 
 ### **3. Missing Method Error (✅ FIXED)**

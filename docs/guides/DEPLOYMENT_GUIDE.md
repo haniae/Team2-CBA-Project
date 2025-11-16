@@ -126,7 +126,7 @@ pip list
 
 ```bash
 # Run quick test
-python -c "from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot; print('✅ Import successful')"
+python -c "from finanlyzeos_chatbot.chatbot import BenchmarkOSChatbot; print('✅ Import successful')"
 
 # Run full test suite (optional but recommended)
 pytest tests/ -v
@@ -151,7 +151,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4  # or gpt-3.5-turbo
 
 # Database Configuration
-DATABASE_URL=postgresql://user:password@localhost:5432/benchmarkos
+DATABASE_URL=postgresql://user:password@localhost:5432/finanlyzeos
 
 # Server Configuration
 HOST=0.0.0.0
@@ -160,7 +160,7 @@ WORKERS=4
 
 # Logging Configuration
 LOG_LEVEL=INFO
-LOG_FILE=/var/log/benchmarkos/chatbot.log
+LOG_FILE=/var/log/finanlyzeos/chatbot.log
 
 # Feature Flags
 ENABLE_SPELLING_CORRECTION=true
@@ -329,11 +329,11 @@ python3 serve_chatbot.py --host 0.0.0.0 --port 8000
 nohup python3 serve_chatbot.py --host 0.0.0.0 --port 8000 > chatbot.log 2>&1 &
 
 # Using systemd (recommended)
-sudo systemctl start benchmarkos-chatbot
-sudo systemctl enable benchmarkos-chatbot  # Auto-start on boot
+sudo systemctl start finanlyzeos-chatbot
+sudo systemctl enable finanlyzeos-chatbot  # Auto-start on boot
 ```
 
-**systemd Service File** (`/etc/systemd/system/benchmarkos-chatbot.service`):
+**systemd Service File** (`/etc/systemd/system/finanlyzeos-chatbot.service`):
 
 ```ini
 [Unit]
@@ -426,20 +426,20 @@ services:
 
 ```bash
 # Build image
-docker build -t benchmarkos-chatbot:latest .
+docker build -t finanlyzeos-chatbot:latest .
 
 # Run container
 docker run -d \
   -p 8000:8000 \
   -e OPENAI_API_KEY=$OPENAI_API_KEY \
-  --name benchmarkos-chatbot \
-  benchmarkos-chatbot:latest
+  --name finanlyzeos-chatbot \
+  finanlyzeos-chatbot:latest
 
 # Or use docker-compose
 docker-compose up -d
 
 # Check logs
-docker logs -f benchmarkos-chatbot
+docker logs -f finanlyzeos-chatbot
 
 # Stop
 docker-compose down
@@ -452,8 +452,8 @@ docker-compose down
 ```bash
 # 1. Push to ECR
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
-docker tag benchmarkos-chatbot:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/benchmarkos-chatbot:latest
-docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/benchmarkos-chatbot:latest
+docker tag finanlyzeos-chatbot:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/finanlyzeos-chatbot:latest
+docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/finanlyzeos-chatbot:latest
 
 # 2. Deploy to ECS
 aws ecs update-service --cluster chatbot-cluster --service chatbot-service --force-new-deployment
@@ -463,11 +463,11 @@ aws ecs update-service --cluster chatbot-cluster --service chatbot-service --for
 
 ```bash
 # 1. Build and push
-gcloud builds submit --tag gcr.io/your-project/benchmarkos-chatbot
+gcloud builds submit --tag gcr.io/your-project/finanlyzeos-chatbot
 
 # 2. Deploy
-gcloud run deploy benchmarkos-chatbot \
-  --image gcr.io/your-project/benchmarkos-chatbot \
+gcloud run deploy finanlyzeos-chatbot \
+  --image gcr.io/your-project/finanlyzeos-chatbot \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
@@ -478,14 +478,14 @@ gcloud run deploy benchmarkos-chatbot \
 
 ```bash
 # 1. Push to ACR
-az acr build --registry myregistry --image benchmarkos-chatbot:latest .
+az acr build --registry myregistry --image finanlyzeos-chatbot:latest .
 
 # 2. Deploy
 az container create \
   --resource-group myResourceGroup \
-  --name benchmarkos-chatbot \
-  --image myregistry.azurecr.io/benchmarkos-chatbot:latest \
-  --dns-name-label benchmarkos-chatbot \
+  --name finanlyzeos-chatbot \
+  --image myregistry.azurecr.io/finanlyzeos-chatbot:latest \
+  --dns-name-label finanlyzeos-chatbot \
   --ports 8000
 ```
 
@@ -661,7 +661,7 @@ for stat in top_stats[:10]:
 **Step 1: Stop New Version**
 ```bash
 # systemd
-sudo systemctl stop benchmarkos-chatbot
+sudo systemctl stop finanlyzeos-chatbot
 
 # Docker
 docker-compose down
@@ -677,7 +677,7 @@ git checkout <previous-commit-hash>
 git checkout tags/v0.9.0  # Or previous tag
 
 # Docker
-docker run -d -p 8000:8000 benchmarkos-chatbot:v0.9.0
+docker run -d -p 8000:8000 finanlyzeos-chatbot:v0.9.0
 ```
 
 **Step 3: Verify Rollback**
@@ -688,7 +688,7 @@ curl -X POST http://localhost:8000/chat \
   -d '{"query": "What is Apple revenue?"}'
 
 # Check logs
-tail -f /var/log/benchmarkos/chatbot.log
+tail -f /var/log/finanlyzeos/chatbot.log
 ```
 
 **Step 4: Notify Stakeholders**
@@ -738,7 +738,7 @@ Update:
 
 ### Getting Help
 
-1. **Check Logs**: `/var/log/benchmarkos/chatbot.log`
+1. **Check Logs**: `/var/log/finanlyzeos/chatbot.log`
 2. **Review Documentation**: `docs/`
 3. **Run Tests**: `pytest tests/ -v`
 4. **Contact Team**: your-team@example.com
@@ -747,14 +747,14 @@ Update:
 
 ```bash
 # Check service status
-sudo systemctl status benchmarkos-chatbot
+sudo systemctl status finanlyzeos-chatbot
 
 # View logs
-tail -f /var/log/benchmarkos/chatbot.log
-docker logs -f benchmarkos-chatbot
+tail -f /var/log/finanlyzeos/chatbot.log
+docker logs -f finanlyzeos-chatbot
 
 # Restart service
-sudo systemctl restart benchmarkos-chatbot
+sudo systemctl restart finanlyzeos-chatbot
 docker-compose restart
 
 # Check resource usage

@@ -1,4 +1,4 @@
-"""External data source clients for BenchmarkOS ingestion."""
+"""External data source clients for FinanlyzeOS ingestion."""
 
 from __future__ import annotations
 

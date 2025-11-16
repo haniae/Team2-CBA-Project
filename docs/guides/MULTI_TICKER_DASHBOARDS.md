@@ -8,7 +8,7 @@ This feature allows users to request dashboards for multiple companies and recei
 
 ## Implementation Details
 
-### 1. Backend (`src/benchmarkos_chatbot/chatbot.py`)
+### 1. Backend (`src/finanlyzeos_chatbot/chatbot.py`)
 
 **Location**: Lines 3026-3048
 
@@ -208,10 +208,10 @@ Potential improvements:
 
 ## Related Files
 
-- `src/benchmarkos_chatbot/chatbot.py` - Dashboard building logic
+- `src/finanlyzeos_chatbot/chatbot.py` - Dashboard building logic
 - `webui/app.js` - Frontend rendering
 - `webui/styles.css` - Visual styling
-- `src/benchmarkos_chatbot/dashboard_utils.py` - Dashboard payload builders
+- `src/finanlyzeos_chatbot/dashboard_utils.py` - Dashboard payload builders
 - `webui/cfi_dashboard.html` - Single-company dashboard template
 - `webui/cfi_dashboard.js` - Dashboard rendering functions
 

@@ -546,7 +546,7 @@ def add_footer(slide, page_num: int, total_pages: int = 12):
     footer_box = slide.shapes.add_textbox(Inches(0.5), Inches(7.0), Inches(9.0), Inches(0.3))
     tf = footer_box.text_frame
     p = tf.paragraphs[0]
-    p.text = f"Prepared by Team 2 | BenchmarkOS Intelligence Platform | Page {page_num} of {total_pages}"
+    p.text = f"Prepared by Team 2 | FinanlyzeOS Intelligence Platform | Page {page_num} of {total_pages}"
     p.font.size = Pt(9)
     p.font.color.rgb = GREY_LIGHT
     p.alignment = PP_ALIGN.CENTER
@@ -663,7 +663,7 @@ def build_cfi_ppt(payload: Dict[str, Any]) -> bytes:
     brand_box = slide1.shapes.add_textbox(Inches(1), Inches(6.8), Inches(8), Inches(0.4))
     tf3 = brand_box.text_frame
     p3 = tf3.paragraphs[0]
-    p3.text = "Prepared by Team 2 | BenchmarkOS Intelligence Platform"
+    p3.text = "Prepared by Team 2 | FinanlyzeOS Intelligence Platform"
     p3.font.size = Pt(11)
     p3.font.color.rgb = GREY_LIGHT
     p3.alignment = PP_ALIGN.CENTER
@@ -1429,7 +1429,7 @@ def build_cfi_ppt(payload: Dict[str, Any]) -> bytes:
             ("SEC EDGAR Company Filings", "https://www.sec.gov/edgar/searchedgar/companysearch.html"),
             ("SEC Financial Statement & Notes Datasets", "https://www.sec.gov/dera/data/financial-statement-and-notes-data-sets.html"),
             ("Yahoo Finance Market Data", "https://finance.yahoo.com"),
-            ("BenchmarkOS GitHub Repository", "https://github.com/haniae/Team2-CBA-Project"),
+            ("FinanlyzeOS GitHub Repository", "https://github.com/haniae/Team2-CBA-Project"),
         ]
         
         for idx, (label, url) in enumerate(default_sources):
@@ -1463,7 +1463,7 @@ def build_cfi_ppt(payload: Dict[str, Any]) -> bytes:
     footer_p.font.size = Pt(8)
     footer_p = stf.add_paragraph()
     footer_run = footer_p.add_run()
-    footer_run.text = f"\nAnalysis Date: {as_of} | Prepared by: Team 2 | BenchmarkOS Intelligence Platform"
+    footer_run.text = f"\nAnalysis Date: {as_of} | Prepared by: Team 2 | FinanlyzeOS Intelligence Platform"
     footer_run.font.size = Pt(9)
     footer_run.font.color.rgb = GREY_LIGHT
     footer_run.font.italic = True

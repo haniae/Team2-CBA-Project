@@ -379,14 +379,14 @@ FRED_TIMEOUT=10
 ```bash
 # Test Yahoo Finance data
 python -c "
-from benchmarkos_chatbot.multi_source_aggregator import get_multi_source_context
+from finanlyzeos_chatbot.multi_source_aggregator import get_multi_source_context
 print(get_multi_source_context('AAPL', include_yahoo=True))
 "
 
 # Test with FRED (requires API key)
 export FRED_API_KEY=your_key
 python -c "
-from benchmarkos_chatbot.multi_source_aggregator import get_multi_source_context
+from finanlyzeos_chatbot.multi_source_aggregator import get_multi_source_context
 print(get_multi_source_context('AAPL', include_yahoo=True, include_fred=True))
 "
 ```
@@ -394,7 +394,7 @@ print(get_multi_source_context('AAPL', include_yahoo=True, include_fred=True))
 ### Test Full Chatbot
 
 ```bash
-python -m benchmarkos_chatbot.cli chat
+python -m finanlyzeos_chatbot.cli chat
 ```
 
 **Try these queries:**
@@ -455,10 +455,10 @@ Potential additions:
 
 ## Related Files
 
-- `src/benchmarkos_chatbot/multi_source_aggregator.py` - Multi-source fetcher
-- `src/benchmarkos_chatbot/context_builder.py` - Context integration
-- `src/benchmarkos_chatbot/external_data.py` - Existing Yahoo integration
-- `src/benchmarkos_chatbot/imf_proxy.py` - Existing IMF integration
+- `src/finanlyzeos_chatbot/multi_source_aggregator.py` - Multi-source fetcher
+- `src/finanlyzeos_chatbot/context_builder.py` - Context integration
+- `src/finanlyzeos_chatbot/external_data.py` - Existing Yahoo integration
+- `src/finanlyzeos_chatbot/imf_proxy.py` - Existing IMF integration
 - `requirements.txt` - Package dependencies
 
 ## Support

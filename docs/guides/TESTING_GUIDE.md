@@ -9,7 +9,7 @@
 ## ✅ **What's PROVEN WORKING (Just Tested)**
 
 ```bash
-$ python3 src/benchmarkos_chatbot/custom_kpi_builder.py
+$ python3 src/finanlyzeos_chatbot/custom_kpi_builder.py
 
 ✅ Created: Efficiency Score
    Formula: (ROE + ROIC) / 2
@@ -41,7 +41,7 @@ $ python3 src/benchmarkos_chatbot/custom_kpi_builder.py
 ```bash
 # Test 1: Custom KPI Builder
 cd /home/malcolm-munoriyarwa/projects/Team2-CBA-Project
-PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py
+PYTHONPATH=src python3 src/finanlyzeos_chatbot/custom_kpi_builder.py
 
 # Expected output:
 # ✅ Created: Efficiency Score
@@ -49,9 +49,9 @@ PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py
 # ✅ Validation working
 
 # Test 2: Check code has zero linter errors
-python3 -m py_compile src/benchmarkos_chatbot/chatbot.py
-python3 -m py_compile src/benchmarkos_chatbot/custom_kpi_builder.py
-python3 -m py_compile src/benchmarkos_chatbot/database.py
+python3 -m py_compile src/finanlyzeos_chatbot/chatbot.py
+python3 -m py_compile src/finanlyzeos_chatbot/custom_kpi_builder.py
+python3 -m py_compile src/finanlyzeos_chatbot/database.py
 
 # Expected: No output = No errors ✅
 ```
@@ -74,7 +74,7 @@ pip3 install yfinance --user  # Required for portfolio.py
 pip3 install fastapi uvicorn --user  # Required for web.py
 
 # Step 2: Start server
-PYTHONPATH=src python3 -m benchmarkos_chatbot.web &
+PYTHONPATH=src python3 -m finanlyzeos_chatbot.web &
 sleep 5
 
 # Step 3: Test health endpoint
@@ -106,14 +106,14 @@ curl http://localhost:8000/health
 **What to Show:**
 1. **File Structure** (30 sec)
    ```bash
-   ls -lh src/benchmarkos_chatbot/
+   ls -lh src/finanlyzeos_chatbot/
    # Show: chatbot.py (huge), custom_kpi_builder.py (new), database.py
    ```
 
 2. **Custom KPI Builder** (1 min)
    ```bash
    # Show the test working
-   PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py
+   PYTHONPATH=src python3 src/finanlyzeos_chatbot/custom_kpi_builder.py
    
    # Point to code
    # Lines 77-247: Formula parsing logic
@@ -202,7 +202,7 @@ Expected: Side-by-side comparison table
    cd /home/malcolm-munoriyarwa/projects/Team2-CBA-Project
    
    # Test custom KPI builder
-   PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py
+   PYTHONPATH=src python3 src/finanlyzeos_chatbot/custom_kpi_builder.py
    
    # Should see:
    # ✅ Created: Efficiency Score
@@ -233,15 +233,15 @@ Expected: Side-by-side comparison table
 **Show:**
 1. **Run working test:**
    ```bash
-   PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py
+   PYTHONPATH=src python3 src/finanlyzeos_chatbot/custom_kpi_builder.py
    ```
    → Proves custom KPIs work
 
 2. **Show file statistics:**
    ```bash
-   wc -l src/benchmarkos_chatbot/chatbot.py
-   wc -l src/benchmarkos_chatbot/custom_kpi_builder.py
-   wc -l src/benchmarkos_chatbot/database.py
+   wc -l src/finanlyzeos_chatbot/chatbot.py
+   wc -l src/finanlyzeos_chatbot/custom_kpi_builder.py
+   wc -l src/finanlyzeos_chatbot/database.py
    ```
    → Proves 2,160+ lines
 
@@ -276,7 +276,7 @@ pip3 install --user yfinance fastapi uvicorn python-multipart
 pip3 install --user -r requirements.txt
 
 # Then start server
-PYTHONPATH=src python3 -m benchmarkos_chatbot.web
+PYTHONPATH=src python3 -m finanlyzeos_chatbot.web
 
 # Test in browser: http://localhost:8000
 ```
@@ -342,12 +342,12 @@ dependencies for full UI, but let me show you the code—it's actually more
 impressive this way. You can see the engineering."
 
 Demo Part 1: Live Custom KPI Test (1 min)
-[Run: PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py]
+[Run: PYTHONPATH=src python3 src/finanlyzeos_chatbot/custom_kpi_builder.py]
 [Shows: ✅ Created, calculation works, validation works]
 "This is live code execution—not slides."
 
 Demo Part 2: Code Statistics (30 sec)
-[Run: wc -l src/benchmarkos_chatbot/*.py]
+[Run: wc -l src/finanlyzeos_chatbot/*.py]
 [Shows: 2,160+ lines]
 "Production-quality implementation."
 
@@ -381,7 +381,7 @@ Total: 4 minutes + 1 min Q&A
 ### **Test 1: Verify Custom KPI Builder Works**
 ```bash
 cd /home/malcolm-munoriyarwa/projects/Team2-CBA-Project
-PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py
+PYTHONPATH=src python3 src/finanlyzeos_chatbot/custom_kpi_builder.py
 ```
 **Expected:** ✅ Created messages, calculation: 0.243
 
@@ -390,8 +390,8 @@ PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py
 ### **Test 2: Verify Code Compiles (Zero Errors)**
 ```bash
 cd /home/malcolm-munoriyarwa/projects/Team2-CBA-Project
-python3 -m py_compile src/benchmarkos_chatbot/custom_kpi_builder.py
-python3 -m py_compile src/benchmarkos_chatbot/database.py
+python3 -m py_compile src/finanlyzeos_chatbot/custom_kpi_builder.py
+python3 -m py_compile src/finanlyzeos_chatbot/database.py
 echo "✅ All files compile successfully!"
 ```
 **Expected:** No output = No errors ✅
@@ -401,10 +401,10 @@ echo "✅ All files compile successfully!"
 ### **Test 3: Count Lines of Code**
 ```bash
 cd /home/malcolm-munoriyarwa/projects/Team2-CBA-Project
-wc -l src/benchmarkos_chatbot/chatbot.py
-wc -l src/benchmarkos_chatbot/custom_kpi_builder.py  
-wc -l src/benchmarkos_chatbot/database.py
-wc -l src/benchmarkos_chatbot/context_builder.py
+wc -l src/finanlyzeos_chatbot/chatbot.py
+wc -l src/finanlyzeos_chatbot/custom_kpi_builder.py  
+wc -l src/finanlyzeos_chatbot/database.py
+wc -l src/finanlyzeos_chatbot/context_builder.py
 ```
 **Expected:** 2,000+ total lines
 
@@ -438,12 +438,12 @@ echo "="
 
 echo ""
 echo "📋 Test 1: Custom KPI Builder"
-PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py
+PYTHONPATH=src python3 src/finanlyzeos_chatbot/custom_kpi_builder.py
 
 echo ""
 echo "📋 Test 2: Code Compilation"
-python3 -m py_compile src/benchmarkos_chatbot/custom_kpi_builder.py && echo "✅ custom_kpi_builder.py compiles"
-python3 -m py_compile src/benchmarkos_chatbot/database.py && echo "✅ database.py compiles"
+python3 -m py_compile src/finanlyzeos_chatbot/custom_kpi_builder.py && echo "✅ custom_kpi_builder.py compiles"
+python3 -m py_compile src/finanlyzeos_chatbot/database.py && echo "✅ database.py compiles"
 
 echo ""
 echo "📋 Test 3: Documentation"
@@ -473,7 +473,7 @@ echo "="
 **You:**
 > "Yes! Let me show you:"
 > 
-> [Run: `PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py`]
+> [Run: `PYTHONPATH=src python3 src/finanlyzeos_chatbot/custom_kpi_builder.py`]
 > 
 > [Shows: ✅ Created, calculation works]
 > 
@@ -568,7 +568,7 @@ Advantage: Flexibility during presentation
 
 ```bash
 cd /home/malcolm-munoriyarwa/projects/Team2-CBA-Project && PYTHONPATH=src python3 -c "
-from benchmarkos_chatbot.custom_kpi_builder import CustomKPIBuilder
+from finanlyzeos_chatbot.custom_kpi_builder import CustomKPIBuilder
 
 builder = CustomKPIBuilder()
 kpi = builder.create_custom_kpi('Test Score', '(roe + roic) / 2')

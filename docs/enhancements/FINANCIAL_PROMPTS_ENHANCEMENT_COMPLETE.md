@@ -10,7 +10,7 @@ You asked: **"can u incorporate more prompts financial people would ask"**
 
 ## 📊 What Changed
 
-### 1. **Expanded SYSTEM_PROMPT** (`src/benchmarkos_chatbot/chatbot.py`)
+### 1. **Expanded SYSTEM_PROMPT** (`src/finanlyzeos_chatbot/chatbot.py`)
 
 Added 12 categories of financial professional queries with 60+ example questions:
 

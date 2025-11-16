@@ -7,15 +7,15 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot.analytics_engine import (
+from finanlyzeos_chatbot.analytics_engine import (
     BASE_METRICS, DERIVED_METRICS, AGGREGATE_METRICS,
     SUPPLEMENTAL_METRICS, METRIC_LABELS
 )
-from benchmarkos_chatbot.response_verifier import _identify_metric_from_context
-from benchmarkos_chatbot.parsing.alias_builder import resolve_tickers_freeform
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
-from benchmarkos_chatbot.response_verifier import verify_fact, FinancialFact
+from finanlyzeos_chatbot.response_verifier import _identify_metric_from_context
+from finanlyzeos_chatbot.parsing.alias_builder import resolve_tickers_freeform
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.response_verifier import verify_fact, FinancialFact
 from datetime import datetime
 
 print("=" * 60)

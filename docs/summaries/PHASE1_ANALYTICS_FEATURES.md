@@ -11,7 +11,7 @@ Four powerful analytics modules have been added to BenchmarkOS, providing sophis
 
 ## 1. Sector Benchmarking Module
 
-**File:** `src/benchmarkos_chatbot/sector_analytics.py`
+**File:** `src/finanlyzeos_chatbot/sector_analytics.py`
 
 ### Features
 - **Sector Classification:** 475 S&P 500 companies mapped to 11 GICS sectors
@@ -56,7 +56,7 @@ Apple vs Sector:
 
 ## 2. Anomaly Detection Module
 
-**File:** `src/benchmarkos_chatbot/anomaly_detection.py`
+**File:** `src/finanlyzeos_chatbot/anomaly_detection.py`
 
 ### Features
 - **Statistical Analysis:** Z-score based anomaly detection (configurable threshold)
@@ -108,7 +108,7 @@ Anomaly(
 
 ## 3. Predictive Analytics Module
 
-**File:** `src/benchmarkos_chatbot/predictive_analytics.py`
+**File:** `src/finanlyzeos_chatbot/predictive_analytics.py`
 
 ### Features
 - **Forecasting Methods:**
@@ -168,7 +168,7 @@ Predictions:
 
 ## 4. Advanced KPI Calculator
 
-**File:** `src/benchmarkos_chatbot/advanced_kpis.py`
+**File:** `src/finanlyzeos_chatbot/advanced_kpis.py`
 
 ### Features
 
@@ -292,7 +292,7 @@ fetch('/api/forecast/MSFT?metric=revenue&years=3')
 
 ### For REST API
 
-Add these endpoints to `src/benchmarkos_chatbot/api.py`:
+Add these endpoints to `src/finanlyzeos_chatbot/api.py`:
 
 ```python
 from sector_analytics import get_sector_analytics
@@ -418,10 +418,10 @@ Expected output:
 
 ## Files Created
 
-1. `src/benchmarkos_chatbot/sector_analytics.py` (470 lines)
-2. `src/benchmarkos_chatbot/anomaly_detection.py` (403 lines)
-3. `src/benchmarkos_chatbot/predictive_analytics.py` (372 lines)
-4. `src/benchmarkos_chatbot/advanced_kpis.py` (482 lines)
+1. `src/finanlyzeos_chatbot/sector_analytics.py` (470 lines)
+2. `src/finanlyzeos_chatbot/anomaly_detection.py` (403 lines)
+3. `src/finanlyzeos_chatbot/predictive_analytics.py` (372 lines)
+4. `src/finanlyzeos_chatbot/advanced_kpis.py` (482 lines)
 5. `test_new_analytics.py` (186 lines)
 6. `docs/PHASE1_ANALYTICS_FEATURES.md` (this file)
 

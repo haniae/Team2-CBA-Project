@@ -12,7 +12,7 @@
 curl http://localhost:8000/health
 
 # 2. Ensure test data exists in database
-sqlite3 benchmarkos_chatbot.sqlite3 "SELECT COUNT(*) FROM financial_facts WHERE ticker='AAPL';"
+sqlite3 finanlyzeos_chatbot.sqlite3 "SELECT COUNT(*) FROM financial_facts WHERE ticker='AAPL';"
 # Should return a number > 0
 ```
 
@@ -215,13 +215,13 @@ ps aux | grep uvicorn
 # If not, start it
 cd /home/malcolm-munoriyarwa/projects/Team2-CBA-Project
 source .venv/bin/activate
-uvicorn benchmarkos_chatbot.web:app --host 0.0.0.0 --port 8000 &
+uvicorn finanlyzeos_chatbot.web:app --host 0.0.0.0 --port 8000 &
 ```
 
 ### "No data found in database"
 ```bash
 # Check database
-sqlite3 benchmarkos_chatbot.sqlite3 "SELECT ticker, metric, fiscal_year, value FROM financial_facts WHERE ticker='AAPL' LIMIT 5;"
+sqlite3 finanlyzeos_chatbot.sqlite3 "SELECT ticker, metric, fiscal_year, value FROM financial_facts WHERE ticker='AAPL' LIMIT 5;"
 
 # If empty, run data ingestion
 python add_test_data.py
@@ -231,7 +231,7 @@ python add_test_data.py
 The post-processor isn't catching them. Check:
 ```bash
 # Check if post-processor is enabled
-grep -n "_fix_astronomical_percentages" src/benchmarkos_chatbot/chatbot.py
+grep -n "_fix_astronomical_percentages" src/finanlyzeos_chatbot/chatbot.py
 
 # Check server logs
 tail -50 server.log | grep "astronomical"

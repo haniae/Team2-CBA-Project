@@ -12,13 +12,13 @@ Tests:
 """
 
 import pytest
-from src.benchmarkos_chatbot.parsing.comparative import (
+from src.finanlyzeos_chatbot.parsing.comparative import (
     ComparativeAnalyzer,
     ComparisonType,
     ComparisonDirection,
     ComparisonIntent,
 )
-from src.benchmarkos_chatbot.parsing.parse import classify_intent, parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import classify_intent, parse_to_structured
 
 
 class TestBasicComparatives:

@@ -46,7 +46,7 @@ cp env.example .env
 
 Our repository follows a strict organizational structure. **Always place files in the correct directory:**
 
-#### `/src/benchmarkos_chatbot/`
+#### `/src/finanlyzeos_chatbot/`
 **Purpose:** Core application code (production-ready modules)
 
 **What belongs here:**
@@ -297,7 +297,7 @@ pytest
 pytest tests/test_analytics.py
 
 # Run with coverage
-pytest --cov=src/benchmarkos_chatbot
+pytest --cov=src/finanlyzeos_chatbot
 
 # Run only regression tests
 pytest tests/regression/
@@ -381,7 +381,7 @@ pytest tests/regression/
 
 1. Design the feature (discuss in issues if major)
 2. Create feature branch
-3. Implement in appropriate module under `src/benchmarkos_chatbot/`
+3. Implement in appropriate module under `src/finanlyzeos_chatbot/`
 4. Write comprehensive tests
 5. Update documentation
 6. Submit PR with examples

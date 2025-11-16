@@ -13,8 +13,8 @@ from datetime import datetime
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from benchmarkos_chatbot.parsing.parse import parse_to_structured
-from benchmarkos_chatbot.parsing.time_grammar import parse_periods
+from finanlyzeos_chatbot.parsing.parse import parse_to_structured
+from finanlyzeos_chatbot.parsing.time_grammar import parse_periods
 
 class TimePeriodStressTester:
     """Stress test suite for time period parsing with 200 test cases."""

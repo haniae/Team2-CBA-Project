@@ -17,11 +17,11 @@ Tests:
 """
 
 import pytest
-from src.benchmarkos_chatbot.parsing.metric_inference import (
+from src.finanlyzeos_chatbot.parsing.metric_inference import (
     MetricInferenceEngine,
     InferredMetric,
 )
-from src.benchmarkos_chatbot.parsing.parse import parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestRevenueInference:

@@ -14,13 +14,13 @@ Tests:
 """
 
 import pytest
-from src.benchmarkos_chatbot.parsing.multi_intent import (
+from src.finanlyzeos_chatbot.parsing.multi_intent import (
     MultiIntentDetector,
     MultiIntentQuery,
     SubIntent,
     ConjunctionType,
 )
-from src.benchmarkos_chatbot.parsing.parse import parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestANDConjunction:

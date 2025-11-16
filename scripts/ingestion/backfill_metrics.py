@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-from benchmarkos_chatbot import load_settings
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot import load_settings
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 
 try:
-    from benchmarkos_chatbot.external_data import ingest_imf_kpis
+    from finanlyzeos_chatbot.external_data import ingest_imf_kpis
 except Exception:  # pragma: no cover - optional dependency
     ingest_imf_kpis = None
 

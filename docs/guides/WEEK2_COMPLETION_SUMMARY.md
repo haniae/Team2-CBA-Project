@@ -870,9 +870,9 @@ The judges gave you a vision. You delivered it in 2 weeks.
 - 🏆 `WEEK2_COMPLETION_SUMMARY.md` - This file
 
 **Modified Code:**
-- 🔧 `src/benchmarkos_chatbot/chatbot.py` (+910 lines)
-- 🔧 `src/benchmarkos_chatbot/database.py` (+170 lines)
-- 🔧 `src/benchmarkos_chatbot/context_builder.py` (+90 lines)
+- 🔧 `src/finanlyzeos_chatbot/chatbot.py` (+910 lines)
+- 🔧 `src/finanlyzeos_chatbot/database.py` (+170 lines)
+- 🔧 `src/finanlyzeos_chatbot/context_builder.py` (+90 lines)
 
 **Total:** 1,170 lines of production-ready code
 

@@ -3,8 +3,8 @@ Quick test to verify ChatGPT-style responses are working.
 Run this to see if the new formatting is active.
 """
 
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
 
 
 def test_chatgpt_style():
@@ -23,7 +23,7 @@ def test_chatgpt_style():
     print(f"   - Conversational mode: {settings.prefer_conversational_mode}")
     print()
     
-    chatbot = BenchmarkOSChatbot.create(settings)
+    chatbot = FinanlyzeOSChatbot.create(settings)
     print("   ✓ Chatbot loaded successfully")
     print()
     

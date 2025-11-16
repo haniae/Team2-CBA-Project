@@ -3,14 +3,14 @@ Tests for sentiment detection (Phase 3.4).
 """
 
 import pytest
-from src.benchmarkos_chatbot.parsing.sentiment import (
+from src.finanlyzeos_chatbot.parsing.sentiment import (
     SentimentDetector,
     SentimentPolarity,
     SentimentIntensity,
     FinancialSentiment,
     SentimentAnalysis,
 )
-from src.benchmarkos_chatbot.parsing.parse import parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestPositiveSentiment:

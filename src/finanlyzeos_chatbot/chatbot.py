@@ -234,7 +234,7 @@ class _CompanyNameIndex:
         """Populate the index from database data instead of SEC API to avoid 404 errors."""
         # Use database data instead of SEC API to avoid 404 errors
         try:
-            from benchmarkos_chatbot.config import load_settings
+            from finanlyzeos_chatbot.config import load_settings
             import sqlite3
             
             settings = load_settings()
@@ -701,7 +701,7 @@ class Conversation:
 
 
 SYSTEM_PROMPT = (
-    "You are BenchmarkOS, an institutional-grade financial analyst. Provide comprehensive, data-rich analysis "
+    "You are FinanlyzeOS, an institutional-grade financial analyst. Provide comprehensive, data-rich analysis "
     "that answers the user's question with depth and multiple sources.\n\n"
     
     "## Core Approach\n\n"
@@ -1833,8 +1833,8 @@ SYSTEM_PROMPT = (
 )
 @dataclass
 # Wraps settings, analytics, ingestion hooks, and the LLM client into a stateful conversation
-# object. Use `BenchmarkOSChatbot.create()` before calling `ask()`.
-class BenchmarkOSChatbot:
+# object. Use `FinanlyzeOSChatbot.create()` before calling `ask()`.
+class FinanlyzeOSChatbot:
     """High-level interface wrapping the entire chatbot pipeline."""
 
     _MAX_CACHE_ENTRIES = 32
@@ -2358,7 +2358,7 @@ class BenchmarkOSChatbot:
             except Exception:  # pragma: no cover - defensive caching preload
                 LOGGER.debug("Preload for %s failed", ticker, exc_info=True)
     @classmethod
-    def create(cls, settings: Settings) -> "BenchmarkOSChatbot":
+    def create(cls, settings: Settings) -> "FinanlyzeOSChatbot":
         """Factory that wires analytics, storage, and the LLM client together."""
         llm_client = build_llm_client(
             settings.llm_provider,
@@ -2389,7 +2389,7 @@ class BenchmarkOSChatbot:
         # Build the SEC-backed name index once; always attempt local alias fallback
         index = _CompanyNameIndex()
         base = getattr(settings, "edgar_base_url", None) or "https://www.sec.gov"
-        ua = getattr(settings, "sec_api_user_agent", None) or "BenchmarkOSBot/1.0 (support@benchmarkos.com)"
+        ua = getattr(settings, "sec_api_user_agent", None) or "FinanlyzeOSBot/1.0 (support@finanlyzeos.com)"
         try:
             index.build_from_sec(base, ua)
             LOGGER.info("SEC company index built with %d names", len(index.by_exact))
@@ -4845,7 +4845,7 @@ class BenchmarkOSChatbot:
             **deltas,
         )
         return getattr(summary, 'narrative', str(summary))
-    def _resolve_tickers(self, subjects: Sequence[str]) -> "BenchmarkOSChatbot._TickerResolution":
+    def _resolve_tickers(self, subjects: Sequence[str]) -> "FinanlyzeOSChatbot._TickerResolution":
         """Resolve tickers against the dataset, recording missing entries."""
         subjects_list = list(subjects)
         if subjects_list:
@@ -4903,7 +4903,7 @@ class BenchmarkOSChatbot:
                 detail = "No tickers provided"
             self._progress("ticker_resolution_complete", detail)
 
-        return BenchmarkOSChatbot._TickerResolution(available=available, missing=missing)
+        return FinanlyzeOSChatbot._TickerResolution(available=available, missing=missing)
 
     def _format_missing_message(
         self, requested: Sequence[str], available: Optional[Sequence[str]]
@@ -5161,7 +5161,7 @@ class BenchmarkOSChatbot:
         if not slug:
             slug = "metrics"
         timestamp = datetime.utcnow().strftime("%Y%m%d")
-        base_name = f"benchmarkos-{slug}-{timestamp}"
+        base_name = f"finanlyzeos-{slug}-{timestamp}"
         csv_payload = {
             "type": "csv",
             "label": "Download CSV",
