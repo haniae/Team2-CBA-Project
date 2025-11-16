@@ -42,17 +42,7 @@ Contributors:  **Hania A.**  , **Van Nhi Vuong** , **Malcolm Muoriyarwa** & **De
 - [📚 Further Reading](#-further-reading)
 - [🧭 Full Docs Index](docs/README.md)
 
-## 🎓 Practicum Context
 
-This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing FinalyzeOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
-
-### 👥 Team
-
-- **Hania A.** 
-- **Van Nhi Vuong** 
-- **Malcolm Muoriyarwa**
-- **Devarsh Patel** 
-- **Professor Patrick Hall** - Supervising Faculty (The George Washington University)
 
 ### 🎯 Project Focus
 
