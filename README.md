@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📊 BenchmarkOS Chatbot Platform
+# 📊 FinalyzeOS Chatbot Platform
 
 ### Institutional-Grade Finance Copilot with Explainable AI
 
@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-**BenchmarkOS** is an institutional-grade copilot for finance teams. It pairs deterministic market analytics with a conversational interface so analysts can ask natural-language questions, inspect lineage, and keep data pipelines auditable.
+**FinalyzeOS** is an institutional-grade copilot for finance teams. It pairs deterministic market analytics with a conversational interface so analysts can ask natural-language questions, inspect lineage, and keep data pipelines auditable.
 
 [Quick Start](#quick-start) • [Documentation](docs/) • [Features](#core-capabilities) • [Contributing](CONTRIBUTING.md)
 
@@ -18,7 +18,7 @@
 
 ## 🎓 Practicum Context
 
-This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing BenchmarkOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
+This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing FinalyzeOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
 
 ### 👥 Team
 
@@ -57,7 +57,7 @@ This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washin
 - [🏗️ Architecture Map](#-architecture-map)
 - [🧠 Retrieval & ML Internals](#-retrieval--ml-internals)
 - [🚀 Quick Start](#-quick-start)
-- [💬 Running the Chatbot](#-running-the-chatbot)
+- [💬 Running FinalyzeOS](#-running-the-chatbot)
 - [📥 Data Ingestion Guide](#-data-ingestion-guide)
 - [⚙️ Configuration Reference](#-configuration-reference)
 - [🗄️ Database Schema](#-database-schema)
@@ -69,7 +69,7 @@ This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washin
 
 ## 📖 Overview
 
-BenchmarkOS ships as a **batteries-included template** for building finance copilots. Out of the box you gain:
+FinalyzeOS ships as a **batteries-included template** for building finance copilots. Out of the box you gain:
 
 - 🗄️ **Durable Storage** - SQLite by default, PostgreSQL optional for conversations, facts, metrics, audit trails, and scenarios
 - 📊 **Analytics Engines** - Normalise SEC filings, hydrate them with market quotes, and expose tabular as well as scenario-ready metrics
@@ -104,7 +104,7 @@ The database currently contains **390,966 total rows** of financial data across 
 
 ### ⚡ Quick Start: First-Time Data Ingestion
 
-If you're setting up BenchmarkOS for the first time, start with a focused ingestion to get familiar with the process:
+If you're setting up FinalyzeOS for the first time, start with a focused ingestion to get familiar with the process:
 
 ```bash
 # Step 1: Activate your virtual environment
@@ -161,11 +161,11 @@ Four sophisticated analytics modules deliver institutional-grade capabilities:
 **Documentation:** See `docs/PHASE1_ANALYTICS_FEATURES.md` for complete API reference and integration examples.  
 **Test Suite:** Run `python test_new_analytics.py` to see live demonstrations with real S&P 500 data.
 
-These modules transform BenchmarkOS into a professional analytics platform comparable to Bloomberg Terminal and FactSet.
+These modules transform FinalyzeOS into a professional analytics platform comparable to Bloomberg Terminal and FactSet.
 
 ## 🤖 Machine Learning Stack
 
-BenchmarkOS blends deterministic analytics with a modular ML layer so finance teams can prototype forecasts without giving up auditability.
+FinalyzeOS blends deterministic analytics with a modular ML layer so finance teams can prototype forecasts without giving up auditability.
 
 ### Architecture Overview
 
@@ -179,7 +179,7 @@ BenchmarkOS blends deterministic analytics with a modular ML layer so finance te
 2. **Dataset Assembly:** Historical metrics are pulled from SQLite or Postgres and preprocessed (`predictive_analytics.prepare_training_series`).  
 3. **Model Selection:** The ensemble coordinator benchmarks candidates, caching scores so repeated queries stay performant.  
 4. **Output Packaging:** Predictions, bull/base/bear scenarios, CAGR deltas, and sector benchmarks are serialised into the forecast context.  
-5. **Conversation Delivery:** `BenchmarkOSChatbot.ask()` appends the forecast context to the conversational history before calling the LLM client.
+5. **Conversation Delivery:** `FinalyzeOSChatbot.ask()` appends the forecast context to the conversational history before calling the LLM client.
 
 ### Guardrails & Verification
 
@@ -218,7 +218,7 @@ Natural-language answers are grounded in auditable data through a layered RAG st
 
 ### Context Fusion
 
-- `BenchmarkOSChatbot.ask()` merges three layers in priority order: portfolio analytics, financial KPI context, and document snippets.  
+- `FinalyzeOSChatbot.ask()` merges three layers in priority order: portfolio analytics, financial KPI context, and document snippets.  
 - A document-follow-up heuristic (`_is_document_followup`) skips ticker summary heuristics when the user says “summarise it” immediately after an upload.  
 - When heuristics cannot serve the request, the bot falls back to a plain conversational instruction set ensuring non-financial prompts still receive responses.
 
@@ -237,7 +237,7 @@ Natural-language answers are grounded in auditable data through a layered RAG st
 
 ## 📊 Portfolio Management 
 
-BenchmarkOS includes comprehensive **portfolio management capabilities** that enable institutional-grade portfolio analysis, optimization, and risk management. The portfolio system supports multiple portfolios, automatic detection from user queries, and sophisticated analytics.
+FinalyzeOS includes comprehensive **portfolio management capabilities** that enable institutional-grade portfolio analysis, optimization, and risk management. The portfolio system supports multiple portfolios, automatic detection from user queries, and sophisticated analytics.
 
 ### 🎯 Core Portfolio Features
 
@@ -408,11 +408,11 @@ Portfolios are stored with the following structure:
 
 ## 🤖 Machine Learning Forecasting (NEW)
 
-BenchmarkOS includes **sophisticated machine learning forecasting capabilities** that provide institutional-grade financial predictions using multiple ML models. The forecasting system integrates seamlessly with the RAG layer to provide detailed, technically accurate forecasts.
+FinalyzeOS includes **sophisticated machine learning forecasting capabilities** that provide institutional-grade financial predictions using multiple ML models. The forecasting system integrates seamlessly with the RAG layer to provide detailed, technically accurate forecasts.
 
 ### 🎯 ML Forecasting Models
 
-BenchmarkOS supports **7 different ML forecasting models**, each optimized for different use cases:
+FinalyzeOS supports **7 different ML forecasting models**, each optimized for different use cases:
 
 #### 1. **ARIMA (AutoRegressive Integrated Moving Average)**
 - **Best For**: Short-term forecasts, trend-following patterns
@@ -584,7 +584,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the complete component di
 
 ## 🧠 Retrieval & ML Internals
 
-BenchmarkOS combines **deterministic data prep** with **retrieval-augmented generation (RAG)** so every answer traces back to persisted facts. The RAG layer has been significantly enhanced to support portfolio management and machine learning forecasting with comprehensive technical details.
+FinalyzeOS combines **deterministic data prep** with **retrieval-augmented generation (RAG)** so every answer traces back to persisted facts. The RAG layer has been significantly enhanced to support portfolio management and machine learning forecasting with comprehensive technical details.
 
 ### 🔤 Natural-Language Parsing (Deterministic)
 
@@ -834,7 +834,7 @@ python --version
 python -c "import fastapi, openai, pandas, sqlalchemy; print('✅ Core packages installed')"
 
 # Run a quick test
-python -c "from finanlyzeos_chatbot.config import load_settings; print('✅ BenchmarkOS imports successfully')"
+python -c "from finanlyzeos_chatbot.config import load_settings; print('✅ FinalyzeOS imports successfully')"
 ```
 
 #### Troubleshooting Installation
@@ -915,7 +915,7 @@ The PowerPoint export generates a comprehensive **12-slide CFI-style presentatio
 - [SEC EDGAR Company Filings](https://www.sec.gov/edgar/searchedgar/companysearch.html)
 - [SEC Financial Statement & Notes Datasets](https://www.sec.gov/dera/data/financial-statement-and-notes-data-sets.html)
 - [Yahoo Finance Market Data](https://finance.yahoo.com)
-- [BenchmarkOS GitHub Repository](https://github.com/haniae/Team2-CBA-Project)
+- [FinalyzeOS GitHub Repository](https://github.com/haniae/Team2-CBA-Project)
 
 **Usage Examples:**
 
@@ -987,7 +987,7 @@ python scripts/ingestion/ingest_universe.py --years 5 --chunk-size 25 --sleep 2 
 
 This pulls the sample watch list, respects SEC rate limits, and writes audit events.
 
-## 💬 Running the Chatbot
+## 💬 Running FinalyzeOS
 
 ### 🖥️ CLI REPL
 
@@ -1036,7 +1036,7 @@ The /chat response includes structured extras (highlights, trends, comparison_ta
 
 ## 📥 Data Ingestion Guide
 
-BenchmarkOS provides **multiple ingestion strategies** to fit different use cases. This section explains how to populate your database with financial data.
+FinalyzeOS provides **multiple ingestion strategies** to fit different use cases. This section explains how to populate your database with financial data.
 
 ### ⭐ Recommended: Smart Gap Filling Script
 
@@ -1193,7 +1193,7 @@ pip install -e .
   ```
 - Optional but recommended for SEC: set a descriptive User-Agent (not a token):
   ```bash
-  export SEC_API_USER_AGENT="BenchmarkOSBot/1.0 (you@example.com)"
+  export SEC_API_USER_AGENT="FinalyzeOSBot/1.0 (you@example.com)"
   ```
 
 ### Ingest the S&P 500 into SQLite
@@ -1344,7 +1344,7 @@ python scripts/generate_aliases.py
 | POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DATABASE, POSTGRES_USER, POSTGRES_PASSWORD | unset | Required when DATABASE_TYPE=postgresql; POSTGRES_SCHEMA overrides the default sec. |
 | LLM_PROVIDER | local | local uses the deterministic echo model; set to openai for real completions. |
 | OPENAI_MODEL | gpt-4o-mini | Passed verbatim to the OpenAI Chat Completions API. |
-| SEC_API_USER_AGENT | BenchmarkOSBot/1.0 (support@finanlyzeos.com) | Mandatory for SEC EDGAR requests. Customize it for your org. |
+| SEC_API_USER_AGENT | FinalyzeOSBot/1.0 (support@finanlyzeos.com) | Mandatory for SEC EDGAR requests. Customize it for your org. |
 | EDGAR_BASE_URL | https://data.sec.gov | Override if you proxy or mirror EDGAR. |
 | YAHOO_QUOTE_URL | https://query1.finance.yahoo.com/v7/finance/quote | Used to refresh quotes. |
 | YAHOO_QUOTE_BATCH_SIZE | 50 | Maximum tickers per Yahoo batch. |
@@ -1359,12 +1359,12 @@ Secrets belong in your local .env. Windows developers can rely on keyring so API
 
 ## 🗄️ Database Schema
 
-BenchmarkOS intentionally supports **two storage backends**, but your deployment uses only one at a time—by default it's SQLite:
+FinalyzeOS intentionally supports **two storage backends**, but your deployment uses only one at a time—by default it's SQLite:
 
 - **SQLite (default / implied in this repo)** – shipping the database as a file keeps setup frictionless for development, tests, and CI. All conversations, metrics, and audit events live in the path defined by DATABASE_PATH. For this reason, the stock .env (and most tests such as test_ingestion_perf.py) run purely on SQLite. It was chosen because it "just works": no external server to provision, a trivial backup story, and fast enough for single-user workflows. PRAGMAs (WAL, synchronous=NORMAL, temp_store=MEMORY, cache_size=-16000) are applied automatically so sustained writes remain smooth.
 - **PostgreSQL (optional)** – the same helper module can target Postgres when you set DATABASE_TYPE=postgresql and supply the POSTGRES_* DSN variables. Teams switch to Postgres when chat sessions are shared across analysts, when concurrency or replication matters, or when governance requires managed backups. If you haven't changed those settings, Postgres is unused.
 
-In other words, you are currently using a single database—SQLite—because it was selected for simplicity and portability. The PostgreSQL path is documented for teams that choose to run BenchmarkOS in a multi-user/shared environment later.
+In other words, you are currently using a single database—SQLite—because it was selected for simplicity and portability. The PostgreSQL path is documented for teams that choose to run FinalyzeOS in a multi-user/shared environment later.
 
 Regardless of backend, both share the same schema:
 
@@ -1744,7 +1744,7 @@ Project/
     │   ├── test_all_sp500_dashboards.py # Full S&P 500 dashboard test
     │   ├── test_sample_companies.py   # Sample companies test (10 companies)
     │   ├── test_single_company.py     # Single company test (Apple)
-    │   ├── test_chatbot_stress_test.py # Chatbot stress test
+    │   ├── test_chatbot_stress_test.py # FinalyzeOS stress test
     │   ├── test_chatgpt_style.py      # ChatGPT-style test
     │   ├── test_comprehensive_sources.py # Comprehensive sources test
     │   ├── PORTFOLIO_STRESS_TEST_SUMMARY.md # Portfolio stress test summary
@@ -1814,7 +1814,7 @@ Project/
     ├── test_dashboard_sources.html     # Dashboard sources HTML test
     ├── test_integration_e2e.py        # Integration E2E tests
     ├── test_source_completeness.py    # Source completeness tests
-    ├── test_chatbot_stress_test.py    # Chatbot stress test
+    ├── test_chatbot_stress_test.py    # FinalyzeOS stress test
     ├── test_chatgpt_style.py          # ChatGPT-style test
     ├── portfolio_stress_test_results.json # Portfolio stress test results
     │
@@ -1829,7 +1829,7 @@ Project/
 
 | File | Description |
 |------|-------------|
-| run_chatbot.py | Lightweight REPL entry point that calls BenchmarkOSChatbot.create(). Provides interactive CLI for chatbot queries. |
+| run_chatbot.py | Lightweight REPL entry point that calls FinalyzeOSChatbot.create(). Provides interactive CLI for chatbot queries. |
 | serve_chatbot.py | Convenience launcher for the FastAPI app (src/finanlyzeos_chatbot/web.py). Starts web server on specified port. |
 | run_data_ingestion.ps1 | Windows PowerShell script for automated data ingestion. Wraps fill_data_gaps.py with Windows-specific settings. |
 | run_data_ingestion.sh | Unix/Linux script for automated data ingestion. Wraps fill_data_gaps.py with Unix-specific settings. |
@@ -2083,7 +2083,7 @@ Project/
 | tests/e2e/test_all_sp500_dashboards.py | Full S&P 500 dashboard test. Tests dashboard generation for all S&P 500 companies. |
 | tests/e2e/test_sample_companies.py | Sample companies test (10 companies). Tests dashboard generation for sample companies. |
 | tests/e2e/test_single_company.py | Single company test (Apple). Tests dashboard generation for single company. |
-| tests/e2e/test_chatbot_stress_test.py | Chatbot stress test. Tests chatbot under high load. |
+| tests/e2e/test_chatbot_stress_test.py | FinalyzeOS stress test. Tests chatbot under high load. |
 | tests/e2e/test_chatgpt_style.py | ChatGPT-style test. Tests ChatGPT-style responses. |
 | tests/e2e/test_comprehensive_sources.py | Comprehensive sources test. Tests multi-source data aggregation. |
 | tests/e2e/test_ml_detailed_answers.py | ML detailed answers test. Tests ML forecast response detail and verification. |
@@ -2255,7 +2255,7 @@ python run_chatbot.py
 
 ## 📚 Further Reading
 
-- 📖 [`docs/orchestration_playbook.md`](docs/orchestration_playbook.md) – Three ingestion/orchestration patterns (local queue, serverless fetchers, batch jobs) and how to wire them into BenchmarkOSChatbot
+- 📖 [`docs/orchestration_playbook.md`](docs/orchestration_playbook.md) – Three ingestion/orchestration patterns (local queue, serverless fetchers, batch jobs) and how to wire them into FinalyzeOSChatbot
 - 💻 **Inline Module Documentation** - Comprehensive docs across `src/finanlyzeos_chatbot/` describe invariants, data contracts, and extension hooks
 - 🔧 **Versioning Best Practices** - Consider versioning your `.env` templates and deployment runbooks alongside these docs as the project evolves
 
@@ -2316,7 +2316,7 @@ efresh_quotes.py | Daily | Price/ratio refresh |
 
 ## 🎉 Happy Building!
 
-**BenchmarkOS** - Institutional-grade analytics tooling for finance teams
+**FinalyzeOS** - Institutional-grade analytics tooling for finance teams
 
 *Conversational interface • Reproducible metrics • Transparent data lineage*
 
