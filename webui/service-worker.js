@@ -1,7 +1,7 @@
 // CFI Dashboard Service Worker
 // Provides offline support and caching for better performance
 
-const CACHE_NAME = 'cfi-dashboard-v1';
+const CACHE_NAME = 'cfi-dashboard-v2';
 const ASSETS_TO_CACHE = [
   'cfi_dashboard.html',
   'cfi_dashboard.css',

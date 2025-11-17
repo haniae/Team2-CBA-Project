@@ -7,6 +7,8 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/haniae/Team2-CBA-Project)
+[![Data Coverage](https://img.shields.io/badge/data-1,505%20companies%20%7C%2018%20years-success)](https://github.com/haniae/Team2-CBA-Project)
 
 **FinalyzeOS** is an institutional-grade copilot for finance teams. It pairs deterministic market analytics with a conversational interface so analysts can ask natural-language questions, inspect lineage, and keep data pipelines auditable.
 
@@ -14,7 +16,38 @@
 
 Contributors:  **Hania A.**  , **Van Nhi Vuong** , **Malcolm Muoriyarwa** & **Devarsh Patel** . Special thanks to: supervising faculty (The George Washington University): **Professor Patrick Hall**
 
-[Quick Start](#quick-start) • [Documentation](docs/) • [Features](#core-capabilities) • [Contributing](CONTRIBUTING.md)
+[Setup Guide](#️-complete-setup-guide) • [Documentation](docs/) • [Features](#core-capabilities) • [Example Queries](#-example-queries) • [Contributing](CONTRIBUTING.md)
+
+---
+
+## ⚡ TL;DR - Quick Start
+
+**Get started in 30 seconds:**
+
+```bash
+# 1. Clone and setup
+git clone https://github.com/haniae/Team2-CBA-Project.git
+cd Team2-CBA-Project
+python -m venv .venv
+.\.venv\Scripts\activate  # Windows: .\.venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt && pip install -e .
+
+# 2. Quick test (100 companies, ~15-30 min)
+python scripts/ingestion/ingest_universe.py --universe-file data/tickers/test_100.txt --years 5
+
+# 3. Run the chatbot
+python run_chatbot.py
+# Or web UI: python serve_chatbot.py --port 8000
+```
+
+**Try these queries:**
+- `"What is Apple's revenue?"`
+- `"Compare Microsoft and Google's profit margins"`
+- `"Show me Tesla's free cash flow in 2023"`
+- `"Why is NVDA's stock price increasing?"`
+
+📖 **For detailed setup with options (100/250/500/1500 companies), see [Complete Setup Guide](#️-complete-setup-guide)**
 
 ---
 
@@ -22,15 +55,17 @@ Contributors:  **Hania A.**  , **Van Nhi Vuong** , **Malcolm Muoriyarwa** & **De
 
 ## 📚 Table of Contents
 
+- [⚡ TL;DR - Quick Start](#-tldr---quick-start)
 - [🎓 Practicum Context](#-practicum-context)
 - [📖 Overview](#-overview)
+- [🛠️ Complete Setup Guide](#️-complete-setup-guide)
+- [💡 Example Queries](#-example-queries)
 - [📊 Current Data Coverage](#-current-data-coverage)
 - [⚡ Core Capabilities](#-core-capabilities)
 - [🚀 Advanced Analytics](#-advanced-analytics)
 - [🤖 Machine Learning Stack](#-machine-learning-stack)
 - [📚 Retrieval-Augmented Generation](#-retrieval-augmented-generation)
 - [📊 Portfolio Management](#-portfolio-management)
-- [🚀 Quick Start](#-quick-start)
 - [💬 Running FinalyzeOS](#-running-the-chatbot)
 - [📥 Data Ingestion Guide](#-data-ingestion-guide)
 - [⚙️ Configuration Reference](#-configuration-reference)
@@ -62,50 +97,507 @@ FinalyzeOS ships as a **batteries-included template** for building finance copil
 - 🖥️ **Multi-Channel Experiences** - CLI REPL, FastAPI REST service, single-page web UI so you can prototype quickly and scale later
 - 📚 **Rich Documentation** - Complete guides for scaling "any company" requests and replicating workflows in production
 
+### 🎯 What Can You Do?
+
+Ask natural language questions and get instant, sourced financial insights:
+
+**Single Company Analysis:**
+- `"What is Apple's revenue?"` → Get revenue with YoY growth, CAGR, and business drivers
+- `"Show me Tesla's free cash flow"` → Detailed FCF analysis with trends and context
+- `"What's Microsoft's P/E ratio?"` → Valuation metrics with historical comparison
+
+**Comparisons:**
+- `"Compare Apple vs Microsoft's profit margins"` → Side-by-side analysis with sector benchmarks
+- `"How do tech companies stack up on ROE?"` → Multi-company ranking and percentile analysis
+
+**Deep Analysis:**
+- `"Why is Tesla's margin declining?"` → Multi-factor explanation with quantified impacts
+- `"What's driving Amazon's revenue growth?"` → Business segment breakdown and drivers
+- `"Is NVDA overvalued?"` → Valuation analysis with peer comparison
+
+**Forecasting & Scenarios:**
+- `"Forecast Microsoft's revenue for 2026"` → ML-powered forecasts with confidence intervals
+- `"What if Apple's revenue grows 10% faster?"` → Scenario analysis with impact on valuation
+
+**Portfolio Management:**
+- `"Show me my portfolio performance"` → Portfolio analytics with risk metrics
+- `"What's my portfolio's sector exposure?"` → Diversification analysis
+
+All responses include clickable SEC filing sources, charts, and exportable reports (PowerPoint, PDF, Excel).
+
+---
+
+## 🛠️ Complete Setup Guide
+
+### **Step 1: Install Dependencies**
+
+#### Prerequisites
+- **Python 3.10+** (Python 3.11 or 3.12 recommended)
+- **pip** (Python package manager)
+- **Git** (to clone the repository)
+
+#### Installation Steps
+
+**1. Clone the Repository**
+```bash
+git clone https://github.com/haniae/Team2-CBA-Project.git
+cd Team2-CBA-Project
+```
+
+**2. Create Virtual Environment**
+```bash
+# Windows
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# macOS/Linux
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+**3. Install Python Dependencies**
+```bash
+# Upgrade pip first
+pip install --upgrade pip
+
+# Install all required packages
+pip install -r requirements.txt
+
+# Install the package in development mode
+pip install -e .
+```
+
+**4. Verify Installation**
+```bash
+# Check Python version (should be 3.10+)
+python --version
+
+# Verify key packages are installed
+python -c "import fastapi, openai, pandas, sqlalchemy; print('✅ Core packages installed')"
+
+# Verify FinalyzeOS imports
+python -c "from finanlyzeos_chatbot import load_settings; print('✅ FinalyzeOS setup complete')"
+```
+
+**5. Configure Environment**
+```bash
+# Copy environment template
+# Windows
+Copy-Item .env.example .env
+
+# macOS/Linux
+cp .env.example .env
+
+# Edit .env file and add your OpenAI API key (optional for testing)
+# OPENAI_API_KEY=your_key_here
+```
+
+---
+
+### **Step 2: Choose Your Data Ingestion Option**
+
+Select the option that best fits your needs:
+
+#### **Option 1: Quick Test (100 Companies) - ⚡ Fastest**
+**Best for**: Quick testing, demos, learning the system  
+**Time**: ~15-30 minutes  
+**Database Size**: ~20-30 MB
+
+```bash
+# Create a custom ticker file with 100 companies
+# Create file: data/tickers/test_100.txt with one ticker per line:
+# AAPL
+# MSFT
+# GOOGL
+# AMZN
+# ... (add 100 tickers)
+
+# Run ingestion
+python scripts/ingestion/ingest_universe.py --universe-file data/tickers/test_100.txt --years 5 --chunk-size 10
+
+# Load prices (optional, adds ~10 minutes)
+python scripts/ingestion/load_historical_prices_15years.py
+```
+
+**Expected Results**:
+- ~5,000-8,000 financial facts
+- ~10,000-15,000 metric snapshots
+- ~100,000 price records (if prices loaded)
+- Database size: ~20-30 MB
+
+---
+
+#### **Option 2: Medium Coverage (250 Companies) - ⚖️ Balanced**
+**Best for**: Testing with good coverage, small teams  
+**Time**: ~1-2 hours  
+**Database Size**: ~50-80 MB
+
+```bash
+# Create a custom ticker file with 250 companies
+# Create file: data/tickers/test_250.txt with 250 tickers
+
+# Run ingestion
+python scripts/ingestion/ingest_universe.py --universe-file data/tickers/test_250.txt --years 10 --chunk-size 15 --resume
+
+# Load prices (optional, adds ~30 minutes)
+python scripts/ingestion/load_historical_prices_15years.py
+```
+
+**Expected Results**:
+- ~15,000-25,000 financial facts
+- ~40,000-60,000 metric snapshots
+- ~250,000 price records (if prices loaded)
+- Database size: ~50-80 MB
+
+---
+
+#### **Option 3: S&P 500 (500 Companies) - 🎯 Recommended**
+**Best for**: Production use, comprehensive analysis  
+**Time**: ~2-3 hours  
+**Database Size**: ~150-200 MB
+
+```bash
+# Ingest S&P 500 financial data (15 years)
+python scripts/ingestion/ingest_sp500_15years.py
+
+# Load historical prices (1-2 hours)
+python scripts/ingestion/load_historical_prices_15years.py
+
+# Verify ingestion
+python scripts/utility/check_ingestion_status.py
+```
+
+**Expected Results**:
+- ~50,000-80,000 financial facts
+- ~150,000-250,000 metric snapshots
+- ~1.7M+ price records
+- Database size: ~150-200 MB
+- **Coverage**: 500 companies, 15 years of data
+
+---
+
+#### **Option 4: S&P 1500 (1,500 Companies) - 🚀 Full Coverage**
+**Best for**: Maximum coverage, institutional use  
+**Time**: ~6-9 hours  
+**Database Size**: ~850 MB
+
+```bash
+# Ingest S&P 1500 (S&P 500 + MidCap + SmallCap)
+python scripts/ingestion/ingest_extended_universe.py
+
+# Load historical prices (2-3 hours)
+python scripts/ingestion/load_historical_prices_15years.py
+
+# Verify ingestion
+python scripts/utility/check_ingestion_status.py
+```
+
+**Expected Results**:
+- ~240,000+ financial facts
+- ~750,000+ metric snapshots
+- ~1.7M+ price records
+- Database size: ~850 MB
+- **Coverage**: 1,500 companies, 18 years of data
+
+---
+
+### **Step 3: Verify Your Setup**
+
+After ingestion completes, verify everything works:
+
+```bash
+# Check database status
+python scripts/utility/check_ingestion_status.py
+
+# Or use the simple checker
+python check_correct_database.py
+
+# Test the chatbot
+python run_chatbot.py
+```
+
+**Test Queries**:
+- "Show me Apple's revenue"
+- "Compare Microsoft and Google's profit margins"
+- "What's Tesla's free cash flow in 2023?"
+
+---
+
+### **Step 4: Start Using FinalyzeOS**
+
+#### **Option A: Command Line Interface (CLI)**
+```bash
+python run_chatbot.py
+```
+
+#### **Option B: Web Interface**
+```bash
+python serve_chatbot.py --port 8000
+```
+Then open: `http://localhost:8000`
+
+---
+
+### 🚀 Quick Start Examples
+
+**Try these queries immediately after setup:**
+
+#### In CLI (`python run_chatbot.py`):
+```
+> What is Apple's revenue?
+> Compare Microsoft and Google's profit margins
+> Show me Tesla's free cash flow in 2023
+> Why is NVDA's stock price increasing?
+> Forecast Microsoft's revenue for 2026
+```
+
+#### In Web UI (`http://localhost:8000`):
+1. Type: `"Show me Apple's dashboard"`
+2. Type: `"Compare AAPL vs MSFT vs GOOGL"`
+3. Type: `"What's driving Tesla's revenue growth?"`
+4. Click **"Export PowerPoint"** to download a presentation
+
+**Expected Response Times:**
+- Simple queries: < 2 seconds
+- Comparisons: 3-5 seconds
+- Dashboards: 5-8 seconds
+- Forecasts: 10-15 seconds
+
+---
+
+## 📊 Ingestion Comparison Table
+
+| Option | Companies | Time | Database Size | Best For |
+|--------|-----------|------|---------------|----------|
+| **Quick Test** | 100 | 15-30 min | 20-30 MB | Learning, demos |
+| **Medium** | 250 | 1-2 hours | 50-80 MB | Testing, small teams |
+| **S&P 500** | 500 | 2-3 hours | 150-200 MB | Production use ⭐ |
+| **S&P 1500** | 1,500 | 6-9 hours | 850 MB | Full coverage |
+
+---
+
+## 🔧 Troubleshooting Setup
+
+### **Issue: Package Installation Fails**
+```bash
+# Upgrade pip first
+pip install --upgrade pip
+
+# Try installing in smaller batches
+pip install fastapi uvicorn python-dotenv
+pip install openai requests httpx
+pip install pandas numpy sqlalchemy
+pip install -r requirements.txt
+```
+
+### **Issue: Database Not Found**
+```bash
+# The database will be created automatically on first run
+# Or manually initialize:
+python -c "from finanlyzeos_chatbot.database import initialise; from pathlib import Path; initialise(Path('data/sqlite/finanlyzeos_chatbot.sqlite3'))"
+```
+
+### **Issue: Ingestion Stops or Fails**
+```bash
+# Most scripts support resume capability
+# Just run the same command again - it will resume from where it stopped
+
+# Check progress
+python scripts/ingestion/monitor_ingestion.py
+
+# Check for errors
+python scripts/utility/check_ingestion_status.py
+```
+
+### **Issue: Out of Memory During Ingestion**
+```bash
+# Reduce batch size
+python scripts/ingestion/ingest_universe.py --universe-file your_tickers.txt --years 10 --chunk-size 5
+
+# Or process in smaller chunks
+# Split your ticker file into multiple smaller files and process separately
+```
+
+---
+
+## 💡 Example Queries
+
+After setup, try these example queries to explore FinalyzeOS capabilities:
+
+### 📊 Single Metric Queries
+```bash
+# In CLI or Web UI
+"What is Apple's revenue?"
+"Show me Microsoft's EBITDA margin"
+"What's Tesla's free cash flow?"
+"What is Google's net income?"
+"Tell me Amazon's market cap"
+"What's Apple's P/E ratio?"
+"Show NVDA's gross margin"
+"What is META's return on equity?"
+```
+
+**What You Get:**
+- ✅ Direct answer in first paragraph
+- ✅ Year-over-year growth context
+- ✅ 3-year and 5-year CAGR trends
+- ✅ Business drivers explanation
+- ✅ Clickable SEC filing links
+- ✅ 150-300 words with analysis
+
+---
+
+### 🔍 "Why" Questions (Multi-Factor Analysis)
+```bash
+"Why is Tesla's margin declining?"
+"Why is Apple's revenue growing?"
+"Why is Microsoft more profitable?"
+"Why did NVDA's stock price increase?"
+"Why is Amazon investing more in CapEx?"
+"Why is Google's margin expanding?"
+```
+
+**What You Get:**
+- ✅ Multi-factor explanation (3-5 key reasons)
+- ✅ Quantified impact (basis points, percentages)
+- ✅ Business context and industry dynamics
+- ✅ Historical comparison
+- ✅ Forward outlook
+- ✅ 400-600 words with deep analysis
+
+---
+
+### 📈 Comparison Queries
+```bash
+"Compare Apple vs Microsoft"
+"Show me Tesla and Ford's financial metrics"
+"Compare tech companies: AAPL, MSFT, GOOGL"
+"How do Apple and Microsoft stack up on profitability?"
+"Compare the big 5 tech companies"
+```
+
+**What You Get:**
+- ✅ Side-by-side metrics table
+- ✅ Sector percentile rankings
+- ✅ Visual comparison charts
+- ✅ Highlighted differences
+- ✅ S&P 500 average benchmarks
+
+---
+
+### 📅 Time-Based Queries
+```bash
+"Show me Apple's revenue over the last 5 years"
+"What was Microsoft's profit margin in 2022?"
+"Compare Tesla's revenue in 2021 vs 2023"
+"Show me Amazon's growth trend"
+"What happened to Meta's revenue in 2023?"
+```
+
+**What You Get:**
+- ✅ Historical trend charts
+- ✅ Period-specific analysis
+- ✅ Year-over-year comparisons
+- ✅ Growth rate calculations
+
+---
+
+### 🎯 Dashboard Requests
+```bash
+"Show me Apple's dashboard"
+"Display Microsoft financial dashboard"
+"Give me Tesla's full financial overview"
+```
+
+**What You Get:**
+- ✅ Interactive dashboard with KPI cards
+- ✅ Revenue, EBITDA, FCF charts
+- ✅ Valuation multiples over time
+- ✅ Share price performance
+- ✅ Risk indicators
+- ✅ Export options (PowerPoint, PDF, Excel)
+
+---
+
+### 🔮 Forecasting Queries
+```bash
+"Forecast Microsoft's revenue for 2026"
+"Predict Apple's earnings growth"
+"What's Tesla's revenue outlook?"
+"Show me Amazon's 5-year forecast"
+```
+
+**What You Get:**
+- ✅ ML-powered forecasts (ARIMA, Prophet, LSTM, Transformer)
+- ✅ Confidence intervals
+- ✅ Trend classification (increasing/decreasing/stable)
+- ✅ Multiple model ensemble
+- ✅ Historical accuracy metrics
+
+---
+
+### 💼 Portfolio Queries
+```bash
+"Show me my portfolio performance"
+"What's my portfolio's sector exposure?"
+"Analyze my portfolio risk"
+"Compare my portfolio to S&P 500"
+```
+
+**What You Get:**
+- ✅ Portfolio analytics dashboard
+- ✅ Sector diversification analysis
+- ✅ Risk metrics (Sharpe ratio, volatility)
+- ✅ Performance attribution
+- ✅ Benchmark comparisons
+
+---
+
+### 🎨 Advanced Analytics
+```bash
+"Which tech company has the best margins?"
+"Rank companies by revenue growth"
+"Find companies with declining profitability"
+"Show me sector benchmarks for technology"
+```
+
+**What You Get:**
+- ✅ Sector benchmarking and percentile rankings
+- ✅ Anomaly detection with severity classification
+- ✅ Top/bottom performers identification
+- ✅ Statistical analysis with Z-scores
+
+---
+
+**💡 Pro Tip:** All queries support natural language - no need to memorize commands! The system understands variations like "What is", "Show me", "Tell me", "Compare", etc.
+
+---
+
 ## 📊 Current Data Coverage
 
-The database currently contains **390,966 total rows** of financial data across 475 S&P 500 companies:
+The database currently contains **2,880,138 total rows** of financial data across 1,505 companies:
 
 | Table | Rows | Description |
 |-------|------|-------------|
-| metric_snapshots | 319,891 | Pre-calculated analytics and KPIs |
-| financial_facts | 33,684 | Raw SEC filing data (revenue, expenses, etc.) |
-| company_filings | 23,743 | SEC filing metadata (10-K, 10-Q forms) |
-| kpi_values | 9,980 | KPI backfill and override values |
-| audit_events | 3,015 | Data ingestion and processing logs |
-| ticker_aliases | 475 | Company ticker mappings (S&P 500) |
-| conversations | 132 | Chat history and user interactions |
-| market_quotes | 46 | Latest market prices and quotes |
-| scenario_results | 0 | Saved scenario analysis results |
+| market_quotes | 1,730,061 | Historical daily price data (15+ years) |
+| metric_snapshots | 777,979 | Pre-calculated analytics and KPIs |
+| financial_facts | 243,777 | Raw SEC filing data (revenue, expenses, etc.) |
+| company_filings | 80,332 | SEC filing metadata (10-K, 10-Q forms) |
+| audit_events | 26,338 | Data ingestion and processing logs |
+| kpi_values | 16,071 | KPI backfill and override values |
+| ticker_aliases | 1,507 | Company ticker mappings |
+| conversations | 3,979 | Chat history and user interactions |
+| portfolio_holdings | 14 | Portfolio positions |
+| scenario_results | 2 | Saved scenario analysis results |
 
 ### 📈 Data Characteristics
 
-- 📅 **Year Range:** 2019-2027 (9 years of coverage)
-- 🏢 **Companies:** 475 unique S&P 500 tickers
-- 📡 **Data Sources:** SEC EDGAR (10-K, 10-Q filings), Yahoo Finance (market quotes)
+- 📅 **Year Range:** 2009-2027 (18 years of coverage)
+- 🏢 **Companies:** 1,505 unique tickers (469 S&P 500 + 1,036 additional)
+- 📡 **Data Sources:** SEC EDGAR (10-K, 10-Q filings), Yahoo Finance (market quotes), FRED, IMF
 - 🔄 **Update Frequency:** On-demand ingestion with smart gap detection
 - 🔍 **Audit Trail:** Full lineage tracking for every data point
-- 💾 **Database Size:** ~150-200 MB (SQLite file)
-
-### ⚡ Quick Start: First-Time Data Ingestion
-
-If you're setting up FinalyzeOS for the first time, start with a focused ingestion to get familiar with the process:
-
-```bash
-# Step 1: Activate your virtual environment
-.\.venv\Scripts\Activate.ps1  # Windows
-# source .venv/bin/activate    # macOS/Linux
-
-# Step 2: Run a quick 3-year ingestion (recommended for first-time users)
-python scripts/ingestion/fill_data_gaps.py --target-years "2022,2023,2024" --years-back 3 --batch-size 10
-
-# Expected: ~5-7 minutes, loads ~5,000-8,000 records for 475 companies
-```
-
-After this completes, you can:
-1. Start the chatbot: `python run_chatbot.py`
-2. Try queries like: "Show me Apple's metrics" or "Compare Microsoft and Google"
-3. Launch the web UI: `python serve_chatbot.py --port 8000`
+- 💾 **Database Size:** ~850 MB (SQLite file)
 
 ## ⚡ Core Capabilities
 
@@ -680,27 +1172,9 @@ The script reads data/tickers/universe_sp500.txt, applies the same normalisation
 
 Guardrails live in tests/test_alias_resolution.py, tests/test_time_grammar.py, and tests/test_nl_parser.py, ensuring alias coverage, period parsing, and structured intents stay within spec.
 
-## 🚀 Quick Start
+### 📦 Complete Package List
 
-These steps assume Python 3.10+ and Git are installed.
-
-### 1️⃣ Clone and Set Up Virtual Environment
-
-```bash
-git clone https://github.com/haniae/Team2-CBA-Project.git
-cd Team2-CBA-Project
-python -m venv .venv
-# PowerShell
-.\.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e .
-Copy-Item .env.example .env   # PowerShell
-# cp .env.example .env        # macOS/Linux
-```
-
-### 📦 Complete Package Installation Guide
+> **Note**: For installation steps, see the [Complete Setup Guide](#️-complete-setup-guide) above. This section lists all packages for reference.
 
 #### Prerequisites
 - **Python 3.10+** (Python 3.11 or 3.12 recommended)
@@ -815,63 +1289,7 @@ The chatbot requires the following packages (all automatically installed via `re
 - `flake8>=6.0.0` - Linter
 - `mypy>=1.5.0` - Type checker
 
-#### Installation Verification
-
-After installation, verify everything works:
-
-```bash
-# Check Python version (should be 3.10+)
-python --version
-
-# Verify key packages are installed
-python -c "import fastapi, openai, pandas, sqlalchemy; print('✅ Core packages installed')"
-
-# Run a quick test
-python -c "from finanlyzeos_chatbot.config import load_settings; print('✅ FinalyzeOS imports successfully')"
-```
-
-#### Troubleshooting Installation
-
-**Issue: Package conflicts**
-```bash
-# Create a fresh virtual environment
-deactivate  # Exit current venv
-rm -rf .venv  # Remove old venv (or rmdir /s .venv on Windows)
-python -m venv .venv  # Create new venv
-source .venv/bin/activate  # Activate (or .\.venv\Scripts\activate on Windows)
-pip install --upgrade pip  # Upgrade pip first
-pip install -r requirements.txt  # Reinstall
-```
-
-**Issue: psycopg2 installation fails (Windows)**
-```bash
-# Install pre-compiled binary
-pip install psycopg2-binary
-```
-
-**Issue: TensorFlow/GPU issues**
-```bash
-# For CPU-only installation (if GPU causes issues)
-pip install tensorflow-cpu
-```
-
-**Issue: Memory errors during installation**
-```bash
-# Install packages in smaller batches
-pip install fastapi uvicorn python-dotenv
-pip install openai requests httpx
-pip install pandas numpy
-# ... continue with other packages from requirements.txt
-```
-
-**Issue: Permission errors (Linux/macOS)**
-```bash
-# Use --user flag or ensure virtual environment is activated
-pip install --user -r requirements.txt
-# OR ensure venv is activated:
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+> **📖 For installation verification and troubleshooting, see the [Complete Setup Guide](#️-complete-setup-guide) above.**
 
 ### 📊 PowerPoint Export & Analyst Documentation
 
@@ -966,20 +1384,6 @@ with open("AAPL_analysis.pptx", "wb") as f:
 
 ---
 
-### 2️⃣ Configure Environment Defaults
-
-Open `.env` and update database paths, API keys, and provider toggles. Prefer not to store an OpenAI key in the repo? Put it in `~/.config/finanlyzeos-chatbot/openai_api_key` and the loader will pick it up automatically.
-
-### 3️⃣ (Optional) Warm the Datastore
-
-SQLite tables are created lazily, but you can preload metrics with:
-
-```bash
-python scripts/ingestion/ingest_universe.py --years 5 --chunk-size 25 --sleep 2 --resume
-```
-
-This pulls the sample watch list, respects SEC rate limits, and writes audit events.
-
 ## 💬 Running FinalyzeOS
 
 ### 🖥️ CLI REPL
@@ -1029,7 +1433,9 @@ The /chat response includes structured extras (highlights, trends, comparison_ta
 
 ## 📥 Data Ingestion Guide
 
-FinalyzeOS provides **multiple ingestion strategies** to fit different use cases. This section explains how to populate your database with financial data.
+> **📖 For first-time setup with options for 100, 250, 500, or 1500 companies, see the [Complete Setup Guide - Step 2](#-step-2-choose-your-data-ingestion-option) above.**
+
+FinalyzeOS provides **multiple ingestion strategies** to fit different use cases. This section explains advanced ingestion techniques and gap-filling strategies for existing databases.
 
 ### ⭐ Recommended: Smart Gap Filling Script
 
@@ -1172,159 +1578,43 @@ PY
 
 Restart serve_chatbot.py afterwards so the SPA sees the refreshed metrics.
 
-## 📊 Ingest and Quote Loading (Quick Guide)
+> **📖 For complete data ingestion instructions with options for 100, 250, 500, or 1500 companies, see the [Complete Setup Guide - Step 2](#-step-2-choose-your-data-ingestion-option) above.**
 
-### ✅ Prerequisites
+## 📊 Advanced Ingestion Techniques
 
-- Python 3.10+
-- Create/activate venv and install deps:
-  ```bash
-python -m venv .venv
-  source .venv/bin/activate  # PowerShell: .\\.venv\\Scripts\\Activate.ps1
-pip install -r requirements.txt
-pip install -e .
-  ```
-- Optional but recommended for SEC: set a descriptive User-Agent (not a token):
-  ```bash
-  export SEC_API_USER_AGENT="FinalyzeOSBot/1.0 (you@example.com)"
-  ```
+> **📖 For basic setup and ingestion options (100, 250, 500, or 1500 companies), see the [Complete Setup Guide](#️-complete-setup-guide) above.**
 
-### Ingest the S&P 500 into SQLite
+This section covers advanced ingestion techniques for users who have already completed the basic setup.
 
-SQLite path defaults to data/sqlite/finanlyzeos_chatbot.sqlite3 (configurable via DATABASE_PATH).
+### Advanced Ingestion Options
 
-Pick one of the following forms (both equivalent if you ran pip install -e .).
-
-Module form:
+**Module vs Script Path Forms:**
 ```bash
+# Module form (requires pip install -e .)
 python -m scripts.ingestion.ingest_universe --universe sp500 --years 10 --chunk-size 25 --sleep 2
-```
 
-Script path form:
-```bash
+# Script path form (works without installation)
 python scripts/ingestion/ingest_universe.py --universe sp500 --years 10 --chunk-size 25 --sleep 2
 ```
 
-Notes:
+**Key Options:**
+- `--years 10` - Pulls the most recent 10 fiscal years
+- `--chunk-size 25` - Processes 25 companies per batch
+- `--sleep 2` - Delay between batches (respects SEC rate limits)
+- `--resume` - Resume from last checkpoint (uses `.ingestion_progress.json`)
 
-- --years 10 pulls the most recent 10 fiscal years (cutoff = current_year - years + 1).
-- The job uses a progress file .ingestion_progress.json so re-runs can --resume where they left off.
-- If you see "Nothing to do" but the DB is empty, delete the progress file and re-run:
-  ```bash
-  rm -f .ingestion_progress.json
-  ```
-
-Verify counts:
-
-```python
-python - <<'PY'
-import sqlite3, json
-p='data/sqlite/finanlyzeos_chatbot.sqlite3'
-con=sqlite3.connect(p)
-print(json.dumps({t: con.execute('select count(*) from '+t).fetchone()[0] for t in [
-  'financial_facts','company_filings','market_quotes','metric_snapshots','audit_events','ticker_aliases'
-]}, indent=2))
-PY
-```
-
-### Load market quotes (so price-based ratios populate)
-
-Load via Yahoo Finance in batches to avoid rate limits. Example: load all tickers already present in the DB, 50 per batch:
-
-```python
-python - <<'PY'
-import os, time, sqlite3, subprocess
-db='data/sqlite/finanlyzeos_chatbot.sqlite3'
-con=sqlite3.connect(db)
-tickers=[r[0] for r in con.execute("SELECT DISTINCT ticker FROM financial_facts ORDER BY ticker")]
-BATCH=50
-for i in range(0,len(tickers),BATCH):
-    os.environ['SEC_TICKERS']=",".join(tickers[i:i+BATCH])
-    subprocess.run(['python','-m','scripts.ingestion.load_prices_yfinance'], check=False)
-    time.sleep(1)
-print('Done.')
-PY
-```
-
-Then refresh analytics snapshots to recalculate P/E, EV/EBITDA, dividend yield, TSR, etc. with the latest prices:
-
-```python
-python - <<'PY'
-from finanlyzeos_chatbot.config import load_settings
-from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
-AnalyticsEngine(load_settings()).refresh_metrics(force=True)
-print('Refreshed metric_snapshots.')
-PY
-```
-
-Check the latest quote timestamp:
-
-```python
-python - <<'PY'
-import sqlite3
-con=sqlite3.connect('data/sqlite/finanlyzeos_chatbot.sqlite3')
-print('quotes=',con.execute('select count(*) from market_quotes').fetchone()[0])
-print('latest=',con.execute('select max(quote_time) from market_quotes').fetchone()[0])
-PY
-```
-
-### Windows notes (PowerShell)
-
-- Activate:  .\\.venv\\Scripts\\Activate.ps1
-- Use the script path variant if python -m complains about imports:
-  ```bash
-  python scripts/ingestion/ingest_universe.py --universe sp500 --years 10 --chunk-size 25 --sleep 2
-  ```
-- If you see ModuleNotFoundError: finanlyzeos_chatbot, ensure you ran pip install -e . or set:
-  ```bash
-  $env:PYTHONPATH = (Resolve-Path .\src).Path
-  ```
-
-### Common issues
-
-- "Nothing to do" with --resume: delete .ingestion_progress.json and re-run.
-- Yahoo 429: reduce batch size (env YAHOO_QUOTE_BATCH_SIZE) and add small sleeps; retry.
-- DB path: override with DATABASE_PATH if you don't want the default under data/sqlite/.
-
-### Coverage universe
-
-docs/ticker_names.md lists every tracked company (482 tickers at generation time). Regenerate it—and keep the parser aligned—whenever the universe changes:
-
+**Verify Ingestion:**
 ```bash
-$env:SEC_TICKERS = (Get-Content data/tickers/universe_sp500.txt) -join ','
-python - <<'PY'
-import os
-from pathlib import Path
-import yfinance as yf
-root = Path(__file__).resolve().parent
-tickers = [
-    line.strip()
-    for line in (root / "data" / "tickers" / "universe_sp500.txt").read_text().splitlines()
-    if line.strip()
-]
-pairs = []
-for ticker in tickers:
-    name = None
-    try:
-        info = yf.Ticker(ticker).info
-        name = info.get("longName") or info.get("shortName")
-    except Exception:
-        name = None
-    if not name:
-        name = ticker
-    pairs.append((ticker, name))
-out = root / "docs" / "ticker_names.md"
-out.write_text("## Coverage Universe\n\n" + "\n".join(f"- {name} ({ticker})" for ticker, name in pairs), encoding="utf-8")
-print(f"Updated {out}")
-PY
+python scripts/utility/check_ingestion_status.py
+# Or use the simple checker
+python check_correct_database.py
 ```
 
-To refresh aliases at the same time:
-
-```bash
-export PYTHONPATH=./src
-python scripts/generate_aliases.py
-```
+**Common Issues:**
+- "Nothing to do" with `--resume`: Delete `.ingestion_progress.json` and re-run
+- Yahoo 429 errors: Reduce batch size and add delays between requests
+- DB path: Override with `DATABASE_PATH` environment variable
+- ModuleNotFoundError: Ensure you ran `pip install -e .` or set `PYTHONPATH=./src`
 
 ## ⚙️ Configuration Reference
 

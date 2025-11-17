@@ -4198,7 +4198,7 @@ function buildCompanyUniverseHero() {
   const subtitle = document.createElement("p");
   subtitle.className = "company-universe__subtitle";
   subtitle.textContent =
-    "Explore coverage across every tracked company, segment results, and monitor ingestion progress inside this financial dataset view.";
+    "Explore coverage across every tracked company, segment results, and monitor ingestion progress inside this financial dataset view. The database contains 2.88M+ rows of financial data across 1,505 companies.";
 
   const context = document.createElement("p");
   context.className = "company-universe__context";

@@ -2865,7 +2865,7 @@ function buildCompanyUniverseHero() {
   const subtitle = document.createElement("p");
   subtitle.className = "company-universe__subtitle";
   subtitle.textContent =
-    "Explore coverage across every tracked company, segment results, and monitor ingestion progress inside this financial dataset view.";
+    "Explore coverage across every tracked company, segment results, and monitor ingestion progress inside this financial dataset view. The database contains 2.88M+ rows of financial data across 1,505 companies.";
 
   const context = document.createElement("p");
   context.className = "company-universe__context";
@@ -3409,7 +3409,10 @@ async function renderFilingViewerSection({ container } = {}) {
       <form class="filing-viewer__form" data-role="filing-viewer-form">
         <div class="filing-viewer__form-group">
           <label for="filing-viewer-ticker">Ticker</label>
-          <input id="filing-viewer-ticker" name="ticker" type="text" placeholder="e.g. TSLA" required />
+          <div style="position: relative;">
+            <input id="filing-viewer-ticker" name="ticker" type="text" placeholder="e.g. TSLA or search companies..." required autocomplete="off" list="filing-viewer-ticker-list" />
+            <datalist id="filing-viewer-ticker-list"></datalist>
+          </div>
         </div>
         <div class="filing-viewer__form-group">
           <label for="filing-viewer-metric">Metric (optional)</label>
@@ -3636,6 +3639,25 @@ async function renderFilingViewerSection({ container } = {}) {
       setLoading(false);
     }
   };
+
+  // Load company universe for ticker autocomplete
+  const tickerDatalist = container.querySelector("#filing-viewer-ticker-list");
+  if (tickerDatalist && tickerInput) {
+    loadCompanyUniverseData()
+      .then((companies) => {
+        if (!tickerDatalist || !container.isConnected) return;
+        tickerDatalist.innerHTML = "";
+        companies.forEach((company) => {
+          const option = document.createElement("option");
+          option.value = company.ticker;
+          option.textContent = `${company.ticker} - ${company.company || company.ticker}`;
+          tickerDatalist.appendChild(option);
+        });
+      })
+      .catch((error) => {
+        console.warn("Failed to load company universe for filing viewer:", error);
+      });
+  }
 
   if (form) {
     form.addEventListener("submit", handleSubmit);
