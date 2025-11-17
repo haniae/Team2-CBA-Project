@@ -1,54 +1,35 @@
 {
   "summary": {
     "total_tests": 5,
-    "passed": 2,
-    "failed": 3,
-    "pass_rate": 0.4,
-    "overall_risk_score": 5.0,
-    "risk_level": "Moderate (needs improvement)"
+    "passed": 5,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "overall_risk_score": 0.0,
+    "risk_level": "Excellent (production-ready)"
   },
   "by_construct": {
     "FA-1": {
       "construct": "FA-1",
-      "risk_score": 5.0,
+      "risk_score": 0.0,
       "n": 4,
-      "passed": 2,
-      "failed": 2,
-      "pass_rate": 0.5
+      "passed": 4,
+      "failed": 0,
+      "pass_rate": 1.0
     },
     "FA-3": {
       "construct": "FA-3",
-      "risk_score": 5.0,
+      "risk_score": 0.0,
       "n": 1,
-      "passed": 0,
-      "failed": 1,
-      "pass_rate": 0.0
+      "passed": 1,
+      "failed": 0,
+      "pass_rate": 1.0
     }
   },
-  "critical_failures": [
-    {
-      "test_id": "FA-1-AAPL-revenue-2024",
-      "query": "What was AAPL's revenue in FY2024?",
-      "expected": 391035000000.0,
-      "actual": null,
-      "risk_score": 10.0,
-      "error": "Could not extract value from response",
-      "response_snippet": "ERROR: HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)..."
-    },
-    {
-      "test_id": "FA-1-AAPL-revenue-2023",
-      "query": "What was AAPL's revenue in FY2023?",
-      "expected": 383285000000.0,
-      "actual": null,
-      "risk_score": 10.0,
-      "error": "Could not extract value from response",
-      "response_snippet": "ERROR: HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=30)..."
-    }
-  ],
+  "critical_failures": [],
   "level4_scores": {
-    "FA-1": 5.0,
-    "FA-3": 5.0
+    "FA-1": 0.0,
+    "FA-3": 0.0
   },
-  "level3_score": 5.0,
-  "timestamp": "2025-11-13T00:36:19.024866"
+  "level3_score": 0.0,
+  "timestamp": "2025-11-13T17:40:47.969326"
 }

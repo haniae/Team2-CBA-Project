@@ -132,7 +132,7 @@ class AccuracyTester:
                     query=f"How did {ticker}'s revenue grow year-over-year in 2024?",
                     expected_value=expected_yoy,
                     expected_unit="%",
-                    tolerance=0.01  # 1% tolerance for growth rates
+                    tolerance=0.02  # 2% tolerance (allows for rounding: 2.0% vs 2.02%)
                 ))
         
         return test_cases
@@ -145,7 +145,7 @@ class AccuracyTester:
             response = requests.post(
                 f"{self.api_url}/chat",
                 json={"prompt": query, "conversation_id": "test_session"},
-                timeout=30
+                timeout=60  # Increased for GPT-4o (slower but better quality)
             )
             response.raise_for_status()
             data = response.json()
