@@ -738,8 +738,6 @@ let companyUniverseMetrics = null;
 let companyUniverseTable = null;
 let companyUniverseEmpty = null;
 let companyUniverseSkeleton = null;
-let companyUniverseStatCompanies = null;
-let companyUniverseStatSectors = null;
 let companySearchInput = null;
 let companySectorSelect = null;
 let companyCoverageSelect = null;
@@ -1289,7 +1287,6 @@ async function renderCompanyUniverseSection({ container } = {}) {
 
   container.innerHTML = `
     <div class="company-universe" role="region" aria-live="polite">
-      <h3 class="company-universe__title">Company Universe</h3>
       <div class="company-universe__controls">
         <label class="sr-only" for="company-universe-search-input">Search companies</label>
         <input
@@ -1299,6 +1296,7 @@ async function renderCompanyUniverseSection({ container } = {}) {
           placeholder="Search by company, ticker, or sector"
           autocomplete="off"
         />
+        <button type="button" class="company-universe__search-clear" aria-label="Clear search">×</button>
         <label class="sr-only" for="company-universe-sector-filter">Filter by sector</label>
         <select id="company-universe-sector-filter" data-role="company-universe-sector">
           <option value="">All sectors</option>
@@ -1310,16 +1308,7 @@ async function renderCompanyUniverseSection({ container } = {}) {
           <option value="partial">Partial coverage</option>
           <option value="missing">Missing coverage</option>
         </select>
-      </div>
-      <div class="company-universe__stats" data-role="company-universe-stats">
-        <div class="company-universe__stat">
-          <span class="company-universe__stat-label">Companies</span>
-          <span class="company-universe__stat-value" data-role="company-universe-stat-companies">—</span>
-        </div>
-        <div class="company-universe__stat">
-          <span class="company-universe__stat-label">Sectors</span>
-          <span class="company-universe__stat-value" data-role="company-universe-stat-sectors">—</span>
-        </div>
+        <span class="company-universe__results-count" data-role="company-universe-results-count"></span>
       </div>
       <div class="company-universe__metrics" data-role="company-universe-metrics">
         <div class="utility-loading">Loading coverage snapshot...</div>
@@ -1355,11 +1344,18 @@ async function renderCompanyUniverseSection({ container } = {}) {
         </div>
         <p class="company-universe__empty hidden" data-role="company-universe-empty">
           <span class="company-universe__empty-icon" aria-hidden="true">📊</span>
-          <span>No companies match your search. Adjust filters and try again.</span>
+          <span class="company-universe__empty-title">No companies found</span>
+          <span class="company-universe__empty-message">Try adjusting your search or filters to find what you're looking for.</span>
         </p>
       </div>
     </div>
   `;
+
+  const companyUniverseDiv = container.querySelector(".company-universe");
+  if (companyUniverseDiv) {
+    const hero = buildCompanyUniverseHero();
+    companyUniverseDiv.insertBefore(hero, companyUniverseDiv.firstChild);
+  }
 
   companySearchInput = container.querySelector("[data-role='company-universe-search']");
   companySectorSelect = container.querySelector("[data-role='company-universe-sector']");
@@ -1368,12 +1364,20 @@ async function renderCompanyUniverseSection({ container } = {}) {
   companyUniverseTable = container.querySelector("[data-role='company-universe-table']");
   companyUniverseEmpty = container.querySelector("[data-role='company-universe-empty']");
   companyUniverseSkeleton = container.querySelector("[data-role='company-universe-skeleton']");
-  companyUniverseStatCompanies = container.querySelector("[data-role='company-universe-stat-companies']");
-  companyUniverseStatSectors = container.querySelector("[data-role='company-universe-stat-sectors']");
+  const searchClearButton = container.querySelector(".company-universe__search-clear");
+  const resultsCount = container.querySelector("[data-role='company-universe-results-count']");
 
   if (companySearchInput) {
     companySearchInput.value = "";
     companySearchInput.addEventListener("input", applyCompanyUniverseFilters);
+  }
+  
+  if (searchClearButton && companySearchInput) {
+    searchClearButton.addEventListener("click", () => {
+      companySearchInput.value = "";
+      companySearchInput.dispatchEvent(new Event("input", { bubbles: true }));
+      companySearchInput.focus();
+    });
   }
   if (companySectorSelect) {
     companySectorSelect.value = "";
@@ -1416,8 +1420,6 @@ async function renderCompanyUniverseSection({ container } = {}) {
     companySearchInput = null;
     companySectorSelect = null;
     companyCoverageSelect = null;
-    companyUniverseStatCompanies = null;
-    companyUniverseStatSectors = null;
     if (!container.isConnected) {
       return;
     }
@@ -1893,14 +1895,7 @@ const HELP_SECTIONS = [
       "What is Apple's revenue?",
       "Show Microsoft's EBITDA margin",
       "What's Tesla's free cash flow?",
-      "What is Google's net income?",
-      "Show NVDA's gross margin",
-      "What is META's return on equity?",
       "Analyze Apple",
-      "Show me Tesla's financials",
-      "What's Microsoft's P/E ratio?",
-      "How is NVIDIA performing?",
-      "Compare Apple and Microsoft",
     ],
     delivers: "Direct answers, YoY growth, 3-5 year CAGRs, business drivers, SEC sources, comprehensive sources with clickable links.",
   },
@@ -1927,9 +1922,6 @@ const HELP_SECTIONS = [
       "Compare Apple vs Microsoft margins",
       "Which is better: Tesla or Ford profitability?",
       "Compare AAPL, MSFT, and GOOGL revenue growth",
-      "Compare FAANG stocks",
-      "Compare Apple and Microsoft",
-      "Show me revenue growth for Tesla vs Ford",
     ],
     delivers: "Side-by-side metrics, relative strengths, structural differences, investment implications, comprehensive sources with clickable links.",
   },
@@ -1943,7 +1935,6 @@ const HELP_SECTIONS = [
       "Is Tesla overvalued?",
       "What's Microsoft's EV/EBITDA?",
       "Compare Apple's P/E to the S&P 500 average",
-      "What's Amazon's PEG ratio?",
     ],
     delivers: "Valuation metrics (P/E, EV/EBITDA, P/B, PEG), peer comparison, historical ranges.",
   },
@@ -1955,9 +1946,8 @@ const HELP_SECTIONS = [
     examples: [
       "What's Tesla's debt-to-equity ratio?",
       "How leveraged is Apple?",
-      "What's Microsoft's net debt?",
       "What are the key risks for Tesla?",
-      "What's Apple's interest coverage ratio?",
+      "What's Microsoft's net debt?",
     ],
     delivers: "Balance sheet metrics, leverage ratios, credit analysis, risk factors from 10-K.",
   },
@@ -1971,7 +1961,6 @@ const HELP_SECTIONS = [
       "What's Apple's gross margin trend?",
       "Which is more profitable: Microsoft or Google?",
       "What's driving Tesla's margin compression?",
-      "Compare EBITDA margins across FAANG",
     ],
     delivers: "Margin breakdown, multi-year trends, peer comparison, drivers of margin changes.",
   },
@@ -1984,7 +1973,6 @@ const HELP_SECTIONS = [
       "Is Apple growing faster than Microsoft?",
       "What's Tesla's revenue CAGR?",
       "How fast is Amazon growing?",
-      "What's Apple's earnings growth?",
       "What's the revenue forecast for Microsoft?",
     ],
     delivers: "Historical growth rates (3-5 years), segment breakdown, growth drivers, analyst forecasts.",
@@ -1998,7 +1986,6 @@ const HELP_SECTIONS = [
       "What's Apple's free cash flow?",
       "How much cash does Microsoft generate?",
       "How is Amazon allocating capital?",
-      "What's Microsoft's dividend yield?",
       "Is Apple doing share buybacks?",
     ],
     delivers: "Cash flow statements, FCF trends, capex plans, dividend history, buyback programs.",
@@ -2013,7 +2000,6 @@ const HELP_SECTIONS = [
       "What's the bull case for Tesla?",
       "What's the bear case for Apple?",
       "What are the catalysts for Amazon?",
-      "Why is Netflix stock down?",
     ],
     delivers: "Investment thesis, bull/bear arguments, catalysts, valuation vs fundamentals, risk/reward.",
   },
@@ -2026,7 +2012,6 @@ const HELP_SECTIONS = [
       "Who are Apple's main competitors?",
       "What's Tesla's market share?",
       "What's Apple's moat?",
-      "Is Apple losing share to Samsung?",
       "How competitive is the smartphone market?",
     ],
     delivers: "Competitor analysis, market share data, competitive advantages, industry structure.",
@@ -2040,7 +2025,6 @@ const HELP_SECTIONS = [
       "How is Apple's management performing?",
       "What's Tesla's strategy for growth?",
       "How is Microsoft allocating capital?",
-      "What's Apple's board composition?",
       "Is Apple's capital allocation shareholder-friendly?",
     ],
     delivers: "Management track record, strategic initiatives, capital allocation, governance structure.",
@@ -2054,7 +2038,6 @@ const HELP_SECTIONS = [
       "How is the tech sector performing?",
       "What's the outlook for semiconductors?",
       "Compare retail vs e-commerce stocks",
-      "What are the trends in the auto industry?",
       "How is AI affecting tech stocks?",
     ],
     delivers: "Sector metrics, industry trends, competitive dynamics, regulatory changes, macro factors.",
@@ -2069,10 +2052,6 @@ const HELP_SECTIONS = [
       "What's the price target for Microsoft?",
       "What's the institutional ownership of Apple?",
       "Have there been recent upgrades on Tesla?",
-      "Who are the largest holders of Microsoft?",
-      "What's the consensus rating on Tesla?",
-      "Are institutions buying or selling Amazon?",
-      "Have there been recent insider purchases at Apple?",
     ],
     delivers: "Analyst ratings (Buy/Hold/Sell), price targets, institutional holdings, insider transactions, comprehensive sources with clickable links.",
   },
@@ -2086,7 +2065,6 @@ const HELP_SECTIONS = [
       "What's the impact of inflation on Apple?",
       "How is Apple affected by recession?",
       "How do currency fluctuations impact Microsoft's earnings?",
-      "What's the recession risk for tech?",
     ],
     delivers: "Economic sensitivity analysis, historical correlations, geographic revenue breakdown, hedging strategies.",
   },
@@ -2100,7 +2078,6 @@ const HELP_SECTIONS = [
       "How sustainable is Tesla's business?",
       "What's Microsoft's carbon footprint?",
       "Does Microsoft have good governance?",
-      "What are Amazon's environmental initiatives?",
     ],
     delivers: "ESG scores, environmental initiatives, social policies, governance structure, controversies.",
   },
@@ -2113,7 +2090,6 @@ const HELP_SECTIONS = [
       "Dashboard AAPL",
       "Show dashboard for Apple",
       "Full dashboard for Microsoft",
-      "Comprehensive dashboard Tesla",
     ],
     delivers: "Interactive charts, KPI cards, trend visualizations, comparison views, export options.",
   },
@@ -2126,7 +2102,6 @@ const HELP_SECTIONS = [
       "What's Apple's exposure to China?",
       "Where does Microsoft's revenue come from?",
       "How important is iPhone to Apple?",
-      "What's the outlook for Tesla's Cybertruck?",
       "Is AWS Amazon's most profitable business?",
     ],
     delivers: "Segment breakdown, geographic revenue, product mix, customer demographics, growth by segment.",
@@ -2159,40 +2134,9 @@ const HELP_SECTIONS = [
     purpose: "Manage portfolios, analyze exposures, calculate risk metrics, optimize, and run scenarios.",
     examples: [
       "Analyze portfolio port_xxxxx",
-      "Analyze my portfolio",
-      "What are my holdings?",
-      "Show my portfolio",
-      "List my portfolio",
       "What's my portfolio risk?",
-      "What is my portfolio risk?",
-      "What's my portfolio CVaR?",
-      "What is the CVAR for this portfolio",
-      "What's my portfolio VaR?",
-      "What's my portfolio volatility?",
-      "Calculate my portfolio volatility",
-      "What's my portfolio Sharpe ratio?",
-      "What's my portfolio Sortino ratio?",
-      "What's my portfolio beta?",
-      "What's my portfolio alpha?",
-      "What's my portfolio tracking error?",
       "What's my portfolio exposure?",
-      "Show my portfolio exposure",
-      "What's my portfolio sector exposure?",
-      "Show my portfolio sector exposure",
-      "What's my portfolio diversification?",
-      "Show my portfolio allocation",
-      "What's my portfolio allocation?",
-      "What's my portfolio factor exposure?",
-      "What's my portfolio performance?",
-      "How is my portfolio performing?",
-      "Calculate my portfolio returns",
       "Optimize my portfolio",
-      "Rebalance my portfolio",
-      "Suggest portfolio improvements",
-      "What are my holdings?",
-      "Show my holdings",
-      "List my portfolio holdings",
-      "What stocks are in my portfolio?",
     ],
     delivers: "Holdings, exposures, risk metrics (CVaR, VaR, volatility, Sharpe, Sortino, alpha, beta, tracking error), optimization results, scenario analysis, performance attribution, comprehensive sources with clickable links.",
   },
@@ -2269,17 +2213,18 @@ function renderHelpGuide(content) {
   const article = document.createElement("article");
   article.className = "help-guide";
 
-  const hero = document.createElement("header");
+  // Hero box (summary card)
+  const hero = document.createElement("section");
   hero.className = "help-guide__hero";
 
-  const badge = document.createElement("span");
+  const badge = document.createElement("div");
   badge.className = "help-guide__badge";
   badge.textContent = "📘";
 
   const heroCopy = document.createElement("div");
   heroCopy.className = "help-guide__hero-copy";
 
-  const title = document.createElement("h2");
+  const title = document.createElement("h3");
   title.className = "help-guide__title";
   title.textContent = "Finalyze Copilot — Quick Reference";
 
@@ -2287,21 +2232,138 @@ function renderHelpGuide(content) {
   subtitle.className = "help-guide__subtitle";
   subtitle.textContent = "Ask natural prompts and I will translate them into institutional-grade analysis.";
 
-  const promptList = document.createElement("ul");
-  promptList.className = "help-guide__prompts";
-  content.prompts.forEach((prompt) => {
-    const item = document.createElement("li");
-    item.className = "help-guide__prompt";
-    item.textContent = prompt;
-    promptList.append(item);
-  });
-
-  heroCopy.append(title, subtitle, promptList);
+  heroCopy.append(title, subtitle);
   hero.append(badge, heroCopy);
-  article.append(hero);
+
+  // Search Form (similar to KPI Library)
+  const controls = document.createElement("div");
+  controls.className = "help-guide__filters";
+  
+  const searchGroup = document.createElement("div");
+  searchGroup.className = "help-guide__filter help-guide__filter--search";
+  const searchWrapper = document.createElement("div");
+  searchWrapper.className = "help-guide__search-wrapper";
+  const searchInput = document.createElement("input");
+  searchInput.type = "search";
+  searchInput.placeholder = "Search by command, purpose, or example";
+  searchInput.autocomplete = "off";
+  searchInput.className = "help-guide__search";
+  
+  const clearButton = document.createElement("button");
+  clearButton.className = "help-guide__search-clear";
+  clearButton.innerHTML = "×";
+  clearButton.setAttribute("aria-label", "Clear search");
+  clearButton.setAttribute("type", "button");
+  clearButton.addEventListener("click", () => {
+    searchInput.value = "";
+    searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+    searchInput.focus();
+  });
+  
+  searchWrapper.append(searchInput, clearButton);
+  searchGroup.append(searchWrapper);
+  controls.append(searchGroup);
+
+  const categoryGroup = document.createElement("div");
+  categoryGroup.className = "help-guide__filter";
+  const categorySelect = document.createElement("select");
+  categorySelect.className = "help-guide__select";
+  categorySelect.innerHTML = `<option value="">All categories</option>`;
+  const categories = Array.from(
+    new Set(content.sections.map((section) => section.title || "").filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+  categories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category;
+    option.textContent = category;
+    categorySelect.append(option);
+  });
+  categoryGroup.append(categorySelect);
+  controls.append(categoryGroup);
+  
+  // Results counter
+  const resultsCount = document.createElement("span");
+  resultsCount.className = "help-guide__results-count";
+  controls.append(resultsCount);
+
+  // Create sticky container for hero + filters
+  const stickyContainer = document.createElement("div");
+  stickyContainer.className = "help-guide__sticky-container";
+  stickyContainer.append(hero);
+  stickyContainer.append(controls);
+  article.append(stickyContainer);
 
   const sectionGrid = document.createElement("div");
   sectionGrid.className = "help-guide__grid";
+
+  // Filter function
+  const filterCards = () => {
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    const selectedCategory = categorySelect.value;
+
+    const cards = sectionGrid.querySelectorAll(".help-guide__card");
+    let visibleCount = 0;
+
+    cards.forEach((card) => {
+      const title = card.querySelector(".help-guide__card-title")?.textContent || "";
+      const command = card.querySelector(".help-guide__value")?.textContent || "";
+      const purpose = Array.from(card.querySelectorAll(".help-guide__value")).map(el => el.textContent).join(" ") || "";
+      const examples = Array.from(card.querySelectorAll(".help-guide__list li")).map(el => el.textContent).join(" ") || "";
+      
+      const matchesSearch = !searchTerm || 
+        title.toLowerCase().includes(searchTerm) ||
+        command.toLowerCase().includes(searchTerm) ||
+        purpose.toLowerCase().includes(searchTerm) ||
+        examples.toLowerCase().includes(searchTerm);
+      
+      const matchesCategory = !selectedCategory || title === selectedCategory;
+
+      if (matchesSearch && matchesCategory) {
+        card.style.display = "";
+        visibleCount++;
+      } else {
+        card.style.display = "none";
+      }
+    });
+
+    // Update results counter
+    const totalCards = sectionGrid.querySelectorAll(".help-guide__card").length;
+    if (searchTerm || selectedCategory) {
+      resultsCount.textContent = `${visibleCount} of ${totalCards} results`;
+    } else {
+      resultsCount.textContent = "";
+    }
+    
+    // Show empty state if no cards visible
+    let emptyState = sectionGrid.querySelector(".help-guide__empty");
+    if (visibleCount === 0) {
+      if (!emptyState) {
+        emptyState = document.createElement("div");
+        emptyState.className = "help-guide__empty";
+        
+        const icon = document.createElement("div");
+        icon.className = "help-guide__empty-icon";
+        icon.textContent = "🔍";
+        
+        const title = document.createElement("h4");
+        title.className = "help-guide__empty-title";
+        title.textContent = "No results found";
+        
+        const message = document.createElement("p");
+        message.className = "help-guide__empty-message";
+        message.textContent = "Try adjusting your search or filter to find what you're looking for.";
+        
+        emptyState.append(icon, title, message);
+        sectionGrid.append(emptyState);
+      }
+      emptyState.style.display = "flex";
+    } else if (emptyState) {
+      emptyState.style.display = "none";
+    }
+  };
+
+  searchInput.addEventListener("input", filterCards);
+  categorySelect.addEventListener("change", filterCards);
 
   content.sections.forEach((section) => {
     const card = document.createElement("section");
@@ -2391,6 +2453,30 @@ function appendHelpLine(container, label, value, { tokens = false } = {}) {
       const pill = document.createElement("span");
       pill.className = "help-guide__token";
       pill.textContent = token;
+      pill.setAttribute("role", "button");
+      pill.setAttribute("tabindex", "0");
+      pill.setAttribute("aria-label", `Use command: ${token}`);
+      pill.title = `Click to copy: ${token}`;
+      // Add click handler to copy command
+      pill.addEventListener("click", () => {
+        navigator.clipboard.writeText(token).then(() => {
+          const originalText = pill.textContent;
+          pill.textContent = "✓ Copied!";
+          pill.style.color = "#16a34a";
+          setTimeout(() => {
+            pill.textContent = originalText;
+            pill.style.color = "";
+          }, 1500);
+        }).catch(() => {
+          // Fallback: insert into chat input if available
+          const chatInput = document.querySelector("#chat-input, .chat-input, textarea[placeholder*='Ask']");
+          if (chatInput) {
+            chatInput.value = token;
+            chatInput.focus();
+            chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        });
+      });
       tokenGroup.append(pill);
     });
     line.append(tokenGroup);
@@ -2743,7 +2829,7 @@ function buildKpiLibraryHero(data) {
 
   const title = document.createElement("h3");
   title.className = "kpi-library__title";
-  title.textContent = data.library_name || "KPI Library";
+  title.textContent = "KPI Library";
 
   const subtitle = document.createElement("p");
   subtitle.className = "kpi-library__subtitle";
@@ -2755,6 +2841,93 @@ function buildKpiLibraryHero(data) {
 
   copy.append(title);
   copy.append(subtitle);
+
+  hero.append(badge);
+  hero.append(copy);
+  return hero;
+}
+
+function buildCompanyUniverseHero() {
+  const hero = document.createElement("section");
+  hero.className = "company-universe__hero";
+
+  const badge = document.createElement("div");
+  badge.className = "company-universe__badge";
+  badge.textContent = "🏢";
+
+  const copy = document.createElement("div");
+  copy.className = "company-universe__hero-copy";
+
+  const title = document.createElement("h3");
+  title.className = "company-universe__title";
+  title.textContent = "Company Universe";
+
+  const subtitle = document.createElement("p");
+  subtitle.className = "company-universe__subtitle";
+  subtitle.textContent =
+    "Explore coverage across every tracked company, segment results, and monitor ingestion progress inside this financial dataset view.";
+
+  const context = document.createElement("p");
+  context.className = "company-universe__context";
+  context.textContent = "Coverage includes all S&P 500 firms and major tech leaders, refreshed weekly.";
+
+  const status = document.createElement("div");
+  status.className = "company-universe__status";
+
+  // Universe status card
+  const universeCard = document.createElement("div");
+  universeCard.className = "company-universe__status-card";
+  universeCard.setAttribute("role", "status");
+  universeCard.innerHTML = `
+    <span class="company-universe__status-icon" aria-hidden="true">📈</span>
+    <div class="company-universe__status-text">
+      <span class="company-universe__status-label">Universe</span>
+      <span class="company-universe__status-value" data-role="company-universe-meta-universe">Loading...</span>
+    </div>
+  `;
+
+  // Sectors status card
+  const sectorsCard = document.createElement("div");
+  sectorsCard.className = "company-universe__status-card";
+  sectorsCard.setAttribute("role", "status");
+  sectorsCard.innerHTML = `
+    <span class="company-universe__status-icon" aria-hidden="true">🏭</span>
+    <div class="company-universe__status-text">
+      <span class="company-universe__status-label">Sectors</span>
+      <span class="company-universe__status-value" data-role="company-universe-meta-sectors">Loading...</span>
+    </div>
+  `;
+
+  // Latest filing status card
+  const latestCard = document.createElement("div");
+  latestCard.className = "company-universe__status-card";
+  latestCard.setAttribute("role", "status");
+  latestCard.innerHTML = `
+    <span class="company-universe__status-icon" aria-hidden="true">🗓</span>
+    <div class="company-universe__status-text">
+      <span class="company-universe__status-label">Latest filing</span>
+      <span class="company-universe__status-value" data-role="company-universe-meta-latest">Loading...</span>
+    </div>
+  `;
+
+  // Coverage mix status card
+  const coverageCard = document.createElement("div");
+  coverageCard.className = "company-universe__status-card";
+  coverageCard.setAttribute("role", "status");
+  coverageCard.innerHTML = `
+    <span class="company-universe__status-icon" aria-hidden="true">✅</span>
+    <div class="company-universe__status-text">
+      <span class="company-universe__status-label">Coverage mix</span>
+      <span class="company-universe__status-value" data-role="company-universe-meta-coverage">Loading...</span>
+    </div>
+  `;
+
+  status.append(universeCard, sectorsCard, latestCard, coverageCard);
+
+  copy.append(title);
+  copy.append(subtitle);
+  copy.append(context);
+  copy.append(status);
 
   hero.append(badge);
   hero.append(copy);
@@ -3208,8 +3381,9 @@ async function renderFilingViewerSection({ container } = {}) {
 
   container.innerHTML = `
     <div class="filing-viewer">
+      <div class="filing-viewer__sticky-container">
       <section class="filing-viewer__hero">
-        <div class="filing-viewer__badge">FS</div>
+        <div class="filing-viewer__badge">📄</div>
         <div class="filing-viewer__hero-copy">
           <h3 class="filing-viewer__title">Filing Source Viewer</h3>
           <p class="filing-viewer__subtitle">
@@ -3257,6 +3431,7 @@ async function renderFilingViewerSection({ container } = {}) {
           <button type="submit">Fetch filings</button>
         </div>
       </form>
+      </div>
       <div class="filing-viewer__notice">
         <p>Pull SEC-backed facts to validate every KPI. Supply a ticker, then refine by metric or year.</p>
       </div>
@@ -3348,6 +3523,7 @@ async function renderFilingViewerSection({ container } = {}) {
     tableBody.innerHTML = "";
     if (!Array.isArray(items) || !items.length) {
       emptyState.classList.remove("hidden");
+      emptyState.textContent = "No filings match your filters yet.";
       return;
     }
     emptyState.classList.add("hidden");
@@ -3630,21 +3806,21 @@ let currentUtilityKey = null;
 
 const UTILITY_SECTIONS = {
   help: {
-    title: "Copilot Quick Reference",
+    title: "",
     html: HELP_GUIDE_HTML,
   },
   "kpi-library": {
-    title: "KPI Library",
+    title: "",
     html: `<div class="utility-loading">Đang tải KPI library…</div>`,
     render: renderKpiLibrarySection,
   },
   "company-universe": {
-    title: "Company Universe",
+    title: "",
     html: `<div class="utility-loading">Loading company universe…</div>`,
     render: renderCompanyUniverseSection,
   },
   "filing-viewer": {
-    title: "Filing Source Viewer",
+    title: "",
     html: `<div class="filing-viewer" data-role="filing-viewer-root"></div>`,
     render: renderFilingViewerSection,
   },
@@ -3671,7 +3847,7 @@ const UTILITY_SECTIONS = {
     render: renderSettingsSection,
   },
   portfolio: {
-    title: "Portfolio Management",
+    title: "",
     html: `<div class="portfolio-management-panel" data-role="portfolio-management-root">
       <div class="utility-loading">Loading portfolio management...</div>
     </div>`,
@@ -5414,6 +5590,26 @@ function pushProgressEventsInternal(tracker, events) {
     return;
   }
   const container = tracker.container;
+  // Suppress progress UI for universally-formatted ML forecasts
+  try {
+    // If any event indicates the universal formatter, hide progress
+    const hasUniversalFormatterEvent = events.some(
+      (e) => e && typeof e.stage === "string" && e.stage.indexOf("forecast_formatter") !== -1
+    );
+    // Or if the assistant message already contains the institutional sections, hide progress
+    const contentNode = tracker.wrapper?.querySelector(".message-content");
+    const contentText = contentNode ? contentNode.textContent || "" : "";
+    const looksLikeInstitutionalReport =
+      contentText.indexOf("### 1. Executive Summary") !== -1 ||
+      contentText.indexOf("### 2. Forecast Table") !== -1;
+    if (hasUniversalFormatterEvent || looksLikeInstitutionalReport) {
+      container.classList.remove("active", "pending");
+      container.style.display = "none";
+      return;
+    }
+  } catch (err) {
+    // non-fatal; continue rendering progress if detection fails
+  }
   container.classList.add("active");
   container.classList.remove("pending");
   const typingIndicator = tracker.wrapper?.querySelector(".typing-indicator");
@@ -7571,16 +7767,43 @@ function updateCompanyUniverseMeta({
   latestRecord = null,
   coverage = null,
 } = {}) {
-  if (companyUniverseStatCompanies) {
-    if (filteredCount === totalCount) {
-      companyUniverseStatCompanies.textContent = totalCount.toLocaleString();
-    } else {
-      companyUniverseStatCompanies.textContent = `${filteredCount.toLocaleString()} of ${totalCount.toLocaleString()}`;
+  // Update status cards in hero box
+  const heroBox = document.querySelector(".company-universe__hero");
+  if (heroBox) {
+    const universeEl = heroBox.querySelector("[data-role='company-universe-meta-universe']");
+    if (universeEl) {
+      universeEl.textContent = `${totalCount.toLocaleString()} companies tracked`;
     }
-  }
-  
-  if (companyUniverseStatSectors) {
-    companyUniverseStatSectors.textContent = sectorsCount.toLocaleString();
+
+    const sectorsEl = heroBox.querySelector("[data-role='company-universe-meta-sectors']");
+    if (sectorsEl) {
+      sectorsEl.textContent = `${sectorsCount.toLocaleString()} sectors in view`;
+    }
+
+    const latestEl = heroBox.querySelector("[data-role='company-universe-meta-latest']");
+    if (latestEl) {
+      if (latestRecord && latestRecord.latest_filing) {
+        const dateStr = formatDateHuman(latestRecord.latest_filing);
+        const ticker = latestRecord.ticker || "";
+        latestEl.textContent = ticker ? `${dateStr} | ${ticker}` : dateStr;
+      } else {
+        latestEl.textContent = "—";
+      }
+    }
+
+    const coverageEl = heroBox.querySelector("[data-role='company-universe-meta-coverage']");
+    if (coverageEl && coverage) {
+      const { complete = 0, partial = 0, missing = 0 } = coverage;
+      const total = complete + partial + missing;
+      if (total > 0) {
+        const completePercent = Math.round((complete / total) * 100);
+        const partialCount = partial > 0 ? `, ${partial} partial` : "";
+        const missingCount = missing > 0 ? `, ${missing} missing` : "";
+        coverageEl.textContent = `${completePercent}% complete (${complete}${partialCount}${missingCount})`;
+      } else {
+        coverageEl.textContent = "—";
+      }
+    }
   }
 }
 
@@ -7794,6 +8017,18 @@ function applyCompanyUniverseFilters() {
     const matchesCoverage = !coverageFilter || entry.coverage === coverageFilter;
     return matchesTerm && matchesSector && matchesCoverage;
   });
+
+  // Update results counter
+  const resultsCountEl = document.querySelector("[data-role='company-universe-results-count']");
+  if (resultsCountEl) {
+    const totalCount = companyUniverseData.length;
+    const filteredCount = filteredCompanyData.length;
+    if (term || sectorFilter || coverageFilter) {
+      resultsCountEl.textContent = `${filteredCount} of ${totalCount} companies`;
+    } else {
+      resultsCountEl.textContent = "";
+    }
+  }
 
   renderCompanyUniverseMetrics(filteredCompanyData);
   renderCompanyUniverseTable(filteredCompanyData);

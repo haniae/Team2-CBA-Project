@@ -5,9 +5,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from benchmarkos_chatbot import load_settings
-from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot import load_settings
+from finanlyzeos_chatbot.data_ingestion import ingest_live_tickers
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 
 
 def parse_args() -> argparse.Namespace:

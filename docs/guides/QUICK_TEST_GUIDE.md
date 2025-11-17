@@ -9,7 +9,7 @@
 ```bash
 # Terminal 1: Start server
 cd /home/malcolm-munoriyarwa/projects/Team2-CBA-Project
-python -m benchmarkos_chatbot.web
+python -m finanlyzeos_chatbot.web
 
 # Terminal 2: Watch logs (optional)
 tail -f logs/app.log
@@ -215,14 +215,14 @@ Expected: Side-by-side comparison table
 curl http://localhost:8000/health
 
 # Check database size
-ls -lh data/benchmarkos.db
+ls -lh data/finanlyzeos.db
 
 # Check logs for errors
 tail -n 50 logs/app.log | grep ERROR
 
 # Restart server fresh
-pkill -f "benchmarkos_chatbot.web"
-python -m benchmarkos_chatbot.web
+pkill -f "finanlyzeos_chatbot.web"
+python -m finanlyzeos_chatbot.web
 
 # Clear browser cache
 Ctrl+Shift+Delete (Chrome/Firefox)

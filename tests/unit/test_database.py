@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 import sqlite3
 
-from benchmarkos_chatbot import database
-from benchmarkos_chatbot.data_sources import AuditEvent, FinancialFact, FilingRecord, MarketQuote
+from finanlyzeos_chatbot import database
+from finanlyzeos_chatbot.data_sources import AuditEvent, FinancialFact, FilingRecord, MarketQuote
 
 
 @pytest.fixture()

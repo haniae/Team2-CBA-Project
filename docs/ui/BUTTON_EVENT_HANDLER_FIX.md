@@ -70,7 +70,7 @@ selectElement.selectedIndex = 0;
 
 ## Files Modified
 1. `webui/app.js` (lines 2974-3004, 3115-3128)
-2. `src/benchmarkos_chatbot/static/app.js` (lines 2974-3004, 3115-3128)
+2. `src/finanlyzeos_chatbot/static/app.js` (lines 2974-3004, 3115-3128)
 
 ## Technical Details
 

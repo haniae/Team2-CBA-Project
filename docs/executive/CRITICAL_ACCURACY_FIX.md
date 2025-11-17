@@ -86,7 +86,7 @@ CPI Inflation: 3.2%
 
 ### Step 1: Verify Context Builder Separation
 
-Check `src/benchmarkos_chatbot/context_builder.py`:
+Check `src/finanlyzeos_chatbot/context_builder.py`:
 - How does it combine company metrics + FRED data?
 - Are sections clearly labeled?
 - Could LLM confuse them?

@@ -14,11 +14,11 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='repla
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.response_verifier import extract_financial_numbers
-from benchmarkos_chatbot.confidence_scorer import calculate_confidence
-from benchmarkos_chatbot.source_verifier import extract_cited_sources
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.response_verifier import extract_financial_numbers
+from finanlyzeos_chatbot.confidence_scorer import calculate_confidence
+from finanlyzeos_chatbot.source_verifier import extract_cited_sources
 
 print("=" * 80)
 print("ACCURACY VERIFICATION TEST - 100 PROMPTS")
@@ -188,7 +188,7 @@ results = {
 print("\n[INFO] Initializing BenchmarkOS Chatbot...")
 try:
     settings = load_settings()
-    chatbot = BenchmarkOSChatbot.create(settings)
+    chatbot = FinanlyzeOSChatbot.create(settings)
     print("[OK] Chatbot initialized successfully")
 except Exception as e:
     print(f"[ERROR] Failed to initialize chatbot: {e}")

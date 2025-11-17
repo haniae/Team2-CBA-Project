@@ -1,0 +1,1671 @@
+"""Shared helpers for building CFI dashboard payloads and formatting."""
+
+from __future__ import annotations
+
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING
+
+from . import database
+from .analytics_engine import METRIC_LABELS, MULTIPLE_METRICS, PERCENTAGE_METRICS
+
+if TYPE_CHECKING:
+    from .analytics_engine import AnalyticsEngine
+
+DASHBOARD_KPI_ORDER: Tuple[str, ...] = (
+    # Growth Metrics
+    "revenue_cagr",
+    "revenue_cagr_3y",
+    "eps_cagr",
+    "eps_cagr_3y",
+    "ebitda_growth",
+    
+    # Profitability Metrics
+    "ebitda_margin",
+    "gross_margin",
+    "operating_margin",
+    "net_margin",
+    "profit_margin",
+    
+    # Returns
+    "return_on_assets",
+    "return_on_equity",
+    "return_on_invested_capital",
+    
+    # Cash Flow Metrics
+    "free_cash_flow_margin",
+    "cash_conversion",
+    
+    # Liquidity Metrics
+    "current_ratio",
+    "quick_ratio",
+    
+    # Leverage Metrics
+    "debt_to_equity",
+    "interest_coverage",
+    
+    # Efficiency Metrics
+    "asset_turnover",
+    
+    # Valuation Metrics
+    "pe_ratio",
+    "ev_ebitda",
+    "pb_ratio",
+    "peg_ratio",
+    
+    # Shareholder Returns
+    "dividend_yield",
+    "tsr",
+    "share_buyback_intensity",
+)
+
+
+def _normalise_ticker_symbol(value: str) -> str:
+    """Return canonical ticker form used by the datastore (share classes -> dash)."""
+    symbol = (value or "").strip().upper()
+    return symbol.replace(".", "-")
+
+
+def _display_ticker_symbol(symbol: str) -> str:
+    """Convert canonical datastore ticker to a UI-friendly representation."""
+    if "-" in symbol:
+        return symbol.replace("-", ".")
+    return symbol
+
+
+def _metric_year(record: Optional[database.MetricRecord]) -> Optional[int]:
+    """Extract a fiscal year from a metric snapshot."""
+    if record is None:
+        return None
+    if record.end_year:
+        return int(record.end_year)
+    if record.start_year:
+        return int(record.start_year)
+    if record.period:
+        matches = re.findall(r"\d{4}", record.period)
+        if matches:
+            try:
+                return int(matches[-1])
+            except ValueError:
+                return None
+    return None
+
+
+def _format_billions(value: Optional[float]) -> Optional[float]:
+    """Scale raw currency values to billions with compact precision."""
+    if value is None:
+        return None
+    scaled = value / 1_000_000_000
+    magnitude = abs(scaled)
+    if magnitude >= 100:
+        return round(scaled, 2)
+    if magnitude >= 10:
+        return round(scaled, 2)
+    return round(scaled, 2)
+
+
+def _format_percent(value: Optional[float]) -> Optional[float]:
+    """Convert fractional metrics into percentage values."""
+    if value is None:
+        return None
+    return round(value * 100, 2)
+
+
+def _format_number(value: Optional[float], decimals: int = 2) -> Optional[str]:
+    """Format a float with trimmed trailing zeroes."""
+    if value is None:
+        return None
+    formatted = f"{value:.{decimals}f}"
+    return formatted.rstrip("0").rstrip(".")
+
+
+def _lookup_company_name(database_path: Path, ticker: str) -> Optional[str]:
+    """Fetch a human-readable company name for the supplied ticker."""
+    try:
+        with database.temporary_connection(database_path) as connection:
+            row = connection.execute(
+                """
+                SELECT company_name
+                FROM ticker_aliases
+                WHERE ticker = ? AND company_name <> ''
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (ticker,),
+            ).fetchone()
+            if row and row[0]:
+                return str(row[0])
+            row = connection.execute(
+                """
+                SELECT company_name
+                FROM financial_facts
+                WHERE ticker = ? AND company_name <> ''
+                ORDER BY ingested_at DESC
+                LIMIT 1
+                """,
+                (ticker,),
+            ).fetchone()
+            if row and row[0]:
+                return str(row[0])
+    except Exception:  # pragma: no cover - best-effort lookup
+        return None
+    return None
+
+
+def _latest_metric_value(
+    latest: Dict[str, database.MetricRecord],
+    *names: str,
+) -> Optional[float]:
+    """Return the newest available metric value matching any of the supplied aliases."""
+    for name in names:
+        record = latest.get(name)
+        if record and record.value is not None:
+            try:
+                return float(record.value)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def _round_two(value: Optional[float]) -> Optional[float]:
+    """Round a float to two decimal places when present."""
+    if value is None:
+        return None
+    return round(value, 2)
+
+
+def _format_kpi_value(value: Optional[float], value_type: str) -> str:
+    """Format KPI values based on their type."""
+    if value is None:
+        return "N/A"
+    
+    if value_type == "percent":
+        # Convert decimal to percentage (e.g., 0.12 -> 12.00%)
+        return f"{value * 100:.2f}%"
+    elif value_type == "multiple":
+        # Format multiples with 2 decimal places (e.g., 1.50x)
+        return f"{value:.2f}x"
+    else:
+        # Format large numbers with suffixes
+        abs_value = abs(value)
+        if abs_value >= 1_000_000_000:
+            return f"${value/1_000_000_000:.2f}B"
+        elif abs_value >= 1_000_000:
+            return f"${value/1_000_000:.2f}M"
+        elif abs_value >= 1_000:
+            return f"${value/1_000:.2f}K"
+        else:
+            return f"${value:.2f}"
+
+
+def _build_kpi_summary(
+    latest: Dict[str, database.MetricRecord],
+) -> List[Dict[str, Any]]:
+    """Assemble the ordered KPI list used by the dashboard scorecard."""
+    summary: List[Dict[str, Any]] = []
+    for metric_id in DASHBOARD_KPI_ORDER:
+        record = latest.get(metric_id)
+        value = _latest_metric_value(latest, metric_id)
+        
+        # Determine value type
+        value_type = "percent" if metric_id in PERCENTAGE_METRICS else \
+                     "multiple" if metric_id in MULTIPLE_METRICS else \
+                     "number"
+        
+        entry: Dict[str, Any] = {
+            "id": metric_id,
+            "label": METRIC_LABELS.get(metric_id, metric_id.replace("_", " ").title()),
+            "value": value,
+            "formatted_value": _format_kpi_value(value, value_type),
+            "type": value_type,
+        }
+        if record:
+            period_label = record.period
+            if not period_label:
+                period = _metric_year(record)
+                period_label = f"FY{period}" if period else None
+            if period_label:
+                entry["period"] = period_label
+            if getattr(record, "source", None):
+                entry["source"] = record.source
+            if getattr(record, "updated_at", None):
+                entry["updated_at"] = record.updated_at.isoformat()
+        summary.append(entry)
+    return summary
+
+
+def _build_kpi_series(
+    records: Iterable[database.MetricRecord],
+) -> Dict[str, Dict[str, Any]]:
+    """Collect KPI trend series for drill-down interactions."""
+    series_by_metric: Dict[str, Dict[str, Any]] = {}
+    for metric_id in DASHBOARD_KPI_ORDER:
+        series = _collect_series(records, metric_id)
+        if not series:
+            continue
+        years = sorted(series)
+        series_by_metric[metric_id] = {
+            "type": "percent" if metric_id in PERCENTAGE_METRICS else "multiple" if metric_id in MULTIPLE_METRICS else "number",
+            "years": years,
+            "values": [series[year] for year in years],
+        }
+    return series_by_metric
+
+
+def _collect_sources(
+    latest: Dict[str, database.MetricRecord],
+    engine: Optional["AnalyticsEngine"] = None,
+) -> List[Dict[str, Any]]:
+    """Summarise source provenance for dashboard metrics with clickable URLs."""
+    import json
+    
+    # Suppress debug output in production by checking if we're in verbose mode
+    verbose = False  # Set to True for debugging
+    if verbose:
+        print(f"\n🔍 Processing {len(latest)} metrics for source URLs...")
+    
+    sources: List[Dict[str, Any]] = []
+    for metric_id, record in latest.items():
+        if not record or not getattr(record, "source", None):
+            continue
+        
+        # Build basic entry
+        entry: Dict[str, Any] = {
+            "ticker": record.ticker,
+            "metric": metric_id,
+            "label": METRIC_LABELS.get(metric_id, metric_id.replace("_", " ").title()),
+            "source": record.source,
+            "value": record.value,
+        }
+        if record.period:
+            entry["period"] = record.period
+        else:
+            year = _metric_year(record)
+            if year:
+                entry["period"] = f"FY{year}"
+        if record.updated_at:
+            entry["updated_at"] = record.updated_at.isoformat()
+        
+        # Build text descriptor for chatbot-style citation (ALWAYS, not just when URL exists)
+        parts = [
+            record.ticker,
+            entry["label"],
+            entry.get("period"),
+            str(record.value) if record.value is not None else None,
+        ]
+        
+        # Try to add SEC EDGAR URL and form if engine is available
+        if engine and hasattr(engine, 'financial_facts'):
+            try:
+                fiscal_year = record.end_year or _metric_year(record)
+                if not fiscal_year:
+                    if verbose:
+                        print(f"⚠ {entry['label']}: No fiscal year found")
+                else:
+                    # Try to find financial facts for this year or earlier years (up to 2 years back)
+                    fact_records = None
+                    for year_offset in range(3):  # Try current year, then -1, then -2
+                        try_year = fiscal_year - year_offset
+                        fact_records = engine.financial_facts(
+                            ticker=record.ticker,
+                            fiscal_year=try_year,
+                            metric=metric_id,
+                            limit=1,
+                        )
+                        if fact_records:
+                            break
+                    
+                    if not fact_records:
+                        if verbose:
+                            print(f"⚠ {entry['label']}: No financial_facts found for FY{fiscal_year} or earlier")
+                    else:
+                        fact = fact_records[0]
+                        raw_payload = fact.raw or {}
+                        if isinstance(raw_payload, str):
+                            try:
+                                raw_payload = json.loads(raw_payload)
+                            except Exception:
+                                raw_payload = {}
+                        
+                        # Extract accession and form
+                        accession = None
+                        if isinstance(raw_payload, dict):
+                            accession = raw_payload.get("accn") or raw_payload.get("accession")
+                            if raw_payload.get("form"):
+                                entry["form"] = raw_payload.get("form")
+                                parts.append(entry["form"])  # Add form to text descriptor
+                        accession = accession or fact.source_filing
+                        
+                        if not accession:
+                            if verbose:
+                                print(f"⚠ {entry['label']}: No accession number in fact record")
+                        elif not fact.cik:
+                            if verbose:
+                                print(f"⚠ {entry['label']}: No CIK in fact record")
+                        else:
+                            # Build SEC EDGAR URLs (matching web.py format)
+                            clean_cik = fact.cik.lstrip("0") or fact.cik
+                            accession_no_dash = accession.replace("-", "")
+                            
+                            # Interactive viewer URL
+                            interactive_url = (
+                                f"https://www.sec.gov/cgi-bin/viewer"
+                                f"?action=view&cik={clean_cik}&accession_number={accession}&xbrl_type=v"
+                            )
+                            
+                            # Detail/archive URL
+                            detail_url = (
+                                f"https://www.sec.gov/Archives/edgar/data/{clean_cik}/{accession_no_dash}/{accession}-index.html"
+                            )
+                            
+                            # Search URL
+                            search_url = (
+                                f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={clean_cik}"
+                            )
+                            
+                            # Store in both formats for compatibility
+                            entry["url"] = interactive_url  # Flat format - use interactive as primary
+                            entry["urls"] = {
+                                "interactive": interactive_url,
+                                "detail": detail_url,
+                                "search": search_url
+                            }
+                            if verbose:
+                                print(f"✓ Generated URLs for {entry['label']}: {interactive_url[:80]}...")
+            except Exception as e:
+                # Log the error for debugging (only in verbose mode)
+                if verbose:
+                    print(f"⚠ {entry.get('label', metric_id)}: Exception - {str(e)[:100]}")
+        
+        # Always set the text descriptor
+        descriptor = " • ".join(str(p) for p in parts if p)
+        entry["text"] = descriptor
+        
+        # Add calculation info for derived metrics that don't have direct SEC URLs
+        # This includes metrics marked as "edgar", "SEC", "derived", or any calculated metric
+        if not entry.get("url") and record.source in ("edgar", "SEC", "derived"):
+            calculation_info = _get_calculation_info(metric_id)
+            if calculation_info:
+                entry["calculation"] = calculation_info
+                entry["note"] = "Calculated from SEC filing components"
+        
+        # Add attribution for market data sources
+        if not entry.get("url") and record.source in ("market_data", "IMF", "imf"):
+            entry["note"] = "Market data / External source"
+            entry["source_type"] = "market_data"
+        
+        sources.append(entry)
+    sources.sort(key=lambda item: item.get("label") or item["metric"])
+    
+    if verbose:
+        url_count = sum(1 for s in sources if s.get("url"))
+        print(f"📊 Source URL Summary: {url_count}/{len(sources)} sources have clickable SEC URLs\n")
+    
+    return sources
+
+
+def _build_interactions(
+    kpi_series: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Create interaction metadata consumed by the web dashboard."""
+    drilldowns: List[Dict[str, Any]] = []
+    for metric_id in DASHBOARD_KPI_ORDER:
+        if metric_id not in kpi_series:
+            continue
+        drilldowns.append(
+            {
+                "id": metric_id,
+                "label": METRIC_LABELS.get(metric_id, metric_id.replace("_", " ").title()),
+                "default_view": "trend",
+                "data_refs": {
+                    "series": f"kpi_series.{metric_id}",
+                    "summary_id": metric_id,
+                },
+            }
+        )
+
+    interactions: Dict[str, Any] = {
+        "kpis": {
+            "drilldowns": drilldowns,
+            "default_mode": "trend",
+        },
+        "charts": {
+            "controls": {
+                "modes": ["absolute", "growth"],
+                "default": "absolute",
+            }
+        },
+        "sources": {
+            "enabled": True,
+            "types": ["filing", "market_data", "derived"],
+        },
+    }
+    return interactions
+
+
+def _build_peer_config(
+    engine: "AnalyticsEngine",
+    ticker: str,
+) -> Dict[str, Any]:
+    """Return peer selector configuration for the dashboard."""
+    benchmark_label = engine.benchmark_label()
+    peer_config: Dict[str, Any] = {
+        "focus_ticker": ticker,
+        "default_peer_group": "benchmark",
+        "max_peers": 5,
+        "supports_custom": True,
+        "benchmark_label": benchmark_label,
+        "available_peer_groups": [
+            {
+                "id": "benchmark",
+                "label": benchmark_label,
+                "tickers": [],
+            },
+            {
+                "id": "custom",
+                "label": "Custom selection",
+                "tickers": [],
+            },
+        ],
+    }
+    return peer_config
+
+
+def _valuation_per_share(
+    latest: Dict[str, database.MetricRecord],
+) -> Optional[Dict[str, Optional[float]]]:
+    """Derive simple valuation scenarios (per share) from available metrics."""
+    shares = _latest_metric_value(latest, "shares_outstanding", "weighted_avg_diluted_shares")
+    if not shares or shares <= 0:
+        return None
+
+    net_income = _latest_metric_value(latest, "net_income")
+    pe_ratio = _latest_metric_value(latest, "pe_ratio")
+    ebitda = _latest_metric_value(latest, "ebitda")
+    free_cash_flow = _latest_metric_value(latest, "free_cash_flow")
+    ev_ebitda = _latest_metric_value(latest, "ev_ebitda")
+    cash = _latest_metric_value(latest, "cash_and_cash_equivalents", "cash")
+    total_debt = _latest_metric_value(latest, "total_debt", "long_term_debt")
+
+    eps = None
+    if net_income is not None:
+        eps = net_income / shares
+
+    market_price = None
+    if eps is not None and pe_ratio not in (None, 0):
+        market_price = eps * pe_ratio
+
+    fcf_per_share = None
+    if free_cash_flow is not None:
+        fcf_per_share = free_cash_flow / shares
+
+    comps_price = None
+    if ebitda is not None and ev_ebitda not in (None, 0):
+        enterprise_value = ebitda * ev_ebitda
+        net_debt = (total_debt or 0.0) - (cash or 0.0)
+        equity_value = enterprise_value - net_debt
+        comps_price = equity_value / shares if shares else None
+
+    if market_price is None:
+        market_price = comps_price
+
+    if fcf_per_share is None and market_price is not None:
+        # Back into a proxy FCF multiple when only market pricing exists
+        fcf_per_share = market_price / 18.0
+
+    if market_price is None and fcf_per_share is None:
+        return None
+
+    dcf_base = None
+    if fcf_per_share is not None:
+        dcf_base = fcf_per_share * 18.0
+
+    if dcf_base is None:
+        dcf_base = market_price
+
+    if dcf_base is None:
+        return None
+
+    dcf_bull = dcf_base * 1.15
+    dcf_bear = dcf_base * 0.85
+    comps_value = comps_price or market_price
+
+    return {
+        "dcf_base": _round_two(dcf_base),
+        "dcf_bull": _round_two(dcf_bull),
+        "dcf_bear": _round_two(dcf_bear),
+        "comps": _round_two(comps_value),
+        "market": _round_two(market_price),
+    }
+
+
+def _get_calculation_info(metric_id: str) -> Optional[Dict[str, Any]]:
+    """Return calculation formula and component metrics for derived metrics."""
+    calculations = {
+        # Cash Flow Metrics
+        "free_cash_flow": {
+            "formula": "Cash from Operations - Capital Expenditures",
+            "components": ["cash_from_operations", "capital_expenditures"],
+            "display": "FCF = CFO - CapEx"
+        },
+        "cash_from_operations": {
+            "formula": "From Cash Flow Statement",
+            "components": ["net_income"],
+            "display": "Operating Cash Flow"
+        },
+        
+        # Dividend Metrics
+        "dividends_per_share": {
+            "formula": "Total Dividends Paid / Weighted Average Shares",
+            "components": ["dividends_paid", "weighted_avg_diluted_shares"],
+            "display": "DPS = Dividends / Shares"
+        },
+        "dividends_paid": {
+            "formula": "Total Cash Dividends from Cash Flow Statement",
+            "components": ["cash_from_financing"],
+            "display": "Dividends from CFS"
+        },
+        
+        # Depreciation & Amortization
+        "depreciation_and_amortization": {
+            "formula": "Derived from Cash Flow Statement",
+            "components": ["cash_from_operations"],
+            "display": "D&A from CFS"
+        },
+        
+        # EBITDA Metrics
+        "ebitda": {
+            "formula": "Operating Income + Depreciation & Amortization",
+            "components": ["operating_income", "depreciation_and_amortization"],
+            "display": "EBITDA = EBIT + D&A"
+        },
+        "ebitda_margin": {
+            "formula": "EBITDA / Revenue",
+            "components": ["ebitda", "revenue"],
+            "display": "EBITDA Margin = EBITDA / Revenue"
+        },
+        "ebitda_growth": {
+            "formula": "(Current EBITDA - Prior EBITDA) / Prior EBITDA",
+            "components": ["ebitda"],
+            "display": "EBITDA Growth = ΔEB ITDA / Prior EBITDA"
+        },
+        
+        # Profitability Margins
+        "gross_margin": {
+            "formula": "Gross Profit / Revenue",
+            "components": ["gross_profit", "revenue"],
+            "display": "Gross Margin = GP / Revenue"
+        },
+        "gross_profit": {
+            "formula": "Revenue - Cost of Goods Sold",
+            "components": ["revenue", "cost_of_goods_sold"],
+            "display": "Gross Profit = Revenue - COGS"
+        },
+        "operating_margin": {
+            "formula": "Operating Income / Revenue",
+            "components": ["operating_income", "revenue"],
+            "display": "Operating Margin = OI / Revenue"
+        },
+        "net_margin": {
+            "formula": "Net Income / Revenue",
+            "components": ["net_income", "revenue"],
+            "display": "Net Margin = NI / Revenue"
+        },
+        "profit_margin": {
+            "formula": "Net Income / Revenue",
+            "components": ["net_income", "revenue"],
+            "display": "Profit Margin = NI / Revenue"
+        },
+        "free_cash_flow_margin": {
+            "formula": "Free Cash Flow / Revenue",
+            "components": ["free_cash_flow", "revenue"],
+            "display": "FCF Margin = FCF / Revenue"
+        },
+        
+        # Growth Metrics
+        "revenue_cagr": {
+            "formula": "Compound Annual Growth Rate of Revenue",
+            "components": ["revenue"],
+            "display": "CAGR = (Ending/Beginning)^(1/years) - 1"
+        },
+        "eps_cagr": {
+            "formula": "Compound Annual Growth Rate of EPS",
+            "components": ["net_income", "shares_outstanding"],
+            "display": "EPS CAGR"
+        },
+        "revenue_cagr_(3y)": {
+            "formula": "3-Year Compound Annual Growth Rate of Revenue",
+            "components": ["revenue"],
+            "display": "3Y Revenue CAGR"
+        },
+        "revenue_cagr_3y": {
+            "formula": "3-Year Compound Annual Growth Rate of Revenue",
+            "components": ["revenue"],
+            "display": "3Y Revenue CAGR"
+        },
+        "eps_cagr_(3y)": {
+            "formula": "3-Year Compound Annual Growth Rate of EPS",
+            "components": ["net_income", "shares_outstanding"],
+            "display": "3Y EPS CAGR"
+        },
+        "eps_cagr_3y": {
+            "formula": "3-Year Compound Annual Growth Rate of EPS",
+            "components": ["net_income", "shares_outstanding"],
+            "display": "3Y EPS CAGR"
+        },
+        "ev/ebitda": {
+            "formula": "Enterprise Value / EBITDA",
+            "components": ["enterprise_value", "ebitda"],
+            "display": "EV/EBITDA Multiple"
+        },
+        "ev_ebitda": {
+            "formula": "Enterprise Value / EBITDA",
+            "components": ["enterprise_value", "ebitda"],
+            "display": "EV/EBITDA Multiple"
+        },
+        "p/e_ratio": {
+            "formula": "Price / Earnings Per Share",
+            "components": ["market_cap", "net_income"],
+            "display": "P/E = Price / EPS"
+        },
+        "pe_ratio": {
+            "formula": "Price / Earnings Per Share",
+            "components": ["market_cap", "net_income"],
+            "display": "P/E = Price / EPS"
+        },
+        "p/b_ratio": {
+            "formula": "Price / Book Value Per Share",
+            "components": ["market_cap", "shareholders_equity"],
+            "display": "P/B = Market Cap / Book Value"
+        },
+        "pb_ratio": {
+            "formula": "Price / Book Value Per Share",
+            "components": ["market_cap", "shareholders_equity"],
+            "display": "P/B = Market Cap / Book Value"
+        },
+        
+        # Return Metrics
+        "return_on_assets": {
+            "formula": "Net Income / Total Assets",
+            "components": ["net_income", "total_assets"],
+            "display": "ROA = NI / Total Assets"
+        },
+        "roa": {
+            "formula": "Net Income / Total Assets",
+            "components": ["net_income", "total_assets"],
+            "display": "ROA = NI / Total Assets"
+        },
+        "return_on_equity": {
+            "formula": "Net Income / Shareholders' Equity",
+            "components": ["net_income", "shareholders_equity"],
+            "display": "ROE = NI / Equity"
+        },
+        "roe": {
+            "formula": "Net Income / Shareholders' Equity",
+            "components": ["net_income", "shareholders_equity"],
+            "display": "ROE = NI / Equity"
+        },
+        "return_on_invested_capital": {
+            "formula": "NOPAT / Invested Capital",
+            "components": ["operating_income", "total_assets", "current_liabilities"],
+            "display": "ROIC = NOPAT / Invested Capital"
+        },
+        "roic": {
+            "formula": "NOPAT / Invested Capital",
+            "components": ["operating_income", "total_assets", "current_liabilities"],
+            "display": "ROIC = NOPAT / Invested Capital"
+        },
+        
+        # Liquidity Ratios
+        "current_ratio": {
+            "formula": "Current Assets / Current Liabilities",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "Current Ratio = CA / CL"
+        },
+        "quick_ratio": {
+            "formula": "(Current Assets - Inventory) / Current Liabilities",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "Quick Ratio = (CA - Inv) / CL"
+        },
+        "cash_ratio": {
+            "formula": "Cash / Current Liabilities",
+            "components": ["cash_and_cash_equivalents", "current_liabilities"],
+            "display": "Cash Ratio = Cash / CL"
+        },
+        
+        # Leverage Ratios
+        "debt_to_equity": {
+            "formula": "Total Debt / Shareholders' Equity",
+            "components": ["long_term_debt", "shareholders_equity"],
+            "display": "D/E = Debt / Equity"
+        },
+        "interest_coverage": {
+            "formula": "Operating Income / Interest Expense",
+            "components": ["operating_income", "interest_expense"],
+            "display": "Interest Coverage = OI / Interest"
+        },
+        
+        # Efficiency Ratios
+        "asset_turnover": {
+            "formula": "Revenue / Average Total Assets",
+            "components": ["revenue", "total_assets"],
+            "display": "Asset Turnover = Revenue / Assets"
+        },
+        "cash_conversion": {
+            "formula": "Operating Cash Flow / Net Income",
+            "components": ["cash_from_operations", "net_income"],
+            "display": "Cash Conversion = CFO / NI"
+        },
+        
+        # Working Capital
+        "working_capital": {
+            "formula": "Current Assets - Current Liabilities",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "WC = CA - CL"
+        },
+        "working_capital_change": {
+            "formula": "Change in Working Capital",
+            "components": ["current_assets", "current_liabilities"],
+            "display": "ΔWC = WC(t) - WC(t-1)"
+        },
+        
+        # Other Calculated Metrics
+        "short_term_debt": {
+            "formula": "Current portion of long-term debt from Balance Sheet",
+            "components": ["long_term_debt_current", "current_liabilities"],
+            "display": "Short-term Debt from BS"
+        },
+        "cash_and_cash_equivalents": {
+            "formula": "Cash and equivalents from Balance Sheet",
+            "components": ["current_assets"],
+            "display": "Cash from BS"
+        },
+        "share_buyback_intensity": {
+            "formula": "Share Repurchases / Market Cap",
+            "components": ["share_repurchases", "shares_outstanding"],
+            "display": "Buyback Intensity = Repurchases / Market Cap"
+        },
+    }
+    return calculations.get(metric_id)
+
+
+def _collect_series(
+    records: Iterable[database.MetricRecord],
+    metric: str,
+    *,
+    scale_billions: bool = False,
+) -> Dict[int, float]:
+    """Return a year -> value mapping for a metric."""
+    series: Dict[int, float] = {}
+    for record in records:
+        if record.metric != metric:
+            continue
+        year = _metric_year(record)
+        if year is None or record.value is None:
+            continue
+        value = float(record.value)
+        if scale_billions:
+            value = value / 1_000_000_000
+        series[year] = value
+    return series
+
+
+def _sanitize_chart_data(chart_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove None/NaN values from chart data to prevent Plotly errors."""
+    import math
+    
+    if not chart_dict:
+        return chart_dict
+    
+    # Helper to check if a value is valid (not None, NaN, or Inf)
+    def is_valid_number(val):
+        if val is None:
+            return False
+        if not isinstance(val, (int, float)):
+            return False
+        if math.isnan(val) or math.isinf(val):
+            return False
+        return True
+    
+    # Find data keys (non-'Year' keys)
+    data_keys = [k for k in chart_dict.keys() if k != "Year" and k != "Case"]
+    if not data_keys:
+        return chart_dict
+    
+    # Get the x-axis (Year or Case)
+    x_key = "Year" if "Year" in chart_dict else ("Case" if "Case" in chart_dict else None)
+    if not x_key or x_key not in chart_dict:
+        return chart_dict
+    
+    x_values = chart_dict[x_key]
+    if not x_values:
+        return {k: [] for k in chart_dict.keys()}
+    
+    data_arrays = {k: chart_dict[k] for k in data_keys}
+    
+    # Filter out indices where ALL data values are invalid
+    valid_indices = []
+    for i in range(len(x_values)):
+        has_valid_data = any(
+            is_valid_number(data_arrays[k][i]) 
+            for k in data_keys 
+            if i < len(data_arrays[k])
+        )
+        if has_valid_data:
+            valid_indices.append(i)
+    
+    # If no valid data, return empty structure
+    if not valid_indices:
+        return {k: [] for k in chart_dict.keys()}
+    
+    # Build filtered chart data, replacing invalid values with 0 for Plotly
+    result = {x_key: [x_values[i] for i in valid_indices]}
+    for k in data_keys:
+        clean_values = []
+        for i in valid_indices:
+            if i < len(data_arrays[k]):
+                val = data_arrays[k][i]
+                # Replace None, NaN, or Inf with 0
+                if is_valid_number(val):
+                    clean_values.append(val)
+                else:
+                    clean_values.append(0)
+            else:
+                clean_values.append(0)
+        result[k] = clean_values
+    
+    return result
+
+
+def _sanitize_table_values(values_list: List[Optional[float]]) -> List[Optional[float]]:
+    """Ensure table values are safe for display, replacing inf/nan with None."""
+    import math
+    result = []
+    for val in values_list:
+        if val is None:
+            result.append(None)
+        elif isinstance(val, (int, float)):
+            if math.isnan(val) or math.isinf(val):
+                result.append(None)
+            else:
+                result.append(val)
+        else:
+            result.append(val)
+    return result
+
+
+def _sanitize_value(val: Optional[float]) -> Optional[float]:
+    """Ensure a single value is safe, replacing NaN/Inf with None."""
+    import math
+    if val is None:
+        return None
+    if not isinstance(val, (int, float)):
+        return None
+    if math.isnan(val) or math.isinf(val):
+        return None
+    return val
+
+
+def _sanitize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively sanitize all numeric values in a dictionary."""
+    import math
+    result = {}
+    for key, val in data.items():
+        if isinstance(val, dict):
+            result[key] = _sanitize_dict(val)
+        elif isinstance(val, list):
+            result[key] = [_sanitize_value(v) if isinstance(v, (int, float)) else v for v in val]
+        elif isinstance(val, (int, float)):
+            result[key] = _sanitize_value(val)
+        else:
+            result[key] = val
+    return result
+
+
+def _collect_series_from_facts(
+    engine: "AnalyticsEngine",
+    ticker: str,
+    metric: str,
+) -> Dict[int, float]:
+    """Query financial_facts directly for a metric and return year -> value mapping."""
+    series: Dict[int, float] = {}
+    try:
+        facts = engine.financial_facts(ticker=ticker, metric=metric)
+        for fact in facts:
+            if fact.fiscal_year and fact.value is not None:
+                series[fact.fiscal_year] = float(fact.value)
+        if series:
+            import logging
+            logging.getLogger(__name__).debug(f"Found {len(series)} years of {metric} from financial_facts for {ticker}")
+    except Exception as e:
+        # If query fails, return empty dict
+        import logging
+        logging.getLogger(__name__).debug(f"Failed to query {metric} from financial_facts for {ticker}: {e}")
+    return series
+
+
+def build_cfi_dashboard_payload(
+    engine: "AnalyticsEngine",
+    ticker: str,
+) -> Optional[Dict[str, Any]]:
+    """Construct the payload expected by ``cfi_dashboard.js`` for a ticker."""
+    from datetime import date as _date  # local import to avoid circular hints
+
+    canonical = _normalise_ticker_symbol(ticker)
+    records = engine.get_metrics(canonical)
+    if not records:
+        return None
+
+    latest = engine._select_latest_records(records, span_fn=engine._period_span)
+    if not latest:
+        return None
+
+    valuations = _valuation_per_share(latest) or {}
+    database_path = Path(engine.settings.database_path)
+    company_name = _lookup_company_name(database_path, canonical) or _display_ticker_symbol(canonical)
+    display_ticker = _display_ticker_symbol(canonical)
+
+    shares = _latest_metric_value(latest, "shares_outstanding", "weighted_avg_diluted_shares")
+    market_cap = _latest_metric_value(latest, "market_cap")
+    enterprise_value = _latest_metric_value(latest, "enterprise_value")
+    total_debt = _latest_metric_value(latest, "total_debt", "long_term_debt")
+    cash = _latest_metric_value(latest, "cash_and_cash_equivalents", "cash")
+    net_debt = None
+    if total_debt is not None or cash is not None:
+        net_debt = (total_debt or 0.0) - (cash or 0.0)
+
+    revenue_latest = latest.get("revenue")
+    revenue_year = _metric_year(revenue_latest)
+
+    price_current = valuations.get("market")
+    price_target = valuations.get("dcf_base")
+    upside_pct = None
+    if price_current not in (None, 0) and price_target is not None:
+        upside_pct = ((price_target / price_current) - 1.0) * 100.0
+
+    recommendation = "Hold"
+    if upside_pct is not None:
+        if upside_pct >= 10:
+            recommendation = "Buy"
+        elif upside_pct <= -5:
+            recommendation = "Sell"
+
+    meta = {
+        "brand": (company_name.split()[0] if company_name else display_ticker).lower(),
+        "company": company_name,
+        "ticker": display_ticker,
+        "recommendation": recommendation,
+        "target_price": price_target,
+        "scenario": "Consensus",
+        "report_tag": "FinanlyzeOS Equity Research",
+        "date": _date.today().isoformat(),
+    }
+
+    price_table = {
+        "Ticker": display_ticker,
+        "Current Price": price_current,
+        "Target Price": price_target,
+        "TP Upside %": upside_pct,
+    }
+
+    overview = {
+        "Company": company_name,
+        "Benchmark": engine.benchmark_label(),
+        "Latest Revenue FY": f"FY{revenue_year}" if revenue_year else None,
+    }
+
+    net_margin = _latest_metric_value(latest, "net_margin")
+    roe = _latest_metric_value(latest, "return_on_equity")
+    fcf_margin = _latest_metric_value(latest, "free_cash_flow_margin")
+    key_stats = {}
+    if net_margin is not None:
+        key_stats["Net margin"] = net_margin
+    if roe is not None:
+        key_stats["ROE"] = roe
+    if fcf_margin is not None:
+        key_stats["FCF margin"] = fcf_margin
+
+    market_data = {}
+    if shares is not None:
+        market_data["Shares O/S (M)"] = shares / 1_000_000
+    if market_cap is not None:
+        market_data["Market Cap ($B)"] = market_cap / 1_000_000_000
+    if net_debt is not None:
+        market_data["Net Debt ($B)"] = net_debt / 1_000_000_000
+    if enterprise_value is not None:
+        market_data["Enterprise Value ($B)"] = enterprise_value / 1_000_000_000
+
+    valuation_table = []
+    if any(value is not None for value in (price_current, price_target, valuations.get("comps"))):
+        valuation_table.append(
+            {
+                "Label": "Share Price",
+                "Market": price_current,
+                "DCF": price_target,
+                "Comps": valuations.get("comps"),
+            }
+        )
+    if enterprise_value is not None:
+        valuation_table.append(
+            {
+                "Label": "Enterprise Value ($B)",
+                "Market": enterprise_value / 1_000_000_000,
+                "DCF": None,
+                "Comps": None,
+            }
+        )
+
+    # Collect all series first
+    revenue_series = _collect_series(records, "revenue")
+    ebitda_series = _collect_series(records, "ebitda")
+    net_income_series = _collect_series(records, "net_income")
+    # If net_income not in metric_snapshots, try financial_facts
+    if not net_income_series:
+        net_income_series = _collect_series_from_facts(engine, canonical, "net_income")
+    
+    net_margin_series = _collect_series(records, "net_margin")
+    fcf_series = _collect_series(records, "free_cash_flow")
+    operating_income_series = _collect_series(records, "operating_income")
+    gross_profit_series = _collect_series(records, "gross_profit")
+    
+    # EPS: Try eps_diluted first, then eps_basic, then eps, then query financial_facts
+    eps_series = _collect_series(records, "eps_diluted")
+    if not eps_series:
+        eps_series = _collect_series(records, "eps_basic")
+    if not eps_series:
+        eps_series = _collect_series(records, "eps")
+    # If still not found, try querying financial_facts directly
+    if not eps_series:
+        eps_series = _collect_series_from_facts(engine, canonical, "eps_diluted")
+    if not eps_series:
+        eps_series = _collect_series_from_facts(engine, canonical, "eps_basic")
+    
+    total_assets_series = _collect_series(records, "total_assets")
+    
+    # Total Debt: Try total_debt first, then calculate from long_term_debt + short_term_debt
+    total_debt_series = _collect_series(records, "total_debt")
+    if not total_debt_series:
+        long_term_debt_series = _collect_series(records, "long_term_debt")
+        short_term_debt_series = _collect_series(records, "short_term_debt")
+        # If components not in metric_snapshots, try financial_facts
+        if not long_term_debt_series:
+            long_term_debt_series = _collect_series_from_facts(engine, canonical, "long_term_debt")
+        if not short_term_debt_series:
+            short_term_debt_series = _collect_series_from_facts(engine, canonical, "short_term_debt")
+        # Calculate total_debt from components
+        total_debt_series = {}
+        all_debt_years = set(long_term_debt_series) | set(short_term_debt_series)
+        for year in all_debt_years:
+            lt_debt = long_term_debt_series.get(year, 0) or 0
+            st_debt = short_term_debt_series.get(year, 0) or 0
+            if lt_debt or st_debt:
+                total_debt_series[year] = lt_debt + st_debt
+    # If still not found, try querying financial_facts directly
+    if not total_debt_series:
+        total_debt_series = _collect_series_from_facts(engine, canonical, "total_debt")
+    
+    # Enterprise Value: Try enterprise_value first, then calculate from market_cap + total_debt - cash
+    enterprise_series = _collect_series(records, "enterprise_value")
+    # If enterprise_value not in metric_snapshots, try financial_facts
+    if not enterprise_series:
+        enterprise_series = _collect_series_from_facts(engine, canonical, "enterprise_value")
+    
+    # If still not found, calculate enterprise_value from market_cap + total_debt - cash
+    if not enterprise_series:
+        market_cap_series = _collect_series(records, "market_cap")
+        if not market_cap_series:
+            market_cap_series = _collect_series_from_facts(engine, canonical, "market_cap")
+        cash_series = _collect_series(records, "cash_and_cash_equivalents")
+        if not cash_series:
+            cash_series = _collect_series(records, "cash")
+        if not cash_series:
+            cash_series = _collect_series_from_facts(engine, canonical, "cash_and_cash_equivalents")
+        if not cash_series:
+            cash_series = _collect_series_from_facts(engine, canonical, "cash")
+        
+        # Calculate EV = Market Cap + Total Debt - Cash
+        # Use years from any available series
+        ev_years = set()
+        if market_cap_series:
+            ev_years |= set(market_cap_series)
+        if total_debt_series:
+            ev_years |= set(total_debt_series)
+        if cash_series:
+            ev_years |= set(cash_series)
+        
+        if ev_years and (market_cap_series or total_debt_series):
+            enterprise_series = {}
+            for year in ev_years:
+                market_cap = market_cap_series.get(year, 0) if market_cap_series else 0
+                debt = total_debt_series.get(year, 0) if total_debt_series else 0
+                cash = cash_series.get(year, 0) if cash_series else 0
+                # Only calculate if we have at least market_cap or debt
+                if market_cap or debt:
+                    enterprise_series[year] = (market_cap or 0) + (debt or 0) - (cash or 0)
+            if enterprise_series:
+                import logging
+                logging.getLogger(__name__).debug(f"Calculated {len(enterprise_series)} years of enterprise_value from market_cap+debt-cash for {canonical}")
+    
+    shares_series = _collect_series(records, "shares_outstanding")
+    if not shares_series:
+        shares_series = _collect_series(records, "weighted_avg_diluted_shares")
+    # If still not found, try querying financial_facts directly
+    if not shares_series:
+        shares_series = _collect_series_from_facts(engine, canonical, "shares_outstanding")
+    if not shares_series:
+        shares_series = _collect_series_from_facts(engine, canonical, "weighted_avg_diluted_shares")
+    
+    gross_margin_series = _collect_series(records, "gross_margin")
+
+    # Calculate EPS from net_income / shares if not directly available
+    # EPS = Net Income / Shares Outstanding
+    # Note: Both net_income and shares should be in raw units (not millions/billions)
+    if not eps_series and net_income_series and shares_series:
+        eps_series = {}
+        eps_years = set(net_income_series) & set(shares_series)
+        for year in eps_years:
+            net_income = net_income_series.get(year)
+            shares = shares_series.get(year)
+            if net_income is not None and shares is not None and shares > 0:
+                # Both should already be in raw units from the database
+                # net_income is in dollars, shares is in number of shares
+                eps_series[year] = net_income / shares
+        if eps_series:
+            import logging
+            logging.getLogger(__name__).debug(f"Calculated {len(eps_series)} years of EPS from net_income/shares for {canonical}")
+    
+    # Build years list from ALL metrics that will be displayed
+    # This ensures we only show years where at least some data exists
+    years_set = (
+        set(revenue_series) | 
+        set(ebitda_series) | 
+        set(net_income_series) | 
+        set(fcf_series) |
+        set(operating_income_series) |
+        set(gross_profit_series) |
+        set(eps_series) |
+        set(total_assets_series) |
+        set(total_debt_series) |
+        set(shares_series) |
+        set(gross_margin_series) |
+        set(net_margin_series) |
+        set(enterprise_series)  # Include enterprise_value for EV ratios
+    )
+    if not years_set:
+        # Fallback: use enterprise_value if nothing else has data
+        years_set = set(enterprise_series)
+    years = sorted(years_set)
+    if len(years) > 8:
+        years = years[-8:]
+
+    def _series_values(series: Dict[int, float], transform=None) -> List[Optional[float]]:
+        values: List[Optional[float]] = []
+        for year in years:
+            value = series.get(year)
+            if value is not None and transform:
+                value = transform(value)
+            values.append(value)
+        return values
+
+    def _safe_ratio(numerator: Optional[float], denominator: Optional[float]) -> Optional[float]:
+        if numerator in (None, 0) or denominator in (None, 0):
+            return None
+        return numerator / denominator
+
+    ev_revenue_series: Dict[int, float] = {}
+    ev_ebitda_series: Dict[int, float] = {}
+    for year in years:
+        ev = enterprise_series.get(year)
+        rev = revenue_series.get(year)
+        ebitda = ebitda_series.get(year)
+        ratio_rev = _safe_ratio(ev, rev)
+        ratio_ebitda = _safe_ratio(ev, ebitda)
+        if ratio_rev is not None:
+            ev_revenue_series[year] = ratio_rev
+        if ratio_ebitda is not None:
+            ev_ebitda_series[year] = ratio_ebitda
+    
+    key_financials = {
+        "columns": years,
+        "rows": [
+            {"label": "Revenue", "values": _sanitize_table_values(_series_values(revenue_series))},
+            {"label": "Gross Profit", "values": _sanitize_table_values(_series_values(gross_profit_series))},
+            {"label": "EBITDA", "values": _sanitize_table_values(_series_values(ebitda_series))},
+            {"label": "Operating Income", "values": _sanitize_table_values(_series_values(operating_income_series))},
+            {"label": "Net Income", "values": _sanitize_table_values(_series_values(net_income_series))},
+            {"label": "EPS ($)", "values": _sanitize_table_values(_series_values(eps_series))},
+            {"label": "Free Cash Flow", "values": _sanitize_table_values(_series_values(fcf_series))},
+            {"label": "Total Assets", "values": _sanitize_table_values(_series_values(total_assets_series))},
+            {"label": "Total Debt", "values": _sanitize_table_values(_series_values(total_debt_series))},
+            {"label": "Shares Outstanding (M)", "values": _sanitize_table_values(_series_values(shares_series))},
+            {"label": "Gross Margin", "values": _sanitize_table_values(_series_values(gross_margin_series)), "type": "percent"},
+            {"label": "Net Profit Margin", "values": _sanitize_table_values(_series_values(net_margin_series)), "type": "percent"},
+            {"label": "EV/Revenue (×)", "values": _sanitize_table_values(_series_values(ev_revenue_series)), "type": "multiple"},
+            {"label": "EV/EBITDA (×)", "values": _sanitize_table_values(_series_values(ev_ebitda_series)), "type": "multiple"},
+        ],
+    }
+
+    charts: Dict[str, Any] = {}
+    if years:
+        charts["revenue_ev"] = _sanitize_chart_data({
+            "Year": years,
+            "Revenue": [revenue_series.get(year) for year in years],
+            "EV_Rev": [ev_revenue_series.get(year) for year in years],
+        })
+        charts["ebitda_ev"] = _sanitize_chart_data({
+            "Year": years,
+            "EBITDA": [ebitda_series.get(year) for year in years],
+            "EV_EBITDA": [ev_ebitda_series.get(year) for year in years],
+        })
+
+    current_year = datetime.utcnow().year
+    forecast_years = [current_year, current_year + 1, current_year + 2]
+    if price_current is not None:
+        bull = valuations.get("dcf_bull") or price_target or price_current
+        base = price_target or price_current
+        bear = valuations.get("dcf_bear") or price_target or price_current
+        charts["forecast"] = _sanitize_chart_data({
+            "Year": forecast_years,
+            "Bull": [price_current, bull, bull * 1.05 if bull else None],
+            "Base": [price_current, base, base * 1.03 if base else None],
+            "Bear": [price_current, bear, bear * 0.97 if bear else None],
+        })
+
+    valuation_cases: List[str] = []
+    valuation_values: List[Optional[float]] = []
+    for label, key in (
+        ("DCF - Bull", "dcf_bull"),
+        ("DCF - Base", "dcf_base"),
+        ("DCF - Bear", "dcf_bear"),
+        ("Comps", "comps"),
+        ("Market", "market"),
+    ):
+        value = valuations.get(key)
+        if value is not None:
+            valuation_cases.append(label)
+            valuation_values.append(value)
+    if valuation_cases:
+        charts["valuation_bar"] = _sanitize_chart_data({"Case": valuation_cases, "Value": valuation_values})
+
+    valuation_notes = []
+    if price_target is not None:
+        valuation_notes.append(f"DCF base case target ${price_target:,.2f}")
+    if valuations.get("dcf_bull") is not None and valuations.get("dcf_bear") is not None:
+        valuation_notes.append("Bull/Bear range reflects ±15% swing to base case.")
+    if valuations.get("comps") is not None:
+        valuation_notes.append("Comps derived from EV/EBITDA peer median.")
+
+    current_price = price_current
+    average_price = None
+    if valuation_values:
+        average_price = sum(v for v in valuation_values if v is not None) / len(valuation_values)
+
+    valuation_data = {
+        "current": current_price,
+        "average": _round_two(average_price) if average_price is not None else None,
+        "notes": valuation_notes,
+    }
+
+    kpi_summary = _build_kpi_summary(latest)
+    kpi_series = _build_kpi_series(records)
+    interactions = _build_interactions(kpi_series)
+    peer_config = _build_peer_config(engine, display_ticker)
+    sources = _collect_sources(latest, engine)
+
+    payload = {
+        "meta": meta,
+        "price": _sanitize_dict(price_table),
+        "overview": overview,
+        "key_stats": _sanitize_dict(key_stats),
+        "market_data": _sanitize_dict(market_data),
+        "valuation_table": [_sanitize_dict(row) for row in valuation_table] if valuation_table else [],
+        "key_financials": key_financials,
+        "charts": charts,
+        "valuation_data": _sanitize_dict(valuation_data),
+        "kpi_summary": kpi_summary,
+        "kpi_series": kpi_series,
+        "interactions": interactions,
+        "peer_config": peer_config,
+        "sources": sources,
+    }
+    # Final pass: sanitize the entire payload to catch any remaining NaN values
+    return _sanitize_dict(payload)
+
+
+def build_cfi_compare_payload(
+    engine: "AnalyticsEngine",
+    tickers: Sequence[str],
+    benchmark_label: Optional[str] = None,
+    *,
+    strict: bool = True,
+) -> Optional[Dict[str, Any]]:
+    """Construct the payload expected by ``cfi_compare.js`` for up to three tickers."""
+    if not tickers:
+        if strict:
+            raise ValueError("At least one ticker is required.")
+        return None
+
+    canonical: List[str] = []
+    for ticker in tickers:
+        if ticker and ticker.strip():
+            symbol = _normalise_ticker_symbol(ticker)
+            if symbol not in canonical:
+                canonical.append(symbol)
+        if len(canonical) >= 3:
+            break
+
+    if not canonical:
+        if strict:
+            raise ValueError("No valid tickers provided.")
+        return None
+
+    display_order = [_display_ticker_symbol(symbol) for symbol in canonical]
+
+    records_by_ticker: Dict[str, List[database.MetricRecord]] = {}
+    latest_by_ticker: Dict[str, Dict[str, database.MetricRecord]] = {}
+    valuations_by_ticker: Dict[str, Optional[Dict[str, Optional[float]]]] = {}
+
+    for symbol in canonical:
+        records = engine.get_metrics(symbol)
+        if not records:
+            if strict:
+                raise ValueError(f"No metric snapshots available for {_display_ticker_symbol(symbol)}.")
+            return None
+        records_by_ticker[symbol] = records
+        latest = engine._select_latest_records(records, span_fn=engine._period_span)
+        latest_by_ticker[symbol] = latest
+        valuations_by_ticker[symbol] = _valuation_per_share(latest)
+
+    benchmark_label = benchmark_label or engine.benchmark_label()
+    metric_scope = {
+        "revenue",
+        "net_margin",
+        "return_on_equity",
+        "pe_ratio",
+        "ebitda_margin",
+        "ev_ebitda",
+        "debt_to_equity",
+        "ebitda",
+        "free_cash_flow",
+        "net_income",
+        "shares_outstanding",
+        "cash_and_cash_equivalents",
+        "total_debt",
+        "long_term_debt",
+        "revenue_cagr",
+        "eps_cagr",
+        "ebitda_growth",
+        "operating_margin",
+        "return_on_assets",
+        "return_on_invested_capital",
+        "pb_ratio",
+        "peg_ratio",
+        "cash_conversion",
+        "working_capital",
+        "tsr",
+        "dividend_yield",
+        "share_buyback_intensity",
+    }
+    benchmark_metrics = engine.compute_benchmark_metrics(metric_scope)
+
+    db_path = Path(engine.settings.database_path)
+    company_names = {
+        display: (_lookup_company_name(db_path, symbol) or display)
+        for symbol, display in zip(canonical, display_order)
+    }
+
+    cards: Dict[str, Dict[str, str]] = {}
+    for symbol, display in zip(canonical, display_order):
+        latest = latest_by_ticker.get(symbol, {})
+        valuation = valuations_by_ticker.get(symbol) or {}
+        card: Dict[str, str] = {}
+        if valuation.get("market") is not None:
+            card["Price"] = f"${_format_number(valuation['market'], 2)}"
+        revenue_record = latest.get("revenue")
+        revenue_billions = _format_billions(
+            revenue_record.value if revenue_record and revenue_record.value is not None else None
+        )
+        if revenue_billions is not None:
+            year = _metric_year(revenue_record)
+            if year:
+                label = f"Revenue (FY{str(year)[-2:]} $B)"
+            else:
+                label = "Revenue ($B)"
+            card[label] = _format_number(revenue_billions, 2)
+
+        net_margin_pct = _format_percent(_latest_metric_value(latest, "net_margin"))
+        if net_margin_pct is not None:
+            card["Net margin"] = f"{_format_number(net_margin_pct, 2)}%"
+        roe_pct = _format_percent(_latest_metric_value(latest, "return_on_equity", "roe"))
+        if roe_pct is not None:
+            card["ROE"] = f"{_format_number(roe_pct, 2)}%"
+        pe_ratio = _latest_metric_value(latest, "pe_ratio")
+        if pe_ratio is not None:
+            card["P/E (ttm)"] = f"{_format_number(pe_ratio, 2)}×"
+        cards[display] = card
+
+    benchmark_card: Dict[str, str] = {}
+    bench_revenue = benchmark_metrics.get("revenue")
+    bench_revenue_b = _format_billions(bench_revenue.value if bench_revenue and bench_revenue.value is not None else None)
+    if bench_revenue_b is not None:
+        benchmark_card["Revenue (Avg $B)"] = _format_number(bench_revenue_b, 2)
+    bench_net_margin = _format_percent(_latest_metric_value(benchmark_metrics, "net_margin"))
+    if bench_net_margin is not None:
+        benchmark_card["Net margin"] = f"{_format_number(bench_net_margin, 2)}%"
+    bench_roe = _format_percent(_latest_metric_value(benchmark_metrics, "return_on_equity"))
+    if bench_roe is not None:
+        benchmark_card["ROE"] = f"{_format_number(bench_roe, 2)}%"
+    bench_pe = _latest_metric_value(benchmark_metrics, "pe_ratio")
+    if bench_pe is not None:
+        benchmark_card["P/E (ttm)"] = f"{_format_number(bench_pe, 2)}×"
+    cards["SP500"] = benchmark_card
+
+    table_columns = ["Metric", *display_order, benchmark_label]
+    table_rows: List[Dict[str, Any]] = []
+    table_config = [
+        {"metric": "revenue", "label": "Revenue", "type": "moneyB"},
+        {"metric": "revenue_cagr", "label": "Revenue CAGR", "type": "pct"},
+        {"metric": "eps_cagr", "label": "EPS CAGR", "type": "pct"},
+        {"metric": "ebitda_growth", "label": "EBITDA Growth", "type": "pct"},
+        {"metric": "ebitda_margin", "label": "EBITDA margin", "type": "pct"},
+        {"metric": "operating_margin", "label": "Operating margin", "type": "pct"},
+        {"metric": "net_margin", "label": "Net margin", "type": "pct"},
+        {"metric": "return_on_assets", "label": "ROA", "type": "pct"},
+        {"metric": "return_on_equity", "label": "ROE", "type": "pct"},
+        {"metric": "return_on_invested_capital", "label": "ROIC", "type": "pct"},
+        {"metric": "pe_ratio", "label": "P/E (ttm)", "type": "x"},
+        {"metric": "ev_ebitda", "label": "EV/EBITDA (ttm)", "type": "x"},
+        {"metric": "pb_ratio", "label": "P/B", "type": "x"},
+        {"metric": "peg_ratio", "label": "PEG", "type": "x"},
+        {"metric": "free_cash_flow", "label": "Free Cash Flow", "type": "moneyB"},
+        {"metric": "cash_conversion", "label": "Cash Conversion", "type": "pct"},
+        {"metric": "working_capital", "label": "Working Capital", "type": "moneyB"},
+        {"metric": "tsr", "label": "TSR", "type": "pct"},
+        {"metric": "dividend_yield", "label": "Dividend Yield", "type": "pct"},
+        {"metric": "share_buyback_intensity", "label": "Share Buyback Intensity", "type": "pct"},
+        {"metric": "debt_to_equity", "label": "Debt/Equity", "type": "x"},
+    ]
+
+    for config in table_config:
+        metric_name = config["metric"]
+        row: Dict[str, Any] = {"label": config["label"], "type": config["type"]}
+        if metric_name == "revenue":
+            revenue_years = [
+                _metric_year(latest_by_ticker[symbol].get("revenue"))
+                for symbol in canonical
+                if latest_by_ticker[symbol].get("revenue")
+            ]
+            revenue_years = [year for year in revenue_years if year]
+            if revenue_years:
+                row["label"] = f"Revenue (FY{str(max(revenue_years))[-2:]} $B)"
+        elif metric_name in {"free_cash_flow", "working_capital"}:
+            row["label"] = f"{config['label']} ($B)"
+
+        for symbol, display in zip(canonical, display_order):
+            latest = latest_by_ticker[symbol]
+            value: Optional[float]
+            if config["type"] == "pct":
+                value = _format_percent(_latest_metric_value(latest, metric_name))
+            elif config["type"] == "moneyB":
+                value = _format_billions(_latest_metric_value(latest, metric_name))
+            else:
+                value = _latest_metric_value(latest, metric_name)
+                if value is not None:
+                    value = round(float(value), 2)
+            row[display] = value
+
+        bench_metric = benchmark_metrics.get(metric_name)
+        if config["type"] == "pct":
+            bench_value = _format_percent(_latest_metric_value(benchmark_metrics, metric_name))
+        elif config["type"] == "moneyB":
+            bench_value = _format_billions(bench_metric.value if bench_metric else None)
+        else:
+            bench_value = _latest_metric_value(benchmark_metrics, metric_name)
+            if bench_value is not None:
+                bench_value = round(float(bench_value), 2)
+        row[benchmark_label] = bench_value
+        row["SPX"] = bench_value
+        table_rows.append(row)
+
+    table = {"columns": table_columns, "rows": table_rows}
+
+    all_years: set[int] = set()
+    revenue_series_map: Dict[str, Dict[int, float]] = {}
+    ebitda_series_map: Dict[str, Dict[int, float]] = {}
+    for symbol, display in zip(canonical, display_order):
+        revenue_series = _collect_series(records_by_ticker[symbol], "revenue", scale_billions=True)
+        ebitda_series = _collect_series(records_by_ticker[symbol], "ebitda", scale_billions=True)
+        if revenue_series:
+            all_years.update(revenue_series.keys())
+        if ebitda_series:
+            all_years.update(ebitda_series.keys())
+        revenue_series_map[display] = revenue_series
+        ebitda_series_map[display] = ebitda_series
+
+    years = sorted(all_years)
+    if len(years) > 8:
+        years = years[-8:]
+
+    revenue_series_payload: Dict[str, List[Optional[float]]] = {}
+    ebitda_series_payload: Dict[str, List[Optional[float]]] = {}
+    for display in display_order:
+        revenue_data = revenue_series_map.get(display, {})
+        ebitda_data = ebitda_series_map.get(display, {})
+        revenue_series_payload[display] = [
+            _round_two(revenue_data.get(year)) if revenue_data.get(year) is not None else None
+            for year in years
+        ]
+        ebitda_series_payload[display] = [
+            _round_two(ebitda_data.get(year)) if ebitda_data.get(year) is not None else None
+            for year in years
+        ]
+
+    series = {
+        "years": years,
+        "revenue": revenue_series_payload,
+        "ebitda": ebitda_series_payload,
+    }
+
+    scatter: List[Dict[str, Any]] = []
+    for symbol, display in zip(canonical, display_order):
+        latest = latest_by_ticker[symbol]
+        net_margin_pct = _format_percent(_latest_metric_value(latest, "net_margin"))
+        roe_pct = _format_percent(_latest_metric_value(latest, "return_on_equity", "roe"))
+        revenue_billions = _format_billions(_latest_metric_value(latest, "revenue"))
+        if net_margin_pct is None or roe_pct is None:
+            continue
+        scatter.append(
+            {
+                "ticker": display,
+                "x": net_margin_pct,
+                "y": roe_pct,
+                "size": _round_two(revenue_billions) or 0.0,
+            }
+        )
+
+    bench_scatter_margin = _format_percent(_latest_metric_value(benchmark_metrics, "net_margin"))
+    bench_scatter_roe = _format_percent(_latest_metric_value(benchmark_metrics, "return_on_equity"))
+    bench_scatter_revenue = _format_billions(
+        benchmark_metrics.get("revenue").value if benchmark_metrics.get("revenue") else None
+    )
+    if bench_scatter_margin is not None and bench_scatter_roe is not None:
+        scatter.append(
+            {
+                "ticker": benchmark_label,
+                "x": bench_scatter_margin,
+                "y": bench_scatter_roe,
+                "size": _round_two(bench_scatter_revenue) or 0.0,
+            }
+        )
+
+    football: List[Dict[str, Any]] = []
+    val_summary_cases = ["DCF-Bull", "DCF-Base", "DCF-Bear", "Comps", "Market"]
+    val_summary: Dict[str, Any] = {"case": val_summary_cases}
+
+    for symbol, display in zip(canonical, display_order):
+        valuation = valuations_by_ticker.get(symbol)
+        if not valuation:
+            continue
+        ranges: List[Dict[str, Optional[float]]] = []
+        if valuation.get("dcf_base") is not None:
+            ranges.append(
+                {
+                    "name": "DCF",
+                    "lo": valuation.get("dcf_bear"),
+                    "hi": valuation.get("dcf_bull"),
+                }
+            )
+        if valuation.get("comps") is not None:
+            comps = valuation.get("comps")
+            if comps is not None:
+                ranges.append(
+                    {
+                        "name": "Comps",
+                        "lo": _round_two(comps * 0.95),
+                        "hi": _round_two(comps * 1.05),
+                    }
+                )
+        if valuation.get("market") is not None:
+            market_price = valuation.get("market")
+            ranges.append(
+                {
+                    "name": "Market",
+                    "lo": market_price,
+                    "hi": market_price,
+                }
+            )
+        if ranges:
+            football.append({"ticker": display, "ranges": ranges})
+        val_summary[display] = [
+            valuation.get("dcf_bull"),
+            valuation.get("dcf_base"),
+            valuation.get("dcf_bear"),
+            valuation.get("comps"),
+            valuation.get("market"),
+        ]
+
+    meta = {
+        "date": datetime.utcnow().date().isoformat(),
+        "peerset": " vs ".join(
+            [
+                f"{company_names.get(display, display)} ({display})" if company_names.get(display) != display else display
+                for display in display_order
+            ]
+            + ([benchmark_label] if benchmark_label else [])
+        ),
+        "tickers": display_order,
+        "companies": company_names,
+        "benchmark": benchmark_label,
+    }
+
+    payload = {
+        "meta": meta,
+        "cards": cards,
+        "table": table,
+        "football": football,
+        "series": series,
+        "scatter": scatter,
+        "valSummary": val_summary,
+    }
+    return payload

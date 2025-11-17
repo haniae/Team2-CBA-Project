@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from benchmarkos_chatbot import custom_kpis
-from benchmarkos_chatbot.analytics_workspace import DataSourcePreferencesManager
-from benchmarkos_chatbot.custom_kpis import CustomKPICalculator, KPIIntentParser
-from benchmarkos_chatbot.kpi_lookup import KPIDefinitionLookup
-from benchmarkos_chatbot.database import initialise
+from finanlyzeos_chatbot import custom_kpis
+from finanlyzeos_chatbot.analytics_workspace import DataSourcePreferencesManager
+from finanlyzeos_chatbot.custom_kpis import CustomKPICalculator, KPIIntentParser
+from finanlyzeos_chatbot.kpi_lookup import KPIDefinitionLookup
+from finanlyzeos_chatbot.database import initialise
 
 
 def _seed_metric_snapshots(db_path: Path, ticker: str, metric: str, value: float, year: int) -> None:

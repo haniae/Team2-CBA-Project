@@ -103,7 +103,7 @@ cp env.example .env
 # Edit .env file with your configuration
 # Required variables:
 # - OPENAI_API_KEY=your_openai_api_key
-# - DATABASE_URL=sqlite:///data/sqlite/benchmarkos_chatbot.sqlite3
+# - DATABASE_URL=sqlite:///data/sqlite/finanlyzeos_chatbot.sqlite3
 ```
 
 ### 6. Start the Application
@@ -175,13 +175,13 @@ pip install -r requirements.txt
 **Issue: Database not found**
 ```bash
 # Solution: Initialize database
-python -c "from src.benchmarkos_chatbot.database import init_db; init_db()"
+python -c "from src.finanlyzeos_chatbot.database import init_db; init_db()"
 ```
 
 **Issue: Permission denied on database**
 ```bash
 # Solution: Check file permissions
-chmod 664 data/sqlite/benchmarkos_chatbot.sqlite3
+chmod 664 data/sqlite/finanlyzeos_chatbot.sqlite3
 ```
 
 ## 📦 Dependencies Overview
@@ -206,13 +206,13 @@ chmod 664 data/sqlite/benchmarkos_chatbot.sqlite3
 ### Development Mode
 ```bash
 # Start with auto-reload
-uvicorn src.benchmarkos_chatbot.web:app --reload --host 0.0.0.0 --port 8000
+uvicorn src.finanlyzeos_chatbot.web:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Production Mode
 ```bash
 # Start with multiple workers
-uvicorn src.benchmarkos_chatbot.web:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn src.finanlyzeos_chatbot.web:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 ### Web Dashboard

@@ -48,7 +48,7 @@ class AccuracyTester:
     """
     
     def __init__(self, chatbot_api_url: str = "http://localhost:8000", 
-                 database_path: str = "data/sqlite/benchmarkos_chatbot.sqlite3"):
+                 database_path: str = "data/sqlite/finanlyzeos_chatbot.sqlite3"):
         self.api_url = chatbot_api_url
         self.database_path = Path(database_path)
         self.results: List[TestResult] = []

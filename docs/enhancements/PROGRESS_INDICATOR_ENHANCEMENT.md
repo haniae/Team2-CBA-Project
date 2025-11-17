@@ -72,7 +72,7 @@ User: "What is Apple's revenue?"
 
 ## 💻 Technical Changes
 
-### File: `src/benchmarkos_chatbot/static/app.js`
+### File: `src/finanlyzeos_chatbot/static/app.js`
 
 #### 1. Enhanced `hideTypingIndicator()` Function
 

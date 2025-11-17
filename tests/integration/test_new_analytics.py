@@ -12,12 +12,12 @@ Demonstrates:
 import sys
 sys.path.insert(0, 'src')
 
-from benchmarkos_chatbot.sector_analytics import get_sector_analytics
-from benchmarkos_chatbot.anomaly_detection import get_anomaly_detector
-from benchmarkos_chatbot.predictive_analytics import get_predictive_analytics
-from benchmarkos_chatbot.advanced_kpis import get_advanced_kpi_calculator
+from finanlyzeos_chatbot.sector_analytics import get_sector_analytics
+from finanlyzeos_chatbot.anomaly_detection import get_anomaly_detector
+from finanlyzeos_chatbot.predictive_analytics import get_predictive_analytics
+from finanlyzeos_chatbot.advanced_kpis import get_advanced_kpi_calculator
 
-DB_PATH = "C:/Users/Hania/Documents/GitHub/Project/benchmarkos_chatbot.sqlite3"
+DB_PATH = "C:/Users/Hania/Documents/GitHub/Project/finanlyzeos_chatbot.sqlite3"
 
 def test_sector_analytics():
     print("\n" + "="*70)

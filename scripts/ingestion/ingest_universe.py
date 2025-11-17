@@ -10,9 +10,9 @@ import time
 from pathlib import Path
 from typing import Iterable, List
 
-from benchmarkos_chatbot import AnalyticsEngine, load_settings
-from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
-from benchmarkos_chatbot.ticker_universe import (
+from finanlyzeos_chatbot import AnalyticsEngine, load_settings
+from finanlyzeos_chatbot.data_ingestion import ingest_live_tickers
+from finanlyzeos_chatbot.ticker_universe import (
     load_ticker_universe,
     available_universes,
     load_ticker_file,

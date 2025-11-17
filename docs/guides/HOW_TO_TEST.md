@@ -13,7 +13,7 @@ cd /home/malcolm-munoriyarwa/projects/Team2-CBA-Project
 
 # Run this ONE command:
 PYTHONPATH=src python3 -c "
-from benchmarkos_chatbot.custom_kpi_builder import CustomKPIBuilder
+from finanlyzeos_chatbot.custom_kpi_builder import CustomKPIBuilder
 builder = CustomKPIBuilder()
 kpi = builder.create_custom_kpi('Test', '(roe + roic) / 2')
 result = builder.calculate_custom_kpi('test', {'roe': 0.286, 'roic': 0.200})
@@ -44,7 +44,7 @@ echo ""
 
 echo "Test 1: Simple Formula"
 PYTHONPATH=src python3 -c "
-from benchmarkos_chatbot.custom_kpi_builder import CustomKPIBuilder
+from finanlyzeos_chatbot.custom_kpi_builder import CustomKPIBuilder
 b = CustomKPIBuilder()
 kpi = b.create_custom_kpi('Efficiency', '(roe + roic) / 2')
 r = b.calculate_custom_kpi('efficiency', {'roe': 0.286, 'roic': 0.200})
@@ -53,7 +53,7 @@ print(f'   Result: {r:.3f} - {\"✅ PASS\" if abs(r - 0.243) < 0.001 else \"❌ 
 echo ""
 echo "Test 2: Complex Formula"
 PYTHONPATH=src python3 -c "
-from benchmarkos_chatbot.custom_kpi_builder import CustomKPIBuilder
+from finanlyzeos_chatbot.custom_kpi_builder import CustomKPIBuilder
 b = CustomKPIBuilder()
 kpi = b.create_custom_kpi('Quality', 'revenue_cagr * profit_margin')
 r = b.calculate_custom_kpi('quality', {'revenue_cagr': 0.08, 'profit_margin': 0.27})
@@ -62,19 +62,19 @@ print(f'   Result: {r:.4f} - {\"✅ PASS\" if r and r > 0 else \"❌ FAIL\"}')"
 echo ""
 echo "Test 3: Validation (Should Reject)"
 PYTHONPATH=src python3 -c "
-from benchmarkos_chatbot.custom_kpi_builder import CustomKPIBuilder
+from finanlyzeos_chatbot.custom_kpi_builder import CustomKPIBuilder
 b = CustomKPIBuilder()
 kpi = b.create_custom_kpi('Bad', 'InvalidMetric')
 print(f'   Rejected: {\"✅ PASS\" if kpi is None else \"❌ FAIL\"}')"
 
 echo ""
 echo "Test 4: Code Compilation"
-python3 -m py_compile src/benchmarkos_chatbot/custom_kpi_builder.py && echo "   ✅ PASS (compiles)"
+python3 -m py_compile src/finanlyzeos_chatbot/custom_kpi_builder.py && echo "   ✅ PASS (compiles)"
 
 echo ""
 echo "Test 5: Pattern Detection"
 PYTHONPATH=src python3 -c "
-from benchmarkos_chatbot.custom_kpi_builder import detect_custom_kpi_query
+from finanlyzeos_chatbot.custom_kpi_builder import detect_custom_kpi_query
 q1 = detect_custom_kpi_query('Define custom metric: Test = ROE + ROIC')
 q2 = detect_custom_kpi_query('Calculate Efficiency for Apple')
 q3 = detect_custom_kpi_query('List my custom KPIs')
@@ -123,7 +123,7 @@ echo "="
 **Step 1: Live Test (30 sec)**
 ```bash
 PYTHONPATH=src python3 -c "
-from benchmarkos_chatbot.custom_kpi_builder import CustomKPIBuilder
+from finanlyzeos_chatbot.custom_kpi_builder import CustomKPIBuilder
 builder = CustomKPIBuilder()
 kpi = builder.create_custom_kpi('Efficiency Score', '(roe + roic) / 2')
 result = builder.calculate_custom_kpi('efficiency_score', {'roe': 0.286, 'roic': 0.200})
@@ -149,14 +149,14 @@ print(f'   Calculated: {result:.1%}')
 **Step 2: Show Code (1 min)**
 ```bash
 # Show lines of code
-wc -l src/benchmarkos_chatbot/chatbot.py
-wc -l src/benchmarkos_chatbot/custom_kpi_builder.py
+wc -l src/finanlyzeos_chatbot/chatbot.py
+wc -l src/finanlyzeos_chatbot/custom_kpi_builder.py
 ```
 
 **What Judges See:**
 ```
-6500+ src/benchmarkos_chatbot/chatbot.py
-500+ src/benchmarkos_chatbot/custom_kpi_builder.py
+6500+ src/finanlyzeos_chatbot/chatbot.py
+500+ src/finanlyzeos_chatbot/custom_kpi_builder.py
 ```
 
 **You Point Out:** *"2,160 lines of new code for these two systems."*
@@ -166,9 +166,9 @@ wc -l src/benchmarkos_chatbot/custom_kpi_builder.py
 **Step 3: Code Walkthrough (2 min)**
 ```bash
 # Open in editor
-code src/benchmarkos_chatbot/custom_kpi_builder.py
+code src/finanlyzeos_chatbot/custom_kpi_builder.py
 # OR
-cat src/benchmarkos_chatbot/custom_kpi_builder.py | head -100
+cat src/finanlyzeos_chatbot/custom_kpi_builder.py | head -100
 ```
 
 **You Explain:**
@@ -231,7 +231,7 @@ INTERACTIVE_FORECASTING_DEMO_SCRIPT.md (50K)
 
 **✅ Option 1: Quick Proof (30 sec) - TESTED ABOVE**
 ```bash
-PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py
+PYTHONPATH=src python3 src/finanlyzeos_chatbot/custom_kpi_builder.py
 ```
 Result: ✅ ALL TESTS PASSED
 
@@ -250,7 +250,7 @@ Result: ✅ Proves technical depth
 ### **Minute 0-5: Verify**
 ```bash
 # Run the quick test
-PYTHONPATH=src python3 src/benchmarkos_chatbot/custom_kpi_builder.py
+PYTHONPATH=src python3 src/finanlyzeos_chatbot/custom_kpi_builder.py
 
 # Should see:
 # ✅ Created: Efficiency Score

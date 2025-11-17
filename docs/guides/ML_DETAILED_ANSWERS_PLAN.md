@@ -220,16 +220,16 @@ For each model type, verify response includes:
 ## Files to Modify
 
 ### Forecasters
-- `src/benchmarkos_chatbot/ml_forecasting/arima_forecaster.py` ✅
-- `src/benchmarkos_chatbot/ml_forecasting/prophet_forecaster.py` ✅
-- `src/benchmarkos_chatbot/ml_forecasting/ets_forecaster.py` ⚠️
-- `src/benchmarkos_chatbot/ml_forecasting/lstm_forecaster.py` ✅
-- `src/benchmarkos_chatbot/ml_forecasting/transformer_forecaster.py` ⚠️
+- `src/finanlyzeos_chatbot/ml_forecasting/arima_forecaster.py` ✅
+- `src/finanlyzeos_chatbot/ml_forecasting/prophet_forecaster.py` ✅
+- `src/finanlyzeos_chatbot/ml_forecasting/ets_forecaster.py` ⚠️
+- `src/finanlyzeos_chatbot/ml_forecasting/lstm_forecaster.py` ✅
+- `src/finanlyzeos_chatbot/ml_forecasting/transformer_forecaster.py` ⚠️
 
 ### Core Files
-- `src/benchmarkos_chatbot/ml_forecasting/ml_forecaster.py` ⚠️ (needs Transformer update)
-- `src/benchmarkos_chatbot/context_builder.py` ⚠️ (needs all model type sections)
-- `src/benchmarkos_chatbot/chatbot.py` ⚠️ (needs ML instructions in SYSTEM_PROMPT)
+- `src/finanlyzeos_chatbot/ml_forecasting/ml_forecaster.py` ⚠️ (needs Transformer update)
+- `src/finanlyzeos_chatbot/context_builder.py` ⚠️ (needs all model type sections)
+- `src/finanlyzeos_chatbot/chatbot.py` ⚠️ (needs ML instructions in SYSTEM_PROMPT)
 
 ### Testing
 - Create `tests/test_ml_detailed_answers.py`

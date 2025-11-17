@@ -16,7 +16,7 @@ FILES_TO_COMBINE = [
     "portfolio_reporting.py",
 ]
 
-SRC_DIR = Path("src/benchmarkos_chatbot")
+SRC_DIR = Path("src/finanlyzeos_chatbot")
 
 def combine_files():
     """Combine all portfolio files into one."""

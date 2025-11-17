@@ -7,7 +7,7 @@ Target: <100ms for typical queries, <200ms for complex queries.
 
 import pytest
 import time
-from src.benchmarkos_chatbot.parsing.parse import parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestParsingPerformance:

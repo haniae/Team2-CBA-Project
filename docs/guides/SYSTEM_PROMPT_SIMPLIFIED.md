@@ -245,7 +245,7 @@ Expected: Brief performance summary, key highlights, sources.
 ## 📊 Technical Details
 
 ### File Changed
-- **`src/benchmarkos_chatbot/chatbot.py`**
+- **`src/finanlyzeos_chatbot/chatbot.py`**
   - Lines 540-608 (SYSTEM_PROMPT)
   - **Before:** 150+ lines
   - **After:** 70 lines

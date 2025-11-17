@@ -12,8 +12,8 @@ from typing import Dict, List, Tuple
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot import database, load_settings
-from benchmarkos_chatbot.ticker_universe import load_ticker_universe
+from finanlyzeos_chatbot import database, load_settings
+from finanlyzeos_chatbot.ticker_universe import load_ticker_universe
 
 
 def print_header(text: str):

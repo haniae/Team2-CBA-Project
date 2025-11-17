@@ -11,7 +11,7 @@ from datetime import datetime
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from benchmarkos_chatbot import BenchmarkOSChatbot, load_settings
+from finanlyzeos_chatbot import FinanlyzeOSChatbot, load_settings
 
 class ChatbotTester:
     """Comprehensive testing suite for BenchmarkOS chatbot with real-world prompts."""
@@ -27,7 +27,7 @@ class ChatbotTester:
         try:
             print("🔧 Setting up BenchmarkOS Chatbot...")
             settings = load_settings()
-            self.chatbot = BenchmarkOSChatbot.create(settings)
+            self.chatbot = FinanlyzeOSChatbot.create(settings)
             print("✅ Chatbot initialized successfully!")
             return True
         except Exception as e:

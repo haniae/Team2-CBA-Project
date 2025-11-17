@@ -15,7 +15,7 @@ from typing import Dict, List, Tuple, Any, Optional, Sequence
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 # Import both original and fixed versions
-from benchmarkos_chatbot.parsing.time_grammar import parse_periods as original_parse_periods
+from finanlyzeos_chatbot.parsing.time_grammar import parse_periods as original_parse_periods
 
 # Import fixed version
 sys.path.insert(0, os.path.dirname(__file__))

@@ -1,13 +1,13 @@
 """Tests for confidence scorer - confidence calculation."""
 
 import pytest
-from benchmarkos_chatbot.confidence_scorer import (
+from finanlyzeos_chatbot.confidence_scorer import (
     calculate_confidence,
     add_confidence_footer,
     calculate_confidence_from_verified_response,
     ConfidenceScore
 )
-from benchmarkos_chatbot.response_verifier import (
+from finanlyzeos_chatbot.response_verifier import (
     VerificationResult,
     FinancialFact,
     VerifiedResponse

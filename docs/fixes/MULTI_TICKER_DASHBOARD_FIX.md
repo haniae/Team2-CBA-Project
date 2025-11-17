@@ -10,7 +10,7 @@ AttributeError: 'BenchmarkOSChatbot' object has no attribute '_handle_compare_mu
 
 ## Root Cause
 
-The code at line 1763 in `src/benchmarkos_chatbot/chatbot.py` was calling a non-existent method `self._handle_compare_multi()` when handling multi-ticker dashboard requests.
+The code at line 1763 in `src/finanlyzeos_chatbot/chatbot.py` was calling a non-existent method `self._handle_compare_multi()` when handling multi-ticker dashboard requests.
 
 ## Solution
 
@@ -117,7 +117,7 @@ Try these to verify the fix:
 
 ## Technical Details
 
-- **File Modified**: `src/benchmarkos_chatbot/chatbot.py` (lines 1759-1787)
+- **File Modified**: `src/finanlyzeos_chatbot/chatbot.py` (lines 1759-1787)
 - **Method**: `ask()` in `BenchmarkOSChatbot` class
 - **Dependencies**: Uses existing `build_cfi_dashboard_payload()` function
 - **Backward Compatible**: Single-ticker dashboards still work exactly as before

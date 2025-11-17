@@ -6,7 +6,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from benchmarkos_chatbot import BenchmarkOSChatbot, load_settings
+from finanlyzeos_chatbot import FinanlyzeOSChatbot, load_settings
 
 def test_comprehensive_followups():
     """Test all advanced follow-up features together."""
@@ -87,7 +87,7 @@ def test_comprehensive_followups():
         print('='*80)
         
         # Create fresh bot for each scenario
-        bot = BenchmarkOSChatbot.create(settings)
+        bot = FinanlyzeOSChatbot.create(settings)
         
         last_reply = ""
         for i, (query, description) in enumerate(scenario['conversation'], 1):

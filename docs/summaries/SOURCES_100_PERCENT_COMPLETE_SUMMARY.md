@@ -180,7 +180,7 @@ No "black box" - every number is:
 ## Technical Details
 
 ### Files Modified
-- `src/benchmarkos_chatbot/dashboard_utils.py`
+- `src/finanlyzeos_chatbot/dashboard_utils.py`
   - Enhanced `_collect_sources()` function
   - Added `_get_calculation_info()` function
   - Fiscal year fallback logic (3-year lookback)

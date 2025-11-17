@@ -204,7 +204,7 @@ sleep_seconds = 1.5  # Reduce sleep time (careful with rate limits!)
 
 ### Issue: Import Errors
 
-**Problem:** `ModuleNotFoundError: No module named 'benchmarkos_chatbot'`
+**Problem:** `ModuleNotFoundError: No module named 'finanlyzeos_chatbot'`
 
 **Solution:**
 ```bash
@@ -328,7 +328,7 @@ Then open: http://localhost:8000
 ### 3. Run Analytics
 
 ```bash
-python -c "from benchmarkos_chatbot import AnalyticsEngine, load_settings; \
+python -c "from finanlyzeos_chatbot import AnalyticsEngine, load_settings; \
            engine = AnalyticsEngine(load_settings()); \
            print(engine.analyze_company('AAPL'))"
 ```
@@ -337,7 +337,7 @@ python -c "from benchmarkos_chatbot import AnalyticsEngine, load_settings; \
 
 Export data for external analysis:
 ```python
-from benchmarkos_chatbot import database, load_settings
+from finanlyzeos_chatbot import database, load_settings
 
 settings = load_settings()
 facts = database.fetch_financial_facts(settings.database_path, "AAPL")
@@ -398,7 +398,7 @@ Set up a cron job (Linux/Mac) or Task Scheduler (Windows):
 After initial ingestion:
 ```bash
 # Analyze and optimize database
-python -c "from benchmarkos_chatbot import database, load_settings; \
+python -c "from finanlyzeos_chatbot import database, load_settings; \
            db = load_settings().database_path; \
            import sqlite3; \
            conn = sqlite3.connect(db); \
@@ -425,7 +425,7 @@ If multiple people are ingesting data:
 
 3. **Commit the database:**
    ```bash
-   git add data/sqlite/benchmarkos_chatbot.sqlite3
+   git add data/sqlite/finanlyzeos_chatbot.sqlite3
    git commit -m "Add S&P 500 data ingestion"
    git push origin ingestion-yourname
    ```

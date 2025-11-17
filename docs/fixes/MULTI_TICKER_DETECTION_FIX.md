@@ -22,7 +22,7 @@ Added an additional pass in the `_detect_tickers` method that:
 
 ### Code Changes
 
-**File**: `src/benchmarkos_chatbot/chatbot.py`
+**File**: `src/finanlyzeos_chatbot/chatbot.py`
 
 **Location**: `_detect_tickers` method (lines 3809-3831)
 

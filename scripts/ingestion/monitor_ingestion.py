@@ -6,7 +6,7 @@ from pathlib import Path
 
 def get_db_stats():
     """Get current database statistics."""
-    db_path = "data/sqlite/benchmarkos_chatbot.sqlite3"
+    db_path = "data/sqlite/finanlyzeos_chatbot.sqlite3"
     if not os.path.exists(db_path):
         print("Database not found!")
         return

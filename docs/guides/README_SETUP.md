@@ -62,7 +62,7 @@ cd webui && npm start  # Terminal 2
 
 ```
 Team2-CBA-Project-1/
-├── src/benchmarkos_chatbot/     # Python backend
+├── src/finanlyzeos_chatbot/     # Python backend
 ├── webui/                       # Node.js frontend
 ├── data/                        # Database and data files
 ├── scripts/                     # Utility scripts
@@ -82,7 +82,7 @@ Team2-CBA-Project-1/
 ```env
 # Required
 OPENAI_API_KEY=your_openai_api_key_here
-DATABASE_URL=sqlite:///data/sqlite/benchmarkos_chatbot.sqlite3
+DATABASE_URL=sqlite:///data/sqlite/finanlyzeos_chatbot.sqlite3
 
 # Optional
 SEC_API_KEY=your_sec_api_key_here
@@ -114,7 +114,7 @@ DEBUG=True
 ```bash
 # Python backend
 source venv/bin/activate
-uvicorn src.benchmarkos_chatbot.web:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn src.finanlyzeos_chatbot.web:app --host 0.0.0.0 --port 8000 --workers 4
 
 # Node.js frontend
 cd webui
@@ -197,7 +197,7 @@ npm test
 3. **Database connection error**
    ```bash
    # Initialize database
-   python -c "from src.benchmarkos_chatbot.database import init_db; init_db()"
+   python -c "from src.finanlyzeos_chatbot.database import init_db; init_db()"
    ```
 
 4. **Port already in use**

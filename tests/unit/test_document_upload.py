@@ -11,8 +11,8 @@ import pytest
 import sqlite3
 from starlette.datastructures import UploadFile
 
-from benchmarkos_chatbot import database
-from benchmarkos_chatbot import web as web_module
+from finanlyzeos_chatbot import database
+from finanlyzeos_chatbot import web as web_module
 
 
 @pytest.fixture

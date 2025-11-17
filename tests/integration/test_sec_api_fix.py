@@ -14,8 +14,8 @@ def main():
     print("=== Testing SEC API Fix ===\n")
     
     try:
-        from benchmarkos_chatbot.data_sources import EdgarClient
-        from benchmarkos_chatbot.config import load_settings
+        from finanlyzeos_chatbot.data_sources import EdgarClient
+        from finanlyzeos_chatbot.config import load_settings
         
         print("🔧 Testing EdgarClient ticker_map()...")
         

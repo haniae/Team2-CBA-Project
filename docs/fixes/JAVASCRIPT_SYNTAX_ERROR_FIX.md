@@ -83,10 +83,10 @@ Plotly.newPlot(
    - Updated cache-busting versions from `?v=20241027i` to `?v=20241027j`
    - Forces browser to reload the fixed JavaScript
 
-3. **`src/benchmarkos_chatbot/static/cfi_dashboard.js`**:
+3. **`src/finanlyzeos_chatbot/static/cfi_dashboard.js`**:
    - Copied the fixed file to the static directory served by FastAPI
 
-4. **`src/benchmarkos_chatbot/static/index.html`**:
+4. **`src/finanlyzeos_chatbot/static/index.html`**:
    - Copied the updated HTML with new cache-busting versions
 
 ## How It Works Now

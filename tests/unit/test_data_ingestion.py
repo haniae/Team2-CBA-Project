@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from benchmarkos_chatbot import ingest_financial_data
-from benchmarkos_chatbot.config import Settings
-from benchmarkos_chatbot import database
+from finanlyzeos_chatbot import ingest_financial_data
+from finanlyzeos_chatbot.config import Settings
+from finanlyzeos_chatbot import database
 
 
 def _make_settings(tmp_path: Path) -> Settings:

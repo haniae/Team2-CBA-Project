@@ -9,9 +9,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from benchmarkos_chatbot import AnalyticsEngine, load_settings
-from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
-from benchmarkos_chatbot.data_sources import EdgarClient
+from finanlyzeos_chatbot import AnalyticsEngine, load_settings
+from finanlyzeos_chatbot.data_ingestion import ingest_live_tickers
+from finanlyzeos_chatbot.data_sources import EdgarClient
 
 RATE_LIMIT_SECONDS = 0.15  # SEC allows 10 requests per second
 MAX_RETRIES = 3

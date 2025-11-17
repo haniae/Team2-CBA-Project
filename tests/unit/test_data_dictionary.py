@@ -3,8 +3,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from benchmarkos_chatbot.analytics_workspace import DataDictionary
-from benchmarkos_chatbot.database import initialise
+from finanlyzeos_chatbot.analytics_workspace import DataDictionary
+from finanlyzeos_chatbot.database import initialise
 
 
 def test_data_dictionary_autocreates_alias(tmp_path):

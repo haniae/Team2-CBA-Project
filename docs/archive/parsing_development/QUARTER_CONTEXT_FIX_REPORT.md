@@ -21,7 +21,7 @@ The `normalize()` function in `parse.py` converts all text to lowercase, transfo
 
 ### **Code Changes**
 
-#### **File**: `src/benchmarkos_chatbot/parsing/time_grammar.py`
+#### **File**: `src/finanlyzeos_chatbot/parsing/time_grammar.py`
 
 **Line 176**: Changed quarter context detection from case-sensitive to case-insensitive
 

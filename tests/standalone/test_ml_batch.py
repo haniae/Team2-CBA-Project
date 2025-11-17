@@ -1,0 +1,150 @@
+"""
+Fast batch testing for ML forecasting prompts.
+Tests in batches with progress reporting.
+"""
+
+import sys
+import re
+from pathlib import Path
+from typing import Dict, List
+
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "src"))
+
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.config import load_settings
+
+# Representative sample of ALL possible prompt variations
+ALL_PROMPTS = [
+    # Basic formats
+    "Forecast Apple's revenue",
+    "Predict Microsoft's revenue",
+    "What's Tesla's revenue forecast?",
+    "Show me Amazon's revenue forecast",
+    "Forecast Google's earnings",
+    
+    # With models
+    "Forecast Apple's revenue using Prophet",
+    "Predict Microsoft's revenue using ARIMA",
+    "Forecast Tesla's earnings using LSTM",
+    "What's Amazon's revenue forecast using GRU?",
+    "Forecast Google's revenue using Transformer",
+    "Predict Apple's revenue using ETS",
+    "Forecast Microsoft's revenue using ensemble",
+    "What's Tesla's revenue forecast using the best ML model?",
+    
+    # With time periods
+    "Forecast Apple's revenue for next 3 years",
+    "Predict Microsoft's revenue for 2025-2027",
+    "What's Tesla's revenue forecast for next 3 years using Prophet?",
+    
+    # Different metrics
+    "Forecast Apple's net income using LSTM",
+    "Predict Microsoft's free cash flow using Prophet",
+    "What's Tesla's EBITDA forecast using ARIMA?",
+    "Forecast Amazon's gross profit using ensemble",
+    
+    # Question formats
+    "Can you forecast Apple's revenue?",
+    "How much will Microsoft's revenue be?",
+    "What do you think Tesla's revenue will be?",
+    "Can you predict Apple's revenue using LSTM?",
+    
+    # Imperative
+    "Forecast Apple revenue now",
+    "Run a forecast for Microsoft revenue",
+    "Generate forecast for Tesla earnings",
+    
+    # Variations
+    "What will Apple's revenue be?",
+    "Project Microsoft's revenue",
+    "Estimate Tesla's revenue",
+    "What's the outlook for Amazon revenue?",
+    
+    # Multiple companies
+    "Forecast Apple and Microsoft revenue",
+    "What's the revenue forecast for Apple, Microsoft, and Tesla?",
+]
+
+def check_quality(response: str) -> Dict:
+    """Quick quality check."""
+    q = {
+        "has_values": bool(re.search(r'\$\d+\.?\d*\s*[BM]', response)),
+        "has_model": bool(re.search(r'\b(lstm|prophet|arima|ets|gru|transformer|ensemble)\b', response.lower())),
+        "has_ci": bool(re.search(r'95%\s*confidence|confidence\s*interval', response.lower())),
+        "has_years": bool(re.search(r'\b(202[4-9]|203[0-5])\b', response)),
+        "has_snapshot": any([
+            "phase1 kpis" in response.lower(),
+            "growth snapshot" in response.lower() and "forecast" not in response.lower()[:500],
+        ]),
+        "has_error": any([
+            "apologize" in response.lower() and "forecast" not in response.lower()[:200],
+            "error" in response.lower() and "forecast" not in response.lower()[:200],
+        ]),
+    }
+    q["passed"] = q["has_values"] and q["has_model"] and not q["has_snapshot"] and not q["has_error"]
+    return q
+
+def main():
+    """Run batch tests."""
+    print("=" * 80)
+    print("ML FORECASTING - BATCH TEST")
+    print("=" * 80)
+    print(f"\nTesting {len(ALL_PROMPTS)} representative prompts...\n")
+    
+    settings = load_settings()
+    bot = FinanlyzeOSChatbot.create(settings)
+    
+    results = []
+    for i, prompt in enumerate(ALL_PROMPTS, 1):
+        print(f"[{i}/{len(ALL_PROMPTS)}] {prompt}")
+        
+        try:
+            response = bot.ask(prompt)
+            if response:
+                quality = check_quality(response)
+                status = "[PASS]" if quality["passed"] else "[FAIL]"
+                print(f"  {status} | Values: {quality['has_values']} | Model: {quality['has_model']} | Snapshot: {quality['has_snapshot']} | Error: {quality['has_error']}")
+                results.append({"prompt": prompt, "passed": quality["passed"], "quality": quality})
+            else:
+                print(f"  [FAIL] No response")
+                results.append({"prompt": prompt, "passed": False, "error": "No response"})
+        except Exception as e:
+            print(f"  [FAIL] Error: {e}")
+            results.append({"prompt": prompt, "passed": False, "error": str(e)})
+    
+    # Summary
+    print("\n" + "=" * 80)
+    print("SUMMARY")
+    print("=" * 80)
+    
+    passed = sum(1 for r in results if r.get("passed"))
+    print(f"\nPassed: {passed}/{len(results)} ({passed/len(results)*100:.1f}%)")
+    
+    if results:
+        qualities = [r["quality"] for r in results if r.get("quality")]
+        if qualities:
+            print(f"\nQuality Breakdown:")
+            print(f"  Has Forecast Values: {sum(1 for q in qualities if q['has_values']) / len(qualities) * 100:.1f}%")
+            print(f"  Has Model Name: {sum(1 for q in qualities if q['has_model']) / len(qualities) * 100:.1f}%")
+            print(f"  Has Confidence Intervals: {sum(1 for q in qualities if q['has_ci']) / len(qualities) * 100:.1f}%")
+            print(f"  Has Years: {sum(1 for q in qualities if q['has_years']) / len(qualities) * 100:.1f}%")
+            print(f"  Has Snapshots (BAD): {sum(1 for q in qualities if q['has_snapshot']) / len(qualities) * 100:.1f}%")
+            print(f"  Has Errors (BAD): {sum(1 for q in qualities if q['has_error']) / len(qualities) * 100:.1f}%")
+    
+    failed = [r for r in results if not r.get("passed")]
+    if failed:
+        print(f"\n[FAIL] Failed Prompts ({len(failed)}):")
+        for r in failed[:10]:
+            print(f"  - {r['prompt']}")
+            if r.get("error"):
+                print(f"    Error: {r['error']}")
+    
+    print("=" * 80)
+    
+    return results
+
+if __name__ == "__main__":
+    main()
+

@@ -87,7 +87,7 @@ Or open `test_dashboard_sources.html` in your browser to see an interactive brea
 ## 🛠️ Technical Details
 
 ### Backend (Python)
-- File: `src/benchmarkos_chatbot/dashboard_utils.py`
+- File: `src/finanlyzeos_chatbot/dashboard_utils.py`
 - Function: `_collect_sources()` (lines 269-370)
 - Generates SEC URLs and calculation formulas
 - Returns complete source metadata

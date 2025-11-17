@@ -3,12 +3,12 @@ Tests for abbreviation and acronym detection (Phase 4.2).
 """
 
 import pytest
-from src.benchmarkos_chatbot.parsing.abbreviations import (
+from src.finanlyzeos_chatbot.parsing.abbreviations import (
     AbbreviationDetector,
     AbbreviationType,
     AbbreviationMatch,
 )
-from src.benchmarkos_chatbot.parsing.parse import parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestTimePeriodAbbreviations:

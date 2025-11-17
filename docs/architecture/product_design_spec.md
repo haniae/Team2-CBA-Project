@@ -5,7 +5,7 @@ last_updated: 2025-10-12
 status: Draft
 owners:
   - name: BenchmarkOS PMO
-    email: pmo@benchmarkos.ai
+    email: pmo@finanlyzeos.ai
 contributors:
   - Engineering: Platform, Data, ML, Web
   - Product: FP&A, IR, CorpDev liaisons

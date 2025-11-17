@@ -118,7 +118,7 @@ for year_offset in range(3):
 
 ## 📁 Files Modified
 
-1. **`src/benchmarkos_chatbot/dashboard_utils.py`**
+1. **`src/finanlyzeos_chatbot/dashboard_utils.py`**
    - Enhanced `_collect_sources()` with fiscal year fallback
    - Standardized SEC EDGAR URL formats  
    - Added verbose mode control

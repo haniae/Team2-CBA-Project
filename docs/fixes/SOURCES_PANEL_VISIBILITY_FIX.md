@@ -44,8 +44,8 @@ This forces the browser to reload the new CSS without caching issues.
 ### 3. Copied Files to Static Directory
 
 ```bash
-copy webui\cfi_dashboard.css src\benchmarkos_chatbot\static\cfi_dashboard.css
-copy webui\cfi_dashboard.html src\benchmarkos_chatbot\static\cfi_dashboard.html
+copy webui\cfi_dashboard.css src\finanlyzeos_chatbot\static\cfi_dashboard.css
+copy webui\cfi_dashboard.html src\finanlyzeos_chatbot\static\cfi_dashboard.html
 ```
 
 ### 4. Restarted Server

@@ -87,8 +87,8 @@
 - [x] Code documented and maintainable
 
 ### **📋 FILES MODIFIED:**
-- `src/benchmarkos_chatbot/parsing/time_grammar.py` - Core parsing logic
-- `src/benchmarkos_chatbot/parsing/parse.py` - Main parsing orchestrator
+- `src/finanlyzeos_chatbot/parsing/time_grammar.py` - Core parsing logic
+- `src/finanlyzeos_chatbot/parsing/parse.py` - Main parsing orchestrator
 
 ### **🧪 TESTING COMPLETED:**
 - 200+ test cases across all categories

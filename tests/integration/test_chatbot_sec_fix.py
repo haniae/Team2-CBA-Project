@@ -14,8 +14,8 @@ def main():
     print("=== Testing Chatbot SEC API Fix ===\n")
     
     try:
-        from benchmarkos_chatbot.chatbot import _CompanyNameIndex
-        from benchmarkos_chatbot.config import load_settings
+        from finanlyzeos_chatbot.chatbot import _CompanyNameIndex
+        from finanlyzeos_chatbot.config import load_settings
         
         print("🔧 Testing _CompanyNameIndex build_from_sec()...")
         

@@ -15,13 +15,13 @@ Tests:
 """
 
 import pytest
-from src.benchmarkos_chatbot.parsing.temporal_relationships import (
+from src.finanlyzeos_chatbot.parsing.temporal_relationships import (
     TemporalRelationshipDetector,
     TemporalRelationship,
     TemporalRelationType,
     EventType,
 )
-from src.benchmarkos_chatbot.parsing.parse import parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestBeforeRelationships:

@@ -205,7 +205,7 @@ Input: "apple vs microsoft revenue q1 2024"
 - **Estimated Fix Time**: 30 minutes
 
 ### **3. Circular Import / Segmentation Fault**
-- **Issue**: Importing `benchmarkos_chatbot` package causes segmentation fault
+- **Issue**: Importing `finanlyzeos_chatbot` package causes segmentation fault
 - **Root Cause**: `__init__.py` imports heavy dependencies (AnalyticsEngine, BenchmarkOSChatbot)
 - **Impact**: Cannot run full test suite with package import
 - **Workaround**: Use isolated module import

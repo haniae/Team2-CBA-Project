@@ -8,7 +8,7 @@ from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot.response_verifier import extract_financial_numbers
+from finanlyzeos_chatbot.response_verifier import extract_financial_numbers
 
 print("="*80)
 print("GLOBAL TICKER EXTRACTION FIX TEST")

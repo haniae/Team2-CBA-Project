@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from benchmarkos_chatbot.custom_kpis import CustomKPICalculator
-from benchmarkos_chatbot.template_processor import TemplateProcessor
-from benchmarkos_chatbot.database import initialise
+from finanlyzeos_chatbot.custom_kpis import CustomKPICalculator
+from finanlyzeos_chatbot.template_processor import TemplateProcessor
+from finanlyzeos_chatbot.database import initialise
 
 
 def _seed_metric(db_path: Path, ticker: str, metric: str, value: float, year: int) -> None:

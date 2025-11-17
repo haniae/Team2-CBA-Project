@@ -188,9 +188,9 @@ MIN_CONFIDENCE_THRESHOLD=0.85
 ---
 
 **Files Updated:**
-1. `src/benchmarkos_chatbot/chatbot.py` - Added explicit LLM instructions
-2. `src/benchmarkos_chatbot/multi_source_aggregator.py` - Fixed FRED formatting
-3. `src/benchmarkos_chatbot/context_builder.py` - Added mandatory data blocks
+1. `src/finanlyzeos_chatbot/chatbot.py` - Added explicit LLM instructions
+2. `src/finanlyzeos_chatbot/multi_source_aggregator.py` - Fixed FRED formatting
+3. `src/finanlyzeos_chatbot/context_builder.py` - Added mandatory data blocks
 
 **Test Results:**
 - 97.8% average (521 companies)

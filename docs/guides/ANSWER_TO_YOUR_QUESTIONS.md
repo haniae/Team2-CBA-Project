@@ -227,9 +227,9 @@ You said:
    - `UI_IMPLEMENTATION_GUIDE.md` (implementation guide)
 
 2. **Source Code:**
-   - `src/benchmarkos_chatbot/chatbot.py` (dashboard building logic)
-   - `src/benchmarkos_chatbot/routing/enhanced_router.py` (routing decisions)
-   - `src/benchmarkos_chatbot/dashboard_utils.py` (dashboard payloads)
+   - `src/finanlyzeos_chatbot/chatbot.py` (dashboard building logic)
+   - `src/finanlyzeos_chatbot/routing/enhanced_router.py` (routing decisions)
+   - `src/finanlyzeos_chatbot/dashboard_utils.py` (dashboard payloads)
    - `webui/app.js` (frontend rendering)
 
 3. **Test Results:**

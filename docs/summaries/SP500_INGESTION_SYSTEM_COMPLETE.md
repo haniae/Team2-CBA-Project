@@ -365,7 +365,7 @@ Database Contents:
   📊 S&P 500 Database Status Report
 ================================================================================
 
-Database: data/sqlite/benchmarkos_chatbot.sqlite3
+Database: data/sqlite/finanlyzeos_chatbot.sqlite3
 
 ================================================================================
   📋 Database Tables
@@ -420,7 +420,7 @@ Team2-CBA-Project/
 ├── .ingestion_progress.json                 (auto-generated)
 └── data/
     └── sqlite/
-        └── benchmarkos_chatbot.sqlite3      (populated)
+        └── finanlyzeos_chatbot.sqlite3      (populated)
 ```
 
 ## ⚙️ Technical Details
@@ -467,7 +467,7 @@ Uses existing tables:
 ```bash
 python scripts/ingestion/ingest_sp500_15years.py
 python scripts/ingestion/load_historical_prices_15years.py
-git add data/sqlite/benchmarkos_chatbot.sqlite3
+git add data/sqlite/finanlyzeos_chatbot.sqlite3
 git commit -m "Add complete S&P 500 dataset"
 git push origin main
 ```

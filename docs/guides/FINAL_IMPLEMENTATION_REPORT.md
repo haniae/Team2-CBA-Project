@@ -148,7 +148,7 @@ LLM Behavioral Rules: 8
 ```bash
 # 1. Start server
 cd /home/malcolm-munoriyarwa/projects/Team2-CBA-Project
-python -m benchmarkos_chatbot.web
+python -m finanlyzeos_chatbot.web
 
 # 2. Open browser
 http://localhost:8000 (or your ngrok URL)
@@ -284,9 +284,9 @@ If 4/5 work → **You're Demo-Ready!** 🎯
 2. **SESSION_SUMMARY.md** - What was built and how
 
 ### **For Code Review:**
-1. **src/benchmarkos_chatbot/chatbot.py** - Main logic
-2. **src/benchmarkos_chatbot/database.py** - Persistence layer
-3. **src/benchmarkos_chatbot/context_builder.py** - Explainability extraction
+1. **src/finanlyzeos_chatbot/chatbot.py** - Main logic
+2. **src/finanlyzeos_chatbot/database.py** - Persistence layer
+3. **src/finanlyzeos_chatbot/context_builder.py** - Explainability extraction
 
 ---
 
@@ -295,7 +295,7 @@ If 4/5 work → **You're Demo-Ready!** 🎯
 ### **Test the Implementation:**
 ```bash
 # Start server
-python -m benchmarkos_chatbot.web
+python -m finanlyzeos_chatbot.web
 
 # In browser: http://localhost:8000
 # Test query: "Forecast Tesla revenue using LSTM"
@@ -308,10 +308,10 @@ python -m benchmarkos_chatbot.web
 ### **Check Database:**
 ```bash
 # Verify ml_forecasts table exists
-sqlite3 data/benchmarkos.db "SELECT name FROM sqlite_master WHERE type='table' AND name='ml_forecasts';"
+sqlite3 data/finanlyzeos.db "SELECT name FROM sqlite_master WHERE type='table' AND name='ml_forecasts';"
 
 # Check saved forecasts
-sqlite3 data/benchmarkos.db "SELECT forecast_name, ticker, metric, method FROM ml_forecasts;"
+sqlite3 data/finanlyzeos.db "SELECT forecast_name, ticker, metric, method FROM ml_forecasts;"
 ```
 
 ---
@@ -351,10 +351,10 @@ sqlite3 data/benchmarkos.db "SELECT forecast_name, ticker, metric, method FROM m
 ## 🚨 **Demo Day Checklist**
 
 ### **1 Hour Before:**
-- [ ] Start server: `python -m benchmarkos_chatbot.web`
+- [ ] Start server: `python -m finanlyzeos_chatbot.web`
 - [ ] Test all 5 demo scenarios from QUICK_TEST_GUIDE.md
 - [ ] Clear browser cache
-- [ ] Check database has data: `ls -lh data/benchmarkos.db`
+- [ ] Check database has data: `ls -lh data/finanlyzeos.db`
 - [ ] Review judge Q&A section above
 
 ### **30 Minutes Before:**

@@ -6,7 +6,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
+from src.finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
 import json
 
 def test_company(ticker="AAPL", company_name="Apple Inc."):
@@ -16,17 +16,17 @@ def test_company(ticker="AAPL", company_name="Apple Inc."):
     
     # Create chatbot
     print("Creating chatbot...")
-    from src.benchmarkos_chatbot.settings import load_settings
-    from src.benchmarkos_chatbot.llm import AnthropicClient
-    from src.benchmarkos_chatbot.analytics_engine import AnalyticsEngine
-    from src.benchmarkos_chatbot import database
+    from src.finanlyzeos_chatbot.settings import load_settings
+    from src.finanlyzeos_chatbot.llm import AnthropicClient
+    from src.finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
+    from src.finanlyzeos_chatbot import database
     
     settings = load_settings()
     db = database.get_default_connection()
     llm_client = AnthropicClient(settings)
     analytics_engine = AnalyticsEngine(db)
     
-    bot = BenchmarkOSChatbot(settings, llm_client, analytics_engine)
+    bot = FinanlyzeOSChatbot(settings, llm_client, analytics_engine)
     
     # Generate dashboard
     print(f"Generating dashboard for {ticker}...")

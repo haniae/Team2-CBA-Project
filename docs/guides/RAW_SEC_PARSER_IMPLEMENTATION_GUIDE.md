@@ -110,9 +110,9 @@ Need to identify which table has which data.
 5. Test on 50 diverse companies
 
 **Files to Create:**
-- `src/benchmarkos_chatbot/parsers/html_table_parser.py`
-- `src/benchmarkos_chatbot/parsers/metric_normalizer.py`
-- `src/benchmarkos_chatbot/parsers/value_parser.py`
+- `src/finanlyzeos_chatbot/parsers/html_table_parser.py`
+- `src/finanlyzeos_chatbot/parsers/metric_normalizer.py`
+- `src/finanlyzeos_chatbot/parsers/value_parser.py`
 - `tests/test_html_parsing.py`
 
 **Challenges:**
@@ -132,8 +132,8 @@ Need to identify which table has which data.
 4. Map extracted data to schema
 
 **Files to Create:**
-- `src/benchmarkos_chatbot/parsers/statement_classifier.py`
-- `src/benchmarkos_chatbot/parsers/filing_processor.py`
+- `src/finanlyzeos_chatbot/parsers/statement_classifier.py`
+- `src/finanlyzeos_chatbot/parsers/filing_processor.py`
 
 **Key Patterns:**
 ```python
@@ -179,7 +179,7 @@ BALANCE_SHEET_PATTERNS = [
 ## Code Structure
 
 ```
-src/benchmarkos_chatbot/parsers/
+src/finanlyzeos_chatbot/parsers/
 ├── __init__.py
 ├── sec_filing_downloader.py      # Fetch filings from SEC
 ├── html_table_parser.py           # Extract tables from HTML

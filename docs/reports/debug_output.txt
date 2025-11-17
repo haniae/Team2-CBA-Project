@@ -1,0 +1,374 @@
+================================================================================
+ML FORECAST DEBUG TEST
+================================================================================
+
+================================================================================
+PROMPT: Forecast Apple's revenue
+================================================================================
+
+Response Length: 4212 chars
+
+Response Preview (first 1000 chars):
+--------------------------------------------------------------------------------
+Based on the Prophet forecasting model, Apple's revenue is projected as follows:
+
+### Forecasted Revenue Values
+- **2026:** $406.16B (95% CI: $269.75B - $550.28B)
+- **2027:** $419.79B (95% CI: $265.63B - $569.80B)
+- **2028:** $432.25B (95% CI: $285.60B - $566.51B)
+
+### Year-over-Year Growth Rates
+- **2026 to 2027:** +3.35% YoY growth
+- **2027 to 2028:** +2.97% YoY growth
+- **Multi-Year CAGR (2026-2028):** 416161000000.0%%
+
+### Model Technical Specifications
+- **Model Used:** Prophet
+- **Confidence Level:** 416161000000.0%
+- **Data Points Used:** 17 periods
+- **Changepoint Count:** 5
+- **Growth Model:** Linear
+
+### Training Details
+- **Training Epochs:** Not applicable for Prophet as it is not a neural network model.
+- **Training Loss:** Not applicable for Prophet.
+- **Validation Loss:** Not applicable for Prophet.
+- **Overfitting Analysis:** Not applicable for Prophet.
+- **Training Time:** Not specified, as Prophet is typically fast for fitting.
+- **Data Points Used:** 17 periods.
+
+###
+--------------------------------------------------------------------------------
+
+Indicators:
+  Has 'forecast'/'predict': True
+  Has model name: True
+  Has $ values: True
+  Has snapshot (BAD): False
+
+================================================================================
+PROMPT: Forecast Apple's revenue using LSTM
+================================================================================
+
+Response Length: 422 chars
+
+Response Preview (first 1000 chars):
+--------------------------------------------------------------------------------
+Based on the LSTM forecasting model, Apple's revenue is projected as follows:
+
+### Forecasted Revenue Values
+- **2026:** $478.24B (95% CI: $478.24B - $478.24B)
+- **2027:** $519.39B (95% CI: $519.39B - $519.39B)
+- **2028:** $567.51B (95% CI: $567.51B - $567.51B)
+
+### Year-over-Year Growth Rates
+- **2026 to 2027:** +8.61% YoY growth
+- **2027 to 2028:** +9.26% YoY growth
+- **Multi-Year CAGR (2026-2028):** 416161000000.0%%
+--------------------------------------------------------------------------------
+
+Indicators:
+  Has 'forecast'/'predict': True
+  Has model name: True
+  Has $ values: True
+  Has snapshot (BAD): False
+
+================================================================================
+PROMPT: Predict Microsoft's revenue using Prophet
+================================================================================
+
+Response Length: 4290 chars
+
+Response Preview (first 1000 chars):
+--------------------------------------------------------------------------------
+Based on the Prophet forecasting model, Microsoft's revenue is projected as follows:
+
+### Forecasted Revenue Values
+- **2026:** $240.88B (95% CI: $158.17B - $328.72B)
+- **2027:** $257.82B (95% CI: $175.70B - $346.58B)
+- **2028:** $274.46B (95% CI: $187.83B - $354.19B)
+
+### Year-over-Year Growth Rates
+- **2026 to 2027:** +7.04% YoY growth
+- **2027 to 2028:** +6.45% YoY growth
+- **Multi-Year CAGR (2026-2028):** 6.74%
+
+### Model Technical Specifications
+- **Model Used:** Prophet
+- **Confidence Level:** 281724000000.0%
+- **Data Points Used:** 16 periods
+- **Changepoint Count:** 5
+- **Growth Model:** Linear
+- **Seasonality Detected:** Yearly (automatically modeled)
+- **Key Hyperparameters:**
+  - Changepoint Prior Scale: 0.05 (controls flexibility of trend changes)
+  - Seasonality Prior Scale: 10.0 (controls strength of seasonality)
+  - Seasonality Mode: Additive
+
+### Training Details
+- **Training Epochs:** Not applicable for Prophet as it is not a neural network model.
+- **Training Loss:** 
+--------------------------------------------------------------------------------
+
+Indicators:
+  Has 'forecast'/'predict': True
+  Has model name: True
+  Has $ values: True
+  Has snapshot (BAD): False
+
+================================================================================
+PROMPT: What's Tesla's revenue forecast?
+================================================================================
+
+Response Length: 2957 chars
+
+Response Preview (first 1000 chars):
+--------------------------------------------------------------------------------
+Based on the Prophet forecasting model, Tesla's revenue is projected as follows:
+
+### Forecasted Revenue Values
+- **2026:** $83.59B (95% CI: $42.97B - $123.79B)
+- **2027:** $94.10B (95% CI: $51.67B - $134.96B)
+- **2028:** $104.82B (95% CI: $61.68B - $147.29B)
+
+### Year-over-Year Growth Rates
+- **2026 to 2027:** +12.56% YoY growth
+- **2027 to 2028:** +11.39% YoY growth
+- **Multi-Year CAGR (2026-2028):** 11.98%
+
+### Model Technical Specifications
+- **Model Used:** Prophet
+- **Confidence Level:** 46801000000.0%
+- **Data Points Used:** 15 periods
+- **Changepoint Count:** 5
+- **Growth Model:** Linear
+
+### Forecast Analysis
+- **Confidence Interval Widths:**
+  - **2026:** 95% CI width = $80.82B (96.7% of forecast)
+  - **2027:** 95% CI width = $83.29B (88.5% of forecast)
+  - **2028:** 95% CI width = $85.62B (81.7% of forecast)
+
+- **Uncertainty Level Assessment:** High uncertainty with average CI width of 46801000000.0% of the forecast.
+
+### Model Explainability
+**How Prophet Works:**
+- Prophet
+--------------------------------------------------------------------------------
+
+Indicators:
+  Has 'forecast'/'predict': True
+  Has model name: True
+  Has $ values: True
+  Has snapshot (BAD): False
+
+================================================================================
+PROMPT: Forecast Apple's revenue using GRU
+================================================================================
+
+Response Length: 4089 chars
+
+Response Preview (first 1000 chars):
+--------------------------------------------------------------------------------
+Based on the GRU forecasting model, Apple's revenue is projected as follows:
+
+### Forecasted Revenue Values
+- **2026:** $489.59B (95% CI: $489.59B - $489.59B)
+- **2027:** $521.12B (95% CI: $521.12B - $521.12B)
+- **2028:** $553.39B (95% CI: $553.39B - $553.39B)
+
+### Year-over-Year Growth Rates
+- **2026 to 2027:** +6.44% YoY growth
+- **2027 to 2028:** +6.19% YoY growth
+- **Multi-Year CAGR (2026-2028):** 6.32%
+
+### Model Architecture
+- **Network Architecture:** 2 layers with [50, 50] units per layer
+  - **Layer 1 Units:** 50
+  - **Layer 2 Units:** 50
+- **Hidden Units per Layer:** 50
+- **Total Parameters:** 23,301
+- **Input Shape:** (10, 1) (lookback window of 10 time steps)
+- **Model Type:** GRU (Gated Recurrent Unit)
+  - GRU networks use memory cells with gates (reset, update) to learn long-term dependencies, making them suitable for time series forecasting with complex patterns.
+
+### Training Details
+- **Training Epochs:** 37
+- **Final Training Loss (MSE):** 0.094737
+- **Final Validatio
+--------------------------------------------------------------------------------
+
+Indicators:
+  Has 'forecast'/'predict': True
+  Has model name: True
+  Has $ values: True
+  Has snapshot (BAD): False
+
+================================================================================
+PROMPT: Forecast Apple's revenue using Transformer
+================================================================================
+
+Response Length: 4036 chars
+
+Response Preview (first 1000 chars):
+--------------------------------------------------------------------------------
+Based on the ARIMA forecasting model, Apple's revenue is projected as follows:
+
+### Forecasted Revenue Values
+- **2026:** $439.49B (95% CI: $326.87B - $552.11B)
+- **2027:** $462.82B (95% CI: $303.55B - $622.09B)
+- **2028:** $486.15B (95% CI: $291.08B - $681.21B)
+
+### Year-over-Year Growth Rates
+- **2026 to 2027:** +5.31% YoY growth
+- **2027 to 2028:** +5.04% YoY growth
+- **Multi-Year CAGR (2026-2028):** 5.17%
+
+### Model Technical Specifications
+- **Model Used:** ARIMA
+- **ARIMA Order:** (0, 1, 0)
+  - **AR (AutoRegressive) Order:** 0
+  - **I (Integrated) Order:** 1
+  - **MA (Moving Average) Order:** 0
+- **Seasonal Order (SARIMA):** (0, 0, 0, 4)
+- **AIC (Akaike Information Criterion):** 842.19
+- **BIC (Bayesian Information Criterion):** 843.73
+- **Data Points Used:** 17 periods
+
+### Training Details
+- **Training Epochs:** Not applicable for ARIMA as it is not a neural network model.
+- **Training Loss (MSE):** Not applicable for ARIMA.
+- **Validation Loss (MSE):** Not applicable for ARIMA
+--------------------------------------------------------------------------------
+
+Indicators:
+  Has 'forecast'/'predict': True
+  Has model name: True
+  Has $ values: True
+  Has snapshot (BAD): False
+
+================================================================================
+PROMPT: Forecast Apple's revenue using ETS
+================================================================================
+
+Response Length: 4140 chars
+
+Response Preview (first 1000 chars):
+--------------------------------------------------------------------------------
+Based on the ETS forecasting model, Apple's revenue is projected as follows:
+
+### Forecasted Values
+- **2026:** $431.46B (95% CI: $321.55B - $541.38B)
+- **2027:** $446.77B (95% CI: $336.86B - $556.68B)
+- **2028:** $462.07B (95% CI: $352.16B - $571.98B)
+
+### Year-over-Year Growth Rates
+- **2026 to 2027:** +3.55% YoY growth
+- **2027 to 2028:** +3.43% YoY growth
+- **Multi-Year CAGR (2026-2028):** 3.49%
+
+### Model Technical Specifications
+- **Model Type:** ETS (Error-Trend-Seasonal)
+  - **ETS Model Type:** AAN (Additive Error, Additive Trend, No Seasonality)
+  - **Smoothing Parameters:**
+    - **Error Component:** Additive
+    - **Trend Component:** Additive
+    - **Seasonal Component:** None
+- **Data Points Used:** 17 periods
+
+### Training Details
+- **Training Epochs:** Not applicable for ETS as it is not a neural network model.
+- **Training Loss:** Not applicable for ETS.
+- **Validation Loss:** Not applicable for ETS.
+- **Overfitting Analysis:** Not applicable for ETS.
+- **Training Time:
+--------------------------------------------------------------------------------
+
+Indicators:
+  Has 'forecast'/'predict': True
+  Has model name: True
+  Has $ values: True
+  Has snapshot (BAD): False
+
+================================================================================
+PROMPT: Forecast Apple's revenue using ensemble methods
+================================================================================
+
+Response Length: 5024 chars
+
+Response Preview (first 1000 chars):
+--------------------------------------------------------------------------------
+Based on the ensemble forecasting model, Apple's revenue is projected as follows:
+
+### Forecasted Values
+- **2026:** $469.90B (95% CI: $386.51B - $553.11B)
+- **2027:** $516.12B (95% CI: $421.44B - $603.83B)
+- **2028:** $573.12B (95% CI: $479.89B - $672.82B)
+
+### Year-over-Year Growth Rates
+- **2026 to 2027:** +9.84% YoY growth
+- **2027 to 2028:** +11.04% YoY growth
+- **Multi-Year CAGR (2026-2028):** 10.44%
+
+### Model Technical Specifications
+- **Model Used:** Ensemble (combination of ARIMA, Prophet, ETS, and LSTM)
+- **Models Combined:** 
+  - LSTM: 416161000000.0% (contributes 416161000000.0% to final forecast)
+  - Prophet: 416161000000.0% (contributes 416161000000.0% to final forecast)
+  - ARIMA: 416161000000.0% (contributes 416161000000.0% to final forecast)
+  - ETS: 416161000000.0% (contributes 416161000000.0% to final forecast)
+- **Ensemble Method:** Weighted average of the individual model forecasts
+- **Model Confidence:** 416161000000.0%
+
+### Training Details
+- **Training Epochs:*
+--------------------------------------------------------------------------------
+
+Indicators:
+  Has 'forecast'/'predict': True
+  Has model name: True
+  Has $ values: True
+  Has snapshot (BAD): False
+
+================================================================================
+PROMPT: Forecast Apple's revenue using the best ML model
+================================================================================
+
+Response Length: 4352 chars
+
+Response Preview (first 1000 chars):
+--------------------------------------------------------------------------------
+Based on the Prophet forecasting model, Apple's revenue is projected as follows:
+
+### Forecast Values
+- **2026:** $406.16B (95% CI: $265.67B - $558.39B)
+- **2027:** $419.79B (95% CI: $282.19B - $568.61B)
+- **2028:** $432.25B (95% CI: $285.12B - $581.65B)
+
+### Year-over-Year Growth Rates
+- **2026 to 2027:** +3.35% YoY growth
+- **2027 to 2028:** +2.97% YoY growth
+- **Multi-Year CAGR (2026-2028):** 3.16%
+
+### Model Technical Specifications
+- **Model Used:** Prophet
+- **Confidence Level:** 416161000000.0%
+- **Data Points Used:** 17 periods
+- **Changepoint Count:** 5
+- **Growth Model:** Linear
+- **Seasonality Detected:** Yearly (automatically detected and modeled)
+- **Key Hyperparameters:**
+  - Changepoint Prior Scale: 0.05 (controls flexibility of trend changes)
+  - Seasonality Prior Scale: 10.0 (controls strength of seasonality)
+  - Seasonality Mode: Additive
+
+### Training Details
+- **Training Epochs:** Not applicable for Prophet as it is not a neural network model.
+- **Training Loss:** N
+--------------------------------------------------------------------------------
+
+Indicators:
+  Has 'forecast'/'predict': True
+  Has model name: True
+  Has $ values: True
+  Has snapshot (BAD): False

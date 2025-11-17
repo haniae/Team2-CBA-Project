@@ -7,11 +7,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from benchmarkos_chatbot import AnalyticsEngine, BenchmarkOSChatbot
-from benchmarkos_chatbot import tasks as task_module
-from benchmarkos_chatbot.config import Settings
-from benchmarkos_chatbot.data_ingestion import ingest_financial_data
-from benchmarkos_chatbot import database
+from finanlyzeos_chatbot import AnalyticsEngine, FinanlyzeOSChatbot
+from finanlyzeos_chatbot import tasks as task_module
+from finanlyzeos_chatbot.config import Settings
+from finanlyzeos_chatbot.data_ingestion import ingest_financial_data
+from finanlyzeos_chatbot import database
 
 
 @pytest.fixture()
@@ -68,7 +68,7 @@ def test_chatbot_metrics_accepts_company_name(tmp_path: Path) -> None:
         sec_api_user_agent=None,
     )
     task_module._default_manager = None
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     try:
         reply = bot.ask("metrics for Alpha Technologies phase 1")
     finally:
@@ -86,7 +86,7 @@ def test_chatbot_compare_accepts_company_names(tmp_path: Path) -> None:
         sec_api_user_agent=None,
     )
     task_module._default_manager = None
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     try:
         reply = bot.ask("compare Alpha Technologies vs Bravo Retail phase 2")
     finally:
@@ -128,7 +128,7 @@ def test_chatbot_metrics_suggests_candidates(tmp_path: Path) -> None:
         sec_api_user_agent=None,
     )
     task_module._default_manager = None
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     try:
         reply = bot.ask("metrics for Alpha Technologes")
     finally:
@@ -145,7 +145,7 @@ def test_chatbot_compare_suggests_when_unresolved(tmp_path: Path) -> None:
         sec_api_user_agent=None,
     )
     task_module._default_manager = None
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     try:
         reply = bot.ask("compare Alphaa vs Bravo Retail phase 2")
     finally:
@@ -162,7 +162,7 @@ def test_chatbot_scenario_suggests_candidates(tmp_path: Path) -> None:
         sec_api_user_agent=None,
     )
     task_module._default_manager = None
-    bot = BenchmarkOSChatbot.create(settings)
+    bot = FinanlyzeOSChatbot.create(settings)
     try:
         reply = bot.ask("scenario Alphaa revenue +5% margin +1%")
     finally:

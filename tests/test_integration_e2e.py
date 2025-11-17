@@ -6,7 +6,7 @@ Validates that all 14 features work harmoniously in realistic scenarios.
 """
 
 import pytest
-from src.benchmarkos_chatbot.parsing.parse import parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestMultiFeatureQueries:

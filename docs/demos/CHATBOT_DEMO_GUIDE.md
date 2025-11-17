@@ -378,7 +378,7 @@ Visit http://localhost:8000/docs for interactive Swagger UI
 **Solution:**
 ```bash
 # Refresh metrics after data ingestion
-python -c "from benchmarkos_chatbot.config import load_settings; from benchmarkos_chatbot.analytics_engine import AnalyticsEngine; AnalyticsEngine(load_settings()).refresh_metrics(force=True)"
+python -c "from finanlyzeos_chatbot.config import load_settings; from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine; AnalyticsEngine(load_settings()).refresh_metrics(force=True)"
 ```
 
 ### Issue: "Server won't start"
@@ -410,7 +410,7 @@ export PYTHONPATH=./src  # macOS/Linux
 **Solution:**
 ```bash
 # Check database path in .env file
-DATABASE_PATH=./data/sqlite/benchmarkos_chatbot.sqlite3
+DATABASE_PATH=./data/sqlite/finanlyzeos_chatbot.sqlite3
 
 # Or run data ingestion
 python scripts/ingestion/fill_data_gaps.py --target-years "2022,2023,2024" --years-back 3

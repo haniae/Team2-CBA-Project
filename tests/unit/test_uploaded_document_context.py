@@ -10,13 +10,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from benchmarkos_chatbot import database
-from benchmarkos_chatbot.chatbot import BenchmarkOSChatbot
-from benchmarkos_chatbot.document_context import build_uploaded_document_context
+from finanlyzeos_chatbot import database
+from finanlyzeos_chatbot.chatbot import FinanlyzeOSChatbot
+from finanlyzeos_chatbot.document_context import build_uploaded_document_context
 
 
 @pytest.fixture
-def chatbot(tmp_path: Path) -> tuple[BenchmarkOSChatbot, Path]:
+def chatbot(tmp_path: Path) -> tuple[FinanlyzeOSChatbot, Path]:
     """Provide a chatbot instance backed by a temporary database."""
     db_path = tmp_path / "chat.sqlite3"
     database.initialise(db_path)
@@ -29,7 +29,7 @@ def chatbot(tmp_path: Path) -> tuple[BenchmarkOSChatbot, Path]:
     llm_client = SimpleNamespace(generate_reply=lambda *args, **kwargs: "ok")
     analytics_engine = SimpleNamespace()
 
-    bot = BenchmarkOSChatbot(
+    bot = FinanlyzeOSChatbot(
         settings=settings,
         llm_client=llm_client,
         analytics_engine=analytics_engine,

@@ -19,9 +19,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.context_builder import _build_ml_forecast_context, _is_forecasting_query, _extract_forecast_metric, _extract_forecast_method
-from benchmarkos_chatbot.analytics_engine import AnalyticsEngine
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.context_builder import _build_ml_forecast_context, _is_forecasting_query, _extract_forecast_metric, _extract_forecast_method
+from finanlyzeos_chatbot.analytics_engine import AnalyticsEngine
 
 def main():
     print("="*80)
@@ -53,7 +53,7 @@ def main():
     
     # Check if ML forecasting is available
     try:
-        from benchmarkos_chatbot.ml_forecasting import get_ml_forecaster
+        from finanlyzeos_chatbot.ml_forecasting import get_ml_forecaster
         ml_forecaster = get_ml_forecaster(settings.database_path)
         print(f"\nML Forecaster available: {ml_forecaster is not None}")
         print(f"  - ARIMA: {ml_forecaster.arima_forecaster is not None}")

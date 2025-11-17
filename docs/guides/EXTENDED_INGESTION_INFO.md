@@ -83,8 +83,8 @@ python ingest_more_years.py
 
 ### To Ingest Specific Companies:
 ```python
-from benchmarkos_chatbot import load_settings
-from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
+from finanlyzeos_chatbot import load_settings
+from finanlyzeos_chatbot.data_ingestion import ingest_live_tickers
 
 settings = load_settings()
 tickers = ["AAPL", "MSFT", "GOOGL"]  # Your list

@@ -9,10 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from benchmarkos_chatbot import AnalyticsEngine, load_settings
-from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
-from benchmarkos_chatbot.data_sources import EdgarClient
-from benchmarkos_chatbot.ticker_universe import load_ticker_universe
+from finanlyzeos_chatbot import AnalyticsEngine, load_settings
+from finanlyzeos_chatbot.data_ingestion import ingest_live_tickers
+from finanlyzeos_chatbot.data_sources import EdgarClient
+from finanlyzeos_chatbot.ticker_universe import load_ticker_universe
 
 
 RATE_LIMIT_SECONDS = 1.0

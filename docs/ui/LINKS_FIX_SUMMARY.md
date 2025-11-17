@@ -113,7 +113,7 @@ The Python changes require restarting:
 ```bash
 # Stop current backend
 # Restart with updated code
-python -m benchmarkos_chatbot.web
+python -m finanlyzeos_chatbot.web
 ```
 
 ### **2. Clear Browser Cache**

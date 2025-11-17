@@ -14,12 +14,12 @@ Tests:
 """
 
 import pytest
-from src.benchmarkos_chatbot.parsing.natural_filters import (
+from src.finanlyzeos_chatbot.parsing.natural_filters import (
     NaturalFilterDetector,
     NaturalFilter,
     FilterType,
 )
-from src.benchmarkos_chatbot.parsing.parse import parse_to_structured
+from src.finanlyzeos_chatbot.parsing.parse import parse_to_structured
 
 
 class TestSectorFilters:

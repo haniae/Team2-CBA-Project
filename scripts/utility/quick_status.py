@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot import load_settings
+from finanlyzeos_chatbot import load_settings
 import sqlite3
 
 settings = load_settings()

@@ -6,7 +6,7 @@ For multi-ticker dashboards, the complex dashboard toolbar (with view switcher, 
 
 ## What Was Changed
 
-### 1. Backend (`src/benchmarkos_chatbot/chatbot.py`)
+### 1. Backend (`src/finanlyzeos_chatbot/chatbot.py`)
 No changes needed - already returns `"kind": "multi-cfi-classic"` with multiple dashboard payloads.
 
 ### 2. Frontend JavaScript (`webui/app.js`)

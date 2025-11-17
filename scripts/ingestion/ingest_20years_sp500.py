@@ -14,9 +14,9 @@ from typing import List
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from benchmarkos_chatbot import AnalyticsEngine, load_settings
-from benchmarkos_chatbot.data_ingestion import ingest_live_tickers
-from benchmarkos_chatbot.ticker_universe import load_ticker_universe
+from finanlyzeos_chatbot import AnalyticsEngine, load_settings
+from finanlyzeos_chatbot.data_ingestion import ingest_live_tickers
+from finanlyzeos_chatbot.ticker_universe import load_ticker_universe
 
 def chunked(iterable, size: int):
     """Yield fixed-size chunks from the iterable."""

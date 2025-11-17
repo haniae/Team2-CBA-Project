@@ -120,7 +120,7 @@ Team2-CBA-Project/
 
 **Example:**
 ```
-/src/benchmarkos_chatbot/ @haniae
+/src/finanlyzeos_chatbot/ @haniae
 SECURITY.md @haniae
 /.github/workflows/ @haniae
 ```

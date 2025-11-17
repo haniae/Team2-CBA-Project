@@ -7,14 +7,14 @@ from datetime import datetime
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from benchmarkos_chatbot.followup_context import (
+from finanlyzeos_chatbot.followup_context import (
     ConversationContext,
     detect_ambiguity,
     resolve_implicit_entities,
     calculate_resolution_confidence,
     should_ask_clarification,
 )
-from benchmarkos_chatbot.intent_carryover import (
+from finanlyzeos_chatbot.intent_carryover import (
     should_carry_over_intent,
     augment_query_with_intent,
 )

@@ -14,10 +14,10 @@ from typing import List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import yfinance as yf
-from benchmarkos_chatbot import database
-from benchmarkos_chatbot.config import load_settings
-from benchmarkos_chatbot.data_sources import MarketQuote
-from benchmarkos_chatbot.ticker_universe import load_ticker_universe
+from finanlyzeos_chatbot import database
+from finanlyzeos_chatbot.config import load_settings
+from finanlyzeos_chatbot.data_sources import MarketQuote
+from finanlyzeos_chatbot.ticker_universe import load_ticker_universe
 
 def fetch_historical_prices(ticker: str, years: int = 15) -> List[Tuple[str, str, Optional[float], Optional[float], Optional[int]]]:
     """Fetch historical prices for a ticker."""

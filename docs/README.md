@@ -1,6 +1,6 @@
 # Documentation Index
 
-Complete documentation for the BenchmarkOS Chatbot project.
+Complete documentation for the FinalyzeOS Chatbot project.
 
 ---
 
@@ -192,4 +192,4 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) in the root directory for contribution
 ---
 
 **Last Updated:** October 29, 2025  
-**Project:** BenchmarkOS Chatbot - Financial Analysis & Dashboard System
+**Project:** FinalyzeOS Chatbot - Financial Analysis & Dashboard System

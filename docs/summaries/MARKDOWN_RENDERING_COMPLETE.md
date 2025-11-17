@@ -144,9 +144,9 @@ Added professional styling for all markdown elements:
 
 ### 5. Deployed Files
 
-✅ `webui/app.js` → `src/benchmarkos_chatbot/static/app.js`  
-✅ `webui/styles.css` → `src/benchmarkos_chatbot/static/styles.css`  
-✅ `webui/index.html` → `src/benchmarkos_chatbot/static/index.html`
+✅ `webui/app.js` → `src/finanlyzeos_chatbot/static/app.js`  
+✅ `webui/styles.css` → `src/finanlyzeos_chatbot/static/styles.css`  
+✅ `webui/index.html` → `src/finanlyzeos_chatbot/static/index.html`
 
 ### 6. Restarted Server
 

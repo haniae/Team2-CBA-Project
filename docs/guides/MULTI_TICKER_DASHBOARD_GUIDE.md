@@ -99,7 +99,7 @@ Each company dashboard contains:
 
 ## 🔍 Technical Details
 
-### Backend (`src/benchmarkos_chatbot/chatbot.py`)
+### Backend (`src/finanlyzeos_chatbot/chatbot.py`)
 
 When processing a query:
 1. Detects "dashboard" keyword
@@ -199,10 +199,10 @@ Button classes:
 
 ## 🔗 Related Files
 
-- **Backend**: `src/benchmarkos_chatbot/chatbot.py` (lines 3026-3047)
+- **Backend**: `src/finanlyzeos_chatbot/chatbot.py` (lines 3026-3047)
 - **Frontend**: `webui/app.js` (lines 2900-3130)
 - **Styling**: `webui/styles.css` (lines 4264-4354)
-- **Dashboard Payload**: `src/benchmarkos_chatbot/dashboard_utils.py`
+- **Dashboard Payload**: `src/finanlyzeos_chatbot/dashboard_utils.py`
 
 ---
 
@@ -218,7 +218,7 @@ Button classes:
 
 **Root Cause**: The dashboard detection logic was using `_detect_summary_target()` which only returns a single ticker.
 
-**Solution**: Modified `src/benchmarkos_chatbot/chatbot.py` (lines 1751-1795) to:
+**Solution**: Modified `src/finanlyzeos_chatbot/chatbot.py` (lines 1751-1795) to:
 1. Check for "dashboard" keyword FIRST
 2. If found, detect ALL tickers in the input
 3. If 2+ tickers → route to multi-ticker path → generate company switcher buttons
