@@ -32,10 +32,47 @@ INTENT_EXPLAIN_PATTERN = re.compile(
 
 
 def normalize(text: str) -> str:
-    """Return a lower-cased, whitespace-collapsed representation."""
+    """Return a lower-cased, whitespace-collapsed representation.
+    
+    For multi-line queries, intelligently preserves structure:
+    - Joins lines with spaces (removes excessive newlines)
+    - Preserves list markers (bullets, numbers) as context
+    - Collapses multiple spaces but keeps query structure
+    """
+    if not text:
+        return ""
+    
     normalized = unicodedata.normalize("NFKC", text or "")
     normalized = normalized.lower()
-    normalized = re.sub(r"\s+", " ", normalized).strip()
+    
+    # Handle multi-line queries intelligently
+    # Split into lines and process each
+    lines = normalized.split('\n')
+    processed_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Preserve list markers (bullets, numbers) as context
+        # This helps with structured queries like:
+        # "Analyze:
+        #  - Apple's revenue
+        #  - Microsoft's margins"
+        if re.match(r'^[\-\*\+]\s+', line) or re.match(r'^\d+[\.\)]\s+', line):
+            # It's a list item - keep it as is (will be joined with space)
+            processed_lines.append(line)
+        else:
+            # Regular line - collapse internal whitespace
+            line = re.sub(r'\s+', ' ', line)
+            processed_lines.append(line)
+    
+    # Join lines with single space (removes newlines but preserves structure)
+    normalized = ' '.join(processed_lines)
+    
+    # Final cleanup: collapse any remaining excessive whitespace
+    normalized = re.sub(r'\s+', ' ', normalized).strip()
     return normalized
 
 
@@ -122,13 +159,29 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
     intent = classify_intent(norm, ticker_matches, metric_matches, periods)
 
     warnings = list(periods.get("warnings", [])) + ticker_warnings
+    suggestion_ticker = None
+    suggestion_source = None
+    for warn in ticker_warnings:
+        if warn.startswith("suggested_ticker:"):
+            parts = warn.split(":", 2)
+            if len(parts) >= 2:
+                suggestion_ticker = parts[1]
+                if len(parts) == 3:
+                    suggestion_source = parts[2]
+            break
     if not ticker_matches:
-        warnings.append("missing_ticker")
-        # For forecasting queries, don't use default ticker fallback
-        # Let specialized extraction in context_builder handle it
-        if not is_forecasting_query:
-            ticker_matches = [{"input": "AAPL", "ticker": "AAPL"}]
-            warnings.append("default_ticker:AAPL")
+        if suggestion_ticker:
+            ticker_matches = [
+                {"input": suggestion_source or suggestion_ticker, "ticker": suggestion_ticker}
+            ]
+            warnings.append(f"autocorrect_ticker:{suggestion_source or suggestion_ticker}->{suggestion_ticker}")
+        else:
+            warnings.append("missing_ticker")
+            # For forecasting queries, don't use default ticker fallback
+            # Let specialized extraction in context_builder handle it
+            if not is_forecasting_query:
+                ticker_matches = [{"input": "AAPL", "ticker": "AAPL"}]
+                warnings.append("default_ticker:AAPL")
     if not metric_matches:
         warnings.append("missing_metric")
 

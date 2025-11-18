@@ -529,6 +529,35 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                 if _try_add_alias(best_alias, candidate_phrase, mark_warning=True):
                     continue
 
+    # If nothing resolved yet, attempt a softer suggestion
+    if not resolved:
+        suggestion_alias: Optional[str] = None
+        suggestion_score: float = 0.0
+        suggestion_source: Optional[str] = None
+        unique_tokens = []
+        for token in tokens:
+            token_norm = normalize_alias(token)
+            if token_norm and token_norm not in unique_tokens:
+                unique_tokens.append(token_norm)
+        for token_norm in unique_tokens:
+            if len(token_norm) < 3:
+                continue
+            close_matches = difflib.get_close_matches(token_norm, alias_candidates, n=1, cutoff=0.88)
+            if not close_matches:
+                continue
+            alias_candidate = close_matches[0]
+            score = difflib.SequenceMatcher(None, token_norm, alias_candidate).ratio()
+            if score > suggestion_score:
+                suggestion_score = score
+                suggestion_alias = alias_candidate
+                suggestion_source = token_norm
+        if suggestion_alias and suggestion_score >= 0.9:
+            tickers = lookup.get(suggestion_alias, [])
+            if tickers:
+                ticker = tickers[0]
+                resolved.append({"input": suggestion_source or suggestion_alias, "ticker": ticker})
+                warnings.append(f"suggested_ticker:{ticker}:{suggestion_source or suggestion_alias}")
+
     return resolved, warnings
 
 

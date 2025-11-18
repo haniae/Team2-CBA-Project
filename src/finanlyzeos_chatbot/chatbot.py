@@ -704,6 +704,30 @@ SYSTEM_PROMPT = (
     "You are FinanlyzeOS, an institutional-grade financial analyst. Provide comprehensive, data-rich analysis "
     "that answers the user's question with depth and multiple sources.\n\n"
     
+    "## Universal Natural Language Understanding\n\n"
+    "**CRITICAL: You must understand and respond to ANY natural language question, regardless of phrasing or structure.**\n\n"
+    "1. **Interpret Intent Flexibly** - Understand what the user is asking even if:\n"
+    "   - The question is phrased informally or conversationally\n"
+    "   - The question contains typos or spelling mistakes\n"
+    "   - The question uses synonyms or alternative terminology\n"
+    "   - The question is multi-part or complex\n"
+    "   - The question is ambiguous (clarify and provide best answer)\n\n"
+    "2. **Extract Partial Information** - Even if you can't parse everything perfectly:\n"
+    "   - Identify any companies/tickers mentioned (even with typos)\n"
+    "   - Identify any metrics or financial concepts mentioned\n"
+    "   - Identify time periods or comparisons mentioned\n"
+    "   - Use context from conversation history to fill gaps\n\n"
+    "3. **Provide Helpful Responses** - For ANY question:\n"
+    "   - If you understand the question: Answer it comprehensively\n"
+    "   - If partially understood: Answer what you can and ask for clarification\n"
+    "   - If unclear: Provide examples of what you can answer and suggest rephrasing\n"
+    "   - Never say 'I don't understand' - always try to help\n\n"
+    "4. **Handle Edge Cases** - Be flexible with:\n"
+    "   - Questions about companies not in database (suggest similar companies)\n"
+    "   - Questions about metrics not available (suggest similar metrics)\n"
+    "   - Questions with multiple interpretations (address all interpretations)\n"
+    "   - Follow-up questions without explicit context (use conversation history)\n\n"
+    
     "## Core Approach\n\n"
     "1. **Lead with the direct answer** - First sentence answers the question\n"
     "2. **Then provide comprehensive depth** - Multiple data points, context, analysis\n"
@@ -3940,6 +3964,15 @@ class FinanlyzeOSChatbot:
                     r'\bhow\'s\b',   # "how's" contraction
                     r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would|about|does|did)\b',
                     r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would|about|to|do|profitable|fast|good|bad|strong|weak)\b',
+                    r'\bwhat\s+(?:happened|changed|improved|declined|increased|decreased|caused)\b',
+                    r'\bhow\s+(?:has|have|did|does|will|can|should|would)\s+\w+\s+(?:changed|grown|improved|declined|performed|trended)\b',
+                    r'\bhow\s+(?:does|do)\s+\w+\s+(?:affect|impact|influence)\b',
+                    r'\bwhat\s+(?:impact|effect)\s+does\b',
+                    r'\bwhat\s+(?:year|quarter|period)\s+(?:did|was|were)\b',
+                    r'\bwhen\s+(?:did|does|will)\s+\w+\s+(?:start|begin|become|turn|report)\b',
+                    r'\bhow\s+long\b',
+                    r'\bwhat\s+if\b',
+                    r'\bif\b.*\bwhat\b',
                     r'\bwhy\b',
                     r'\bexplain\b',
                     r'\btell\s+me\s+(?:about|why|how)\b',
@@ -4159,6 +4192,21 @@ class FinanlyzeOSChatbot:
                         context += f"{'='*80}\n"
 
                     context_detail = "Context compiled" if context else "Context not required"
+                    
+                    # ENHANCED: Ensure LLM always has context, even if empty
+                    # This prevents the LLM from being called with no context at all
+                    if not context:
+                        # Provide minimal helpful context for the LLM
+                        context = f"\n{'='*80}\n"
+                        context += f"📊 USER QUERY\n"
+                        context += f"{'='*80}\n\n"
+                        context += f"**Query:** {user_input}\n\n"
+                        context += f"**Note:** No specific financial data was extracted from this query. "
+                        context += f"Please provide a helpful response based on your knowledge. "
+                        context += f"If the query is unclear, ask for clarification in a friendly way. "
+                        context += f"Never say 'I don't understand' - always try to help!\n"
+                        context += f"{'='*80}\n"
+                        context_detail = "Minimal context provided for LLM"
 
                 if doc_context:
                     context = f"{context}\n\n{doc_context}" if context else doc_context
@@ -4309,6 +4357,17 @@ class FinanlyzeOSChatbot:
                 
                 # If no preformatted reply, prepare LLM messages
                 if not reply:
+                    # CRITICAL: Ensure context is never None - LLM needs something to work with
+                    if not context:
+                        context = f"\n{'='*80}\n"
+                        context += f"📊 USER QUERY\n"
+                        context += f"{'='*80}\n\n"
+                        context += f"**Query:** {user_input}\n\n"
+                        context += f"**Note:** Please provide a helpful response to this query. "
+                        context += f"If it's unclear, ask for clarification. Never say 'I don't understand'.\n"
+                        context += f"{'='*80}\n"
+                        LOGGER.info("Created fallback context for LLM")
+                    
                     # Pass is_forecasting flag and user_query to message preparation
                     messages = self._prepare_llm_messages(context, is_forecasting=is_forecasting, user_query=user_input)
                     LOGGER.debug(f"Prepared {len(messages)} messages for LLM")
