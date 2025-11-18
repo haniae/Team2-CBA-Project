@@ -3300,6 +3300,97 @@ def _build_enhanced_forecast_context(
         return ""
 
 
+def _extract_partial_info_from_query(query: str) -> Dict[str, Any]:
+    """
+    Extract partial information from ANY query, even if structured parsing fails.
+    This enables the chatbot to understand and respond to queries with typos, 
+    informal phrasing, or incomplete information.
+    
+    Returns:
+        Dictionary with extracted information (tickers, metrics, concepts, etc.)
+    """
+    import re
+    from typing import List, Set
+    
+    extracted = {
+        "tickers": [],
+        "metrics": [],
+        "concepts": [],
+        "time_periods": [],
+        "comparison_words": [],
+        "question_type": None,
+    }
+    
+    query_lower = query.lower()
+    
+    # Try to extract tickers even with typos
+    try:
+        from .parsing.alias_builder import resolve_tickers_freeform
+        ticker_matches, _ = resolve_tickers_freeform(query)
+        if ticker_matches:
+            extracted["tickers"] = [t.get("ticker") for t in ticker_matches if t.get("ticker")]
+    except Exception:
+        pass
+    
+    # Extract metric keywords (even if not perfectly matched)
+    # Order matters: longer/more specific keywords first to avoid false matches
+    metric_keywords = [
+        'cash flow', 'free cash flow', 'market cap',  # Multi-word first
+        'revenue', 'sales', 'income', 'earnings', 'profit', 'margin', 
+        'ebitda', 'assets', 'liabilities', 'equity', 'debt', 'capex', 'fcf',
+        'roe', 'roa', 'roic', 'pe', 'pb', 'ps', 'ev', 'valuation'
+    ]
+    for keyword in metric_keywords:
+        # Use word boundaries to avoid matching "ev" inside "revenue"
+        if len(keyword) <= 2:
+            # Short keywords like "ev", "pe", "pb" need word boundaries
+            import re
+            pattern = r'\b' + re.escape(keyword) + r'\b'
+            if re.search(pattern, query_lower):
+                extracted["metrics"].append(keyword)
+        else:
+            # Longer keywords can use simple substring match
+            if keyword in query_lower:
+                extracted["metrics"].append(keyword)
+    
+    # Extract financial concepts
+    concept_keywords = {
+        'growth', 'decline', 'increase', 'decrease', 'trend', 'performance',
+        'profitability', 'liquidity', 'solvency', 'efficiency', 'leverage',
+        'valuation', 'risk', 'volatility', 'stability', 'health'
+    }
+    for keyword in concept_keywords:
+        if keyword in query_lower:
+            extracted["concepts"].append(keyword)
+    
+    # Extract time periods
+    time_patterns = [
+        r'\b(\d{4})\b',  # Years like 2023, 2024
+        r'\b(?:last|past|previous)\s+(\d+)\s+(?:years?|quarters?|months?)',
+        r'\b(?:next|upcoming|future)\s+(\d+)\s+(?:years?|quarters?|months?)',
+        r'\bq[1-4]\s+(\d{4})\b',  # Quarters
+    ]
+    for pattern in time_patterns:
+        matches = re.findall(pattern, query_lower)
+        extracted["time_periods"].extend(matches)
+    
+    # Detect question type
+    if any(word in query_lower for word in ['why', 'what caused', 'what led to', 'reason']):
+        extracted["question_type"] = "causal"
+    elif any(word in query_lower for word in ['how', 'what happened', 'what changed']):
+        extracted["question_type"] = "change_analysis"
+    elif any(word in query_lower for word in ['compare', 'vs', 'versus', 'better', 'worse']):
+        extracted["question_type"] = "comparison"
+    elif any(word in query_lower for word in ['when', 'what year', 'what quarter']):
+        extracted["question_type"] = "temporal"
+    elif any(word in query_lower for word in ['which', 'top', 'best', 'worst', 'highest', 'lowest']):
+        extracted["question_type"] = "ranking"
+    elif any(word in query_lower for word in ['explain', 'define', 'what is', 'tell me about']):
+        extracted["question_type"] = "explanation"
+    
+    return extracted
+
+
 def build_financial_context(
     query: str,
     analytics_engine: "AnalyticsEngine",
@@ -3312,6 +3403,9 @@ def build_financial_context(
     
     🚨 CRITICAL: All metric values in this context are DIRECT DATABASE VALUES.
     Present them as facts. NEVER show calculations, formulas, or derivation steps.
+    
+    Enhanced to extract information from ANY query, even if structured parsing fails.
+    Uses partial information extraction as fallback to ensure maximum query coverage.
     
     Args:
         query: User's question
@@ -3334,6 +3428,36 @@ def build_financial_context(
         LOGGER.critical(f"🔍 DEBUG: structured.get('tickers'): {structured.get('tickers') if structured else None}")
         tickers = [t["ticker"] for t in structured.get("tickers", [])][:max_tickers]
         LOGGER.critical(f"🔍 DEBUG: Final tickers list: {tickers}")
+        
+        # ENHANCED: If structured parsing failed to extract tickers, try partial extraction
+        if not tickers:
+            LOGGER.info(f"Structured parsing found no tickers, trying partial extraction for: {query}")
+            partial_info = _extract_partial_info_from_query(query)
+            if partial_info.get("tickers"):
+                tickers = partial_info["tickers"][:max_tickers]
+                LOGGER.info(f"Partial extraction found tickers: {tickers}")
+            
+            # If still no tickers but we have concepts/metrics, build general context
+            if not tickers and (partial_info.get("metrics") or partial_info.get("concepts")):
+                LOGGER.info(f"Building general financial context for concepts: {partial_info.get('concepts')}")
+                # Return a helpful context that guides the LLM
+                general_context = f"\n{'='*80}\n"
+                general_context += f"📊 FINANCIAL QUERY ANALYSIS\n"
+                general_context += f"{'='*80}\n\n"
+                general_context += f"**Query:** {query}\n\n"
+                
+                if partial_info.get("metrics"):
+                    general_context += f"**Detected Metrics:** {', '.join(partial_info['metrics'])}\n"
+                if partial_info.get("concepts"):
+                    general_context += f"**Detected Concepts:** {', '.join(partial_info['concepts'])}\n"
+                if partial_info.get("question_type"):
+                    general_context += f"**Question Type:** {partial_info['question_type']}\n"
+                
+                general_context += f"\n**Note:** No specific company was identified in the query. "
+                general_context += f"Please provide a helpful answer based on the financial concepts mentioned, "
+                general_context += f"or ask the user to specify a company if needed.\n"
+                general_context += f"{'='*80}\n"
+                return general_context
         
         # For forecasting queries, if no tickers were extracted, try to extract manually
         # This handles cases like "Forecast Apple revenue using LSTM" where ticker might not be parsed
@@ -3416,6 +3540,27 @@ def build_financial_context(
                 error_context += f"**Recommendation:** Please specify the company name more clearly (e.g., 'Forecast Microsoft revenue' or 'What's the revenue forecast for MSFT?').\n"
                 error_context += f"{'='*80}\n"
                 return error_context
+            
+            # ENHANCED: Even if no tickers found, return helpful context for LLM
+            # This ensures the LLM always gets context to work with, even for unrelated queries
+            partial_info = _extract_partial_info_from_query(query)
+            if not partial_info.get("tickers") and not partial_info.get("metrics") and not partial_info.get("concepts"):
+                # Completely unrelated query - provide general guidance
+                general_context = f"\n{'='*80}\n"
+                general_context += f"📊 USER QUERY (No Financial Data Extracted)\n"
+                general_context += f"{'='*80}\n\n"
+                general_context += f"**Query:** {query}\n\n"
+                general_context += f"**Note:** This query doesn't appear to be about financial data or companies in the database. "
+                general_context += f"Please provide a helpful response. If the user is asking about:\n"
+                general_context += f"- Financial concepts: Explain them clearly\n"
+                general_context += f"- Companies: Suggest they specify a company name or ticker\n"
+                general_context += f"- General questions: Answer helpfully or redirect to financial topics\n"
+                general_context += f"- Unclear queries: Ask for clarification in a friendly way\n\n"
+                general_context += f"**Remember:** Never say 'I don't understand' - always try to help!\n"
+                general_context += f"{'='*80}\n"
+                return general_context
+            
+            # If we have some partial info but no tickers, return empty to let LLM handle it
             return ""
         
         context_parts = []

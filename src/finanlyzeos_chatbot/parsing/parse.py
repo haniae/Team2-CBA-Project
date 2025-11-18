@@ -12,30 +12,100 @@ from .time_grammar import parse_periods
 
 _METRIC_ITEMS = sorted(METRIC_SYNONYMS.items(), key=lambda item: -len(item[0]))
 
-INTENT_COMPARE_PATTERN = re.compile(r"\b(compare|vs|versus)\b")
-INTENT_TREND_PATTERN = re.compile(
-    r"(over time|over the last|history|trend|past \d+\s+(?:years?|quarters?))"
+INTENT_COMPARE_PATTERN = re.compile(
+    r"\b(compare|vs|versus|v\.?s\.?|compared\s+to|compared\s+with|"
+    r"comparison|contrast|difference\s+between|similarity\s+between|"
+    r"versus|against|relative\s+to|in\s+comparison|"
+    r"better\s+than|worse\s+than|higher\s+than|lower\s+than|"
+    r"more\s+than|less\s+than|stronger\s+than|weaker\s+than|"
+    r"times\s+more|times\s+less|X\s+times|twice|double|triple|"
+    r"X%|percent|percentage\s+higher|percent\s+lower|"
+    r"relative\s+performance|side\s+by\s+side|head\s+to\s+head)\b"
 )
-INTENT_LAST_PATTERN = re.compile(r"\blast\s+\d+\s+(quarters?|years?)\b")
+INTENT_TREND_PATTERN = re.compile(
+    r"(over\s+time|over\s+the\s+last|over\s+the\s+past|history|historical|"
+    r"trend|trends|trending|trajectory|direction|path|course|"
+    r"past\s+\d+\s+(?:years?|quarters?|months?)|"
+    r"last\s+\d+\s+(?:years?|quarters?|months?)|"
+    r"recent|recently|evolution|development|progression|"
+    r"how\s+has|how\s+have|how\s+did|how\s+does|"
+    r"changed\s+over|improved\s+over|declined\s+over|"
+    r"grown\s+over|shrunk\s+over|evolved\s+over|"
+    r"time\s+series|time\s+frame|period\s+over|"
+    r"year\s+over\s+year|yoy|quarter\s+over\s+quarter|qoq)\b"
+)
+INTENT_LAST_PATTERN = re.compile(
+    r"\b(last|past|previous|recent|recently|lately)\s+\d+\s+(quarters?|years?|months?|periods?)\b"
+)
 INTENT_RANK_PATTERN = re.compile(
-    r"\b(which|highest|lowest|top|best|worst|most|least|fastest|slowest|"
-    r"rank|ranking|ranked|best performing|worst performing|"
+    r"\b(which|who|what|highest|lowest|top|bottom|best|worst|most|least|"
+    r"fastest|slowest|strongest|weakest|largest|smallest|"
+    r"rank|ranking|ranked|ranks|"
+    r"best\s+performing|worst\s+performing|top\s+performing|"
     r"which.*has.*best|which.*has.*worst|which.*has.*highest|which.*has.*lowest|"
-    r"which.*company.*has|which.*stock.*has|which.*firm.*has)\b"
+    r"which.*company.*has|which.*stock.*has|which.*firm.*has|"
+    r"which.*is.*best|which.*is.*worst|which.*is.*highest|which.*is.*lowest|"
+    r"top\s+\d+|bottom\s+\d+|best\s+\d+|worst\s+\d+|"
+    r"leading|trailing|ahead|behind|outperforming|underperforming|"
+    r"number\s+one|#1|first\s+place|last\s+place)\b"
 )
 INTENT_EXPLAIN_PATTERN = re.compile(
-    r"\b(define|explain|tell me about|describe|break down|"
-    r"how (?:do|does|is|to).*(?:compute|calculate|calculated|work|mean)|"
-    r"what does.*mean|what.*mean|explain.*mean|"
-    r"definition of|meaning of|explanation of)\b"
+    r"\b(define|explain|tell\s+me\s+about|describe|break\s+down|"
+    r"clarify|elaborate|detail|expand|"
+    r"how\s+(?:do|does|is|to|can|should|would).*(?:compute|calculate|calculated|work|mean|function|operate)|"
+    r"what\s+does.*mean|what.*mean|explain.*mean|"
+    r"definition\s+of|meaning\s+of|explanation\s+of|"
+    r"what\s+is|what\s+are|what\s+was|what\s+were|"
+    r"tell\s+me\s+what|help\s+me\s+understand|"
+    r"can\s+you\s+explain|could\s+you\s+explain|"
+    r"i\s+don\'t\s+understand|i\s+need\s+to\s+understand|"
+    r"walk\s+me\s+through|break\s+it\s+down|"
+    r"in\s+simple\s+terms|in\s+layman\'s\s+terms)\b"
 )
 
 
 def normalize(text: str) -> str:
-    """Return a lower-cased, whitespace-collapsed representation."""
+    """Return a lower-cased, whitespace-collapsed representation.
+    
+    For multi-line queries, intelligently preserves structure:
+    - Joins lines with spaces (removes excessive newlines)
+    - Preserves list markers (bullets, numbers) as context
+    - Collapses multiple spaces but keeps query structure
+    """
+    if not text:
+        return ""
+    
     normalized = unicodedata.normalize("NFKC", text or "")
     normalized = normalized.lower()
-    normalized = re.sub(r"\s+", " ", normalized).strip()
+    
+    # Handle multi-line queries intelligently
+    # Split into lines and process each
+    lines = normalized.split('\n')
+    processed_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Preserve list markers (bullets, numbers) as context
+        # This helps with structured queries like:
+        # "Analyze:
+        #  - Apple's revenue
+        #  - Microsoft's margins"
+        if re.match(r'^[\-\*\+]\s+', line) or re.match(r'^\d+[\.\)]\s+', line):
+            # It's a list item - keep it as is (will be joined with space)
+            processed_lines.append(line)
+        else:
+            # Regular line - collapse internal whitespace
+            line = re.sub(r'\s+', ' ', line)
+            processed_lines.append(line)
+    
+    # Join lines with single space (removes newlines but preserves structure)
+    normalized = ' '.join(processed_lines)
+    
+    # Final cleanup: collapse any remaining excessive whitespace
+    normalized = re.sub(r'\s+', ' ', normalized).strip()
     return normalized
 
 
@@ -122,13 +192,29 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
     intent = classify_intent(norm, ticker_matches, metric_matches, periods)
 
     warnings = list(periods.get("warnings", [])) + ticker_warnings
+    suggestion_ticker = None
+    suggestion_source = None
+    for warn in ticker_warnings:
+        if warn.startswith("suggested_ticker:"):
+            parts = warn.split(":", 2)
+            if len(parts) >= 2:
+                suggestion_ticker = parts[1]
+                if len(parts) == 3:
+                    suggestion_source = parts[2]
+            break
     if not ticker_matches:
-        warnings.append("missing_ticker")
-        # For forecasting queries, don't use default ticker fallback
-        # Let specialized extraction in context_builder handle it
-        if not is_forecasting_query:
-            ticker_matches = [{"input": "AAPL", "ticker": "AAPL"}]
-            warnings.append("default_ticker:AAPL")
+        if suggestion_ticker:
+            ticker_matches = [
+                {"input": suggestion_source or suggestion_ticker, "ticker": suggestion_ticker}
+            ]
+            warnings.append(f"autocorrect_ticker:{suggestion_source or suggestion_ticker}->{suggestion_ticker}")
+        else:
+            warnings.append("missing_ticker")
+            # For forecasting queries, don't use default ticker fallback
+            # Let specialized extraction in context_builder handle it
+            if not is_forecasting_query:
+                ticker_matches = [{"input": "AAPL", "ticker": "AAPL"}]
+                warnings.append("default_ticker:AAPL")
     if not metric_matches:
         warnings.append("missing_metric")
 
