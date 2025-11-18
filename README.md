@@ -42,10 +42,10 @@ python run_chatbot.py
 ```
 
 **Try these queries:**
-- `"What is Apple's revenue?"`
-- `"Compare Microsoft and Google's profit margins"`
-- `"Show me Tesla's free cash flow in 2023"`
-- `"Why is NVDA's stock price increasing?"`
+ `"What is Apple's revenue?"`
+ `"Compare Microsoft and Google's profit margins"`
+ `"Show me Tesla's free cash flow in 2023"`
+ `"Why is NVDA's stock price increasing?"`
 
 📖 **For detailed setup with options (100/250/500/1500 companies), see [Complete Setup Guide](#️-complete-setup-guide)**
 
