@@ -599,6 +599,25 @@ The database currently contains **2,880,138 total rows** of financial data acros
 - 🔍 **Audit Trail:** Full lineage tracking for every data point
 - 💾 **Database Size:** ~850 MB (SQLite file)
 
+### 📊 Coverage Status Definitions
+
+The Company Universe view categorizes companies by data completeness:
+
+| Status | Criteria | Description |
+|--------|----------|-------------|
+| **✅ Complete** | 5+ years AND 12+ metrics | Good historical coverage with comprehensive metrics |
+| **⚠️ Partial** | 2-4 years OR 6-11 metrics | Some data available but could use more years or metrics |
+| **❌ Missing** | <2 years OR <6 metrics | Very little data or no data available |
+
+**Note:** The chatbot can access **all 2.88M rows** of data regardless of coverage status. The coverage label is a UI indicator showing data completeness, not access restrictions.
+
+**Current Coverage:**
+- ✅ **Complete:** 1,035 companies (68%)
+- ⚠️ **Partial:** 469 companies (31%)
+- ❌ **Missing:** 13 companies (1%)
+
+To improve coverage, run: `python scripts/ingestion/full_coverage_ingestion.py --years 20`
+
 ## ⚡ Core Capabilities
 
 - 💬 **Multi-Channel Chat** – CLI REPL, REST API endpoints, and browser client with live status indicators
@@ -1684,27 +1703,43 @@ Project/
 ├── serve_chatbot.py                   # Web server entry point (FastAPI)
 ├── run_data_ingestion.ps1             # Windows PowerShell ingestion script
 ├── run_data_ingestion.sh              # Unix/Linux ingestion script
+├── generate_company_universe.py       # Generate company universe JSON for UI
+├── analyze_coverage_gaps.py           # Analyze coverage gaps (complete/partial/missing)
 │
 ├── scripts/
-│   ├── generate_aliases.py            # Regenerate ticker alias universe (S&P 500)
+│   ├── check_packages.py              # Package verification utility
 │   │
 │   ├── ingestion/                      # Data ingestion scripts
 │   │   ├── fill_data_gaps.py          # ⭐ Recommended: Smart gap-filling script
+│   │   ├── full_coverage_ingestion.py # ⭐ Full coverage ingestion (20+ years)
 │   │   ├── ingest_20years_sp500.py    # Full 20-year historical ingestion
+│   │   ├── ingest_sp500_15years.py    # S&P 500 15-year ingestion
+│   │   ├── ingest_more_years.py       # Extend historical years for existing tickers
+│   │   ├── ingest_extended_universe.py # Extended universe ingestion
 │   │   ├── batch_ingest.py            # Batch ingestion with retry/backoff
 │   │   ├── ingest_companyfacts.py     # SEC CompanyFacts API ingestion
 │   │   ├── ingest_companyfacts_batch.py # Batch CompanyFacts ingestion
 │   │   ├── ingest_frames.py           # SEC data frames ingestion
 │   │   ├── ingest_from_file.py        # Ingestion from file input
 │   │   ├── ingest_universe.py         # Universe-based ingestion with resume support
-│   │   ├── load_prices_stooq.py       # Stooq price loader (fallback)
-│   │   ├── load_prices_yfinance.py   # Yahoo Finance price loader
-│   │   └── load_ticker_cik.py         # Ticker to CIK mapping loader
+│   │   ├── load_prices_stooq.py      # Stooq price loader (fallback)
+│   │   ├── load_prices_yfinance.py    # Yahoo Finance price loader
+│   │   ├── load_historical_prices_15years.py # Historical price loader (15 years)
+│   │   ├── load_ticker_cik.py         # Ticker to CIK mapping loader
+│   │   ├── refresh_quotes.py          # Refresh market quotes
+│   │   ├── backfill_metrics.py        # Backfill missing metrics
+│   │   ├── fetch_imf_sector_kpis.py   # Fetch IMF sector KPI benchmarks
+│   │   ├── parse_raw_sec_filings.py   # Parse raw SEC filing data
+│   │   └── monitor_ingestion.py       # Monitor ingestion progress
 │   │
 │   └── utility/                        # Utility and helper scripts
 │       ├── check_database_simple.py   # Database verification utility
+│       ├── check_correct_database.py  # Verify correct database path
+│       ├── check_data_coverage.py     # Check data coverage statistics
+│       ├── check_dashboard_data.py    # Verify dashboard data integrity
 │       ├── check_ingestion_status.py  # Ingestion status checker
 │       ├── check_kpi_values.py        # KPI validation utility
+│       ├── check_test_progress.py     # Test progress tracker
 │       ├── check_braces.py            # Syntax checking utility
 │       ├── check_syntax.py            # Code syntax validation
 │       ├── find_unclosed_brace.py     # Brace matching utility
@@ -1713,10 +1748,20 @@ Project/
 │       ├── monitor_progress.py        # Progress monitoring utility
 │       ├── quick_status.py            # Quick status check
 │       ├── show_complete_attribution.py # Attribution display utility
+│       ├── show_detailed_results.py   # Show detailed test results
+│       ├── show_test_results.py       # Display test results
 │       ├── plotly_demo.py             # Plotly chart examples
 │       ├── chat_metrics.py            # Chat metrics utility
 │       ├── data_sources_backup.py     # Data sources backup utility
 │       ├── refresh_ticker_catalog.py  # Ticker catalog refresh utility
+│       ├── improve_kpi_coverage.py   # Improve KPI coverage analysis
+│       ├── fix_remaining_kpis.py     # Fix remaining KPI issues
+│       ├── kpi_registry_cli.py        # KPI registry CLI tool
+│       ├── generate_company_universe.py # Generate company universe (utility version)
+│       ├── generate_help_center_verification_tracker.py # Help center tracker generator
+│       ├── print_failed_prompts.py    # Print failed test prompts
+│       ├── smoke_chat_api.py          # Smoke test for chat API
+│       ├── verify_chatbot_connection.py # Verify chatbot connection
 │       └── main.py                    # Main utility CLI wrapper
 │
 ├── src/
@@ -1724,6 +1769,7 @@ Project/
 │       │
 │       ├── Core Components:
 │       ├── analytics_engine.py        # Core analytics engine (KPI calculations)
+│       ├── analytics_workspace.py     # Analytics workspace management
 │       ├── chatbot.py                 # Main chatbot orchestration (RAG, LLM integration)
 │       ├── config.py                  # Configuration management (settings loader)
 │       ├── database.py                # Database abstraction layer (SQLite/Postgres)
@@ -1733,6 +1779,7 @@ Project/
 │       ├── Data & Ingestion:
 │       ├── data_ingestion.py          # Data ingestion pipeline (SEC, Yahoo, Bloomberg)
 │       ├── data_sources.py            # Data source integrations (SEC EDGAR, Yahoo Finance)
+│       ├── data_validator.py          # Data validation utilities
 │       ├── external_data.py          # External data providers (FRED, IMF)
 │       ├── macro_data.py              # Macroeconomic data provider
 │       ├── multi_source_aggregator.py # Multi-source data aggregation
@@ -1741,9 +1788,27 @@ Project/
 │       │
 │       ├── Context & RAG:
 │       ├── context_builder.py         # Financial context builder for RAG (ML forecasts, portfolio)
+│       ├── context_validator.py       # Context validation utilities
+│       ├── document_context.py        # Document context management
+│       ├── document_processor.py      # Document processing utilities
 │       ├── ml_response_verifier.py    # ML forecast response verification & enhancement
 │       ├── followup_context.py       # Follow-up question context management
 │       ├── intent_carryover.py       # Intent carryover between conversations
+│       │
+│       ├── Quality & Verification:
+│       ├── confidence_scorer.py       # Confidence scoring for responses
+│       ├── response_corrector.py      # Response correction utilities
+│       ├── response_verifier.py       # Response verification system
+│       ├── source_tracer.py           # Source tracing utilities
+│       ├── source_verifier.py         # Source verification system
+│       ├── hallucination_detector.py  # Hallucination detection
+│       │
+│       ├── Formatting & Templates:
+│       ├── finance_forecast_formatter.py # Finance forecast formatting
+│       ├── rewrite_formatter.py       # Response rewrite formatting
+│       ├── template_processor.py       # Template processing utilities
+│       ├── universal_ml_formatter.py  # Universal ML forecast formatter
+│       ├── framework_processor.py     # Framework processing utilities
 │       │
 │       ├── Parsing & NLP:
 │       ├── parsing/
@@ -1827,11 +1892,13 @@ Project/
 │       ├── tasks.py                   # Task queue management
 │       ├── help_content.py           # Help content and documentation
 │       ├── dashboard_utils.py        # Dashboard utility functions
-│       ├── document_processor.py     # Document processing utilities
 │       ├── imf_proxy.py              # IMF data proxy
 │       ├── kpi_backfill.py           # KPI backfill utilities
+│       ├── kpi_lookup.py             # KPI lookup utilities
+│       ├── custom_kpis.py            # Custom KPI definitions
 │       ├── backfill_policy.py        # Backfill policy management
 │       ├── ticker_universe.py        # Ticker universe management
+│       ├── interactive_modeling.py  # Interactive modeling utilities
 │       │
 │       └── Static Assets:
 │       └── static/
@@ -1891,6 +1958,40 @@ Project/
 │   │   ├── ticker_names.md           # Ticker coverage list
 │   │   └── (additional guides)
 │   │
+│   ├── ingestion/                      # Ingestion documentation
+│   │   ├── FULL_COVERAGE_GUIDE.md     # Full coverage ingestion guide
+│   │   └── FULL_INGESTION_SCRIPTS.md  # Full ingestion scripts guide
+│   │
+│   ├── database/                       # Database documentation
+│   │   ├── DATABASE_STRUCTURE_POSTER.md # Database structure poster
+│   │   ├── EXPECTED_DATA_VOLUMES.md   # Expected data volumes
+│   │   └── full_coverage_summary.json # Full coverage summary data
+│   │
+│   ├── accuracy/                       # Accuracy testing documentation
+│   │   ├── README_ACCURACY_TESTING.md # Accuracy testing guide
+│   │   ├── 100_PERCENT_ACCURACY_ACHIEVED.md # 100% accuracy achievement
+│   │   ├── ACCURACY_100_PERCENT_PROOF.md # Accuracy proof documentation
+│   │   ├── ACCURACY_EXECUTIVE_SUMMARY.md # Executive summary
+│   │   ├── ACCURACY_FINAL_PROOF.md    # Final accuracy proof
+│   │   ├── ACCURACY_IMPROVEMENT_PLAN.md # Improvement plan
+│   │   ├── ACCURACY_METRICS_DETAILED.md # Detailed metrics
+│   │   ├── ACCURACY_SLIDE_SUMMARY.md  # Slide summary
+│   │   ├── ACCURACY_STATS_FOR_SLIDES.md # Stats for slides
+│   │   ├── ACCURACY_VERIFICATION_SLIDES.md # Verification slides
+│   │   ├── help_center_confidence_workflow.md # Help center workflow
+│   │   └── help_center_verification_tracker.csv # Verification tracker
+│   │
+│   ├── executive/                      # Executive documentation
+│   │   ├── BENCHMARKOS_SLIDE.md       # BenchmarkOS slide
+│   │   ├── COMPREHENSIVE_ACCURACY_FIX_SUMMARY.md # Accuracy fix summary
+│   │   ├── CRITICAL_ACCURACY_FIX.md   # Critical accuracy fix
+│   │   ├── FINAL_SP500_ALL_KPIS_REPORT.md # Final S&P 500 KPI report
+│   │   ├── FIX_CHATBOT_ACCURACY_ISSUE.md # Chatbot accuracy fix
+│   │   └── HOW_TO_MAKE_ALL_ANSWERS_TRUSTED.md # Trusted answers guide
+│   │
+│   ├── plans/                          # Planning documentation
+│   │   └── ML_PROMPT_TESTING_PLAN.md  # ML prompt testing plan
+│   │
 │   ├── organization/                   # Organization documentation
 │   │   ├── REPOSITORY_ORGANIZATION_2024.md # Repository organization (2024)
 │   │   ├── REPOSITORY_ORGANIZATION_COMPLETE.md # Repository organization (complete)
@@ -1949,33 +2050,45 @@ Project/
 │
 ├── data/
 │   ├── sample_financials.csv          # Sample financial data
+│   ├── cache/
+│   │   └── edgar_tickers.json         # Cached EDGAR ticker data
 │   ├── external/
 │   │   └── imf_sector_kpis.json       # IMF sector KPI benchmarks
 │   ├── sqlite/
-│   │   └── finanlyzeos_chatbot.sqlite3 # SQLite database (created on demand)
-│   └── tickers/
-│       ├── universe_sp500.txt         # S&P 500 ticker list (475 companies)
-│       ├── sec_top100.txt             # Top 100 SEC companies
-│       ├── universe_custom.txt        # Custom universe list
-│       └── sample_watchlist.txt       # Sample watchlist
+│   │   ├── finanlyzeos_chatbot.sqlite3 # SQLite database (created on demand)
+│   │   └── benchmarkos_chatbot.sqlite3 # Benchmark database
+│   ├── tickers/
+│   │   ├── universe_sp500.txt         # S&P 500 ticker list (475 companies)
+│   │   ├── sec_top100.txt             # Top 100 SEC companies
+│   │   ├── universe_custom.txt        # Custom universe list
+│   │   └── sample_watchlist.txt       # Sample watchlist
+│   └── test_chatbot.db                # Test database
 │
 ├── cache/                              # Generated at runtime (gitignored)
 │   ├── edgar_tickers.json             # Cached EDGAR ticker data
 │   └── progress/
 │       └── fill_gaps_summary.json     # Ingestion progress tracking
 │
-├── analysis/                           # Experimental and analysis code
-│   ├── experiments/                   # Experimental implementations
-│   │   ├── enhanced_ticker_resolver.py # Enhanced ticker resolver experiment
-│   │   ├── fixed_ticker_resolver.py   # Fixed ticker resolver experiment
-│   │   ├── fixed_time_grammar.py      # Fixed time grammar experiment
-│   │   ├── implement_metric_improvements.py # Metric improvements experiment
-│   │   ├── improved_real_world_parse.py # Real-world parsing improvements
-│   │   └── ultimate_failing_cases_fix.py # Failing cases fix experiment
-│   └── scripts/                        # Analysis and validation scripts
-│       └── (20 analysis and validation scripts)
+├── app/                                # Application entry points
+│   ├── run_chatbot.py                 # Run chatbot (alternative entry)
+│   ├── run_server.py                  # Run server (alternative entry)
+│   ├── serve_chatbot.py              # Serve chatbot (alternative entry)
+│   └── start_server.sh                # Server startup script
+│
+├── research/                           # Research and analysis code
+│   └── analysis/                      # Analysis scripts
+│       └── (28 analysis scripts)
+│
+├── temp/                               # Temporary files (gitignored)
+│   ├── apple-companyfacts.json        # Temporary SEC data
+│   ├── apple-q4-2024-results.html     # Temporary HTML
+│   ├── extract_pdf.py                 # PDF extraction utility
+│   ├── FY24_Q4_Consolidated_Financial_Statements.pdf # Sample PDF
+│   ├── msft-2024-10k.htm              # Sample SEC filing
+│   └── msft-companyfacts.json          # Sample company facts
 │
 ├── archive/                            # Archived files
+│   ├── arxiv_2509_26632.txt           # Archived research paper
 │   └── parsing_development/           # Parsing development archive
 │       └── (15 archived files: 11 markdown, 4 Python)
 │
