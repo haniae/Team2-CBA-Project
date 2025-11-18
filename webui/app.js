@@ -283,6 +283,20 @@ function renderMarkdown(text) {
 
     let working = value;
 
+    // Handle LaTeX display math \[...\] - use non-greedy match to handle multiple blocks
+    const mathDisplayTokens = [];
+    working = working.replace(/\\\[([\s\S]*?)\\\]/g, (match, math) => {
+      mathDisplayTokens.push(math);
+      return `\uE001${mathDisplayTokens.length - 1}\uE001`;
+    });
+
+    // Handle LaTeX inline math \(...\) - use non-greedy match
+    const mathInlineTokens = [];
+    working = working.replace(/\\\(([\s\S]*?)\\\)/g, (match, math) => {
+      mathInlineTokens.push(math);
+      return `\uE002${mathInlineTokens.length - 1}\uE002`;
+    });
+
     const codeTokens = [];
     working = working.replace(/`([^`]+)`/g, (match, code) => {
       codeTokens.push(code);
@@ -320,6 +334,32 @@ function renderMarkdown(text) {
       return `<code>${codeText}</code>`;
     });
 
+    // Restore LaTeX display math - use KaTeX for rendering
+    working = working.replace(/\uE001(\d+)\uE001/g, (match, indexValue) => {
+      const idx = Number(indexValue);
+      const mathText = mathDisplayTokens[idx] || "";
+      // Escape HTML
+      const escaped = mathText
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      // Return with data attribute for KaTeX to render
+      return `<div class="math-display" data-math="${escaped}">\\[${escaped}\\]</div>`;
+    });
+
+    // Restore LaTeX inline math - use KaTeX for rendering
+    working = working.replace(/\uE002(\d+)\uE002/g, (match, indexValue) => {
+      const idx = Number(indexValue);
+      const mathText = mathInlineTokens[idx] || "";
+      // Escape HTML
+      const escaped = mathText
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      // Return with data attribute for KaTeX to render
+      return `<span class="math-inline" data-math="${escaped}">\\(${escaped}\\)</span>`;
+    });
+
     return working;
   };
 
@@ -334,6 +374,9 @@ function renderMarkdown(text) {
   let inCodeBlock = false;
   let codeLang = "";
   const codeBuffer = [];
+  let inTable = false;
+  let tableAlignments = [];
+  let pendingHeaderRow = null;
 
   const closeParagraph = () => {
     if (inParagraph) {
@@ -440,6 +483,109 @@ function renderMarkdown(text) {
       continue;
     }
 
+    // Check for markdown table
+    const tableMatch = line.match(/^\s*\|(.+)\|\s*$/);
+    const isSeparatorRow = line.match(/^\s*\|[\s\-:]+\|\s*$/);
+    
+    if (isSeparatorRow) {
+      // This is a separator row - parse alignment markers
+      if (!inTable && pendingHeaderRow) {
+        // Separator comes after header - start the table now with alignments
+        closeParagraph();
+        closeAllLists();
+        html.push('<div class="message-table"><table><thead><tr>');
+        
+        // Parse alignment from separator row
+        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
+        tableAlignments = cells.map(cell => {
+          if (/^:?-+:?$/.test(cell)) {
+            if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+            if (cell.endsWith(':')) return 'right';
+            return 'left';
+          }
+          return 'left';
+        });
+        
+        // Output header row with alignments
+        const headerCells = pendingHeaderRow.split('|').map(cell => cell.trim()).filter(cell => cell);
+        headerCells.forEach((cell, index) => {
+          const alignment = tableAlignments[index] || 'left';
+          const alignStyle = alignment === 'center' ? 'center' : alignment === 'right' ? 'right' : 'left';
+          html.push(`<th style="text-align: ${alignStyle}">${processInline(cell)}</th>`);
+        });
+        html.push('</tr></thead><tbody>');
+        inTable = true;
+        pendingHeaderRow = null;
+      } else if (inTable) {
+        // Parse alignment from separator row (shouldn't happen in well-formed markdown)
+        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
+        tableAlignments = cells.map(cell => {
+          if (/^:?-+:?$/.test(cell)) {
+            if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+            if (cell.endsWith(':')) return 'right';
+            return 'left';
+          }
+          return 'left';
+        });
+      }
+      continue;
+    }
+    
+    if (tableMatch) {
+      // This is a table row (not a separator)
+      if (!inTable && !pendingHeaderRow) {
+        // This might be a header row - store it and wait for separator
+        pendingHeaderRow = tableMatch[1];
+        continue;
+      } else if (!inTable && pendingHeaderRow) {
+        // We have a pending header but got another row before separator
+        // This means the previous row wasn't actually a header, start table without alignments
+        closeParagraph();
+        closeAllLists();
+        html.push('<div class="message-table"><table><thead><tr>');
+        const cells = pendingHeaderRow.split('|').map(cell => cell.trim()).filter(cell => cell);
+        cells.forEach(cell => {
+          html.push(`<th>${processInline(cell)}</th>`);
+        });
+        html.push('</tr></thead><tbody>');
+        inTable = true;
+        tableAlignments = [];
+        pendingHeaderRow = null;
+        
+        // Now add this row as a data row
+        const dataCells = tableMatch[1].split('|').map(cell => cell.trim()).filter(cell => cell);
+        html.push('<tr>');
+        dataCells.forEach((cell, index) => {
+          const alignment = tableAlignments[index] || 'left';
+          const alignStyle = alignment === 'center' ? 'center' : alignment === 'right' ? 'right' : 'left';
+          html.push(`<td style="text-align: ${alignStyle}">${processInline(cell)}</td>`);
+        });
+        html.push('</tr>');
+      } else if (inTable) {
+        // Continuing table - add body row
+        const cells = tableMatch[1].split('|').map(cell => cell.trim()).filter(cell => cell);
+        html.push('<tr>');
+        cells.forEach((cell, index) => {
+          const alignment = tableAlignments[index] || 'left';
+          const alignStyle = alignment === 'center' ? 'center' : alignment === 'right' ? 'right' : 'left';
+          html.push(`<td style="text-align: ${alignStyle}">${processInline(cell)}</td>`);
+        });
+        html.push('</tr>');
+      }
+      continue;
+    } else if (inTable || pendingHeaderRow) {
+      // We were in a table or had a pending header but this line is not a table row
+      if (pendingHeaderRow) {
+        // Pending header never got a separator - treat it as a regular paragraph
+        pendingHeaderRow = null;
+      }
+      if (inTable) {
+        html.push('</tbody></table></div>');
+        inTable = false;
+        tableAlignments = [];
+      }
+    }
+
     const listMatch = line.match(/^(\s*)([-+*]|\d+\.)\s+(.*)$/);
     if (listMatch) {
       const indent = listMatch[1].replace(/\t/g, "    ").length;
@@ -489,6 +635,11 @@ function renderMarkdown(text) {
     closeParagraph();
     closeAllLists();
     html.push("</blockquote>");
+  }
+  
+  // Close any open table
+  if (inTable) {
+    html.push('</tbody></table></div>');
   }
 
   return html.join("");
@@ -5923,6 +6074,16 @@ function buildMessageBlocks(text) {
       const div = document.createElement("div");
       div.className = "message-content";
       div.innerHTML = renderMarkdown(block.text);
+      // Render KaTeX math after markdown is processed
+      if (typeof renderMathInElement !== 'undefined') {
+        renderMathInElement(div, {
+          delimiters: [
+            {left: '\\[', right: '\\]', display: true},
+            {left: '\\(', right: '\\)', display: false}
+          ],
+          throwOnError: false
+        });
+      }
       fragments.push(div);
     }
   });
@@ -5931,6 +6092,16 @@ function buildMessageBlocks(text) {
     const div = document.createElement("div");
     div.className = "message-content";
     div.innerHTML = renderMarkdown(text);
+    // Render KaTeX math after markdown is processed
+    if (typeof renderMathInElement !== 'undefined') {
+      renderMathInElement(div, {
+        delimiters: [
+          {left: '\\[', right: '\\]', display: true},
+          {left: '\\(', right: '\\)', display: false}
+        ],
+        throwOnError: false
+      });
+    }
     fragments.push(div);
   }
 

@@ -91,9 +91,18 @@ def format_currency(value: Optional[float]) -> str:
         return f"${value:,.0f}"
 
 
-def format_percent(value: Optional[float]) -> str:
-    """Format percentage value with validation."""
+def format_percent(value: Optional[float], treat_zero_as_na: bool = False) -> str:
+    """Format percentage value with validation.
+    
+    Args:
+        value: The percentage value to format (as a decimal, e.g., 0.15 for 15%)
+        treat_zero_as_na: If True, treat 0.0 as missing data (useful for ROE/ROA when denominator is missing)
+    """
     if value is None:
+        return "N/A"
+    
+    # Treat 0.0 as missing data if requested (prevents showing "0.0%" when calculation couldn't be performed)
+    if treat_zero_as_na and abs(value) < 0.0001:  # Essentially zero (0.0001% threshold)
         return "N/A"
     
     # CRITICAL: Detect if value is absurdly large (likely a formatting bug)
@@ -857,6 +866,9 @@ def _build_mandatory_data_block(ticker: str, latest_records: dict, period_label:
             # Format based on metric type
             if value is None:
                 continue
+            # Treat 0.0 as missing for ROE/ROA (likely indicates missing denominator)
+            elif metric_key in ['roe', 'roic', 'roa'] and abs(value) < 0.0001:
+                continue  # Skip displaying 0.0% ROE/ROA
             elif abs(value) > 1_000_000_000:
                 # Currency in billions
                 formatted = f"${value / 1_000_000_000:.1f}B"
@@ -3298,6 +3310,9 @@ def build_financial_context(
     """
     Build comprehensive financial context with SEC filing sources for LLM.
     
+    🚨 CRITICAL: All metric values in this context are DIRECT DATABASE VALUES.
+    Present them as facts. NEVER show calculations, formulas, or derivation steps.
+    
     Args:
         query: User's question
         analytics_engine: Analytics engine instance
@@ -3404,6 +3419,14 @@ def build_financial_context(
             return ""
         
         context_parts = []
+        
+        # 🚨 CRITICAL DIRECTIVE: Add at the very beginning of context
+        context_parts.append("🚨 **CRITICAL INSTRUCTION - READ FIRST:**\n")
+        context_parts.append("All financial metric values below are DIRECT DATABASE VALUES extracted from SEC filings.\n")
+        context_parts.append("PRESENT THEM AS FACTS. NEVER show formulas, calculations, or derivation steps.\n")
+        context_parts.append("NEVER write 'To calculate...', 'Using the formula...', 'Plugging in the numbers...'.\n")
+        context_parts.append("Just state the value directly (e.g., 'Google's gross profit is $223.8 billion').\n")
+        context_parts.append("═══════════════════════════════════════════════════════════════════════════════\n\n")
         
         # Add macro economic context at the beginning
         if include_macro_context and MACRO_DATA_AVAILABLE:
@@ -3620,11 +3643,11 @@ def build_financial_context(
                     # Returns & Efficiency
                     returns_metrics = []
                     if latest_records.get("roe"):
-                        returns_metrics.append(f"Return on Equity: {format_percent(latest_records['roe'].value)}")
+                        returns_metrics.append(f"Return on Equity: {format_percent(latest_records['roe'].value, treat_zero_as_na=True)}")
                     if latest_records.get("roic"):
-                        returns_metrics.append(f"Return on Invested Capital: {format_percent(latest_records['roic'].value)}")
+                        returns_metrics.append(f"Return on Invested Capital: {format_percent(latest_records['roic'].value, treat_zero_as_na=True)}")
                     if latest_records.get("roa"):
-                        returns_metrics.append(f"Return on Assets: {format_percent(latest_records['roa'].value)}")
+                        returns_metrics.append(f"Return on Assets: {format_percent(latest_records['roa'].value, treat_zero_as_na=True)}")
                     
                     if returns_metrics:
                         ticker_context += "Returns & Efficiency:\n" + "\n".join(f"  • {m}" for m in returns_metrics) + "\n\n"

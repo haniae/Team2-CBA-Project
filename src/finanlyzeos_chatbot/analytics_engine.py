@@ -1514,6 +1514,11 @@ def _compute_derived_metrics(
     
     # Profitability
     gross_profit = _first_non_none(value_map, "gross_profit")
+    # Calculate gross_profit from revenue - cost_of_revenue if not directly available
+    if gross_profit is None and revenue is not None:
+        cost_of_revenue = _first_non_none(value_map, "cost_of_revenue", "cost_of_goods_sold")
+        if cost_of_revenue is not None:
+            gross_profit = revenue - cost_of_revenue
     derived["gross_margin"] = _safe_div(gross_profit, revenue)
     
     # Interest coverage = EBIT / Interest Expense
