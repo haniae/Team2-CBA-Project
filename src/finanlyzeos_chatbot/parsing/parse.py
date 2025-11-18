@@ -63,6 +63,85 @@ INTENT_EXPLAIN_PATTERN = re.compile(
     r"in\s+simple\s+terms|in\s+layman\'s\s+terms)\b"
 )
 
+# New intent patterns for expanded query types
+INTENT_WHY_PATTERN = re.compile(
+    r"\b(why|what\s+caused|what\s+led\s+to|what\'s\s+driving|what\'s\s+behind|"
+    r"reason\s+for|explanation\s+for|why\s+did|why\s+is|why\s+are|why\s+was|why\s+were|"
+    r"what\'s\s+the\s+reason|what\s+caused|what\s+factors|what\s+drives|"
+    r"what\s+led|what\s+triggered|what\s+contributed\s+to|"
+    r"how\s+come|why\s+so|why\s+does|why\s+do)\b"
+)
+
+INTENT_WHATIF_PATTERN = re.compile(
+    r"\b(what\s+if|what\s+would|what\s+happens\s+if|if.*then|"
+    r"scenario|assume|suppose|imagine|project|forecast|predict|"
+    r"what\s+would\s+happen|what\s+might\s+happen|"
+    r"hypothetical|projection|outlook|what\s+about|"
+    r"supposing|assuming|given\s+that|if.*what)\b"
+)
+
+INTENT_RELATIONSHIP_PATTERN = re.compile(
+    r"\b(relationship|correlation|connection|link|"
+    r"how.*relate|how.*connect|how.*link|"
+    r"does.*affect|does.*impact|does.*influence|"
+    r"related\s+to|connected\s+to|linked\s+to|"
+    r"how\s+does.*affect|how\s+does.*impact|how\s+does.*influence|"
+    r"what\'s\s+the\s+relationship|what\'s\s+the\s+connection|"
+    r"correlate|covariance|dependence)\b"
+)
+
+INTENT_BENCHMARK_PATTERN = re.compile(
+    r"\b(benchmark|vs\s+industry|vs\s+sector|vs\s+peers|"
+    r"compared\s+to\s+industry|compared\s+to\s+sector|compared\s+to\s+peers|"
+    r"relative\s+to\s+industry|relative\s+to\s+sector|relative\s+to\s+peers|"
+    r"industry\s+average|sector\s+average|peer\s+group|peer\s+average|"
+    r"how\s+does.*compare\s+to\s+industry|how\s+does.*compare\s+to\s+sector|"
+    r"where\s+does.*rank\s+in|rank\s+among|compared\s+to\s+market)\b"
+)
+
+INTENT_WHEN_PATTERN = re.compile(
+    r"\b(when|what\s+year|what\s+quarter|in\s+which|"
+    r"first\s+time|last\s+time|since\s+when|until\s+when|"
+    r"what\s+period|which\s+year|which\s+quarter|"
+    r"when\s+did|when\s+was|when\s+were|when\s+is|when\s+are|"
+    r"at\s+what\s+time|during\s+what|what\s+date)\b"
+)
+
+INTENT_CONDITIONAL_PATTERN = re.compile(
+    r"\b(if.*then|if.*what|what.*if|"
+    r"assuming|supposing|given\s+that|"
+    r"conditional|hypothetical|"
+    r"in\s+case|should\s+.*\s+happen|would\s+.*\s+if)\b"
+)
+
+INTENT_SUMMARY_PATTERN = re.compile(
+    r"\b(summary|overview|summary\s+of|key\s+points|"
+    r"main\s+highlights|top|bottom|total|aggregate|"
+    r"sum\s+of|average\s+of|combined|"
+    r"give\s+me\s+a\s+summary|provide\s+a\s+summary|"
+    r"what\'s\s+the\s+summary|overall|in\s+summary)\b"
+)
+
+INTENT_CHANGE_PATTERN = re.compile(
+    r"\b(change|delta|difference|increase|decrease|"
+    r"growth|decline|improvement|deterioration|"
+    r"how\s+much.*change|how\s+much.*increase|how\s+much.*decrease|"
+    r"what\'s\s+the\s+change|what\'s\s+the\s+difference|"
+    r"change\s+from|change\s+to|changed\s+by|"
+    r"improved|worsened|gained|lost|shift)\b"
+)
+
+INTENT_AGGREGATION_PATTERN = re.compile(
+    r"\b(sum|total|aggregate|combined|collective|cumulative|grand\s+total|"
+    r"sum\s+of|total\s+of|aggregate\s+of|combined\s+of|collective\s+of|cumulative\s+of|"
+    r"calculate\s+the\s+sum|calculate\s+the\s+total|compute\s+the\s+sum|compute\s+the\s+total|"
+    r"what\'s\s+the\s+sum|what\'s\s+the\s+total|what\'s\s+the\s+aggregate|what\'s\s+the\s+combined|"
+    r"how\s+much\s+in\s+total|how\s+much\s+altogether|how\s+much\s+combined|"
+    r"add\s+up|sum\s+up|total\s+up|combine|aggregate|"
+    r"all\s+together|everything\s+combined|altogether|"
+    r"sum\s+all|total\s+all|add\s+all|aggregate\s+all|combined\s+value|combined\s+amount)\b"
+)
+
 
 def normalize(text: str) -> str:
     """Return a lower-cased, whitespace-collapsed representation.
@@ -309,9 +388,43 @@ def classify_intent(
     if periods and isinstance(periods, dict):
         period_type = periods.get("type")
 
-    # Priority order: rank > explain > trend > compare > lookup
+    # Priority order: what-if > why > when > relationship > benchmark > summary > 
+    #                 conditional > rank > explain > trend > compare > change > lookup
     
-    # Check for rank intent first (highest priority for ranking questions)
+    # Check for what-if/scenario intent (highest priority - very specific)
+    if INTENT_WHATIF_PATTERN.search(norm_text):
+        return "scenario_analysis"
+
+    # Check for why/causal intent (high priority - specific reasoning queries)
+    if INTENT_WHY_PATTERN.search(norm_text):
+        return "causal_analysis"
+
+    # Check for when/temporal intent (high priority - specific time queries)
+    if INTENT_WHEN_PATTERN.search(norm_text):
+        return "temporal_query"
+
+    # Check for relationship/correlation intent (medium-high priority)
+    if INTENT_RELATIONSHIP_PATTERN.search(norm_text):
+        return "relationship_analysis"
+
+    # Check for benchmark intent (medium priority - similar to compare but more specific)
+    if INTENT_BENCHMARK_PATTERN.search(norm_text):
+        return "benchmark_analysis"
+
+    # Check for aggregation intent FIRST (higher priority than summary - more specific)
+    # This must come before summary since "sum", "total", "combined" might match summary pattern
+    if INTENT_AGGREGATION_PATTERN.search(norm_text):
+        return "aggregation"
+
+    # Check for summary intent (medium priority)
+    if INTENT_SUMMARY_PATTERN.search(norm_text):
+        return "summary"
+
+    # Check for conditional intent (medium priority)
+    if INTENT_CONDITIONAL_PATTERN.search(norm_text):
+        return "conditional_analysis"
+
+    # Check for rank intent (medium priority for ranking questions)
     if INTENT_RANK_PATTERN.search(norm_text):
         # For ranking queries, only parse tickers if explicitly mentioned
         if tickers and isinstance(tickers, list) and unique_tickers:
@@ -321,7 +434,7 @@ def classify_intent(
                 pass
         return "rank"
 
-    # Check for explain intent (second priority)
+    # Check for explain intent (medium priority)
     if INTENT_EXPLAIN_PATTERN.search(norm_text):
         # For explain queries, only parse tickers if explicitly mentioned
         if tickers and isinstance(tickers, list) and unique_tickers:
@@ -331,7 +444,7 @@ def classify_intent(
                 pass
         return "explain_metric"
 
-    # Check for trend intent (third priority)
+    # Check for trend intent (medium-low priority)
     if (
         INTENT_TREND_PATTERN.search(norm_text)
         or INTENT_LAST_PATTERN.search(norm_text)
@@ -340,11 +453,15 @@ def classify_intent(
     ):
         return "trend"
 
-    # Check for compare intent (fourth priority)
+    # Check for compare intent (medium-low priority)
     # Only classify as compare if explicitly compare keywords OR multiple tickers with clear compare context
     if (INTENT_COMPARE_PATTERN.search(norm_text) or 
         (unique_tickers and len(unique_tickers) >= 2 and ("compare" in norm_text or "vs" in norm_text or "versus" in norm_text))):
         return "compare"
+
+    # Check for change/delta intent (low priority - could overlap with trend, so check after)
+    if INTENT_CHANGE_PATTERN.search(norm_text):
+        return "change_analysis"
 
     # Default to lookup intent
     return "lookup"

@@ -910,6 +910,24 @@ def enhance_structured_parse(
             confidence=0.4
         )
     
+    # New analytical query types - all should use natural language / LLM
+    elif existing_intent in [
+        "scenario_analysis",      # What-if queries
+        "causal_analysis",        # Why queries
+        "temporal_query",         # When queries
+        "relationship_analysis",  # Relationship/correlation queries
+        "benchmark_analysis",     # Benchmark queries
+        "summary",                # Summary/overview queries
+        "aggregation",            # Aggregation/sum/total queries
+        "conditional_analysis",   # Conditional/hypothetical queries
+        "change_analysis",        # Change/delta queries
+    ]:
+        # Complex analytical queries should use natural language / LLM
+        return EnhancedRouting(
+            intent=EnhancedIntent.NATURAL_LANGUAGE,
+            confidence=0.4
+        )
+    
     # ========================================
     # 5. NATURAL LANGUAGE (Low Confidence)
     # ========================================

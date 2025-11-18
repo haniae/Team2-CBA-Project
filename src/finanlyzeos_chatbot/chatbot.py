@@ -4226,6 +4226,69 @@ class FinanlyzeOSChatbot:
                     # Question tag patterns
                     r'\b(?:isn\'t|aren\'t|wasn\'t|weren\'t|doesn\'t|don\'t|didn\'t|won\'t|can\'t|couldn\'t|shouldn\'t|hasn\'t|haven\'t|hadn\'t)\s+(?:it|they|he|she|we|you)\b',
                     r'\b(?:right|correct|true|accurate|accurate|is\s+that\s+right|is\s+that\s+correct|am\s+i\s+right|am\s+i\s+correct)\b',
+                    
+                    # Enhanced imperative/command patterns (all, every, any variations)
+                    r'\b(?:show|display|list|get|find|give|pull|fetch|retrieve|bring|present|print|output)\s+(?:me|us)?\s+(?:all|every|any|each|some|the\s+list|the\s+list\s+of)\b',
+                    r'\b(?:show|display|list|get|find|give|pull|fetch|retrieve|bring|present|print|output)\s+(?:all|every|any|each|some)\s+(?:of\s+)?(?:the|their|its|them|these|those)\b',
+                    r'\b(?:list|enumerate|itemize|catalog|inventory)\s+(?:all|every|any|each|some|the|their|its)\b',
+                    
+                    # Modal verb patterns for speculative queries (expanded)
+                    r'\b(?:might|may|could|would|should)\s+(?:be|have|do|make|earn|generate|produce|create|perform|achieve|reach|exceed|surpass)\b',
+                    r'\b(?:might|may|could|would|should)\s+(?:not|never)\s+(?:be|have|do|make|earn|generate|produce|create|perform|achieve|reach|exceed|surpass)\b',
+                    r'\b(?:is|are|was|were)\s+(?:likely|unlikely|possible|impossible|probable|improbable|certain|uncertain)\s+(?:to\s+be|to\s+have|to\s+do|that|to)\b',
+                    r'\b(?:might|may|could|would|should)\s+(?:have|had)\s+(?:been|become|became|done|made|earned|generated|produced|created|performed|achieved|reached)\b',
+                    
+                    # Enhanced aggregation patterns
+                    r'\b(?:what|how|show|tell|calculate|compute|determine|find|get|give)\s+(?:is|are|was|were|the|their|its)\s+(?:sum|total|aggregate|combined|collective|cumulative|overall|grand\s+total)\b',
+                    r'\b(?:calculate|compute|determine|find|get|give|show|tell)\s+(?:the|their|its)?\s+(?:sum|total|aggregate|combined|collective|cumulative|overall|grand\s+total)\s+(?:of|for|across|over)\b',
+                    r'\b(?:sum|total|aggregate|combined|collective|cumulative|overall|grand\s+total)\s+(?:of|for|across|over|all|every|each)\b',
+                    r'\b(?:add|sum|total|combine|aggregate)\s+(?:up|together|all|everything)\b',
+                    r'\b(?:what|how)\s+(?:is|are|was|were)\s+(?:the|their|its)?\s+(?:combined|total|overall|aggregate|collective)\s+(?:value|amount|figure|number|sum)\b',
+                    
+                    # Enhanced modal and speculative patterns
+                    r'\b(?:i\s+think|i\s+believe|i\s+expect|i\s+anticipate|i\s+predict|i\s+estimate|i\s+guess|i\s+assume)\s+(?:that|it|they|he|she|we|you)\s+(?:is|are|was|were|will|would|should|might|may|could)\b',
+                    r'\b(?:do|does|did)\s+(?:you|they|it|he|she|we)\s+(?:think|believe|expect|anticipate|predict|estimate|guess|assume)\s+(?:that|it|they|he|she|we|you)\b',
+                    r'\b(?:would|could|should|might|may)\s+(?:you|they|it|he|she|we)\s+(?:think|believe|expect|anticipate|predict|estimate|guess|assume)\s+(?:that|it|they|he|she|we|you)\b',
+                    
+                    # Additional question tag patterns (expanded)
+                    r'\b(?:isn\'t|aren\'t|wasn\'t|weren\'t|doesn\'t|don\'t|didn\'t|won\'t|can\'t|couldn\'t|shouldn\'t|hasn\'t|haven\'t|hadn\'t)\s+(?:it|that|this|they|he|she|we|you)\s+(?:right|correct|true|accurate|so)\b',
+                    r'\b(?:is|are|was|were|does|do|did|will|can|could|should|has|have|had)\s+(?:that|this|it|they|he|she|we|you)\s+(?:right|correct|true|accurate|so)\b',
+                    r'\b(?:am|is|are|was|were)\s+(?:i|we|you|they|he|she)\s+(?:right|correct|accurate|wrong|incorrect)\b',
+                    r'\b(?:that|this|it)\s+(?:is|are|was|were)\s+(?:right|correct|true|accurate|so|yes|no)\b',
+                    r'\b(?:confirm|verify|check)\s+(?:that|if|whether|for\s+me)\b',
+                    
+                    # Interrogative statement patterns (statements that are questions)
+                    r'\b(?:i\s+)?(?:wonder|question|ask)\s+(?:if|whether|about|why|how|what|when|where|who|which)\b',
+                    r'\b(?:curious|interested|wondering)\s+(?:if|whether|about|why|how|what|when|where|who|which)\b',
+                    r'\b(?:help\s+me|guide\s+me|assist\s+me)\s+(?:understand|figure\s+out|determine|find\s+out|learn|know)\b',
+                    
+                    # Domain-specific financial terms as question starters
+                    r'\b(?:what|how|tell\s+me\s+about|show\s+me|calculate|compute|find)\s+(?:the\s+)?(?:alpha|beta|sharpe\s+ratio|sortino\s+ratio|information\s+ratio|tracking\s+error|jensen\'?s?\s+alpha|treynor\s+ratio|calmar\s+ratio|max\s+drawdown|var|value\s+at\s+risk|cvar|conditional\s+var|expected\s+shortfall)\b',
+                    r'\b(?:alpha|beta|sharpe|sortino|information\s+ratio|tracking\s+error|jensen\'?s?\s+alpha|treynor|calmar|max\s+drawdown|var|cvar|expected\s+shortfall)\s+(?:of|for|is|are|was|were|does|did|will|can|should)\b',
+                    r'\b(?:what\'?s?|what\s+is|how\s+is|tell\s+me)\s+(?:the\s+)?(?:alpha|beta|sharpe|sortino|information\s+ratio|tracking\s+error|jensen\'?s?\s+alpha|treynor|calmar|max\s+drawdown|var|cvar|expected\s+shortfall)\b',
+                    r'\b(?:show|calculate|compute|find|get|tell)\s+(?:me|us)?\s+(?:the\s+)?(?:alpha|beta|sharpe|sortino|information\s+ratio|tracking\s+error|jensen\'?s?\s+alpha|treynor|calmar|max\s+drawdown|var|cvar|expected\s+shortfall)\b',
+                    r'\b(?:risk\s+metrics?|risk\s+measures?|performance\s+metrics?|portfolio\s+metrics?)\s+(?:like|such\s+as|including|for)\b',
+                    
+                    # Casual/slang expression patterns
+                    r'\b(?:how\'?s?|how\s+is|how\s+are)\s+\w+\s+(?:doing|going|performing|trending|looking)\b',
+                    r'\b(?:what\'?s?|what\s+is)\s+(?:the\s+)?(?:deal|story|scoop|latest|update|news)\s+(?:with|on|about)\b',
+                    r'\b(?:what\'?s?|what\s+is)\s+\w+\s+(?:up\s+to|about|dealing\s+with|working\s+on)\b',
+                    r'\b(?:how\'?s?\s+)?(?:things|stuff|it|they|that|this)\s+(?:going|doing|looking|trending|shaping\s+up)\b',
+                    r'\b(?:what\'?s?|what\s+is)\s+(?:the\s+)?(?:situation|status|state|condition|position)\s+(?:with|on|for|of)\b',
+                    r'\b(?:give\s+me|tell\s+me|show\s+me)\s+(?:the\s+)?(?:rundown|lowdown|scoop|411|update|status)\s+(?:on|about|for|of)\b',
+                    r'\b(?:what\'?s?|what\s+is)\s+(?:happening|going\s+on|up|the\s+deal)\s+(?:with|at|in)\b',
+                    r'\b(?:is|are|was|were)\s+\w+\s+(?:any\s+good|worth\s+it|doing\s+well|performing\s+well)\b',
+                    r'\b(?:check|look\s+at|see|review)\s+(?:how|what|where)\s+\w+\s+(?:is|are|was|were)\s+(?:doing|going|performing)\b',
+                    
+                    # Multi-part query patterns (conjunctions and continuation)
+                    r'\b(?:analyze|compare|show|tell|give|calculate|compute|find|get|list|display)\s+.*?\s+(?:and\s+also|and\s+then|also|plus|as\s+well|in\s+addition|additionally|furthermore|moreover|besides|on\s+top\s+of)\b',
+                    r'\b.*?\s+(?:and|also|plus|as\s+well|in\s+addition)\s+(?:analyze|compare|show|tell|give|calculate|compute|find|get|list|display|what|how|why|when|where|which)\b',
+                    r'\b(?:both|all|each|every)\s+.*?\s+(?:and|,)\s+.*?\b',  # "both X and Y", "all X, Y, and Z"
+                    r'\b(?:analyze|compare|show|tell|give|calculate|compute|find|get|list|display)\s+(?:both|all|each|every)\s+.*?\s+(?:and|,)\s+.*?\b',
+                    r'\b(?:what|how|why|when|where|which|tell\s+me|show\s+me)\s+.*?\s+(?:and|,)\s+(?:also|what|how|why|when|where|which|tell\s+me|show\s+me)\b',
+                    r'\b(?:first|second|third|then|next|after\s+that|finally|lastly)\s+(?:analyze|compare|show|tell|give|calculate|compute|find|get|list|display|what|how|why|when|where|which)\b',
+                    r'\b(?:analyze|compare|show|tell|give|calculate|compute|find|get|list|display)\s+.*?\s+(?:,|and)\s+(?:analyze|compare|show|tell|give|calculate|compute|find|get|list|display|what|how|why|when|where|which)\b',
+                    r'\b(?:as\s+well\s+as|along\s+with|together\s+with|in\s+addition\s+to|besides|on\s+top\s+of)\s+.*?\b',
                 ]
                 # Use module-level re import explicitly
                 import re as re_module
