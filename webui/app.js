@@ -6703,6 +6703,8 @@ function loadStoredConversations() {
         id: entry.id,
         remoteId: entry.remoteId || null,
         title: entry.title || "",
+        customName: entry.customName || null,
+        starred: Boolean(entry.starred),
         createdAt: entry.createdAt || entry.updatedAt || new Date().toISOString(),
         updatedAt: entry.updatedAt || entry.createdAt || new Date().toISOString(),
         messages: Array.isArray(entry.messages) ? entry.messages : [],
@@ -7258,7 +7260,17 @@ function renderConversationList() {
 
   conversationList.innerHTML = "";
 
-  const items = getFilteredConversations().filter((conversation) => !conversation.archived);
+  let items = getFilteredConversations().filter((conversation) => !conversation.archived);
+
+  // Sort: starred first, then by updatedAt
+  items = items.sort((a, b) => {
+    const aStarred = Boolean(a.starred);
+    const bStarred = Boolean(b.starred);
+    if (aStarred !== bStarred) {
+      return bStarred ? 1 : -1;
+    }
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
 
   if (!items.length) {
     const empty = document.createElement("p");
@@ -7277,6 +7289,9 @@ function renderConversationList() {
     if (activeConversation && conversation.id === activeConversation.id) {
       item.classList.add("active");
     }
+    if (conversation.starred) {
+      item.classList.add("starred");
+    }
 
     const linkButton = document.createElement("button");
     linkButton.type = "button";
@@ -7285,8 +7300,8 @@ function renderConversationList() {
 
     const title = document.createElement("span");
     title.className = "conversation-title";
-    title.textContent = conversation.title || "Untitled Chat";
-    title.title = conversation.previewPrompt || conversation.title || "Untitled Chat";
+    title.textContent = conversation.customName || conversation.title || "Untitled Chat";
+    title.title = conversation.customName || conversation.previewPrompt || conversation.title || "Untitled Chat";
     linkButton.title = title.title;
 
     const timestamp = document.createElement("span");
@@ -7295,18 +7310,138 @@ function renderConversationList() {
 
     linkButton.append(title, timestamp);
 
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "conversation-delete";
-    deleteButton.textContent = "Delete";
-    deleteButton.addEventListener("click", (event) => {
+    // Three-dot menu button
+    const menuButton = document.createElement("button");
+    menuButton.type = "button";
+    menuButton.className = "conversation-menu-btn";
+    menuButton.setAttribute("aria-label", "More options");
+    menuButton.innerHTML = "⋯";
+    menuButton.dataset.conversationId = conversation.id;
+
+    // Menu dropdown
+    const menu = document.createElement("div");
+    menu.className = "conversation-menu";
+    menu.setAttribute("role", "menu");
+    menu.style.display = "none";
+
+    // Star option
+    const starOption = document.createElement("button");
+    starOption.type = "button";
+    starOption.className = "menu-item";
+    starOption.setAttribute("role", "menuitem");
+    const starColor = conversation.starred ? '#f59e0b' : '#0f172a';
+    starOption.innerHTML = `<span class="menu-icon" style="color: ${starColor} !important; font-size: 20px !important; font-weight: bold !important;">${conversation.starred ? "★" : "☆"}</span><span class="menu-text" style="color: #0f172a !important; font-weight: 700 !important; font-size: 14px !important;">${conversation.starred ? "Unstar" : "Star"}</span>`;
+    starOption.addEventListener("click", (event) => {
       event.stopPropagation();
-      deleteConversation(conversation.id);
+      toggleStarConversation(conversation.id);
+      closeAllMenus();
     });
 
-    item.append(linkButton, deleteButton);
+    // Rename option
+    const renameOption = document.createElement("button");
+    renameOption.type = "button";
+    renameOption.className = "menu-item";
+    renameOption.setAttribute("role", "menuitem");
+    renameOption.innerHTML = '<span class="menu-icon" style="color: #0f172a !important; font-size: 20px !important;">✏️</span><span class="menu-text" style="color: #0f172a !important; font-weight: 700 !important; font-size: 14px !important;">Rename</span>';
+    renameOption.addEventListener("click", (event) => {
+      event.stopPropagation();
+      renameConversation(conversation.id);
+      closeAllMenus();
+    });
+
+    // Delete option
+    const deleteOption = document.createElement("button");
+    deleteOption.type = "button";
+    deleteOption.className = "menu-item menu-item-danger";
+    deleteOption.setAttribute("role", "menuitem");
+    deleteOption.innerHTML = '<span class="menu-icon" style="color: #dc2626 !important; font-size: 20px !important;">🗑️</span><span class="menu-text" style="color: #dc2626 !important; font-weight: 700 !important; font-size: 14px !important;">Delete</span>';
+    deleteOption.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (confirm("Are you sure you want to delete this conversation?")) {
+        deleteConversation(conversation.id);
+      }
+      closeAllMenus();
+    });
+
+    menu.append(starOption, renameOption, deleteOption);
+
+    // Toggle menu on button click
+    menuButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const isOpen = menu.style.display !== "none";
+      closeAllMenus();
+      if (!isOpen) {
+        menu.style.display = "block";
+        menuButton.classList.add("active");
+        
+        // Position menu above if there's not enough space below
+        const rect = menuButton.getBoundingClientRect();
+        const menuHeight = 150; // Approximate menu height
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        
+        if (spaceBelow < menuHeight && spaceAbove > menuHeight) {
+          menu.style.top = "auto";
+          menu.style.bottom = "100%";
+          menu.style.marginTop = "0";
+          menu.style.marginBottom = "4px";
+        } else {
+          menu.style.top = "100%";
+          menu.style.bottom = "auto";
+          menu.style.marginTop = "4px";
+          menu.style.marginBottom = "0";
+        }
+      }
+    });
+
+    item.append(linkButton, menuButton, menu);
     conversationList.append(item);
   });
+}
+
+function closeAllMenus() {
+  document.querySelectorAll(".conversation-menu").forEach((menu) => {
+    menu.style.display = "none";
+  });
+  document.querySelectorAll(".conversation-menu-btn").forEach((btn) => {
+    btn.classList.remove("active");
+  });
+}
+
+// Global click listener to close menus when clicking outside
+if (!window.conversationMenuClickHandler) {
+  window.conversationMenuClickHandler = (event) => {
+    if (!event.target.closest(".conversation-menu-btn") && !event.target.closest(".conversation-menu")) {
+      closeAllMenus();
+    }
+  };
+  document.addEventListener("click", window.conversationMenuClickHandler);
+}
+
+function toggleStarConversation(conversationId) {
+  const conversation = conversations.find((entry) => entry.id === conversationId);
+  if (!conversation) {
+    return;
+  }
+  conversation.starred = !conversation.starred;
+  saveConversations();
+  renderConversationList();
+  showToast(conversation.starred ? "Conversation starred" : "Conversation unstarred", "success");
+}
+
+function renameConversation(conversationId) {
+  const conversation = conversations.find((entry) => entry.id === conversationId);
+  if (!conversation) {
+    return;
+  }
+  const currentName = conversation.customName || conversation.title || "Untitled Chat";
+  const newName = prompt("Rename conversation:", currentName);
+  if (newName !== null && newName.trim() !== "") {
+    conversation.customName = newName.trim();
+    saveConversations();
+    renderConversationList();
+    showToast("Conversation renamed", "success");
+  }
 }
 
 function exportConversation(format) {

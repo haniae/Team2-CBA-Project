@@ -1,22 +1,72 @@
-// ============================================
-// FILE UPLOAD INITIALIZATION - RUNS IMMEDIATELY
-// ============================================
-console.log("🚀🚀🚀 [Upload] SCRIPT LOADED - FILE UPLOAD CODE IS RUNNING! 🚀🚀🚀");
-
 const API_BASE = window.API_BASE || "";
-const STORAGE_KEY = "finanlyzeos.chatHistory.v2";
-const LEGACY_STORAGE_KEYS = ["finanlyzeos.chatHistory.v1"];
-const ACTIVE_CONVERSATION_KEY = "finanlyzeos.activeConversationId";
+const STORAGE_KEY = "benchmarkos.chatHistory.v2";
+const LEGACY_STORAGE_KEYS = ["benchmarkos.chatHistory.v1"];
+const ACTIVE_CONVERSATION_KEY = "benchmarkos.activeConversationId";
+
+// Initialize theme from localStorage
+(function initializeTheme() {
+  try {
+    const savedTheme = localStorage.getItem('benchmarkos.theme');
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  } catch (error) {
+    console.warn("Unable to load theme from storage", error);
+  }
+})();
+
+(function cleanupLegacyStorage() {
+  try {
+    if (!window || !window.localStorage) {
+      return;
+    }
+    LEGACY_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+  } catch (error) {
+    console.warn("Unable to clear legacy chat storage", error);
+  }
+})();
+
+const chatLog = document.getElementById("chat-log");
+const chatForm = document.getElementById("chat-form");
+const chatInput = document.getElementById("chat-input");
+const sendButton = document.getElementById("send-button");
+const stopButton = document.getElementById("stop-button");
+const scrollBtn = document.getElementById("scrollBtn");
+const statusDot = document.getElementById("api-status");
+const statusMessage = document.getElementById("status-message");
+const conversationList = document.getElementById("conversation-list");
+const navItems = document.querySelectorAll(".nav-item");
+const promptSuggestionsContainer = document.getElementById("prompt-suggestions");
+const conversationExportButtons = document.querySelectorAll(".chat-export-btn");
+const auditDrawer = document.getElementById("audit-drawer");
+const auditDrawerList = document.getElementById("audit-drawer-list");
+const auditDrawerStatus = document.getElementById("audit-drawer-status");
+const auditDrawerTitle = document.getElementById("audit-drawer-title");
+const auditDrawerDetail = document.getElementById("audit-drawer-detail");
+const chatSearchContainer = document.getElementById("chat-search");
+const chatSearchInput = document.getElementById("chat-search-input");
+const chatSearchClear = document.getElementById("chat-search-clear");
+const utilityPanel = document.getElementById("utility-panel");
+const utilityTitle = document.getElementById("utility-title");
+const utilityContent = document.getElementById("utility-content");
+const introPanel = document.getElementById("chat-intro");
+const chatPanel = document.querySelector(".chat-panel");
+const chatFormContainer = document.getElementById("chat-form");
+const savedSearchTrigger = document.querySelector("[data-action='search-saved']");
+const archivedToggleButton = document.querySelector("[data-action='toggle-archived']");
+
 const CHAT_FILE_INPUT_ID = "chat-file-upload";
 const CHAT_FILE_BUTTON_ID = "chat-file-upload-btn";
-const LEGACY_BUTTON_ID = "upload-button";
+const LEGACY_UPLOAD_BUTTON_ID = "upload-button";
 
 let chatUploadHandlersBound = false;
+let uploadInitAttempts = 0;
+const MAX_UPLOAD_INIT_ATTEMPTS = 40;
 
 function resolveChatUploadButton() {
   return (
     document.getElementById(CHAT_FILE_BUTTON_ID) ||
-    document.getElementById(LEGACY_BUTTON_ID) ||
+    document.getElementById(LEGACY_UPLOAD_BUTTON_ID) ||
     document.querySelector(".chat-file-upload-btn")
   );
 }
@@ -50,109 +100,153 @@ function getChatUploadElements() {
   return { input, button };
 }
 
-function bindChatUploadHandlers(reason = "unspecified") {
+function bindChatUploadHandlers(reason = "initial") {
   if (chatUploadHandlersBound) {
     return true;
   }
 
   const { input, button } = getChatUploadElements();
-
   if (!input || !button) {
-    console.warn("[Upload] Chat upload elements missing during bind", {
-      reason,
-      inputFound: !!input,
-      buttonFound: !!button,
-    });
+    console.debug("Upload controls not ready yet", { reason, inputFound: !!input, buttonFound: !!button });
     return false;
   }
 
   const triggerPicker = (event) => {
-    if (!input) {
-      console.error("[Upload] Cannot trigger file picker: input not available");
-      return;
-    }
     event.preventDefault();
     event.stopPropagation();
-    console.log("[Upload] Upload control activated", {
-      type: event.type,
-      key: event.key,
-    });
-    try {
-      input.click();
-      console.log("[Upload] File picker opened successfully");
-    } catch (error) {
-      console.error("[Upload] Failed to open file picker", error);
-    }
-  };
-
-  const handleButtonKeydown = (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      triggerPicker(event);
-    }
+    input.click();
   };
 
   button.addEventListener("click", triggerPicker);
-  button.addEventListener("keydown", handleButtonKeydown);
+  button.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      triggerPicker(event);
+    }
+  });
 
   if (!input.dataset.chatUploadChangeBound) {
     input.addEventListener("change", onChatFileSelected);
     input.dataset.chatUploadChangeBound = "true";
   }
 
-  console.log("[Upload] Chat upload handlers bound", { reason });
   chatUploadHandlersBound = true;
+  console.debug("Upload controls bound");
   return true;
 }
 
-// Attempt to bind immediately so pointer events work even before DOMContentLoaded
-if (!bindChatUploadHandlers("initial")) {
-  const retryBind = (reason) => bindChatUploadHandlers(reason);
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => retryBind("domcontentloaded"));
-  } else {
-    setTimeout(() => retryBind("post-timeout"), 100);
+async function onChatFileSelected(event) {
+  const input = event.target;
+  const file = input?.files?.[0];
+  if (!file) {
+    return;
   }
-  window.addEventListener("load", () => retryBind("window-load"));
+
+  const conversation = ensureActiveConversation();
+  let remoteConversationId = conversation.remoteId;
+  if (!remoteConversationId) {
+    const generatedId =
+      (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
+      `conv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    conversation.remoteId = generatedId;
+    remoteConversationId = generatedId;
+    promoteConversation(conversation);
+    saveConversations();
+  }
+
+  const uploadingMsgWrapper = appendMessage("user", `📎 Uploading ${file.name}...`, { forceScroll: true });
+  setSending(true);
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (remoteConversationId) {
+      formData.append("conversation_id", remoteConversationId);
+    }
+
+    const response = await fetch(`${API_BASE}/api/documents/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.success) {
+      const errorMessage =
+        (payload && (payload.message || (payload.errors && payload.errors[0]))) ||
+        `Upload failed with status ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    if (payload.conversation_id && payload.conversation_id !== remoteConversationId) {
+      remoteConversationId = payload.conversation_id;
+      conversation.remoteId = payload.conversation_id;
+      promoteConversation(conversation);
+      saveConversations();
+    }
+
+    if (uploadingMsgWrapper) {
+      const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
+      if (bodyEl) {
+        bodyEl.textContent = `📎 Uploaded ${file.name} successfully`;
+        uploadingMsgWrapper.classList.add("upload-success");
+      }
+    }
+
+    const assistantMsg =
+      payload.message ||
+      `✅ File "${file.name}" uploaded successfully. The document has been processed and is ready for analysis. Ask about it directly in your next prompt.`;
+    recordMessage("assistant", assistantMsg, { upload: { documentId: payload.document_id, filename: file.name } });
+    appendMessage("assistant", assistantMsg, { forceScroll: true });
+
+    if (Array.isArray(payload.warnings) && payload.warnings.length) {
+      const warningText = `⚠️ Upload warnings for "${file.name}": ${payload.warnings.join(" ")}`;
+      recordMessage("system", warningText);
+      appendMessage("system", warningText, { forceScroll: true });
+    }
+  } catch (error) {
+    console.error("Upload failed", error);
+    if (uploadingMsgWrapper) {
+      const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
+      if (bodyEl) {
+        bodyEl.textContent = `❌ Upload failed: ${error.message}`;
+        uploadingMsgWrapper.classList.add("upload-error");
+      }
+    }
+    const errorMsg = `❌ Failed to upload ${file.name}: ${error.message}`;
+    recordMessage("system", errorMsg);
+    appendMessage("system", errorMsg, { forceScroll: true });
+  } finally {
+    setSending(false);
+    if (input) {
+      input.value = "";
+    }
+  }
 }
 
-(function cleanupLegacyStorage() {
-  try {
-    if (!window || !window.localStorage) {
-      return;
-    }
-    LEGACY_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
-  } catch (error) {
-    console.warn("Unable to clear legacy chat storage", error);
+function tryInitializeFileUpload() {
+  if (chatUploadHandlersBound) {
+    return;
   }
-})();
+  uploadInitAttempts += 1;
+  if (bindChatUploadHandlers(`attempt-${uploadInitAttempts}`)) {
+    return;
+  }
+  if (uploadInitAttempts < MAX_UPLOAD_INIT_ATTEMPTS) {
+    window.setTimeout(tryInitializeFileUpload, 120);
+  }
+}
 
-const chatLog = document.getElementById("chat-log");
-const chatForm = document.getElementById("chat-form");
-const chatInput = document.getElementById("chat-input");
-const sendButton = document.getElementById("send-button");
-const scrollBtn = document.getElementById("scrollBtn");
-const statusDot = document.getElementById("api-status");
-const statusMessage = document.getElementById("status-message");
-const conversationList = document.getElementById("conversation-list");
-const navItems = document.querySelectorAll(".nav-item");
-const promptSuggestionsContainer = document.getElementById("prompt-suggestions");
-const conversationExportButtons = document.querySelectorAll(".chat-export-btn");
-const auditDrawer = document.getElementById("audit-drawer");
-const auditDrawerList = document.getElementById("audit-drawer-list");
-const auditDrawerStatus = document.getElementById("audit-drawer-status");
-const auditDrawerTitle = document.getElementById("audit-drawer-title");
-const auditDrawerDetail = document.getElementById("audit-drawer-detail");
-const chatSearchContainer = document.getElementById("chat-search");
-const chatSearchInput = document.getElementById("chat-search-input");
-const chatSearchClear = document.getElementById("chat-search-clear");
-const utilityPanel = document.getElementById("utility-panel");
-const utilityTitle = document.getElementById("utility-title");
-const utilityContent = document.getElementById("utility-content");
-const introPanel = document.getElementById("chat-intro");
-const chatPanel = document.querySelector(".chat-panel");
-const chatFormContainer = document.getElementById("chat-form");
-const savedSearchTrigger = document.querySelector("[data-action='search-saved']");
-const archivedToggleButton = document.querySelector("[data-action='toggle-archived']");
+if (typeof document !== "undefined") {
+  const scheduleUploadInit = () => {
+    tryInitializeFileUpload();
+    window.setTimeout(tryInitializeFileUpload, 400);
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", scheduleUploadInit, { once: true });
+  } else {
+    scheduleUploadInit();
+  }
+  window.addEventListener("load", tryInitializeFileUpload, { once: true });
+}
 
 const STREAM_STEP_MS = 18;
 const STREAM_MIN_SLICE = 2;
@@ -413,7 +507,7 @@ const FOLLOW_UP_SUGGESTION_LIBRARY = {
   KPI: "List the KPI definitions and calculation lineage referenced in this analysis."
 };
 const MAX_PROMPT_SUGGESTIONS = 5;
-const ALERT_PREFS_KEY = "finanlyzeos.alertPreferences";
+const ALERT_PREFS_KEY = "benchmarkos.alertPreferences";
 const DEFAULT_ALERT_PREFERENCES = {
   digest: "immediate",
   quietHours: {
@@ -440,30 +534,48 @@ const PREFERS_REDUCED_MOTION = (() => {
 })();
 
 const TICKER_STOPWORDS = new Set([
-  "THE",
-  "AND",
-  "WITH",
-  "KPI",
-  "EPS",
-  "ROE",
-  "FCF",
-  "PE",
-  "TSR",
-  "LTM",
-  "FY",
-  "API",
-  "DATA",
-  "THIS",
-  "THAT",
-  "YOY",
-  "TTM",
-  "GROWTH",
-  "METRIC",
-  "METRICS",
-  "SUMMARY",
-  "REPORT",
-  "SCENARIO",
-  "K",
+  // Common words
+  "THE", "AND", "WITH", "FOR", "FROM", "ABOUT", "SHOW", "TELL",
+  "THIS", "THAT", "THEM", "THEIR", "THOSE", "THESE",
+  "ARE", "WAS", "WERE", "BEEN", "BEING",
+  
+  // Question words
+  "WHAT", "WHICH", "WHERE", "WHEN", "WHY", "HOW", "WHO",
+  
+  // Verbs (prevent "HAS", "CAN", "DID", etc. being treated as tickers)
+  "HAS", "HAVE", "HAD", "CAN", "COULD", "WOULD", "SHOULD", "WILL",
+  "DID", "DOES", "DO", "DONE", "MAY", "MIGHT", "MUST",
+  "IS", "ARE", "WAS", "WERE",
+  
+  // Sector/industry words (prevent sector names being treated as tickers)
+  "TECH", "TECHNOLOGY", "SOFTWARE", "HARDWARE", "SEMICONDUCTOR", "SEMIS", "CHIP",
+  "FINANCIAL", "FINANCE", "BANKING", "BANK", "BANKS", "INSURANCE", "FINTECH",
+  "HEALTHCARE", "HEALTH", "PHARMA", "PHARMACEUTICAL", "BIOTECH", "MEDICAL", "DRUG",
+  "ENERGY", "OIL", "GAS", "PETROLEUM", "RENEWABLES", "CLEAN",
+  "CONSUMER", "RETAIL", "ECOMMERCE", "CPG", "DISCRETIONARY", "STAPLES",
+  "INDUSTRIAL", "MANUFACTURING", "AEROSPACE", "DEFENSE", "MACHINERY",
+  "PROPERTY", "REIT", "REITS",
+  "UTILITY", "UTILITIES", "POWER", "ELECTRIC", "WATER", "INFRASTRUCTURE",
+  "MATERIALS", "MINING", "METALS", "CHEMICALS", "COMMODITIES",
+  "COMMUNICATION", "TELECOM", "MEDIA", "ENTERTAINMENT", "BROADCASTING",
+  "SECTOR", "INDUSTRY",
+  
+  // Company descriptors
+  "COMPANY", "COMPANIES", "STOCK", "STOCKS", "FIRM", "FIRMS",
+  "BEST", "TOP", "GOOD", "BETTER", "HIGHEST", "LOWEST", "WORST",
+  "MOST", "LEAST", "MORE", "LESS",
+  
+  // Metrics (existing)
+  "KPI", "EPS", "ROE", "FCF", "PE", "TSR", "LTM", "FY",
+  "YOY", "TTM", "GROWTH", "METRIC", "METRICS",
+  "MARGIN", "MARGINS", "PROFIT", "REVENUE", "EARNINGS",
+  
+  // Report types
+  "SUMMARY", "REPORT", "SCENARIO", "ANALYSIS", "INSIGHT",
+  
+  // Other common words
+  "API", "DATA", "K", "ALL", "ANY", "SOME", "EACH",
+  "GET", "GIVE", "LIST", "FIND",
 ]);
 
 let reportMenu = null;
@@ -629,14 +741,10 @@ let companyUniverseSkeleton = null;
 let companySearchInput = null;
 let companySectorSelect = null;
 let companyCoverageSelect = null;
-let companyUniverseMetaUniverse = null;
-let companyUniverseMetaSectors = null;
-let companyUniverseMetaLatest = null;
-let companyUniverseMetaCoverage = null;
 
 const KPI_LIBRARY_PATH = "/static/data/kpi_library.json";
 const COMPANY_UNIVERSE_PATH = "/static/data/company_universe.json";
-const SETTINGS_STORAGE_KEY = "finanlyzeos.userSettings.v1";
+const SETTINGS_STORAGE_KEY = "benchmarkos.userSettings.v1";
 let kpiLibraryCache = null;
 let kpiLibraryLoadPromise = null;
 let companyUniversePromise = null;
@@ -644,6 +752,7 @@ let companyUniversePromise = null;
 const METRIC_KEYWORD_MAP = [
   { regex: /\bgrowth|cagr|yoy\b/i, label: "Growth" },
   { regex: /\brevenue\b/i, label: "Revenue" },
+  { regex: /\bprofit\s*margin|profitability\b/i, label: "Profitability" },
   { regex: /\bmargin\b/i, label: "Margin" },
   { regex: /\bearnings|\beps\b/i, label: "Earnings" },
   { regex: /\bcash\s*flow|\bcf\b/i, label: "Cash Flow" },
@@ -683,7 +792,6 @@ const DEFAULT_USER_SETTINGS = {
   currency: "USD",
   compliance: "standard",
 };
-
 function loadUserSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
@@ -768,6 +876,7 @@ function saveAlertPreferences(preferences) {
     throw error;
   }
 }
+
 function renderAlertPreview(previewEl, preferences) {
   if (!previewEl) {
     return;
@@ -1175,10 +1284,6 @@ async function renderCompanyUniverseSection({ container } = {}) {
   companySearchInput = null;
   companySectorSelect = null;
   companyCoverageSelect = null;
-  companyUniverseMetaUniverse = null;
-  companyUniverseMetaSectors = null;
-  companyUniverseMetaLatest = null;
-  companyUniverseMetaCoverage = null;
 
   container.innerHTML = `
     <div class="company-universe" role="region" aria-live="polite">
@@ -1191,6 +1296,7 @@ async function renderCompanyUniverseSection({ container } = {}) {
           placeholder="Search by company, ticker, or sector"
           autocomplete="off"
         />
+        <button type="button" class="company-universe__search-clear" aria-label="Clear search">×</button>
         <label class="sr-only" for="company-universe-sector-filter">Filter by sector</label>
         <select id="company-universe-sector-filter" data-role="company-universe-sector">
           <option value="">All sectors</option>
@@ -1202,17 +1308,7 @@ async function renderCompanyUniverseSection({ container } = {}) {
           <option value="partial">Partial coverage</option>
           <option value="missing">Missing coverage</option>
         </select>
-      </div>
-      <div class="company-universe__legend" role="note" aria-label="Dataset cues">
-        <span class="company-universe__legend-title">Data cues</span>
-        <span class="company-universe__legend-item" title="Market cap benchmark"> 
-          <span class="company-universe__legend-dot company-universe__legend-dot--mega" aria-hidden="true"></span>
-          Market cap ≥ $1T
-        </span>
-        <span class="company-universe__legend-item" title="Filing recency benchmark">
-          <span class="company-universe__legend-dot company-universe__legend-dot--stale" aria-hidden="true"></span>
-          Filing > 180 days
-        </span>
+        <span class="company-universe__results-count" data-role="company-universe-results-count"></span>
       </div>
       <div class="company-universe__metrics" data-role="company-universe-metrics">
         <div class="utility-loading">Loading coverage snapshot...</div>
@@ -1248,7 +1344,8 @@ async function renderCompanyUniverseSection({ container } = {}) {
         </div>
         <p class="company-universe__empty hidden" data-role="company-universe-empty">
           <span class="company-universe__empty-icon" aria-hidden="true">📊</span>
-          <span>No companies match your search. Adjust filters and try again.</span>
+          <span class="company-universe__empty-title">No companies found</span>
+          <span class="company-universe__empty-message">Try adjusting your search or filters to find what you're looking for.</span>
         </p>
       </div>
     </div>
@@ -1267,14 +1364,20 @@ async function renderCompanyUniverseSection({ container } = {}) {
   companyUniverseTable = container.querySelector("[data-role='company-universe-table']");
   companyUniverseEmpty = container.querySelector("[data-role='company-universe-empty']");
   companyUniverseSkeleton = container.querySelector("[data-role='company-universe-skeleton']");
-  companyUniverseMetaUniverse = container.querySelector("[data-role='company-universe-meta-universe']");
-  companyUniverseMetaSectors = container.querySelector("[data-role='company-universe-meta-sectors']");
-  companyUniverseMetaLatest = container.querySelector("[data-role='company-universe-meta-latest']");
-  companyUniverseMetaCoverage = container.querySelector("[data-role='company-universe-meta-coverage']");
+  const searchClearButton = container.querySelector(".company-universe__search-clear");
+  const resultsCount = container.querySelector("[data-role='company-universe-results-count']");
 
   if (companySearchInput) {
     companySearchInput.value = "";
     companySearchInput.addEventListener("input", applyCompanyUniverseFilters);
+  }
+  
+  if (searchClearButton && companySearchInput) {
+    searchClearButton.addEventListener("click", () => {
+      companySearchInput.value = "";
+      companySearchInput.dispatchEvent(new Event("input", { bubbles: true }));
+      companySearchInput.focus();
+    });
   }
   if (companySectorSelect) {
     companySectorSelect.value = "";
@@ -1317,10 +1420,6 @@ async function renderCompanyUniverseSection({ container } = {}) {
     companySearchInput = null;
     companySectorSelect = null;
     companyCoverageSelect = null;
-    companyUniverseMetaUniverse = null;
-    companyUniverseMetaSectors = null;
-    companyUniverseMetaLatest = null;
-    companyUniverseMetaCoverage = null;
     if (!container.isConnected) {
       return;
     }
@@ -1339,17 +1438,453 @@ async function renderCompanyUniverseSection({ container } = {}) {
   }
 }
 
+async function renderPortfolioManagementSection({ container } = {}) {
+  if (!container) {
+    return;
+  }
+
+  // Remove any dashboards from the page
+  const removeDashboards = () => {
+    document.querySelectorAll('.financial-dashboard, .message-dashboard, .cfi-dashboard, [class*="dashboard"], [class*="chart"], [class*="Chart"], [id*="dashboard"], [id*="chart"]').forEach(el => {
+      if (el.closest('[data-role="portfolio-management-root"]') || !el.closest('.message')) {
+        el.remove();
+      }
+    });
+    document.querySelectorAll('.message').forEach(msg => {
+      msg.classList.remove('message--has-dashboard');
+    });
+  };
+
+  removeDashboards();
+
+  // Monitor for dashboards for 30 seconds
+  const dashboardObserver = new MutationObserver(() => {
+    removeDashboards();
+  });
+
+  const root = container.querySelector('[data-role="portfolio-management-root"]') || container;
+  dashboardObserver.observe(root, { childList: true, subtree: true });
+  
+  setTimeout(() => {
+    dashboardObserver.disconnect();
+  }, 30000);
+
+  container.innerHTML = `
+    <div class="portfolio-management" data-role="portfolio-management-root">
+      <section class="portfolio-management__hero">
+        <div class="portfolio-management__badge" aria-hidden="true">💼</div>
+        <div class="portfolio-management__hero-copy">
+          <h3 class="portfolio-management__title">Portfolio Management</h3>
+          <p class="portfolio-management__subtitle">
+            Upload, manage, and analyze your investment portfolios. Upload CSV, Excel, or JSON files to get started with portfolio analysis.
+          </p>
+        </div>
+      </section>
+
+      <div class="portfolio-management__tabs">
+        <button class="portfolio-management__tab is-active" data-tab="upload">
+          <span class="portfolio-management__tab-icon">📤</span>
+          <span>Upload Portfolio</span>
+        </button>
+        <button class="portfolio-management__tab" data-tab="list">
+          <span class="portfolio-management__tab-icon">📋</span>
+          <span>My Portfolios</span>
+        </button>
+      </div>
+
+      <div class="portfolio-management__content">
+        <div class="portfolio-management__tab-panel is-active" data-panel="upload">
+          <form class="portfolio-upload-form" data-role="portfolio-upload-form">
+            <div class="portfolio-upload-form__field">
+              <label>Portfolio Name</label>
+              <input type="text" name="name" placeholder="e.g., Tech Growth Portfolio" required />
+            </div>
+
+            <div class="portfolio-upload-form__field">
+              <label>Upload Portfolio File</label>
+              <div class="portfolio-upload-form__file-input">
+                <input type="file" id="portfolio-file-input" name="file" accept=".csv,.xlsx,.xls,.json" required />
+                <label for="portfolio-file-input" class="portfolio-upload-form__file-label">
+                  <span class="portfolio-upload-form__file-button">Choose File</span>
+                  <span class="portfolio-upload-form__file-name" data-role="file-name">No file chosen</span>
+                </label>
+              </div>
+              <p class="portfolio-upload-form__hint">
+                Supported formats: CSV, Excel (.xlsx, .xls), JSON
+              </p>
+            </div>
+
+            <button type="submit" class="portfolio-upload-form__submit">Upload Portfolio</button>
+
+            <div class="portfolio-upload-form__status" data-role="upload-status" style="display: none;"></div>
+
+            <div class="portfolio-upload-form__instructions">
+              <h4>File Format Requirements</h4>
+              <p>Your portfolio file should include the following columns:</p>
+              <ul>
+                <li><code>ticker</code> - Stock ticker symbol (required)</li>
+                <li><code>shares</code> or <code>quantity</code> - Number of shares (required)</li>
+                <li><code>weight</code> - Portfolio weight as percentage (optional)</li>
+                <li><code>price</code> - Purchase price per share (optional)</li>
+              </ul>
+              <p><strong>Example CSV:</strong></p>
+              <pre><code>ticker,shares,weight
+AAPL,100,15.5
+MSFT,50,12.3
+GOOGL,25,8.7</code></pre>
+            </div>
+          </form>
+        </div>
+
+        <div class="portfolio-management__tab-panel" data-panel="list">
+          <div class="portfolio-list" data-role="portfolio-list">
+            <div class="portfolio-list__loading">Loading portfolios...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Tab switching
+  const tabs = container.querySelectorAll('.portfolio-management__tab');
+  const panels = container.querySelectorAll('.portfolio-management__tab-panel');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.dataset.tab;
+      
+      tabs.forEach(t => t.classList.remove('is-active'));
+      panels.forEach(p => p.classList.remove('is-active'));
+      
+      tab.classList.add('is-active');
+      const panel = container.querySelector(`[data-panel="${tabName}"]`);
+      if (panel) {
+        panel.classList.add('is-active');
+      }
+
+      if (tabName === 'list') {
+        loadPortfolioList();
+      }
+    });
+  });
+
+  // File input handler
+  const fileInput = container.querySelector('#portfolio-file-input');
+  const fileName = container.querySelector('[data-role="file-name"]');
+  
+  if (fileInput && fileName) {
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        fileName.textContent = file.name;
+      } else {
+        fileName.textContent = 'No file chosen';
+      }
+    });
+  }
+
+  // Upload form handler
+  const uploadForm = container.querySelector('[data-role="portfolio-upload-form"]');
+  const uploadStatus = container.querySelector('[data-role="upload-status"]');
+
+  if (uploadForm) {
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      removeDashboards();
+
+      const formData = new FormData(uploadForm);
+      const name = formData.get('name');
+      const file = formData.get('file');
+
+      if (!file || !name) {
+        showUploadStatus('Please provide both portfolio name and file.', 'error');
+        return;
+      }
+
+      const submitButton = uploadForm.querySelector('button[type="submit"]');
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Uploading...';
+      }
+
+      try {
+        const uploadData = new FormData();
+        uploadData.append('name', name);
+        uploadData.append('file', file);
+
+        const response = await fetch(`${API_BASE}/api/portfolio/upload`, {
+          method: 'POST',
+          body: uploadData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+          throw new Error(error.message || 'Upload failed');
+        }
+
+        const result = await response.json();
+        showUploadStatus(`Portfolio "${result.name || name}" uploaded successfully! Portfolio ID: ${result.portfolio_id}`, 'success');
+        
+        // Reset form
+        uploadForm.reset();
+        if (fileName) {
+          fileName.textContent = 'No file chosen';
+        }
+
+        // Switch to list tab and refresh
+        const listTab = container.querySelector('[data-tab="list"]');
+        if (listTab) {
+          listTab.click();
+        }
+      } catch (error) {
+        showUploadStatus(error.message || 'Failed to upload portfolio. Please try again.', 'error');
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = 'Upload Portfolio';
+        }
+      }
+    });
+  }
+
+  function showUploadStatus(message, tone) {
+    if (!uploadStatus) return;
+    uploadStatus.textContent = message;
+    uploadStatus.dataset.tone = tone;
+    uploadStatus.style.display = 'block';
+    setTimeout(() => {
+      uploadStatus.style.display = 'none';
+    }, 5000);
+  }
+
+  // Load portfolio list
+  async function loadPortfolioList() {
+    const listContainer = container.querySelector('[data-role="portfolio-list"]');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '<div class="portfolio-list__loading">Loading portfolios...</div>';
+
+    try {
+      const response = await fetch(`${API_BASE}/api/portfolio/list`);
+      if (!response.ok) {
+        throw new Error('Failed to load portfolios');
+      }
+
+      const portfolios = await response.json();
+
+      if (portfolios.length === 0) {
+        listContainer.innerHTML = `
+          <div class="portfolio-list__empty">
+            <p>No portfolios found. Upload your first portfolio to get started!</p>
+          </div>
+        `;
+        return;
+      }
+
+      listContainer.innerHTML = portfolios.map(portfolio => `
+        <div class="portfolio-list__item" data-portfolio-id="${portfolio.portfolio_id}">
+          <div class="portfolio-list__item-header">
+            <h4 class="portfolio-list__item-name">${portfolio.name || 'Unnamed Portfolio'}</h4>
+            <span class="portfolio-list__item-id">${portfolio.portfolio_id}</span>
+          </div>
+          <div class="portfolio-list__item-meta">
+            <span>Created: ${new Date(portfolio.created_at).toLocaleDateString()}</span>
+            ${portfolio.strategy_type ? `<span>Strategy: ${portfolio.strategy_type}</span>` : ''}
+            ${portfolio.benchmark_index ? `<span>Benchmark: ${portfolio.benchmark_index}</span>` : ''}
+          </div>
+          <div class="portfolio-list__item-actions">
+            <button class="portfolio-list__action-button" data-action="view" data-portfolio-id="${portfolio.portfolio_id}">
+              👁️ View Holdings
+            </button>
+            <button class="portfolio-list__action-button" data-action="use-in-chat" data-portfolio-id="${portfolio.portfolio_id}">
+              💬 Use in Chat
+            </button>
+            <button class="portfolio-list__action-button portfolio-list__action-button--danger" data-action="delete" data-portfolio-id="${portfolio.portfolio_id}">
+              🗑️ Delete
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      // Attach event listeners
+      listContainer.querySelectorAll('[data-action]').forEach(button => {
+        button.addEventListener('click', async (e) => {
+          const action = button.dataset.action;
+          const portfolioId = button.dataset.portfolioId;
+          
+          if (action === 'view') {
+            await showHoldingsModal(portfolioId);
+          } else if (action === 'use-in-chat') {
+            usePortfolioInChat(portfolioId);
+          } else if (action === 'delete') {
+            if (confirm(`Are you sure you want to delete portfolio "${portfolioId}"?`)) {
+              await deletePortfolio(portfolioId);
+            }
+          }
+        });
+      });
+    } catch (error) {
+      listContainer.innerHTML = `
+        <div class="portfolio-list__error">
+          Failed to load portfolios: ${error.message}
+        </div>
+      `;
+    }
+  }
+
+  // Show holdings modal
+  async function showHoldingsModal(portfolioId) {
+    removeDashboards();
+
+    try {
+      const response = await fetch(`${API_BASE}/api/portfolio/${portfolioId}/holdings`);
+      if (!response.ok) {
+        throw new Error('Failed to load holdings');
+      }
+
+      const data = await response.json();
+
+      // Create modal
+      const modal = document.createElement('div');
+      modal.className = 'portfolio-holdings-modal';
+      modal.innerHTML = `
+        <div class="portfolio-holdings-modal__backdrop"></div>
+        <div class="portfolio-holdings-modal__content">
+          <div class="portfolio-holdings-modal__header">
+            <h3 class="portfolio-holdings-modal__title">${data.name || portfolioId} - Holdings</h3>
+            <button class="portfolio-holdings-modal__close" aria-label="Close">×</button>
+          </div>
+          <div class="portfolio-holdings-modal__body">
+            <table class="portfolio-holdings-modal__table">
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Weight</th>
+                  <th>Shares</th>
+                  <th>Market Value</th>
+                  <th>Sector</th>
+                  <th>P/E</th>
+                  <th>Dividend Yield</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.holdings.map(h => `
+                  <tr>
+                    <td><strong>${h.ticker}</strong></td>
+                    <td>${h.weight ? (h.weight * 100).toFixed(2) + '%' : 'N/A'}</td>
+                    <td>${h.shares ? h.shares.toLocaleString() : 'N/A'}</td>
+                    <td>${h.market_value ? '$' + h.market_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 'N/A'}</td>
+                    <td>${h.sector || 'N/A'}</td>
+                    <td>${h.pe_ratio ? h.pe_ratio.toFixed(2) : 'N/A'}</td>
+                    <td>${h.dividend_yield ? (h.dividend_yield * 100).toFixed(2) + '%' : 'N/A'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Close handlers
+      const closeBtn = modal.querySelector('.portfolio-holdings-modal__close');
+      const backdrop = modal.querySelector('.portfolio-holdings-modal__backdrop');
+      
+      const closeModal = () => {
+        modal.remove();
+        removeDashboards();
+      };
+
+      closeBtn?.addEventListener('click', closeModal);
+      backdrop?.addEventListener('click', closeModal);
+    } catch (error) {
+      alert(`Failed to load holdings: ${error.message}`);
+    }
+  }
+
+  // Use portfolio in chat
+  function usePortfolioInChat(portfolioId) {
+    removeDashboards();
+
+    if (!chatInput) return;
+
+    // Remove collapsed classes
+    if (chatPanel) {
+      chatPanel.classList.remove('chat-panel--collapsed');
+    }
+    if (chatLog) {
+      chatLog.classList.remove('hidden');
+    }
+    if (chatFormContainer) {
+      chatFormContainer.classList.remove('chat-form--collapsed');
+    }
+
+    // Close utility panel
+    closeUtilityPanel();
+
+    // Set prompt
+    chatInput.value = `Analyze portfolio ${portfolioId}`;
+    
+    // Trigger input event to enable send button
+    const inputEvent = new Event('input', { bubbles: true });
+    chatInput.dispatchEvent(inputEvent);
+    
+    // Manually update send button state
+    if (sendButton) {
+      sendButton.disabled = !chatInput.value.trim();
+    }
+    
+    // Auto-resize textarea
+    if (typeof autoResizeTextarea === 'function') {
+      autoResizeTextarea();
+    }
+    
+    // Focus input
+    chatInput.focus();
+    chatInput.setSelectionRange(chatInput.value.length, chatInput.value.length);
+  }
+
+  // Delete portfolio
+  async function deletePortfolio(portfolioId) {
+    try {
+      const response = await fetch(`${API_BASE}/api/portfolio/${portfolioId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete portfolio');
+      }
+
+      // Reload list
+      await loadPortfolioList();
+    } catch (error) {
+      alert(`Failed to delete portfolio: ${error.message}`);
+    }
+  }
+
+  // Load initial list if on list tab
+  const activeTab = container.querySelector('.portfolio-management__tab.is-active');
+  if (activeTab && activeTab.dataset.tab === 'list') {
+    loadPortfolioList();
+  }
+}
+
 
 const HELP_PROMPTS = [
   "What is Apple's revenue?",
   "Show Microsoft's EBITDA margin",
-  "Why is Tesla's margin declining?",
-  "Compare AAPL and MSFT profitability",
   "Is Tesla overvalued?",
+  "Compare AAPL and MSFT profitability",
+  "Why is Tesla's margin declining?",
+  "Analyze portfolio port_xxxxx",
+  "What's my portfolio risk?",
+  "What's my portfolio CVaR?",
   "What's my portfolio exposure?",
-  "Show me a dashboard for Apple",
-  "What are the key risks for Tesla?",
+  "Optimize my portfolio to maximize Sharpe",
+  "What if the market drops 20%?",
 ];
+
 const HELP_SECTIONS = [
   {
     icon: "📊",
@@ -1360,13 +1895,9 @@ const HELP_SECTIONS = [
       "What is Apple's revenue?",
       "Show Microsoft's EBITDA margin",
       "What's Tesla's free cash flow?",
-      "What is Google's net income?",
-      "Show NVDA's gross margin",
-      "What is META's return on equity?",
-      "Tell me about Amazon's balance sheet",
-      "What's Microsoft's P/E ratio?",
+      "Analyze Apple",
     ],
-    delivers: "Direct answers, YoY growth, 3-5 year CAGRs, business drivers, SEC sources.",
+    delivers: "Direct answers, YoY growth, 3-5 year CAGRs, business drivers, SEC sources, comprehensive sources with clickable links.",
   },
   {
     icon: "🔍",
@@ -1378,57 +1909,45 @@ const HELP_SECTIONS = [
       "Why is Apple's revenue growing?",
       "Why is Microsoft more profitable?",
       "Why did NVDA's stock price increase?",
-      "Why is Amazon investing more in CapEx?",
-      "Why is Google's margin expanding?",
     ],
-    delivers: "Multi-factor analysis (3-5 reasons), quantified impacts, business context, forward outlook.",
+    delivers: "3-5 key drivers, quantified impacts, business context, forward outlook.",
   },
   {
-    icon: "⚖️",
+    icon: "🆚",
     title: "Comparisons",
-    command: "Compare [TICKER1] and [TICKER2] [metric]",
-    purpose: "Side-by-side analysis of companies, metrics, or performance.",
+    command: "Compare [TICKER1] vs [TICKER2] [metric]",
+    purpose: "Compare companies, metrics, or multi-company analysis.",
     examples: [
-      "Compare AAPL and MSFT profitability",
-      "Is Apple more profitable than Microsoft?",
-      "Compare Tesla and Ford margins",
-      "Which is better: Apple or Microsoft?",
-      "Compare FAANG revenue growth",
-      "Compare valuation metrics for AAPL, MSFT, GOOGL",
+      "Is Microsoft more profitable than Apple?",
+      "Compare Apple vs Microsoft margins",
+      "Which is better: Tesla or Ford profitability?",
+      "Compare AAPL, MSFT, and GOOGL revenue growth",
     ],
-    delivers: "Side-by-side metrics, percentage differences, rankings, performance indicators.",
+    delivers: "Side-by-side metrics, relative strengths, structural differences, investment implications, comprehensive sources with clickable links.",
   },
   {
-    icon: "💎",
+    icon: "💰",
     title: "Valuation & Multiples",
     command: "What's [TICKER]'s [valuation metric]?",
-    purpose: "Analyze valuation multiples, P/E ratios, and relative valuation.",
+    purpose: "Get valuation metrics, multiples, and fair value analysis.",
     examples: [
       "What's Apple's P/E ratio?",
       "Is Tesla overvalued?",
-      "What multiples is Microsoft trading at?",
-      "Compare Apple's P/E to the S&P 500",
-      "What's Amazon's PEG ratio?",
-      "How does Tesla's valuation compare to Ford?",
-      "Compare valuation metrics for FAANG stocks",
-      "Which is cheaper: Apple or Microsoft?",
+      "What's Microsoft's EV/EBITDA?",
+      "Compare Apple's P/E to the S&P 500 average",
     ],
-    delivers: "Valuation metrics, peer comparison, analyst target prices, historical multiples.",
+    delivers: "Valuation metrics (P/E, EV/EBITDA, P/B, PEG), peer comparison, historical ranges.",
   },
   {
     icon: "💪",
     title: "Financial Health & Risk",
-    command: "What's [TICKER]'s [risk/health metric]?",
+    command: "What's [TICKER]'s [risk metric]?",
     purpose: "Assess balance sheet strength, leverage, and risk factors.",
     examples: [
       "What's Tesla's debt-to-equity ratio?",
       "How leveraged is Apple?",
-      "What's Microsoft's net debt?",
       "What are the key risks for Tesla?",
-      "Is Amazon's balance sheet strong?",
-      "How much cash does Apple have?",
-      "What's Apple's interest coverage ratio?",
-      "What could go wrong with Apple's business?",
+      "What's Microsoft's net debt?",
     ],
     delivers: "Balance sheet metrics, leverage ratios, credit analysis, risk factors from 10-K.",
   },
@@ -1442,9 +1961,6 @@ const HELP_SECTIONS = [
       "What's Apple's gross margin trend?",
       "Which is more profitable: Microsoft or Google?",
       "What's driving Tesla's margin compression?",
-      "Compare EBITDA margins across FAANG",
-      "Show me Microsoft's operating margin",
-      "What's Amazon's profit margin?",
     ],
     delivers: "Margin breakdown, multi-year trends, peer comparison, drivers of margin changes.",
   },
@@ -1457,10 +1973,7 @@ const HELP_SECTIONS = [
       "Is Apple growing faster than Microsoft?",
       "What's Tesla's revenue CAGR?",
       "How fast is Amazon growing?",
-      "What's Apple's earnings growth?",
       "What's the revenue forecast for Microsoft?",
-      "Which tech stock has the best growth trajectory?",
-      "Show me NVDA's 3-year revenue CAGR",
     ],
     delivers: "Historical growth rates (3-5 years), segment breakdown, growth drivers, analyst forecasts.",
   },
@@ -1473,10 +1986,7 @@ const HELP_SECTIONS = [
       "What's Apple's free cash flow?",
       "How much cash does Microsoft generate?",
       "How is Amazon allocating capital?",
-      "What's Microsoft's dividend yield?",
       "Is Apple doing share buybacks?",
-      "Compare ROI across mega-cap tech",
-      "What's Tesla's cash burn rate?",
     ],
     delivers: "Cash flow statements, FCF trends, capex plans, dividend history, buyback programs.",
   },
@@ -1488,2033 +1998,113 @@ const HELP_SECTIONS = [
     examples: [
       "Should I invest in Apple or Microsoft?",
       "What's the bull case for Tesla?",
-      "What's the bear case for Amazon?",
-      "Should I buy Apple stock?",
-      "What's the investment thesis for NVDA?",
-      "Is Microsoft a good investment?",
+      "What's the bear case for Apple?",
+      "What are the catalysts for Amazon?",
     ],
-    delivers: "Bull/bear cases, investment thesis, analyst consensus, target prices, risk factors.",
+    delivers: "Investment thesis, bull/bear arguments, catalysts, valuation vs fundamentals, risk/reward.",
   },
   {
-    icon: "📦",
-    title: "Portfolio Management",
-    command: "What's my portfolio [metric]?",
-    purpose: "Analyze portfolio holdings, exposure, and optimization.",
+    icon: "🏆",
+    title: "Market Position & Competition",
+    command: "Who are [TICKER]'s competitors?",
+    purpose: "Analyze competitive landscape, market share, and competitive advantages.",
     examples: [
-      "What's my portfolio exposure?",
-      "Show my portfolio holdings",
-      "Optimize my portfolio to maximize Sharpe",
-      "What if the market drops 20%?",
-      "Show my portfolio performance",
-      "Analyze my portfolio risk",
-      "What's my portfolio's sector allocation?",
+      "Who are Apple's main competitors?",
+      "What's Tesla's market share?",
+      "What's Apple's moat?",
+      "How competitive is the smartphone market?",
     ],
-    delivers: "Portfolio analysis, holdings breakdown, risk metrics, optimization suggestions.",
+    delivers: "Competitor analysis, market share data, competitive advantages, industry structure.",
   },
   {
-    icon: "📊",
-    title: "Dashboards",
-    command: "Show me a dashboard for [TICKER]",
-    purpose: "Get interactive visualizations and comprehensive financial tables.",
+    icon: "👔",
+    title: "Management & Strategy",
+    command: "How is [TICKER]'s management performing?",
+    purpose: "Assess management performance, corporate strategy, and governance.",
     examples: [
-      "Show me a dashboard for Apple",
-      "Dashboard AAPL",
-      "Show dashboard for Microsoft",
-      "Create a dashboard for Tesla",
+      "How is Apple's management performing?",
+      "What's Tesla's strategy for growth?",
+      "How is Microsoft allocating capital?",
+      "Is Apple's capital allocation shareholder-friendly?",
     ],
-    delivers: "Interactive charts, multi-year comparisons, comprehensive metrics table, downloadable data.",
+    delivers: "Management track record, strategic initiatives, capital allocation, governance structure.",
   },
   {
     icon: "🏭",
-    title: "Market Position & Competition",
-    command: "Who are [TICKER]'s competitors?",
-    purpose: "Analyze competitive landscape and market position.",
-    examples: [
-      "Who are Apple's main competitors?",
-      "Is Apple losing market share to Samsung?",
-      "What's Microsoft's competitive advantage?",
-      "Compare Tesla to traditional automakers",
-      "What's Amazon's market share?",
-    ],
-    delivers: "Competitor analysis, market share data, competitive advantages, industry positioning.",
-  },
-  {
-    icon: "📋",
     title: "Sector & Industry Analysis",
-    command: "Compare [TICKER] to [sector/industry]",
-    purpose: "Benchmark companies against sector averages and industry peers.",
+    command: "How is the [sector] performing?",
+    purpose: "Analyze sector trends, industry dynamics, and macro factors.",
     examples: [
-      "How does Apple compare to the technology sector?",
-      "Compare Tesla to the automotive sector",
-      "What's Microsoft's position in cloud computing?",
-      "Show me tech sector benchmarks",
+      "How is the tech sector performing?",
+      "What's the outlook for semiconductors?",
+      "Compare retail vs e-commerce stocks",
+      "How is AI affecting tech stocks?",
     ],
-    delivers: "Sector benchmarks, percentile rankings, industry averages, peer comparisons.",
+    delivers: "Sector metrics, industry trends, competitive dynamics, regulatory changes, macro factors.",
   },
-  {
-    icon: "🧾",
-    title: "SEC Filing Facts",
-    command: "Fact [TICKER] [YEAR] [metric]",
-    purpose: "Retrieve exactly what was reported in 10-K/10-Q filings.",
-    example: "Fact TSLA 2022 revenue",
-    delivers: "Original value, adjustment notes, and source reference.",
-  },
-  {
-    icon: "🧮",
-    title: "Scenario Modelling",
-    command: "Scenario [TICKER] [NAME] rev=+X% margin=+Y% mult=+Z",
-    purpose: "Run what-if cases for growth, margin shifts, or valuation moves.",
-    example: "Scenario NVDA Bull rev=+8% margin=+1.5% mult=+0.5",
-    delivers: "Projected revenue, margins, EPS/FCF change, implied valuation.",
-  },
-  {
-    icon: "⚙️",
-    title: "Data Management",
-    command: ["Ingest [TICKER] [years]", "Ingest status [TICKER]", "Audit [TICKER] [year]"],
-    purpose: "Refresh data, track ingestion progress, or review the audit log.",
-    examples: [
-      "Ingest META 5 — refreshes five fiscal years of filings and quotes.",
-      "Audit META 2023 — lists the latest import activity and KPI updates.",
-    ],
-  },
-];
-
-function getHelpContent() {
-  return {
-    prompts: HELP_PROMPTS,
-    sections: HELP_SECTIONS,
-    tips: HELP_TIPS,
-  };
-}
-
-let HELP_TIPS = [
-  // Intentionally empty; tips section removed.
-];
-
-let HELP_TEXT = composeHelpText(getHelpContent());
-let HELP_GUIDE_HTML = renderHelpGuide(getHelpContent()).outerHTML;
-
-function composeHelpText(content) {
-  const lines = [];
-  lines.push("📘 Finalyze Copilot — Quick Reference", "", "How to ask:");
-  content.prompts.forEach((prompt) => lines.push(`• ${prompt}`));
-  lines.push("", "──────────────────────────────────────");
-
-  content.sections.forEach((section, index) => {
-    lines.push(`${section.icon} ${section.title.toUpperCase()}`);
-    if (Array.isArray(section.command)) {
-      section.command.forEach((entry, entryIndex) => {
-        const prefix = entryIndex === 0 ? "Command:" : "         ";
-        lines.push(`${prefix} ${entry}`);
-      });
-    } else {
-      lines.push(`Command: ${section.command}`);
-    }
-    if (section.purpose) {
-      lines.push(`Purpose: ${section.purpose}`);
-    }
-    if (section.example) {
-      lines.push(`Example: ${section.example}`);
-    }
-    if (section.delivers) {
-      lines.push(`Delivers: ${section.delivers}`);
-    }
-    if (section.examples && section.examples.length) {
-      lines.push("Examples:");
-      section.examples.forEach((example) => lines.push(`• ${example}`));
-    }
-    lines.push("");
-    if (index !== content.sections.length - 1) {
-      lines.push("──────────────────────────────────────");
-    }
-  });
-
-  if (content.tips && content.tips.length) {
-    lines.push("──────────────────────────────────────", "💡 Tips");
-    content.tips.forEach((tip) => lines.push(`• ${tip}`));
-  }
-
-  return lines.join("\n");
-}
-
-function renderHelpGuide(content) {
-  const article = document.createElement("article");
-  article.className = "help-guide";
-
-  // Hero box (summary card)
-  const hero = document.createElement("section");
-  hero.className = "help-guide__hero";
-
-  const badge = document.createElement("div");
-  badge.className = "help-guide__badge";
-  badge.textContent = "📘";
-
-  const heroCopy = document.createElement("div");
-  heroCopy.className = "help-guide__hero-copy";
-
-  const title = document.createElement("h3");
-  title.className = "help-guide__title";
-  title.textContent = "Finalyze Copilot — Quick Reference";
-
-  const subtitle = document.createElement("p");
-  subtitle.className = "help-guide__subtitle";
-  subtitle.textContent = "Ask natural prompts and I will translate them into institutional-grade analysis.";
-
-  heroCopy.append(title, subtitle);
-  hero.append(badge, heroCopy);
-
-  // Search Form (similar to KPI Library)
-  const controls = document.createElement("div");
-  controls.className = "help-guide__filters";
-  
-  const searchGroup = document.createElement("div");
-  searchGroup.className = "help-guide__filter help-guide__filter--search";
-  const searchInput = document.createElement("input");
-  searchInput.type = "search";
-  searchInput.placeholder = "Search by command, purpose, or example";
-  searchInput.autocomplete = "off";
-  searchInput.className = "help-guide__search";
-  searchGroup.append(searchInput);
-  controls.append(searchGroup);
-
-  const categoryGroup = document.createElement("div");
-  categoryGroup.className = "help-guide__filter";
-  const categorySelect = document.createElement("select");
-  categorySelect.className = "help-guide__select";
-  categorySelect.innerHTML = `<option value="">All categories</option>`;
-  const categories = Array.from(
-    new Set(content.sections.map((section) => section.title || "").filter(Boolean))
-  ).sort((a, b) => a.localeCompare(b));
-  categories.forEach((category) => {
-    const option = document.createElement("option");
-    option.value = category;
-    option.textContent = category;
-    categorySelect.append(option);
-  });
-  categoryGroup.append(categorySelect);
-  controls.append(categoryGroup);
-
-  // Create sticky container for hero + filters
-  const stickyContainer = document.createElement("div");
-  stickyContainer.className = "help-guide__sticky-container";
-  stickyContainer.append(hero);
-  stickyContainer.append(controls);
-  article.append(stickyContainer);
-
-  const sectionGrid = document.createElement("div");
-  sectionGrid.className = "help-guide__grid";
-
-  // Filter function
-  const filterCards = () => {
-    const searchTerm = searchInput.value.toLowerCase().trim();
-    const selectedCategory = categorySelect.value;
-
-    const cards = sectionGrid.querySelectorAll(".help-guide__card");
-    let visibleCount = 0;
-
-    cards.forEach((card) => {
-      const title = card.querySelector(".help-guide__card-title")?.textContent || "";
-      const command = card.querySelector(".help-guide__value")?.textContent || "";
-      const purpose = Array.from(card.querySelectorAll(".help-guide__value")).map(el => el.textContent).join(" ") || "";
-      const examples = Array.from(card.querySelectorAll(".help-guide__list li")).map(el => el.textContent).join(" ") || "";
-      
-      const matchesSearch = !searchTerm || 
-        title.toLowerCase().includes(searchTerm) ||
-        command.toLowerCase().includes(searchTerm) ||
-        purpose.toLowerCase().includes(searchTerm) ||
-        examples.toLowerCase().includes(searchTerm);
-      
-      const matchesCategory = !selectedCategory || title === selectedCategory;
-
-      if (matchesSearch && matchesCategory) {
-        card.style.display = "";
-        visibleCount++;
-      } else {
-        card.style.display = "none";
-      }
-    });
-
-    // Show empty state if no cards visible
-    let emptyState = sectionGrid.querySelector(".help-guide__empty");
-    if (visibleCount === 0) {
-      if (!emptyState) {
-        emptyState = document.createElement("div");
-        emptyState.className = "help-guide__empty";
-        emptyState.textContent = "No results match your search.";
-        sectionGrid.append(emptyState);
-      }
-      emptyState.style.display = "";
-    } else if (emptyState) {
-      emptyState.style.display = "none";
-    }
-  };
-
-  searchInput.addEventListener("input", filterCards);
-  categorySelect.addEventListener("change", filterCards);
-
-  content.sections.forEach((section) => {
-    const card = document.createElement("section");
-    card.className = "help-guide__card";
-
-    const cardHeader = document.createElement("div");
-    cardHeader.className = "help-guide__card-header";
-
-    const icon = document.createElement("span");
-    icon.className = "help-guide__card-icon";
-    icon.textContent = section.icon;
-
-    const heading = document.createElement("h3");
-    heading.className = "help-guide__card-title";
-    heading.textContent = section.title;
-
-    cardHeader.append(icon, heading);
-    card.append(cardHeader);
-
-    appendHelpLine(card, "Command", section.command, { tokens: true });
-    appendHelpLine(card, "Purpose", section.purpose);
-    appendHelpLine(card, "Example", section.example);
-    appendHelpLine(card, "Delivers", section.delivers);
-
-    if (section.examples && section.examples.length) {
-      const examplesLabel = document.createElement("p");
-      examplesLabel.className = "help-guide__label help-guide__label--stack";
-      examplesLabel.textContent = "Examples";
-      card.append(examplesLabel);
-
-      const exampleList = document.createElement("ul");
-      exampleList.className = "help-guide__list";
-      section.examples.forEach((example) => {
-        const li = document.createElement("li");
-        li.textContent = example;
-        exampleList.append(li);
-      });
-      card.append(exampleList);
-    }
-
-    sectionGrid.append(card);
-  });
-
-  article.append(sectionGrid);
-
-  if (content.tips && content.tips.length) {
-    const tipsSection = document.createElement("section");
-    tipsSection.className = "help-guide__tips";
-
-    const tipsHeading = document.createElement("h3");
-    tipsHeading.className = "help-guide__tips-title";
-    tipsHeading.textContent = "💡 Tips";
-
-    const tipsList = document.createElement("ul");
-    tipsList.className = "help-guide__tips-list";
-    content.tips.forEach((tip) => {
-      const li = document.createElement("li");
-      li.textContent = tip;
-      tipsList.append(li);
-    });
-
-    tipsSection.append(tipsHeading, tipsList);
-    article.append(tipsSection);
-  }
-
-  return article;
-}
-
-function appendHelpLine(container, label, value, { tokens = false } = {}) {
-  if (!value) {
-    return;
-  }
-
-  const line = document.createElement("p");
-  line.className = "help-guide__line";
-
-  const labelEl = document.createElement("span");
-  labelEl.className = "help-guide__label";
-  labelEl.textContent = `${label}`;
-  line.append(labelEl);
-
-  if (Array.isArray(value) || tokens) {
-    const values = Array.isArray(value) ? value : [value];
-    const tokenGroup = document.createElement("div");
-    tokenGroup.className = "help-guide__tokens";
-    values.forEach((token) => {
-      const pill = document.createElement("span");
-      pill.className = "help-guide__token";
-      pill.textContent = token;
-      pill.setAttribute("role", "button");
-      pill.setAttribute("tabindex", "0");
-      pill.setAttribute("aria-label", `Use command: ${token}`);
-      pill.title = `Click to copy: ${token}`;
-      // Add click handler to copy command
-      pill.addEventListener("click", () => {
-        navigator.clipboard.writeText(token).then(() => {
-          const originalText = pill.textContent;
-          pill.textContent = "✓ Copied!";
-          pill.style.color = "#16a34a";
-          setTimeout(() => {
-            pill.textContent = originalText;
-            pill.style.color = "";
-          }, 1500);
-        }).catch(() => {
-          // Fallback: insert into chat input if available
-          const chatInput = document.querySelector("#chat-input, .chat-input, textarea[placeholder*='Ask']");
-          if (chatInput) {
-            chatInput.value = token;
-            chatInput.focus();
-            chatInput.dispatchEvent(new Event("input", { bubbles: true }));
-          }
-        });
-      });
-      tokenGroup.append(pill);
-    });
-    line.append(tokenGroup);
-  } else {
-    const valueEl = document.createElement("span");
-    valueEl.className = "help-guide__value";
-    valueEl.textContent = value;
-    line.append(valueEl);
-  }
-
-  container.append(line);
-}
-
-function refreshHelpArtifacts() {
-  HELP_TEXT = composeHelpText(getHelpContent());
-  HELP_GUIDE_HTML = renderHelpGuide(getHelpContent()).outerHTML;
-  if (UTILITY_SECTIONS.help) {
-    UTILITY_SECTIONS.help.html = HELP_GUIDE_HTML;
-  }
-  if (currentUtilityKey === "help" && utilityContent) {
-    utilityContent.innerHTML = HELP_GUIDE_HTML;
-  }
-}
-
-async function loadHelpContentOverrides() {
-  try {
-    const response = await fetch(`${API_BASE}/help-content`);
-    if (!response.ok) {
-      return;
-    }
-    const data = await response.json();
-    if (Array.isArray(data?.tips) && data.tips.length) {
-      const customTips = data.tips.map((tip) => `${tip}`.trim()).filter(Boolean);
-      if (customTips.length) {
-        HELP_TIPS = customTips;
-        refreshHelpArtifacts();
-      }
-    }
-  } catch (error) {
-    console.warn("Failed to load help tip overrides:", error);
-  }
-}
-
-
-
-function formatDisplayDate(value) {
-  if (!value) {
-    return "";
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return `${value}`;
-  }
-  return parsed.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function humaniseLabel(value) {
-  if (!value) {
-    return "";
-  }
-  return `${value}`
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function createList(items, className = "kpi-library__doc-list") {
-  const list = document.createElement("ul");
-  list.className = className;
-  (items || [])
-    .map((item) => (typeof item === "string" ? item.trim() : item))
-    .filter(Boolean)
-    .forEach((item) => {
-      const li = document.createElement("li");
-      li.textContent = `${item}`;
-      list.append(li);
-    });
-  return list;
-}
-
-function formatDirectionality(value) {
-  if (!value) {
-    return "";
-  }
-  const mapping = {
-    higher_is_better: "Higher is better",
-    lower_is_better: "Lower is better",
-    depends: "Depends",
-  };
-  return mapping[value] || humaniseLabel(value);
-}
-
-function formatPeriodLabel(value) {
-  if (!value) {
-    return "";
-  }
-  return `${value}`
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function formatTagName(tag) {
-  if (!tag) {
-    return "";
-  }
-  return `${tag}`
-    .replace(/[_-]+/g, " ")
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function formatFriendlyInput(input) {
-  if (!input || typeof input !== "object") {
-    return "";
-  }
-  const label = input.tag ? formatTagName(input.tag) : formatTagName(input.source);
-  const statement = input.statement ? humaniseLabel(input.statement) : "";
-  const derived = input.source === "derived" ? " (Derived)" : "";
-  const base = label ? `${label}${derived}` : statement;
-  if (base && statement) {
-    return `${base} (${statement})`;
-  }
-  return base || statement || "";
-}
-
-function formatTechnicalInput(input) {
-  if (!input || typeof input !== "object") {
-    return "";
-  }
-  const segments = [];
-  if (input.source) {
-    segments.push(`[${input.source}]`);
-  }
-  if (input.tag) {
-    segments.push(input.tag);
-  }
-  if (input.statement) {
-    segments.push(`(${input.statement})`);
-  }
-  if (Array.isArray(input.components) && input.components.length) {
-    segments.push(`components: ${input.components.join(", ")}`);
-  }
-  if (Array.isArray(input.fallbacks) && input.fallbacks.length) {
-    segments.push(`fallbacks: ${input.fallbacks.join(", ")}`);
-  }
-  return segments.join(" ").trim();
-}
-
-function createMetaBadge(label, value, directionality = null) {
-  if (!value) {
-    return null;
-  }
-  const badge = document.createElement("span");
-  badge.className = "kpi-library__meta-pill";
-  
-  // Add color coding for directionality
-  if (label === "Direction" && directionality) {
-    const colorClass = getDirectionalityColor(directionality);
-    badge.classList.add(colorClass);
-  }
-  
-  badge.textContent = `${label}: ${value}`;
-  return badge;
-}
-
-function getDirectionalityColor(directionality) {
-  switch (directionality) {
-    case "higher_is_better":
-      return "kpi-library__meta-pill--positive";
-    case "lower_is_better":
-      return "kpi-library__meta-pill--negative";
-    case "depends":
-      return "kpi-library__meta-pill--neutral";
-    case "neutral":
-      return "kpi-library__meta-pill--neutral";
-    default:
-      return "";
-  }
-}
-
-function createDocSection(label, content, options = {}) {
-  if (
-    content === undefined ||
-    content === null ||
-    (typeof content === "string" && !content.trim())
-  ) {
-    return null;
-  }
-  if (Array.isArray(content)) {
-    const filtered = content.map((entry) => (entry ? `${entry}`.trim() : "")).filter(Boolean);
-    if (!filtered.length) {
-      return null;
-    }
-    content = filtered;
-  }
-
-  const section = document.createElement("section");
-  section.className = "kpi-library__doc-section";
-
-  const heading = document.createElement("h6");
-  heading.className = "kpi-library__doc-label";
-  heading.textContent = label;
-  section.append(heading);
-
-  if (options.type === "code") {
-    const block = document.createElement("pre");
-    block.className = "kpi-library__formula";
-    const code = document.createElement("code");
-    code.textContent = `${content}`;
-    block.append(code);
-    section.append(block);
-    return section;
-  }
-
-  if (Array.isArray(content)) {
-    section.append(createList(content, options.listClass || "kpi-library__doc-list"));
-    return section;
-  }
-
-  if (typeof content === "object") {
-    const entries = Object.entries(content).map(
-      ([key, value]) => `${humaniseLabel(key)}: ${value}`
-    );
-    section.append(createList(entries, options.listClass || "kpi-library__doc-list"));
-    return section;
-  }
-
-  const paragraph = document.createElement("p");
-  paragraph.className = "kpi-library__doc-text";
-  paragraph.textContent = `${content}`;
-  section.append(paragraph);
-  return section;
-}
-
-function buildTechnicalDetails(kpi) {
-  const lines = [];
-  (kpi.inputs || []).forEach((input) => {
-    const descriptor = formatTechnicalInput(input);
-    if (descriptor) {
-      lines.push(`Input: ${descriptor}`);
-    }
-  });
-
-  if (kpi.parameters && Object.keys(kpi.parameters).length) {
-    lines.push(`Parameters: ${JSON.stringify(kpi.parameters)}`);
-  }
-  if (kpi.presentation && Object.keys(kpi.presentation).length) {
-    lines.push(`Presentation: ${JSON.stringify(kpi.presentation)}`);
-  }
-  if (Array.isArray(kpi.dimensions_supported) && kpi.dimensions_supported.length) {
-    lines.push(`Dimensions: ${kpi.dimensions_supported.join(", ")}`);
-  }
-  if (kpi.quality_notes) {
-    lines.push(`Quality notes: ${kpi.quality_notes}`);
-  }
-
-  const detailLines = lines.filter(Boolean);
-  if (!detailLines.length) {
-    return null;
-  }
-
-  const container = document.createElement("div");
-  container.className = "kpi-library__tech";
-
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "kpi-library__tech-toggle";
-  toggle.textContent = "Show technical tags ▸";
-
-  const body = document.createElement("div");
-  body.className = "kpi-library__tech-body";
-  body.hidden = true;
-  body.append(createList(detailLines, "kpi-library__tech-list"));
-
-  toggle.addEventListener("click", () => {
-    const isOpen = !body.hidden;
-    if (isOpen) {
-      body.hidden = true;
-      toggle.textContent = "Show technical tags ▸";
-      toggle.classList.remove("is-open");
-    } else {
-      body.hidden = false;
-      toggle.textContent = "Hide technical tags ▾";
-      toggle.classList.add("is-open");
-    }
-  });
-
-  container.append(toggle);
-  container.append(body);
-  return container;
-}
-
-async function loadKpiLibraryData() {
-  if (kpiLibraryCache) {
-    return kpiLibraryCache;
-  }
-  if (kpiLibraryLoadPromise) {
-    return kpiLibraryLoadPromise;
-  }
-  kpiLibraryLoadPromise = fetch(KPI_LIBRARY_PATH, { cache: "no-store" })
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`KPI library fetch failed (${response.status})`);
-      }
-      return response.json();
-    })
-    .then((data) => {
-      kpiLibraryCache = data;
-      return data;
-    })
-    .finally(() => {
-      kpiLibraryLoadPromise = null;
-    });
-  return kpiLibraryLoadPromise;
-}
-
-function buildKpiLibraryHero(data) {
-  const hero = document.createElement("section");
-  hero.className = "kpi-library__hero";
-
-  const badge = document.createElement("div");
-  badge.className = "kpi-library__badge";
-  badge.textContent = "📊";
-
-  const copy = document.createElement("div");
-  copy.className = "kpi-library__hero-copy";
-
-  const title = document.createElement("h3");
-  title.className = "kpi-library__title";
-  title.textContent = "KPI Library";
-
-  const subtitle = document.createElement("p");
-  subtitle.className = "kpi-library__subtitle";
-  subtitle.textContent =
-    "Standardised KPI definitions, formulas, and data lineage policies.";
-
-  const metaList = document.createElement("ul");
-  metaList.className = "kpi-library__meta";
-
-  copy.append(title);
-  copy.append(subtitle);
-
-  hero.append(badge);
-  hero.append(copy);
-  return hero;
-}
-
-// ============================================
-// FILE UPLOAD INITIALIZATION - RUNS IMMEDIATELY
-// ============================================
-console.log("🚀🚀🚀 [Upload] SCRIPT LOADED - FILE UPLOAD CODE IS RUNNING! 🚀🚀🚀");
-const API_BASE = window.API_BASE || "";
-const STORAGE_KEY = "finanlyzeos.chatHistory.v2";
-const LEGACY_STORAGE_KEYS = ["finanlyzeos.chatHistory.v1"];
-const ACTIVE_CONVERSATION_KEY = "finanlyzeos.activeConversationId";
-
-// Initialize file upload handler immediately - run at top level
-(function initFileUploadImmediate() {
-  console.log("🚀 [Upload] TOP LEVEL: Starting file upload initialization...");
-  console.log("🚀 [Upload] TOP LEVEL: Document ready state:", document.readyState);
-  
-  function tryInit() {
-    const { input, button } = getChatUploadElements();
-    console.log("🚀 [Upload] TOP LEVEL: Element check:", {
-      input: !!input,
-      button: !!button,
-      inputEl: input,
-      buttonEl: button
-    });
-    
-    if (input && button) {
-      console.log("🚀 [Upload] TOP LEVEL: ✅ Elements found! Setting up click handler...");
-      bindChatUploadHandlers("top-level");
-      
-      input.addEventListener("change", function(e) {
-        console.log("🚀 [Upload] TOP LEVEL: File selected:", e.target.files?.[0]?.name);
-        // The main handler will process this
-      });
-      
-      return true;
-    }
-    return false;
-  }
-  
-  // Try immediately
-  if (!tryInit()) {
-    // Retry on DOM ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function() {
-        console.log("🚀 [Upload] TOP LEVEL: DOMContentLoaded, retrying...");
-        tryInit();
-      });
-    } else {
-      setTimeout(function() {
-        console.log("🚀 [Upload] TOP LEVEL: Retrying after delay...");
-        tryInit();
-      }, 100);
-    }
-  }
-  
-  // Also try on window load
-  window.addEventListener('load', function() {
-    console.log("🚀 [Upload] TOP LEVEL: Window load, retrying...");
-    tryInit();
-  });
-})();
-
-(function cleanupLegacyStorage() {
-  try {
-    if (!window || !window.localStorage) {
-      return;
-    }
-    LEGACY_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
-  } catch (error) {
-    console.warn("Unable to clear legacy chat storage", error);
-  }
-})();
-
-const chatLog = document.getElementById("chat-log");
-const chatForm = document.getElementById("chat-form");
-const chatInput = document.getElementById("chat-input");
-const sendButton = document.getElementById("send-button");
-const scrollBtn = document.getElementById("scrollBtn");
-const statusDot = document.getElementById("api-status");
-const statusMessage = document.getElementById("status-message");
-const conversationList = document.getElementById("conversation-list");
-const navItems = document.querySelectorAll(".nav-item");
-const promptSuggestionsContainer = document.getElementById("prompt-suggestions");
-const conversationExportButtons = document.querySelectorAll(".chat-export-btn");
-const auditDrawer = document.getElementById("audit-drawer");
-const auditDrawerList = document.getElementById("audit-drawer-list");
-const auditDrawerStatus = document.getElementById("audit-drawer-status");
-const auditDrawerTitle = document.getElementById("audit-drawer-title");
-const auditDrawerDetail = document.getElementById("audit-drawer-detail");
-const chatSearchContainer = document.getElementById("chat-search");
-const chatSearchInput = document.getElementById("chat-search-input");
-const chatSearchClear = document.getElementById("chat-search-clear");
-const utilityPanel = document.getElementById("utility-panel");
-const utilityTitle = document.getElementById("utility-title");
-const utilityContent = document.getElementById("utility-content");
-const introPanel = document.getElementById("chat-intro");
-const chatPanel = document.querySelector(".chat-panel");
-const chatFormContainer = document.getElementById("chat-form");
-const savedSearchTrigger = document.querySelector("[data-action='search-saved']");
-const archivedToggleButton = document.querySelector("[data-action='toggle-archived']");
-
-const STREAM_STEP_MS = 18;
-const STREAM_MIN_SLICE = 2;
-const STREAM_MAX_SLICE = 24;
-const DEFAULT_PROMPT_SUGGESTIONS = [
-  "Summarise Q3 performance for AAPL, MSFT, and NVDA with key KPIs.",
-  "Show revenue CAGR, ROIC, and FCF margin trends for semiconductor peers.",
-  "Which tracked tickers triggered alerts in the past week and why?"
-];
-
-/**
- * Convert markdown text to HTML
- * @param {string} text - Raw markdown text
- * @returns {string} HTML string
- */
-function renderMarkdown(text) {
-  if (!text) {
-    return "";
-  }
-
-  const escapeHtml = (value) =>
-    value
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-  const escapeAttribute = (value) =>
-    value.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-
-  const processInline = (value) => {
-    if (!value) {
-      return "";
-    }
-
-    let working = value;
-
-    const codeTokens = [];
-    working = working.replace(/`([^`]+)`/g, (match, code) => {
-      codeTokens.push(code);
-      return `\uE000${codeTokens.length - 1}\uE000`;
-    });
-
-    working = working.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, textValue, urlValue) => {
-      const rawUrl = urlValue.trim();
-      if (!rawUrl) {
-        return textValue;
-      }
-      const safeUrl = escapeAttribute(rawUrl);
-      const href = /^([a-z][a-z\d+\-.]*:|\/\/)/i.test(safeUrl) ? safeUrl : `https://${safeUrl}`;
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${textValue}</a>`;
-    });
-
-    working = working.replace(
-      /(^|[\s>])((?:https?:\/\/|www\.)[^\s<]+)(?=$|[\s<])/gi,
-      (match, prefix, urlValue) => {
-        const safeUrl = escapeAttribute(urlValue);
-        const href = /^https?:\/\//i.test(safeUrl) ? safeUrl : `https://${safeUrl}`;
-        return `${prefix}<a href="${href}" target="_blank" rel="noopener noreferrer">${urlValue}</a>`;
-      }
-    );
-
-    working = working.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    working = working.replace(/__([^_]+)__/g, "<strong>$1</strong>");
-    working = working.replace(/~~([^~]+)~~/g, "<del>$1</del>");
-    working = working.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-    working = working.replace(/_([^_]+)_/g, "<em>$1</em>");
-
-    working = working.replace(/\uE000(\d+)\uE000/g, (match, indexValue) => {
-      const idx = Number(indexValue);
-      const codeText = codeTokens[idx] || "";
-      return `<code>${codeText}</code>`;
-    });
-
-    return working;
-  };
-
-  const lines = escapeHtml(text).split(/\r?\n/);
-
-  const html = [];
-  const listStack = [];
-
-  let inParagraph = false;
-  let paragraphHasContent = false;
-  let inBlockquote = false;
-  let inCodeBlock = false;
-  let codeLang = "";
-  const codeBuffer = [];
-
-  const closeParagraph = () => {
-    if (inParagraph) {
-      html.push("</p>");
-      inParagraph = false;
-      paragraphHasContent = false;
-    }
-  };
-
-  const closeListsToIndent = (indent) => {
-    while (listStack.length && listStack[listStack.length - 1].indent > indent) {
-      const { type } = listStack.pop();
-      html.push(`</${type}>`);
-    }
-  };
-
-  const closeAllLists = () => {
-    closeListsToIndent(-1);
-  };
-
-  const ensureList = (type, indent) => {
-    const current = listStack[listStack.length - 1];
-    if (!current || current.indent < indent) {
-      html.push(`<${type}>`);
-      listStack.push({ type, indent });
-      return;
-    }
-    if (current.indent === indent && current.type !== type) {
-      html.push(`</${current.type}>`);
-      listStack.pop();
-      html.push(`<${type}>`);
-      listStack.push({ type, indent });
-    }
-  };
-
-  const flushCodeBlock = () => {
-    const code = codeBuffer.join("\n");
-    const languageClass = codeLang ? ` class="language-${codeLang}"` : "";
-    html.push(`<pre><code${languageClass}>${code}</code></pre>`);
-    codeBuffer.length = 0;
-    codeLang = "";
-  };
-
-  for (let index = 0; index < lines.length; index += 1) {
-    let line = lines[index];
-
-    if (inCodeBlock) {
-      if (/^\s*```/.test(line)) {
-        flushCodeBlock();
-        inCodeBlock = false;
-      } else {
-        codeBuffer.push(line);
-      }
-      continue;
-    }
-
-    const fenceMatch = line.match(/^\s*```(\w+)?\s*$/);
-    if (fenceMatch) {
-      closeParagraph();
-      closeAllLists();
-      const language = fenceMatch[1] ? fenceMatch[1].trim().toLowerCase() : "";
-      inCodeBlock = true;
-      codeLang = language;
-      continue;
-    }
-
-    if (line.trim() === "") {
-      closeParagraph();
-      continue;
-    }
-
-    const blockquoteMatch = line.match(/^\s*> ?(.*)$/);
-    if (blockquoteMatch) {
-      if (!inBlockquote) {
-        closeParagraph();
-        closeAllLists();
-        html.push("<blockquote>");
-        inBlockquote = true;
-      }
-      line = blockquoteMatch[1];
-    } else if (inBlockquote) {
-      closeParagraph();
-      closeAllLists();
-      html.push("</blockquote>");
-      inBlockquote = false;
-      index -= 1;
-      continue;
-    }
-
-    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
-    if (headingMatch) {
-      closeParagraph();
-      closeAllLists();
-      const level = headingMatch[1].length;
-      html.push(`<h${level}>${processInline(headingMatch[2].trim())}</h${level}>`);
-      continue;
-    }
-
-    const hrMatch = line.trim().match(/^([-*_])(?:\s*\1){2,}$/);
-    if (hrMatch) {
-      closeParagraph();
-      closeAllLists();
-      html.push("<hr />");
-      continue;
-    }
-
-    const listMatch = line.match(/^(\s*)([-+*]|\d+\.)\s+(.*)$/);
-    if (listMatch) {
-      const indent = listMatch[1].replace(/\t/g, "    ").length;
-      const marker = listMatch[2];
-      const content = listMatch[3];
-
-      closeParagraph();
-      closeListsToIndent(indent);
-
-      const type = marker.endsWith(".") ? "ol" : "ul";
-      ensureList(type, indent);
-
-      html.push("<li>");
-      html.push(processInline(content.trim()));
-      html.push("</li>");
-      continue;
-    }
-
-    if (listStack.length) {
-      closeParagraph();
-      closeAllLists();
-    }
-
-    if (!inParagraph) {
-      html.push("<p>");
-      inParagraph = true;
-      paragraphHasContent = false;
-    }
-
-    const content = processInline(line.trim());
-    if (paragraphHasContent && content) {
-      html.push(" ");
-    }
-    if (content) {
-      html.push(content);
-      paragraphHasContent = true;
-    }
-  }
-
-  if (inCodeBlock) {
-    flushCodeBlock();
-  }
-
-  closeParagraph();
-  closeAllLists();
-  if (inBlockquote) {
-    closeParagraph();
-    closeAllLists();
-    html.push("</blockquote>");
-  }
-
-  return html.join("");
-}
-let activePromptSuggestions = [...DEFAULT_PROMPT_SUGGESTIONS];
-const FOLLOW_UP_SUGGESTION_LIBRARY = {
-  Growth: "Which peers are pacing the fastest quarter-over-quarter growth versus consensus?",
-  Revenue: "Break revenue down by segment with multi-year CAGR for each tracked ticker.",
-  Margin: "Compare gross and operating margins against peers over the trailing four quarters.",
-  Earnings: "Summarise EPS surprises and guidance changes across the peer set.",
-  "Cash Flow": "Analyse free-cash-flow conversion and working capital movements this year.",
-  Valuation: "Benchmark valuation multiples versus sector medians and the three-year average.",
-  Leverage: "Show leverage ratios and interest coverage versus covenant targets.",
-  Market: "Highlight market share shifts and relative price performance over the last month.",
-  Snapshot: "Generate a KPI snapshot that I can paste into an investment memo.",
-  KPI: "List the KPI definitions and calculation lineage referenced in this analysis."
-};
-const MAX_PROMPT_SUGGESTIONS = 5;
-const ALERT_PREFS_KEY = "finanlyzeos.alertPreferences";
-const DEFAULT_ALERT_PREFERENCES = {
-  digest: "immediate",
-  quietHours: {
-    enabled: false,
-    start: "22:00",
-    end: "07:00",
-  },
-  types: {
-    filings: { enabled: true, mandatory: true },
-    metricDelta: { enabled: true, threshold: 10 },
-    dataQuality: { enabled: true },
-  },
-  channels: {
-    email: { enabled: true, address: "" },
-    slack: { enabled: false, webhook: "" },
-  },
-};
-const PREFERS_REDUCED_MOTION = (() => {
-  try {
-    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  } catch (error) {
-    return false;
-  }
-})();
-
-const TICKER_STOPWORDS = new Set([
-  "THE",
-  "AND",
-  "WITH",
-  "KPI",
-  "EPS",
-  "ROE",
-  "FCF",
-  "PE",
-  "TSR",
-  "LTM",
-  "FY",
-  "API",
-  "DATA",
-  "THIS",
-  "THAT",
-  "YOY",
-  "TTM",
-  "GROWTH",
-  "METRIC",
-  "METRICS",
-  "SUMMARY",
-  "REPORT",
-  "SCENARIO",
-  "K",
-]);
-
-let reportMenu = null;
-let projectMenu = null;
-let activeMenuConversationId = null;
-let activeMenuAnchor = null;
-let shareModalBackdrop = null;
-let shareModalElement = null;
-let shareToggleInput = null;
-let shareStatusTextEl = null;
-let shareStatusSubTextEl = null;
-let shareLinkInput = null;
-let shareCopyButton = null;
-let sharePrimaryButton = null;
-let shareCancelButton = null;
-let shareModalConversationId = null;
-let toastContainer = null;
-const toastTimeouts = new Map();
-const PROMPT_CACHE_LIMIT = 32;
-const PROMPT_CACHE_TTL_MS = 3 * 60 * 1000;
-const promptCache = new Map();
-const topBar = document.querySelector(".top-bar");
-const PROGRESS_POLL_INTERVAL_MS = 750;
-const progressTrackers = new Map();
-
-// Rotating placeholder for hero (no chips)
-const PLACEHOLDERS = [
-  "Ask anything about tickers or metrics…",
-  "Compare two companies…",
-  "Request a KPI table or explain a metric…",
-];
-let placeholderTimer = null;
-let placeholderIndex = 0;
-let hasNewSinceScroll = false;
-let lastFocusedBeforeAudit = null;
-let auditAbortController = null;
-let auditDrawerEvents = [];
-let auditActiveEventIndex = -1;
-
-function startPlaceholderRotation() {
-  stopPlaceholderRotation();
-  if (!chatInput) {
-    return;
-  }
-  chatInput.placeholder = PLACEHOLDERS[0];
-  placeholderTimer = window.setInterval(() => {
-    if (!chatInput) {
-      return;
-    }
-    if (document.activeElement === chatInput) {
-      return; // don't rotate while typing/focused
-    }
-    if (chatInput.value && chatInput.value.trim().length > 0) {
-      return; // keep when user has typed
-    }
-    placeholderIndex = (placeholderIndex + 1) % PLACEHOLDERS.length;
-    chatInput.placeholder = PLACEHOLDERS[placeholderIndex];
-  }, 5000);
-}
-
-function stopPlaceholderRotation() {
-  if (placeholderTimer) {
-    window.clearInterval(placeholderTimer);
-    placeholderTimer = null;
-  }
-}
-
-// Textarea auto-grow: up to 4 lines, cap at 6 lines then scroll
-function autoResizeTextarea() {
-  if (!chatInput) return;
-  const style = window.getComputedStyle(chatInput);
-  const lineHeight = parseFloat(style.lineHeight) || 22;
-  const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
-  const minHeight = 48;
-  const maxAutoLines = 4;
-  const maxLines = 6;
-  chatInput.style.height = "auto";
-  const content = chatInput.scrollHeight;
-  const maxAuto = maxAutoLines * lineHeight + paddingY;
-  const hardMax = maxLines * lineHeight + paddingY;
-  const next = Math.min(Math.max(content, minHeight), hardMax);
-  chatInput.style.height = `${next}px`;
-  chatInput.style.overflowY = next >= hardMax ? "auto" : "hidden";
-}
-const COMPLETE_STAGE_HINTS = [
-  "_complete",
-  "_ready",
-  "cache_hit",
-  "cache_miss",
-  "cache_store",
-  "cache_skip",
-  "summary_cache_hit",
-  "summary_build_complete",
-  "context_sources_ready",
-  "context_sources_empty",
-  "summary_unavailable",
-  "finalize",
-  "help_complete",
-  "complete",
-];
-const PROGRESS_BLUEPRINT = [
-  {
-    key: "intent",
-    label: "Understand request",
-    matches(stage) {
-      if (!stage) {
-        return false;
-      }
-      return (
-        stage.startsWith("intent") ||
-        stage === "help_lookup" ||
-        stage === "help_complete"
-      );
-    },
-  },
-  {
-    key: "cache",
-    label: "Check recent answers",
-    matches(stage) {
-      if (!stage) {
-        return false;
-      }
-      return stage.startsWith("cache");
-    },
-  },
-  {
-    key: "context",
-    label: "Gather context",
-    matches(stage) {
-      if (!stage) {
-        return false;
-      }
-      return (
-        stage.startsWith("context") ||
-        stage.startsWith("summary") ||
-        stage.startsWith("metrics") ||
-        stage.startsWith("ticker")
-      );
-    },
-  },
-  {
-    key: "compose",
-    label: "Compose explanation",
-    matches(stage) {
-      if (!stage) {
-        return false;
-      }
-      return (
-        stage.startsWith("llm") ||
-        stage === "fallback" ||
-        stage === "finalize" ||
-        stage === "complete"
-      );
-    },
-  },
-];
-let companyUniverseData = [];
-let filteredCompanyData = [];
-let companyUniverseMetrics = null;
-let companyUniverseTable = null;
-let companyUniverseEmpty = null;
-let companyUniverseSkeleton = null;
-let companySearchInput = null;
-let companySectorSelect = null;
-let companyCoverageSelect = null;
-let companyUniverseMetaUniverse = null;
-let companyUniverseMetaSectors = null;
-let companyUniverseMetaLatest = null;
-let companyUniverseMetaCoverage = null;
-
-const KPI_LIBRARY_PATH = "/static/data/kpi_library.json";
-const COMPANY_UNIVERSE_PATH = "/static/data/company_universe.json";
-const SETTINGS_STORAGE_KEY = "finanlyzeos.userSettings.v1";
-let kpiLibraryCache = null;
-let kpiLibraryLoadPromise = null;
-let companyUniversePromise = null;
-
-const METRIC_KEYWORD_MAP = [
-  { regex: /\bgrowth|cagr|yoy\b/i, label: "Growth" },
-  { regex: /\brevenue\b/i, label: "Revenue" },
-  { regex: /\bmargin\b/i, label: "Margin" },
-  { regex: /\bearnings|\beps\b/i, label: "Earnings" },
-  { regex: /\bcash\s*flow|\bcf\b/i, label: "Cash Flow" },
-  { regex: /\bvaluation|\bp\/?e\b|\bmultiple\b/i, label: "Valuation" },
-  { regex: /\bleverage|\bdebt\b/i, label: "Leverage" },
-  { regex: /\bsummary|\bmovers|\bmarket\b/i, label: "Market" },
-  { regex: /\bfact|\bsnapshot\b/i, label: "Snapshot" },
-  { regex: /\bmetric|\bkpi\b/i, label: "KPI" },
-];
-
-const RECENT_PROJECTS = ["Benchmark Coverage", "AI Research Notes", "Sector Watchlist"];
-const INTENT_LABELS = {
-  compare: "Comparison",
-  metric: "KPI Report",
-  fact: "Fact Sheet",
-  summarize: "Market Summary",
-  scenario: "Scenario Analysis",
-  insight: "Insight",
-};
-
-const DEFAULT_USER_SETTINGS = {
-  apiKey: "",
-  dataSources: {
-    edgar: true,
-    yahoo: true,
-    bloomberg: false,
-  },
-  refreshSchedule: "daily",
-  aiModel: "gpt-4o-mini",
-  exportFormats: {
-    pdf: true,
-    excel: true,
-    markdown: false,
-  },
-  locale: "en-US",
-  timezone: "UTC",
-  currency: "USD",
-  compliance: "standard",
-};
-
-function loadUserSettings() {
-  try {
-    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) {
-      return JSON.parse(JSON.stringify(DEFAULT_USER_SETTINGS));
-    }
-    const parsed = JSON.parse(raw);
-    return {
-      ...DEFAULT_USER_SETTINGS,
-      ...parsed,
-      dataSources: {
-        ...DEFAULT_USER_SETTINGS.dataSources,
-        ...(parsed?.dataSources || {}),
-      },
-      exportFormats: {
-        ...DEFAULT_USER_SETTINGS.exportFormats,
-        ...(parsed?.exportFormats || {}),
-      },
-    };
-  } catch (error) {
-    console.warn("Unable to load user settings from storage", error);
-    return JSON.parse(JSON.stringify(DEFAULT_USER_SETTINGS));
-  }
-}
-
-function saveUserSettings(settings) {
-  try {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-  } catch (error) {
-    console.error("Unable to persist user settings", error);
-    throw error;
-  }
-}
-
-function cloneAlertDefaults() {
-  try {
-    // structuredClone is not available in older browsers, fall back to JSON copy.
-    return typeof structuredClone === "function"
-      ? structuredClone(DEFAULT_ALERT_PREFERENCES)
-      : JSON.parse(JSON.stringify(DEFAULT_ALERT_PREFERENCES));
-  } catch (error) {
-    return JSON.parse(JSON.stringify(DEFAULT_ALERT_PREFERENCES));
-  }
-}
-
-function loadAlertPreferences() {
-  try {
-    const raw = localStorage.getItem(ALERT_PREFS_KEY);
-    if (!raw) {
-      return cloneAlertDefaults();
-    }
-    const parsed = JSON.parse(raw);
-    const defaults = cloneAlertDefaults();
-    return {
-      ...defaults,
-      ...parsed,
-      digest: parsed?.digest || defaults.digest,
-      quietHours: {
-        ...defaults.quietHours,
-        ...(parsed?.quietHours || {}),
-      },
-      types: {
-        ...defaults.types,
-        ...(parsed?.types || {}),
-      },
-      channels: {
-        ...defaults.channels,
-        ...(parsed?.channels || {}),
-      },
-    };
-  } catch (error) {
-    console.warn("Unable to load alert preferences from storage", error);
-    return cloneAlertDefaults();
-  }
-}
-
-function saveAlertPreferences(preferences) {
-  try {
-    localStorage.setItem(ALERT_PREFS_KEY, JSON.stringify(preferences));
-  } catch (error) {
-    console.error("Unable to persist alert preferences", error);
-    throw error;
-  }
-}
-
-function renderAlertPreview(previewEl, preferences) {
-  if (!previewEl) {
-    return;
-  }
-  const prefs = preferences || cloneAlertDefaults();
-  previewEl.innerHTML = "";
-
-  const heading = document.createElement("strong");
-  heading.textContent = "What you'll receive";
-  previewEl.append(heading);
-
-  const items = document.createElement("ul");
-  const activeTypes = [];
-  if (prefs.types.filings?.enabled) {
-    activeTypes.push("New SEC filing events for tracked tickers.");
-  }
-  if (prefs.types.metricDelta?.enabled) {
-    const threshold = Number(prefs.types.metricDelta.threshold) || DEFAULT_ALERT_PREFERENCES.types.metricDelta.threshold;
-    activeTypes.push(`Metric change alerts above ${threshold}% delta.`);
-  }
-  if (prefs.types.dataQuality?.enabled) {
-    activeTypes.push("Data quality failures or ingestion retries.");
-  }
-  if (!activeTypes.length) {
-    activeTypes.push("No proactive alerts are currently enabled.");
-  }
-  activeTypes.forEach((line) => {
-    const li = document.createElement("li");
-    li.textContent = line;
-    items.append(li);
-  });
-  previewEl.append(items);
-
-  const channels = [];
-  if (prefs.channels.email?.enabled) {
-    const address = prefs.channels.email.address || "Add an email address";
-    channels.push(`Email → ${address}`);
-  }
-  if (prefs.channels.slack?.enabled) {
-    channels.push("Slack webhook");
-  }
-  if (!channels.length) {
-    channels.push("No delivery channels enabled.");
-  }
-  const channelLine = document.createElement("p");
-  channelLine.textContent = `Channels: ${channels.join(", ")}`;
-  previewEl.append(channelLine);
-
-  const digestLabel = {
-    immediate: "Deliver immediately",
-    daily: "Daily digest (8:00 AM)",
-    weekly: "Weekly digest (Monday 8:00 AM)",
-  }[prefs.digest] || "Deliver immediately";
-
-  const digestLine = document.createElement("p");
-  digestLine.textContent = `Cadence: ${digestLabel}`;
-  previewEl.append(digestLine);
-
-  const quietLine = document.createElement("p");
-  quietLine.textContent = prefs.quietHours?.enabled
-    ? `Quiet hours: ${prefs.quietHours.start || "22:00"} – ${prefs.quietHours.end || "07:00"}`
-    : "Quiet hours disabled.";
-  previewEl.append(quietLine);
-}
-function renderAlertSettingsSection({ container } = {}) {
-  if (!container) {
-    return;
-  }
-
-  const preferences = loadAlertPreferences();
-  container.innerHTML = `
-    <form class="alert-settings" data-role="alert-settings-form" novalidate>
-      <fieldset class="alert-settings__section">
-        <legend>Alert types</legend>
-        <p class="alert-settings__description">Choose which events raise notifications for your workspace.</p>
-        <div class="alert-settings__grid">
-          <label class="alert-settings__toggle" data-role="alert-type-filings">
-            <input type="checkbox" name="alerts.filings" disabled />
-            <span>New SEC filing ingested</span>
-            <small>Mandatory for audit coverage.</small>
-          </label>
-          <label class="alert-settings__toggle">
-            <input type="checkbox" name="alerts.metricDelta" />
-            <span>Metric change above threshold</span>
-            <small>Triggered when KPI delta exceeds your configured limit.</small>
-          </label>
-          <label class="alert-settings__toggle">
-            <input type="checkbox" name="alerts.dataQuality" />
-            <span>Data quality issue detected</span>
-            <small>Heads-up when ingestion or QA checks fail.</small>
-          </label>
-        </div>
-        <div class="alert-settings__field">
-          <span>Metric delta threshold (%)</span>
-          <input
-            type="number"
-            name="alerts.metricDeltaThreshold"
-            min="1"
-            max="100"
-            step="1"
-            inputmode="numeric"
-            aria-describedby="metric-threshold-help"
-          />
-          <small id="metric-threshold-help" class="alert-settings__description">Alerts fire when absolute change exceeds this value.</small>
-        </div>
-      </fieldset>
-      <fieldset class="alert-settings__section">
-        <legend>Delivery channels</legend>
-        <p class="alert-settings__description">Route alerts to your preferred communication channels.</p>
-        <div class="alert-settings__channels">
-          <div class="alert-settings__channel" data-channel="email">
-            <label class="alert-settings__toggle">
-              <input type="checkbox" name="channel.email.enabled" />
-              <span>Email (SES)</span>
-              <small>Distribute alerts to analysts or coverage aliases.</small>
-            </label>
-            <div class="alert-settings__field">
-              <span>Email address</span>
-              <input type="email" name="channel.email.address" placeholder="name@company.com" autocomplete="email" />
-            </div>
-          </div>
-          <div class="alert-settings__channel" data-channel="slack">
-            <label class="alert-settings__toggle">
-              <input type="checkbox" name="channel.slack.enabled" />
-              <span>Slack webhook</span>
-              <small>Post alerts into a shared #finalyze channel.</small>
-            </label>
-            <div class="alert-settings__field">
-              <span>Webhook URL</span>
-              <input type="url" name="channel.slack.webhook" placeholder="https://hooks.slack.com/..." inputmode="url" />
-            </div>
-          </div>
-        </div>
-      </fieldset>
-      <fieldset class="alert-settings__section">
-        <legend>Cadence & quiet hours</legend>
-        <div class="alert-settings__grid">
-          <div class="alert-settings__field">
-            <span>Digest cadence</span>
-            <select name="alerts.digest">
-              <option value="immediate">Send immediately</option>
-              <option value="daily">Daily summary</option>
-              <option value="weekly">Weekly digest</option>
-            </select>
-          </div>
-          <div class="alert-settings__field">
-            <label class="alert-settings__toggle">
-              <input type="checkbox" name="alerts.quiet.enabled" />
-              <span>Respect quiet hours</span>
-              <small>Pause notifications between the times below.</small>
-            </label>
-            <div class="alert-settings__grid">
-              <div class="alert-settings__field">
-                <span>Quiet hours start</span>
-                <input type="time" name="alerts.quiet.start" />
-              </div>
-              <div class="alert-settings__field">
-                <span>Quiet hours end</span>
-                <input type="time" name="alerts.quiet.end" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </fieldset>
-      <div class="alert-settings__actions">
-        <button type="submit">Save preferences</button>
-        <button type="button" data-role="alert-reset">Reset to defaults</button>
-      </div>
-      <p class="alert-settings__status" data-role="alert-status" aria-live="polite"></p>
-      <div class="alert-settings__preview" data-role="alert-preview"></div>
-    </form>
-  `;
-
-  const form = container.querySelector("[data-role='alert-settings-form']");
-  if (!form) {
-    return;
-  }
-
-  const statusEl = form.querySelector("[data-role='alert-status']");
-  const resetButton = form.querySelector("[data-role='alert-reset']");
-  const previewEl = form.querySelector("[data-role='alert-preview']");
-  const channelContainers = {
-    email: form.querySelector("[data-channel='email']"),
-    slack: form.querySelector("[data-channel='slack']"),
-  };
-
-  const controls = {
-    filings: form.querySelector("[name='alerts.filings']"),
-    metricDelta: form.querySelector("[name='alerts.metricDelta']"),
-    metricDeltaThreshold: form.querySelector("[name='alerts.metricDeltaThreshold']"),
-    dataQuality: form.querySelector("[name='alerts.dataQuality']"),
-    digest: form.querySelector("[name='alerts.digest']"),
-    quietEnabled: form.querySelector("[name='alerts.quiet.enabled']"),
-    quietStart: form.querySelector("[name='alerts.quiet.start']"),
-    quietEnd: form.querySelector("[name='alerts.quiet.end']"),
-    emailEnabled: form.querySelector("[name='channel.email.enabled']"),
-    emailAddress: form.querySelector("[name='channel.email.address']"),
-    slackEnabled: form.querySelector("[name='channel.slack.enabled']"),
-    slackWebhook: form.querySelector("[name='channel.slack.webhook']"),
-  };
-
-  const applyPreferences = (prefs) => {
-    controls.filings.checked = true;
-    controls.metricDelta.checked = Boolean(prefs.types.metricDelta?.enabled);
-    controls.metricDeltaThreshold.value = Number(prefs.types.metricDelta?.threshold ?? DEFAULT_ALERT_PREFERENCES.types.metricDelta.threshold);
-    controls.dataQuality.checked = Boolean(prefs.types.dataQuality?.enabled);
-    controls.digest.value = prefs.digest || DEFAULT_ALERT_PREFERENCES.digest;
-    controls.quietEnabled.checked = Boolean(prefs.quietHours?.enabled);
-    controls.quietStart.value = prefs.quietHours?.start || DEFAULT_ALERT_PREFERENCES.quietHours.start;
-    controls.quietEnd.value = prefs.quietHours?.end || DEFAULT_ALERT_PREFERENCES.quietHours.end;
-    controls.emailEnabled.checked = Boolean(prefs.channels.email?.enabled);
-    controls.emailAddress.value = prefs.channels.email?.address || "";
-    controls.slackEnabled.checked = Boolean(prefs.channels.slack?.enabled);
-    controls.slackWebhook.value = prefs.channels.slack?.webhook || "";
-    syncQuietHours();
-    syncChannelState();
-    syncMetricThresholdState();
-    renderAlertPreview(previewEl, prefs);
-  };
-
-  const clampThreshold = (value) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-      return DEFAULT_ALERT_PREFERENCES.types.metricDelta.threshold;
-    }
-    return Math.min(100, Math.max(1, Math.round(numeric)));
-  };
-
-  const collectPreferences = () => {
-    const next = cloneAlertDefaults();
-    next.types.metricDelta.enabled = Boolean(controls.metricDelta.checked);
-    next.types.metricDelta.threshold = clampThreshold(controls.metricDeltaThreshold.value);
-    next.types.dataQuality.enabled = Boolean(controls.dataQuality.checked);
-    next.digest = controls.digest.value || DEFAULT_ALERT_PREFERENCES.digest;
-    next.quietHours.enabled = Boolean(controls.quietEnabled.checked);
-    next.quietHours.start = controls.quietStart.value || DEFAULT_ALERT_PREFERENCES.quietHours.start;
-    next.quietHours.end = controls.quietEnd.value || DEFAULT_ALERT_PREFERENCES.quietHours.end;
-    next.channels.email.enabled = Boolean(controls.emailEnabled.checked);
-    next.channels.email.address = controls.emailAddress.value.trim();
-    next.channels.slack.enabled = Boolean(controls.slackEnabled.checked);
-    next.channels.slack.webhook = controls.slackWebhook.value.trim();
-    controls.metricDeltaThreshold.value = next.types.metricDelta.threshold;
-    return next;
-  };
-
-  const showStatus = (message, tone = "info") => {
-    if (!statusEl) {
-      return;
-    }
-    statusEl.textContent = message;
-    statusEl.dataset.tone = tone;
-  };
-
-  const syncChannelState = () => {
-    const emailEnabled = Boolean(controls.emailEnabled?.checked);
-    const slackEnabled = Boolean(controls.slackEnabled?.checked);
-    if (controls.emailAddress) {
-      controls.emailAddress.disabled = !emailEnabled;
-    }
-    if (controls.slackWebhook) {
-      controls.slackWebhook.disabled = !slackEnabled;
-    }
-    if (channelContainers.email) {
-      channelContainers.email.classList.toggle("alert-settings__channel-disabled", !emailEnabled);
-    }
-    if (channelContainers.slack) {
-      channelContainers.slack.classList.toggle("alert-settings__channel-disabled", !slackEnabled);
-    }
-  };
-
-  const syncQuietHours = () => {
-    const enabled = Boolean(controls.quietEnabled?.checked);
-    if (controls.quietStart) {
-      controls.quietStart.disabled = !enabled;
-    }
-    if (controls.quietEnd) {
-      controls.quietEnd.disabled = !enabled;
-    }
-  };
-
-  const syncMetricThresholdState = () => {
-    if (!controls.metricDeltaThreshold) {
-      return;
-    }
-    const enabled = Boolean(controls.metricDelta?.checked);
-    controls.metricDeltaThreshold.disabled = !enabled;
-  };
-
-  applyPreferences(preferences);
-
-  controls.emailEnabled?.addEventListener("change", () => {
-    syncChannelState();
-    renderAlertPreview(previewEl, collectPreferences());
-  });
-  controls.slackEnabled?.addEventListener("change", () => {
-    syncChannelState();
-    renderAlertPreview(previewEl, collectPreferences());
-  });
-  controls.quietEnabled?.addEventListener("change", () => {
-    syncQuietHours();
-    renderAlertPreview(previewEl, collectPreferences());
-  });
-  controls.metricDelta?.addEventListener("change", () => {
-    syncMetricThresholdState();
-    renderAlertPreview(previewEl, collectPreferences());
-  });
-
-  form.addEventListener("input", (event) => {
-    if (event.target === controls.metricDeltaThreshold) {
-      controls.metricDeltaThreshold.value = controls.metricDeltaThreshold.value.slice(0, 3);
-    }
-    if (statusEl) {
-      statusEl.textContent = "";
-      delete statusEl.dataset.tone;
-    }
-    renderAlertPreview(previewEl, collectPreferences());
-  });
-
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const next = collectPreferences();
-    try {
-      saveAlertPreferences(next);
-      showStatus("Alert preferences saved.", "success");
-      renderAlertPreview(previewEl, next);
-    } catch (error) {
-      showStatus("Unable to save alert preferences. Try again.", "error");
-    }
-  });
-
-  resetButton?.addEventListener("click", (event) => {
-    event.preventDefault();
-    const defaults = cloneAlertDefaults();
-    applyPreferences(defaults);
-    try {
-      saveAlertPreferences(defaults);
-      showStatus("Alert preferences reset to defaults.", "success");
-    } catch (error) {
-      showStatus("Unable to reset alert preferences.", "error");
-    }
-    renderAlertPreview(previewEl, defaults);
-  });
-}
-
-function generateRequestId() {
-  if (window.crypto?.randomUUID) {
-    return window.crypto.randomUUID();
-  }
-  return `req_${Date.now().toString(16)}_${Math.random().toString(16).slice(2, 10)}`;
-}
-
-function formatElapsed(milliseconds) {
-  if (typeof milliseconds !== "number" || Number.isNaN(milliseconds)) {
-    return null;
-  }
-  if (milliseconds < 1000) {
-    return `${Math.max(0, milliseconds).toFixed(0)} ms`;
-  }
-  if (milliseconds < 10000) {
-    return `${(milliseconds / 1000).toFixed(1)} s`;
-  }
-  return `${Math.round(milliseconds / 1000)} s`;
-}
-
-function createProgressSteps() {
-  return PROGRESS_BLUEPRINT.map(({ key, label }) => ({
-    key,
-    label,
-    status: "pending",
-    detail: "",
-    messages: [],
-  }));
-}
-
-function stepStatusFromStage(stage) {
-  if (!stage) {
-    return "pending";
-  }
-  if (stage === "error") {
-    return "error";
-  }
-  if (stage === "complete" || COMPLETE_STAGE_HINTS.some((hint) => stage.includes(hint))) {
-    return "complete";
-  }
-  return "active";
-}
-
-function findStepKeyForStage(stage) {
-  if (!stage) {
-    return null;
-  }
-  const match = PROGRESS_BLUEPRINT.find((entry) => entry.matches(stage));
-  return match ? match.key : null;
-}
-
-async function renderCompanyUniverseSection({ container } = {}) {
-  if (!container) {
-    return;
-  }
-
-  companyUniverseMetrics = null;
-  companyUniverseTable = null;
-  companyUniverseEmpty = null;
-  companySearchInput = null;
-  companySectorSelect = null;
-  companyCoverageSelect = null;
-  companyUniverseMetaUniverse = null;
-  companyUniverseMetaSectors = null;
-  companyUniverseMetaLatest = null;
-  companyUniverseMetaCoverage = null;
-
-  container.innerHTML = `
-    <div class="company-universe" role="region" aria-live="polite">
-      <div class="company-universe__controls">
-        <label class="sr-only" for="company-universe-search-input">Search companies</label>
-        <input
-          type="search"
-          id="company-universe-search-input"
-          data-role="company-universe-search"
-          placeholder="Search by company, ticker, or sector"
-          autocomplete="off"
-        />
-        <label class="sr-only" for="company-universe-sector-filter">Filter by sector</label>
-        <select id="company-universe-sector-filter" data-role="company-universe-sector">
-          <option value="">All sectors</option>
-        </select>
-        <label class="sr-only" for="company-universe-coverage-filter">Filter by coverage</label>
-        <select id="company-universe-coverage-filter" data-role="company-universe-coverage">
-          <option value="">All coverage</option>
-          <option value="complete">Complete coverage</option>
-          <option value="partial">Partial coverage</option>
-          <option value="missing">Missing coverage</option>
-        </select>
-      </div>
-      <div class="company-universe__legend" role="note" aria-label="Dataset cues">
-        <span class="company-universe__legend-title">Data cues</span>
-        <span class="company-universe__legend-item" title="Market cap benchmark"> 
-          <span class="company-universe__legend-dot company-universe__legend-dot--mega" aria-hidden="true"></span>
-          Market cap ≥ $1T
-        </span>
-        <span class="company-universe__legend-item" title="Filing recency benchmark">
-          <span class="company-universe__legend-dot company-universe__legend-dot--stale" aria-hidden="true"></span>
-          Filing > 180 days
-        </span>
-      </div>
-      <div class="company-universe__metrics" data-role="company-universe-metrics">
-        <div class="utility-loading">Loading coverage snapshot...</div>
-      </div>
-      <div class="company-universe__table-wrapper">
-        <table class="company-universe__table hidden" data-role="company-universe-table">
-          <thead>
-            <tr>
-              <th scope="col">Company</th>
-              <th scope="col">Ticker</th>
-              <th scope="col">Sector</th>
-              <th scope="col">Market cap</th>
-              <th scope="col">Latest filing</th>
-              <th scope="col">Coverage</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-        <div class="company-universe__skeleton" data-role="company-universe-skeleton">
-          ${Array.from({ length: 6 })
-            .map(
-              () => `
-                <div class=\"company-universe__skeleton-row\">
-                  <span class=\"company-universe__skeleton-col\"></span>
-                  <span class=\"company-universe__skeleton-col\"></span>
-                  <span class=\"company-universe__skeleton-col\"></span>
-                  <span class=\"company-universe__skeleton-col\"></span>
-                  <span class=\"company-universe__skeleton-col\"></span>
-                  <span class=\"company-universe__skeleton-col\"></span>
-                </div>`
-            )
-            .join("")}
-        </div>
-        <p class="company-universe__empty hidden" data-role="company-universe-empty">
-          <span class="company-universe__empty-icon" aria-hidden="true">📊</span>
-          <span>No companies match your search. Adjust filters and try again.</span>
-        </p>
-      </div>
-    </div>
-  `;
-
-  const companyUniverseDiv = container.querySelector(".company-universe");
-  if (companyUniverseDiv) {
-    const hero = buildCompanyUniverseHero();
-    companyUniverseDiv.insertBefore(hero, companyUniverseDiv.firstChild);
-  }
-
-  companySearchInput = container.querySelector("[data-role='company-universe-search']");
-  companySectorSelect = container.querySelector("[data-role='company-universe-sector']");
-  companyCoverageSelect = container.querySelector("[data-role='company-universe-coverage']");
-  companyUniverseMetrics = container.querySelector("[data-role='company-universe-metrics']");
-  companyUniverseTable = container.querySelector("[data-role='company-universe-table']");
-  companyUniverseEmpty = container.querySelector("[data-role='company-universe-empty']");
-  companyUniverseSkeleton = container.querySelector("[data-role='company-universe-skeleton']");
-  companyUniverseMetaUniverse = container.querySelector("[data-role='company-universe-meta-universe']");
-  companyUniverseMetaSectors = container.querySelector("[data-role='company-universe-meta-sectors']");
-  companyUniverseMetaLatest = container.querySelector("[data-role='company-universe-meta-latest']");
-  companyUniverseMetaCoverage = container.querySelector("[data-role='company-universe-meta-coverage']");
-
-  if (companySearchInput) {
-    companySearchInput.value = "";
-    companySearchInput.addEventListener("input", applyCompanyUniverseFilters);
-  }
-  if (companySectorSelect) {
-    companySectorSelect.value = "";
-    companySectorSelect.addEventListener("change", applyCompanyUniverseFilters);
-  }
-  if (companyCoverageSelect) {
-    companyCoverageSelect.value = "";
-    companyCoverageSelect.addEventListener("change", applyCompanyUniverseFilters);
-  }
-  if (companyUniverseMetrics) {
-    companyUniverseMetrics.innerHTML = `<div class="utility-loading">Loading coverage snapshot...</div>`;
-  }
-  if (companyUniverseSkeleton) {
-    companyUniverseSkeleton.classList.remove("hidden");
-  }
-  if (companyUniverseEmpty) {
-    companyUniverseEmpty.classList.add("hidden");
-  }
-  if (companyUniverseTable) {
-    companyUniverseTable.classList.add("hidden");
-  }
-  if (companyUniverseEmpty) {
-    companyUniverseEmpty.classList.add("hidden");
-  }
-
-  try {
-    await loadCompanyUniverseData();
-    if (!container.isConnected) {
-      return;
-    }
-    applyCompanyUniverseFilters();
-    if (companySearchInput) {
-      companySearchInput.focus();
-      companySearchInput.select();
-    }
-  } catch (error) {
-    companyUniverseMetrics = null;
-    companyUniverseTable = null;
-    companyUniverseEmpty = null;
-    companySearchInput = null;
-    companySectorSelect = null;
-    companyCoverageSelect = null;
-    companyUniverseMetaUniverse = null;
-    companyUniverseMetaSectors = null;
-    companyUniverseMetaLatest = null;
-    companyUniverseMetaCoverage = null;
-    if (!container.isConnected) {
-      return;
-    }
-    container.innerHTML = `
-      <div class="utility-error">
-        <p>Unable to load the company universe right now. Please try again.</p>
-        <button type="button" class="utility-error__retry" data-action="retry-company-universe">Retry</button>
-      </div>
-    `;
-    const retryButton = container.querySelector("[data-action='retry-company-universe']");
-    if (retryButton) {
-      retryButton.addEventListener("click", () => {
-        renderCompanyUniverseSection({ container });
-      });
-    }
-  }
-}
-
-
-const HELP_PROMPTS = [
-  "Show Apple KPIs for 2022–2024",
-  "Compare Microsoft and Amazon in FY2023",
-  "What was Tesla's 2022 revenue?",
-];
-
-const HELP_SECTIONS = [
   {
     icon: "📊",
-    title: "KPI & Comparisons",
-    command: "Metrics TICKER [YEAR | YEAR–YEAR] [+ peers]",
-    purpose: "Summarise a company's finance snapshot or line up peers on one table.",
-    example: "Metrics AAPL 2023 vs MSFT",
-    delivers: "Revenue, profitability, free cash flow, ROE, valuation ratios.",
+    title: "Analyst & Institutional Views",
+    command: "What do analysts think of [TICKER]?",
+    purpose: "Get analyst ratings, price targets, and institutional ownership data.",
+    examples: [
+      "What do analysts think of Apple?",
+      "What's the price target for Microsoft?",
+      "What's the institutional ownership of Apple?",
+      "Have there been recent upgrades on Tesla?",
+    ],
+    delivers: "Analyst ratings (Buy/Hold/Sell), price targets, institutional holdings, insider transactions, comprehensive sources with clickable links.",
+  },
+  {
+    icon: "🌍",
+    title: "Macroeconomic Context",
+    command: "How do [economic factors] affect [TICKER]?",
+    purpose: "Analyze economic sensitivity, interest rate impact, and inflation effects.",
+    examples: [
+      "How do interest rates affect tech stocks?",
+      "What's the impact of inflation on Apple?",
+      "How is Apple affected by recession?",
+      "How do currency fluctuations impact Microsoft's earnings?",
+    ],
+    delivers: "Economic sensitivity analysis, historical correlations, geographic revenue breakdown, hedging strategies.",
+  },
+  {
+    icon: "🌱",
+    title: "ESG & Sustainability",
+    command: "What's [TICKER]'s ESG score?",
+    purpose: "Get ESG scores, environmental initiatives, and governance ratings.",
+    examples: [
+      "What's Apple's ESG score?",
+      "How sustainable is Tesla's business?",
+      "What's Microsoft's carbon footprint?",
+      "Does Microsoft have good governance?",
+    ],
+    delivers: "ESG scores, environmental initiatives, social policies, governance structure, controversies.",
+  },
+  {
+    icon: "📈",
+    title: "Dashboard & Visualizations",
+    command: "Show dashboard for [TICKER]",
+    purpose: "Get comprehensive interactive dashboards with charts and metrics.",
+    examples: [
+      "Dashboard AAPL",
+      "Show dashboard for Apple",
+      "Full dashboard for Microsoft",
+    ],
+    delivers: "Interactive charts, KPI cards, trend visualizations, comparison views, export options.",
+  },
+  {
+    icon: "🌐",
+    title: "Segment & Geographic Analysis",
+    command: "What's [TICKER]'s [segment/region] revenue?",
+    purpose: "Analyze business segments, geographic revenue, and product mix.",
+    examples: [
+      "What's Apple's exposure to China?",
+      "Where does Microsoft's revenue come from?",
+      "How important is iPhone to Apple?",
+      "Is AWS Amazon's most profitable business?",
+    ],
+    delivers: "Segment breakdown, geographic revenue, product mix, customer demographics, growth by segment.",
   },
   {
     icon: "🧾",
@@ -3531,6 +2121,24 @@ const HELP_SECTIONS = [
     purpose: "Run what-if cases for growth, margin shifts, or valuation moves.",
     example: "Scenario NVDA Bull rev=+8% margin=+1.5% mult=+0.5",
     delivers: "Projected revenue, margins, EPS/FCF change, implied valuation.",
+  },
+  {
+    icon: "📊",
+    title: "Portfolio Management",
+    command: [
+      "Analyze portfolio port_xxxxx",
+      "What's my portfolio risk?",
+      "Show my portfolio exposure",
+      "Optimize my portfolio",
+    ],
+    purpose: "Manage portfolios, analyze exposures, calculate risk metrics, optimize, and run scenarios.",
+    examples: [
+      "Analyze portfolio port_xxxxx",
+      "What's my portfolio risk?",
+      "What's my portfolio exposure?",
+      "Optimize my portfolio",
+    ],
+    delivers: "Holdings, exposures, risk metrics (CVaR, VaR, volatility, Sharpe, Sortino, alpha, beta, tracking error), optimization results, scenario analysis, performance attribution, comprehensive sources with clickable links.",
   },
   {
     icon: "⚙️",
@@ -3601,7 +2209,6 @@ function composeHelpText(content) {
 
   return lines.join("\n");
 }
-
 function renderHelpGuide(content) {
   const article = document.createElement("article");
   article.className = "help-guide";
@@ -3634,12 +2241,27 @@ function renderHelpGuide(content) {
   
   const searchGroup = document.createElement("div");
   searchGroup.className = "help-guide__filter help-guide__filter--search";
+  const searchWrapper = document.createElement("div");
+  searchWrapper.className = "help-guide__search-wrapper";
   const searchInput = document.createElement("input");
   searchInput.type = "search";
   searchInput.placeholder = "Search by command, purpose, or example";
   searchInput.autocomplete = "off";
   searchInput.className = "help-guide__search";
-  searchGroup.append(searchInput);
+  
+  const clearButton = document.createElement("button");
+  clearButton.className = "help-guide__search-clear";
+  clearButton.innerHTML = "×";
+  clearButton.setAttribute("aria-label", "Clear search");
+  clearButton.setAttribute("type", "button");
+  clearButton.addEventListener("click", () => {
+    searchInput.value = "";
+    searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+    searchInput.focus();
+  });
+  
+  searchWrapper.append(searchInput, clearButton);
+  searchGroup.append(searchWrapper);
   controls.append(searchGroup);
 
   const categoryGroup = document.createElement("div");
@@ -3658,6 +2280,11 @@ function renderHelpGuide(content) {
   });
   categoryGroup.append(categorySelect);
   controls.append(categoryGroup);
+  
+  // Results counter
+  const resultsCount = document.createElement("span");
+  resultsCount.className = "help-guide__results-count";
+  controls.append(resultsCount);
 
   // Create sticky container for hero + filters
   const stickyContainer = document.createElement("div");
@@ -3699,16 +2326,37 @@ function renderHelpGuide(content) {
       }
     });
 
+    // Update results counter
+    const totalCards = sectionGrid.querySelectorAll(".help-guide__card").length;
+    if (searchTerm || selectedCategory) {
+      resultsCount.textContent = `${visibleCount} of ${totalCards} results`;
+    } else {
+      resultsCount.textContent = "";
+    }
+    
     // Show empty state if no cards visible
     let emptyState = sectionGrid.querySelector(".help-guide__empty");
     if (visibleCount === 0) {
       if (!emptyState) {
         emptyState = document.createElement("div");
         emptyState.className = "help-guide__empty";
-        emptyState.textContent = "No results match your search.";
+        
+        const icon = document.createElement("div");
+        icon.className = "help-guide__empty-icon";
+        icon.textContent = "🔍";
+        
+        const title = document.createElement("h4");
+        title.className = "help-guide__empty-title";
+        title.textContent = "No results found";
+        
+        const message = document.createElement("p");
+        message.className = "help-guide__empty-message";
+        message.textContent = "Try adjusting your search or filter to find what you're looking for.";
+        
+        emptyState.append(icon, title, message);
         sectionGrid.append(emptyState);
       }
-      emptyState.style.display = "";
+      emptyState.style.display = "flex";
     } else if (emptyState) {
       emptyState.style.display = "none";
     }
@@ -3852,6 +2500,7 @@ function refreshHelpArtifacts() {
     utilityContent.innerHTML = HELP_GUIDE_HTML;
   }
 }
+
 async function loadHelpContentOverrides() {
   try {
     const response = await fetch(`${API_BASE}/help-content`);
@@ -3859,15 +2508,33 @@ async function loadHelpContentOverrides() {
       return;
     }
     const data = await response.json();
+    
+    // Load tips
     if (Array.isArray(data?.tips) && data.tips.length) {
       const customTips = data.tips.map((tip) => `${tip}`.trim()).filter(Boolean);
       if (customTips.length) {
         HELP_TIPS = customTips;
-        refreshHelpArtifacts();
       }
     }
+    
+    // Load prompts if provided
+    if (Array.isArray(data?.prompts) && data.prompts.length) {
+      HELP_PROMPTS.length = 0;
+      HELP_PROMPTS.push(...data.prompts);
+    }
+    
+    // Load sections if provided
+    if (Array.isArray(data?.sections) && data.sections.length) {
+      HELP_SECTIONS.length = 0;
+      HELP_SECTIONS.push(...data.sections);
+    }
+    
+    // Refresh help artifacts if any changes were made
+    if (data?.tips || data?.prompts || data?.sections) {
+      refreshHelpArtifacts();
+    }
   } catch (error) {
-    console.warn("Failed to load help tip overrides:", error);
+    console.warn("Failed to load help content overrides:", error);
   }
 }
 
@@ -4468,7 +3135,6 @@ function buildCategoriesSection(kpis) {
 
   return wrapper;
 }
-
 function buildKpiLibraryView(data) {
   const container = document.createElement("div");
   container.className = "kpi-library";
@@ -4707,6 +3373,7 @@ function formatFilingDate(dateString) {
   }
   return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
+
 async function renderFilingViewerSection({ container } = {}) {
   if (!container) {
     return;
@@ -4742,7 +3409,10 @@ async function renderFilingViewerSection({ container } = {}) {
       <form class="filing-viewer__form" data-role="filing-viewer-form">
         <div class="filing-viewer__form-group">
           <label for="filing-viewer-ticker">Ticker</label>
-          <input id="filing-viewer-ticker" name="ticker" type="text" placeholder="e.g. TSLA" required />
+          <div style="position: relative;">
+            <input id="filing-viewer-ticker" name="ticker" type="text" placeholder="e.g. TSLA or search companies..." required autocomplete="off" list="filing-viewer-ticker-list" />
+            <datalist id="filing-viewer-ticker-list"></datalist>
+          </div>
         </div>
         <div class="filing-viewer__form-group">
           <label for="filing-viewer-metric">Metric (optional)</label>
@@ -4856,6 +3526,7 @@ async function renderFilingViewerSection({ container } = {}) {
     tableBody.innerHTML = "";
     if (!Array.isArray(items) || !items.length) {
       emptyState.classList.remove("hidden");
+      emptyState.textContent = "No filings match your filters yet.";
       return;
     }
     emptyState.classList.add("hidden");
@@ -4969,6 +3640,25 @@ async function renderFilingViewerSection({ container } = {}) {
     }
   };
 
+  // Load company universe for ticker autocomplete
+  const tickerDatalist = container.querySelector("#filing-viewer-ticker-list");
+  if (tickerDatalist && tickerInput) {
+    loadCompanyUniverseData()
+      .then((companies) => {
+        if (!tickerDatalist || !container.isConnected) return;
+        tickerDatalist.innerHTML = "";
+        companies.forEach((company) => {
+          const option = document.createElement("option");
+          option.value = company.ticker;
+          option.textContent = `${company.ticker} - ${company.company || company.ticker}`;
+          tickerDatalist.appendChild(option);
+        });
+      })
+      .catch((error) => {
+        console.warn("Failed to load company universe for filing viewer:", error);
+      });
+  }
+
   if (form) {
     form.addEventListener("submit", handleSubmit);
     window.queueMicrotask(() => {
@@ -4990,13 +3680,32 @@ function renderSettingsSection({ container } = {}) {
   const root = container.querySelector("[data-role='settings-root']") || container;
   const settings = loadUserSettings();
 
+  const savedTheme = localStorage.getItem('benchmarkos.theme');
+  const isDarkMode = savedTheme === 'dark' || (!savedTheme && document.documentElement.getAttribute('data-theme') === 'dark');
+  
   root.innerHTML = `
     <form class="settings-form" data-role="settings-form">
       <section class="settings-section">
-        <h3>AI preferences</h3>
+        <h3 class="settings-section-title">
+          <span class="settings-section-icon">🎨</span>
+          <span>Appearance</span>
+        </h3>
+        <label class="settings-toggle-switch">
+          <span class="settings-toggle-label">
+            <span class="settings-toggle-icon">🌙</span>
+            <span>Dark mode</span>
+          </span>
+          <input type="checkbox" class="settings-switch-input" data-role="dark-mode-toggle" ${isDarkMode ? 'checked' : ''} />
+          <span class="settings-switch"></span>
+        </label>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">
+          <span class="settings-section-icon">🤖</span>
+          <span>AI Preferences</span>
+        </h3>
         <p class="settings-hint">
-          The values below are stored locally in your browser so you can experiment without touching
-          the backend configuration.
+          The values below are stored locally in your browser so you can experiment without touching the backend configuration.
         </p>
         <label class="settings-field">
           <span class="settings-label">Preferred model</span>
@@ -5016,53 +3725,14 @@ function renderSettingsSection({ container } = {}) {
         </label>
       </section>
       <section class="settings-section">
-        <h3>Data sources</h3>
+        <h3 class="settings-section-title">
+          <span class="settings-section-icon">📊</span>
+          <span>Data Sources</span>
+        </h3>
         <label class="settings-toggle">
           <input type="checkbox" name="dataSources.edgar" />
           <span>SEC EDGAR filings</span>
         </label>
-        <label class="settings-toggle">
-          <input type="checkbox" name="dataSources.yahoo" />
-          <span>Yahoo Finance market data</span>
-        </label>
-        <label class="settings-toggle">
-          <input type="checkbox" name="dataSources.bloomberg" />
-          <span>Bloomberg real-time quotes</span>
-        </label>
-      </section>
-      <section class="settings-section">
-        <h3>Output preferences</h3>
-        <label class="settings-field">
-          <span class="settings-label">Timezone</span>
-          <input name="timezone" type="text" autocomplete="off" placeholder="e.g. UTC" />
-        </label>
-        <label class="settings-field">
-          <span class="settings-label">Primary currency</span>
-          <input name="currency" type="text" autocomplete="off" placeholder="e.g. USD" />
-        </label>
-        <label class="settings-field">
-          <span class="settings-label">Compliance mode</span>
-          <select name="compliance">
-            <option value="standard">Standard</option>
-            <option value="restricted">Restricted</option>
-            <option value="audit">Audit</option>
-          </select>
-        </label>
-        <fieldset class="settings-checkbox-group">
-          <legend>Enable exports</legend>
-          <label class="settings-toggle">
-            <input type="checkbox" name="exportFormats.pdf" />
-            <span>PDF</span>
-          </label>
-          <label class="settings-toggle">
-            <input type="checkbox" name="exportFormats.excel" />
-            <span>Excel</span>
-          </label>
-          <label class="settings-toggle">
-            <input type="checkbox" name="exportFormats.markdown" />
-            <span>Markdown</span>
-          </label>
-        </fieldset>
       </section>
       <div class="settings-actions">
         <button type="submit">Save settings</button>
@@ -5078,38 +3748,32 @@ function renderSettingsSection({ container } = {}) {
   }
   const statusEl = root.querySelector("[data-role='settings-status']");
   const resetButton = root.querySelector("[data-role='settings-reset']");
+  const darkModeToggle = root.querySelector("[data-role='dark-mode-toggle']");
 
   const fields = {
     aiModel: form.elements.aiModel,
     apiKey: form.elements.apiKey,
     refreshSchedule: form.elements.refreshSchedule,
-    timezone: form.elements.timezone,
-    currency: form.elements.currency,
-    compliance: form.elements.compliance,
     edgar: form.querySelector("[name='dataSources.edgar']"),
-    yahoo: form.querySelector("[name='dataSources.yahoo']"),
-    bloomberg: form.querySelector("[name='dataSources.bloomberg']"),
-    exportPdf: form.querySelector("[name='exportFormats.pdf']"),
-    exportExcel: form.querySelector("[name='exportFormats.excel']"),
-    exportMarkdown: form.querySelector("[name='exportFormats.markdown']"),
   };
+
+  // Dark mode toggle functionality
+  if (darkModeToggle) {
+    darkModeToggle.addEventListener('change', (e) => {
+      const isDark = e.target.checked;
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      localStorage.setItem('benchmarkos.theme', isDark ? 'dark' : 'light');
+    });
+  }
 
   const applySettings = (values) => {
     if (!values) {
       return;
     }
-    fields.aiModel.value = values.aiModel || "";
-    fields.apiKey.value = values.apiKey || "";
-    fields.refreshSchedule.value = values.refreshSchedule || "daily";
-    fields.timezone.value = values.timezone || "UTC";
-    fields.currency.value = values.currency || "USD";
-    fields.compliance.value = values.compliance || "standard";
-    fields.edgar.checked = Boolean(values?.dataSources?.edgar);
-    fields.yahoo.checked = Boolean(values?.dataSources?.yahoo);
-    fields.bloomberg.checked = Boolean(values?.dataSources?.bloomberg);
-    fields.exportPdf.checked = Boolean(values?.exportFormats?.pdf);
-    fields.exportExcel.checked = Boolean(values?.exportFormats?.excel);
-    fields.exportMarkdown.checked = Boolean(values?.exportFormats?.markdown);
+    if (fields.aiModel) fields.aiModel.value = values.aiModel || "";
+    if (fields.apiKey) fields.apiKey.value = values.apiKey || "";
+    if (fields.refreshSchedule) fields.refreshSchedule.value = values.refreshSchedule || "daily";
+    if (fields.edgar) fields.edgar.checked = Boolean(values?.dataSources?.edgar);
   };
 
   const showStatus = (message, type = "info") => {
@@ -5134,23 +3798,12 @@ function renderSettingsSection({ container } = {}) {
     event.preventDefault();
     const nextSettings = {
       ...settings,
-      apiKey: fields.apiKey.value.trim(),
-      aiModel: fields.aiModel.value.trim() || DEFAULT_USER_SETTINGS.aiModel,
-      refreshSchedule: fields.refreshSchedule.value || DEFAULT_USER_SETTINGS.refreshSchedule,
-      timezone: fields.timezone.value.trim() || DEFAULT_USER_SETTINGS.timezone,
-      currency: fields.currency.value.trim() || DEFAULT_USER_SETTINGS.currency,
-      compliance: fields.compliance.value || DEFAULT_USER_SETTINGS.compliance,
+      apiKey: fields.apiKey?.value.trim() || "",
+      aiModel: fields.aiModel?.value.trim() || DEFAULT_USER_SETTINGS.aiModel,
+      refreshSchedule: fields.refreshSchedule?.value || DEFAULT_USER_SETTINGS.refreshSchedule,
       dataSources: {
         ...settings.dataSources,
-        edgar: fields.edgar.checked,
-        yahoo: fields.yahoo.checked,
-        bloomberg: fields.bloomberg.checked,
-      },
-      exportFormats: {
-        ...settings.exportFormats,
-        pdf: fields.exportPdf.checked,
-        excel: fields.exportExcel.checked,
-        markdown: fields.exportMarkdown.checked,
+        edgar: fields.edgar?.checked ?? true,
       },
     };
     saveUserSettings(nextSettings);
@@ -5175,7 +3828,7 @@ let currentUtilityKey = null;
 
 const UTILITY_SECTIONS = {
   help: {
-    title: "Copilot Quick Reference",
+    title: "",
     html: HELP_GUIDE_HTML,
   },
   "kpi-library": {
@@ -5215,27 +3868,20 @@ const UTILITY_SECTIONS = {
     html: `<div class="settings-panel" data-role="settings-root"></div>`,
     render: renderSettingsSection,
   },
+  portfolio: {
+    title: "",
+    html: `<div class="portfolio-management-panel" data-role="portfolio-management-root">
+      <div class="utility-loading">Loading portfolio management...</div>
+    </div>`,
+    render: renderPortfolioManagementSection,
+  },
 };
 
 function normaliseArtifacts(response) {
   if (!response || typeof response !== "object") {
     return null;
   }
-  // CRITICAL: Strictly validate dashboard - if null/undefined/empty, treat as no dashboard
-  let dashboard = response.dashboard || response.Dashboard || null;
-  
-  // Extra validation: ensure dashboard is not empty object or invalid
-  if (dashboard !== null && typeof dashboard === 'object') {
-    // If dashboard is an empty object {}, treat as null
-    if (Object.keys(dashboard).length === 0) {
-      dashboard = null;
-    }
-    // If dashboard has no kind or payload, treat as null
-    if (!dashboard.kind && !dashboard.payload && !dashboard.dashboards) {
-      dashboard = null;
-    }
-  }
-  
+  const dashboard = response.dashboard || response.Dashboard || null;
   const artifacts = {
     highlights: Array.isArray(response.highlights) ? response.highlights : [],
     trends: Array.isArray(response.trends) ? response.trends : [],
@@ -5243,7 +3889,7 @@ function normaliseArtifacts(response) {
     citations: Array.isArray(response.citations) ? response.citations : [],
     exports: Array.isArray(response.exports) ? response.exports : [],
     conclusion: "",
-    dashboard: dashboard,  // Use validated dashboard (null if invalid)
+    dashboard: dashboard,
   };
   if (
     !artifacts.highlights.length &&
@@ -5257,7 +3903,6 @@ function normaliseArtifacts(response) {
   }
   return artifacts;
 }
-
 function appendMessage(
   role,
   text,
@@ -5467,6 +4112,7 @@ function renderMessageArtifacts(wrapper, artifacts) {
   }
   wrapper.classList.toggle("message--has-dashboard", hasDashboard);
 }
+
 function createDashboardLayout(artifacts) {
   const hasComparison =
     artifacts?.comparisonTable &&
@@ -5576,14 +4222,7 @@ function makeIdsUnique(container, uniqueSuffix) {
 }
 
 function renderDashboardArtifact(descriptor) {
-  // CRITICAL: Strict null/undefined/invalid dashboard check
-  if (!descriptor || descriptor === null || descriptor === undefined) {
-    console.log('[Dashboard] Dashboard is null/undefined - skipping render');
-    return null;
-  }
-  // Extra validation: ensure descriptor is a valid object with required properties
-  if (typeof descriptor !== 'object' || Object.keys(descriptor).length === 0) {
-    console.log('[Dashboard] Dashboard is invalid object - skipping render');
+  if (!descriptor) {
     return null;
   }
   const kind = descriptor.kind || "cfi-classic";
@@ -6054,7 +4693,6 @@ function createDashboardHighlights(highlights) {
   section.append(list);
   return section;
 }
-
 function normalizeDashboardText(value) {
   if (value === null || value === undefined) {
     return "";
@@ -6267,6 +4905,7 @@ function createDashboardFooter({ conclusion, citations, exports }) {
   }
   return section;
 }
+
 function createHighlightsSection(highlights) {
   if (!Array.isArray(highlights) || !highlights.length) {
     return null;
@@ -6839,7 +5478,6 @@ function formatCsvValue(value) {
   }
   return stringValue;
 }
-
 function openPdfPreview(payload) {
   const headers = Array.isArray(payload.headers) ? payload.headers : [];
   const rows = Array.isArray(payload.rows) ? payload.rows : [];
@@ -6883,7 +5521,7 @@ function openPdfPreview(payload) {
           if (!text && !link) {
             return "";
           }
-          return `<li>${text}${link ? ' — ' + link : ''}</li>`;
+          return `<li>${text}${link ? ` — ${link}` : ""}</li>`;
         })
         .filter(Boolean)
     : [];
@@ -6974,6 +5612,26 @@ function pushProgressEventsInternal(tracker, events) {
     return;
   }
   const container = tracker.container;
+  // Suppress progress UI for universally-formatted ML forecasts
+  try {
+    // If any event indicates the universal formatter, hide progress
+    const hasUniversalFormatterEvent = events.some(
+      (e) => e && typeof e.stage === "string" && e.stage.indexOf("forecast_formatter") !== -1
+    );
+    // Or if the assistant message already contains the institutional sections, hide progress
+    const contentNode = tracker.wrapper?.querySelector(".message-content");
+    const contentText = contentNode ? contentNode.textContent || "" : "";
+    const looksLikeInstitutionalReport =
+      contentText.indexOf("### 1. Executive Summary") !== -1 ||
+      contentText.indexOf("### 2. Forecast Table") !== -1;
+    if (hasUniversalFormatterEvent || looksLikeInstitutionalReport) {
+      container.classList.remove("active", "pending");
+      container.style.display = "none";
+      return;
+    }
+  } catch (err) {
+    // non-fatal; continue rendering progress if detection fails
+  }
   container.classList.add("active");
   container.classList.remove("pending");
   const typingIndicator = tracker.wrapper?.querySelector(".typing-indicator");
@@ -7000,6 +5658,7 @@ function pushProgressEventsInternal(tracker, events) {
   });
   tracker.render();
 }
+
 function startProgressTracking(requestId, wrapper) {
   if (!requestId || !wrapper) {
     return null;
@@ -7634,7 +6293,6 @@ function handleReportAction(action, conversationId) {
     deleteConversation(conversationId);
   }
 }
-
 function handleReportMenuKeyDown(event) {
   if (!reportMenu) {
     return;
@@ -7770,6 +6428,7 @@ function openProjectSubmenu(conversationId, anchor) {
   const items = Array.from(projectMenu.querySelectorAll(".menu-item"));
   focusMenuItem(items[0], items);
 }
+
 function handleProjectMenuClick(event) {
   const button = event.target.closest(".menu-item");
   if (!button) {
@@ -8005,6 +6664,9 @@ function copyShareLink() {
 function setSending(state) {
   isSending = state;
   sendButton.disabled = state; // block double-submit
+  if (stopButton) {
+    stopButton.disabled = !state; // enable stop button when sending
+  }
   chatInput.disabled = false;  // still allow typing while processing
   // keep icon-only; don't swap label
 }
@@ -8012,22 +6674,37 @@ function setSending(state) {
 function loadStoredConversations() {
   try {
     if (!window.localStorage) {
+      console.warn("localStorage not available");
       return [];
     }
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
+      console.log("No conversations found in localStorage");
       return [];
     }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
+    
+    // Handle both array and object formats (for backward compatibility)
+    let conversationsArray = [];
+    if (Array.isArray(parsed)) {
+      conversationsArray = parsed;
+    } else if (typeof parsed === 'object' && parsed !== null) {
+      // Convert object format to array
+      conversationsArray = Object.values(parsed);
+    } else {
+      console.warn("Invalid conversations format in localStorage");
       return [];
     }
-    return parsed
+    
+    console.log("Conversations loaded:", conversationsArray.length, "conversations");
+    return conversationsArray
       .filter((entry) => entry && entry.id)
       .map((entry) => ({
         id: entry.id,
         remoteId: entry.remoteId || null,
         title: entry.title || "",
+        customName: entry.customName || null,
+        starred: Boolean(entry.starred),
         createdAt: entry.createdAt || entry.updatedAt || new Date().toISOString(),
         updatedAt: entry.updatedAt || entry.createdAt || new Date().toISOString(),
         messages: Array.isArray(entry.messages) ? entry.messages : [],
@@ -8069,12 +6746,15 @@ function loadStoredConversations() {
 function saveConversations() {
   try {
     if (!window.localStorage) {
+      console.warn("localStorage not available");
       return;
     }
     
     // Clean up conversations before saving to prevent quota issues
     const cleanedConversations = cleanupConversationsForStorage();
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanedConversations));
+    const jsonData = JSON.stringify(cleanedConversations);
+    window.localStorage.setItem(STORAGE_KEY, jsonData);
+    console.log("Conversations saved:", cleanedConversations.length, "conversations");
   } catch (error) {
     if (error.name === 'QuotaExceededError') {
       console.warn("Storage quota exceeded. Clearing old conversations...");
@@ -8097,47 +6777,47 @@ function cleanupConversationsForStorage() {
   const MAX_CONVERSATIONS = 20;
   const MAX_MESSAGES_PER_CONVERSATION = 50;
   
+  // Ensure conversations is an array
+  const convsArray = Array.isArray(conversations) ? conversations : Object.values(conversations);
+  
   // Sort conversations by timestamp (most recent first)
-  const sortedConvs = Object.entries(conversations)
+  const sortedConvs = convsArray
     .sort((a, b) => {
-      const aTime = a[1].messages[a[1].messages.length - 1]?.timestamp || 0;
-      const bTime = b[1].messages[b[1].messages.length - 1]?.timestamp || 0;
+      const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
       return bTime - aTime;
     });
   
   // Keep only recent conversations
   const recentConvs = sortedConvs.slice(0, MAX_CONVERSATIONS);
   
-  // Limit messages per conversation
-  const cleaned = {};
-  recentConvs.forEach(([id, conv]) => {
-    cleaned[id] = {
-      ...conv,
-      messages: conv.messages.slice(-MAX_MESSAGES_PER_CONVERSATION)
-    };
-  });
+  // Limit messages per conversation and return as array
+  const cleaned = recentConvs.map(conv => ({
+    ...conv,
+    messages: (conv.messages || []).slice(-MAX_MESSAGES_PER_CONVERSATION)
+  }));
   
   return cleaned;
 }
 
 function keepOnlyRecentConversations(count) {
-  const sortedConvs = Object.entries(conversations)
+  // Ensure conversations is an array
+  const convsArray = Array.isArray(conversations) ? conversations : Object.values(conversations);
+  
+  const sortedConvs = convsArray
     .sort((a, b) => {
-      const aTime = a[1].messages[a[1].messages.length - 1]?.timestamp || 0;
-      const bTime = b[1].messages[b[1].messages.length - 1]?.timestamp || 0;
+      const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
       return bTime - aTime;
     })
     .slice(0, count);
   
-  const recent = {};
-  sortedConvs.forEach(([id, conv]) => {
-    recent[id] = {
-      ...conv,
-      messages: conv.messages.slice(-20) // Keep only last 20 messages
-    };
-  });
+  const recent = sortedConvs.map(conv => ({
+    ...conv,
+    messages: (conv.messages || []).slice(-20) // Keep only last 20 messages
+  }));
   
-  // Update global conversations object
+  // Update global conversations array
   conversations = recent;
   return recent;
 }
@@ -8283,7 +6963,12 @@ function composeTitleComponents({ tickers, period, metricLabel, intentInfo }) {
     });
   };
 
-  if (tickers.length >= 2) {
+  // If no valid tickers, use metric as the main subject
+  if (tickers.length === 0) {
+    if (metricLabel) {
+      pushWord(metricLabel);
+    }
+  } else if (tickers.length >= 2) {
     pushWord(tickers[0]);
     pushWord("vs");
     pushWord(tickers[1]);
@@ -8335,7 +7020,7 @@ function composeTitleComponents({ tickers, period, metricLabel, intentInfo }) {
 
   const fallbackWords = ["Insight", "Report", "Overview", "Brief"];
   let fallbackIndex = 0;
-  while (words.length < 4 && fallbackIndex < fallbackWords.length) {
+  while (words.length < 2 && fallbackIndex < fallbackWords.length) {
     pushWord(fallbackWords[fallbackIndex]);
     fallbackIndex += 1;
   }
@@ -8358,17 +7043,63 @@ function composeTitleComponents({ tickers, period, metricLabel, intentInfo }) {
 
   return title;
 }
-
 function buildSemanticSummary(prompt) {
   const trimmed = (prompt || "").trim();
   if (!trimmed) {
     return { title: "Untitled Chat", intent: "insight", tickers: [], period: "", metric: "" };
   }
+  
+  // Extract metadata for internal use
   const tickers = extractTickers(trimmed);
   const period = extractPeriod(trimmed);
   const intentInfo = detectIntentMeta(trimmed, tickers);
   const metricLabel = detectMetricLabel(trimmed, intentInfo.intent);
-  const title = composeTitleComponents({ tickers, period, metricLabel, intentInfo });
+  
+  // ChatGPT-style title: Use actual query text, cleaned up
+  let title = trimmed;
+  
+  // Remove common question/command starters (case-insensitive)
+  const startersToRemove = [
+    /^what'?s\s+/i,
+    /^how'?s\s+/i,
+    /^show\s+me\s+/i,
+    /^show\s+/i,
+    /^tell\s+me\s+/i,
+    /^give\s+me\s+/i,
+    /^can\s+you\s+/i,
+    /^could\s+you\s+/i,
+    /^please\s+/i,
+    /^i\s+want\s+to\s+know\s+/i,
+    /^i\s+need\s+/i,
+  ];
+  
+  for (const regex of startersToRemove) {
+    title = title.replace(regex, '');
+  }
+  
+  // Capitalize first letter
+  title = title.charAt(0).toUpperCase() + title.slice(1);
+  
+  // Clean up multiple spaces
+  title = title.replace(/\s+/g, ' ').trim();
+  
+  // Truncate intelligently at word boundary if too long
+  const maxLength = 50;
+  if (title.length > maxLength) {
+    // Find last space before maxLength
+    let truncateAt = title.lastIndexOf(' ', maxLength);
+    if (truncateAt === -1 || truncateAt < 20) {
+      // No good word boundary, just cut at maxLength
+      truncateAt = maxLength;
+    }
+    title = title.slice(0, truncateAt).trim() + '…';
+  }
+  
+  // Fallback if title is empty after cleaning
+  if (!title || title.length < 3) {
+    title = composeTitleComponents({ tickers, period, metricLabel, intentInfo });
+  }
+  
   return {
     title: title || "Untitled Chat",
     intent: intentInfo.intent,
@@ -8438,13 +7169,6 @@ function recordMessage(role, text, metadata = null) {
   if (!conversations.find((entry) => entry.id === conversation.id)) {
     conversations = [conversation, ...conversations];
   }
-  
-  // Remove sidebar footer text if accidentally included
-  const footerText = "Grounded by Finalyze analytics — audit-ready by design.";
-  if (typeof text === "string" && text.includes(footerText)) {
-    text = text.replace(new RegExp(footerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '').trim();
-  }
-  
   if (role === "user" && !conversation.previewPrompt) {
     conversation.previewPrompt = text;
     const summary = buildSemanticSummary(text);
@@ -8528,6 +7252,7 @@ function getFilteredConversations() {
     );
   });
 }
+
 function renderConversationList() {
   if (!conversationList) {
     return;
@@ -8535,7 +7260,17 @@ function renderConversationList() {
 
   conversationList.innerHTML = "";
 
-  const items = getFilteredConversations().filter((conversation) => !conversation.archived);
+  let items = getFilteredConversations().filter((conversation) => !conversation.archived);
+
+  // Sort: starred first, then by updatedAt
+  items = items.sort((a, b) => {
+    const aStarred = Boolean(a.starred);
+    const bStarred = Boolean(b.starred);
+    if (aStarred !== bStarred) {
+      return bStarred ? 1 : -1;
+    }
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
 
   if (!items.length) {
     const empty = document.createElement("p");
@@ -8554,6 +7289,9 @@ function renderConversationList() {
     if (activeConversation && conversation.id === activeConversation.id) {
       item.classList.add("active");
     }
+    if (conversation.starred) {
+      item.classList.add("starred");
+    }
 
     const linkButton = document.createElement("button");
     linkButton.type = "button";
@@ -8562,8 +7300,8 @@ function renderConversationList() {
 
     const title = document.createElement("span");
     title.className = "conversation-title";
-    title.textContent = conversation.title || "Untitled Chat";
-    title.title = conversation.previewPrompt || conversation.title || "Untitled Chat";
+    title.textContent = conversation.customName || conversation.title || "Untitled Chat";
+    title.title = conversation.customName || conversation.previewPrompt || conversation.title || "Untitled Chat";
     linkButton.title = title.title;
 
     const timestamp = document.createElement("span");
@@ -8572,18 +7310,138 @@ function renderConversationList() {
 
     linkButton.append(title, timestamp);
 
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "conversation-delete";
-    deleteButton.textContent = "Delete";
-    deleteButton.addEventListener("click", (event) => {
+    // Three-dot menu button
+    const menuButton = document.createElement("button");
+    menuButton.type = "button";
+    menuButton.className = "conversation-menu-btn";
+    menuButton.setAttribute("aria-label", "More options");
+    menuButton.innerHTML = "⋯";
+    menuButton.dataset.conversationId = conversation.id;
+
+    // Menu dropdown
+    const menu = document.createElement("div");
+    menu.className = "conversation-menu";
+    menu.setAttribute("role", "menu");
+    menu.style.display = "none";
+
+    // Star option
+    const starOption = document.createElement("button");
+    starOption.type = "button";
+    starOption.className = "menu-item";
+    starOption.setAttribute("role", "menuitem");
+    const starColor = conversation.starred ? '#f59e0b' : '#0f172a';
+    starOption.innerHTML = `<span class="menu-icon" style="color: ${starColor} !important; font-size: 20px !important; font-weight: bold !important;">${conversation.starred ? "★" : "☆"}</span><span class="menu-text" style="color: #0f172a !important; font-weight: 700 !important; font-size: 14px !important;">${conversation.starred ? "Unstar" : "Star"}</span>`;
+    starOption.addEventListener("click", (event) => {
       event.stopPropagation();
-      deleteConversation(conversation.id);
+      toggleStarConversation(conversation.id);
+      closeAllMenus();
     });
 
-    item.append(linkButton, deleteButton);
+    // Rename option
+    const renameOption = document.createElement("button");
+    renameOption.type = "button";
+    renameOption.className = "menu-item";
+    renameOption.setAttribute("role", "menuitem");
+    renameOption.innerHTML = '<span class="menu-icon" style="color: #0f172a !important; font-size: 20px !important;">✏️</span><span class="menu-text" style="color: #0f172a !important; font-weight: 700 !important; font-size: 14px !important;">Rename</span>';
+    renameOption.addEventListener("click", (event) => {
+      event.stopPropagation();
+      renameConversation(conversation.id);
+      closeAllMenus();
+    });
+
+    // Delete option
+    const deleteOption = document.createElement("button");
+    deleteOption.type = "button";
+    deleteOption.className = "menu-item menu-item-danger";
+    deleteOption.setAttribute("role", "menuitem");
+    deleteOption.innerHTML = '<span class="menu-icon" style="color: #dc2626 !important; font-size: 20px !important;">🗑️</span><span class="menu-text" style="color: #dc2626 !important; font-weight: 700 !important; font-size: 14px !important;">Delete</span>';
+    deleteOption.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (confirm("Are you sure you want to delete this conversation?")) {
+        deleteConversation(conversation.id);
+      }
+      closeAllMenus();
+    });
+
+    menu.append(starOption, renameOption, deleteOption);
+
+    // Toggle menu on button click
+    menuButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const isOpen = menu.style.display !== "none";
+      closeAllMenus();
+      if (!isOpen) {
+        menu.style.display = "block";
+        menuButton.classList.add("active");
+        
+        // Position menu above if there's not enough space below
+        const rect = menuButton.getBoundingClientRect();
+        const menuHeight = 150; // Approximate menu height
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        
+        if (spaceBelow < menuHeight && spaceAbove > menuHeight) {
+          menu.style.top = "auto";
+          menu.style.bottom = "100%";
+          menu.style.marginTop = "0";
+          menu.style.marginBottom = "4px";
+        } else {
+          menu.style.top = "100%";
+          menu.style.bottom = "auto";
+          menu.style.marginTop = "4px";
+          menu.style.marginBottom = "0";
+        }
+      }
+    });
+
+    item.append(linkButton, menuButton, menu);
     conversationList.append(item);
   });
+}
+
+function closeAllMenus() {
+  document.querySelectorAll(".conversation-menu").forEach((menu) => {
+    menu.style.display = "none";
+  });
+  document.querySelectorAll(".conversation-menu-btn").forEach((btn) => {
+    btn.classList.remove("active");
+  });
+}
+
+// Global click listener to close menus when clicking outside
+if (!window.conversationMenuClickHandler) {
+  window.conversationMenuClickHandler = (event) => {
+    if (!event.target.closest(".conversation-menu-btn") && !event.target.closest(".conversation-menu")) {
+      closeAllMenus();
+    }
+  };
+  document.addEventListener("click", window.conversationMenuClickHandler);
+}
+
+function toggleStarConversation(conversationId) {
+  const conversation = conversations.find((entry) => entry.id === conversationId);
+  if (!conversation) {
+    return;
+  }
+  conversation.starred = !conversation.starred;
+  saveConversations();
+  renderConversationList();
+  showToast(conversation.starred ? "Conversation starred" : "Conversation unstarred", "success");
+}
+
+function renameConversation(conversationId) {
+  const conversation = conversations.find((entry) => entry.id === conversationId);
+  if (!conversation) {
+    return;
+  }
+  const currentName = conversation.customName || conversation.title || "Untitled Chat";
+  const newName = prompt("Rename conversation:", currentName);
+  if (newName !== null && newName.trim() !== "") {
+    conversation.customName = newName.trim();
+    saveConversations();
+    renderConversationList();
+    showToast("Conversation renamed", "success");
+  }
 }
 
 function exportConversation(format) {
@@ -8742,22 +7600,6 @@ function loadConversation(conversationId) {
     chatLog.innerHTML = "";
   }
 
-  // Clean up footer text from existing messages
-  const footerText = "Grounded by Finalyze analytics — audit-ready by design.";
-  if (conversation.messages && Array.isArray(conversation.messages)) {
-    let needsSave = false;
-    conversation.messages.forEach((message) => {
-      if (typeof message.text === "string" && message.text.includes(footerText)) {
-        message.text = message.text.replace(new RegExp(footerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '').trim();
-        needsSave = true;
-      }
-    });
-    // Save cleaned conversations if any changes were made
-    if (needsSave) {
-      saveConversations();
-    }
-  }
-
   if (conversation.messages.length) {
     hideIntroPanel();
   } else {
@@ -8765,19 +7607,10 @@ function loadConversation(conversationId) {
   }
 
   conversation.messages.forEach((message) => {
-    // CRITICAL FIX: Don't render dashboards from old conversation history
-    // Only render the text, skip artifacts/dashboards from history
-    // This prevents showing stale/wrong company dashboards
-    let artifactsToRender = message.metadata || null;
-    if (artifactsToRender && artifactsToRender.dashboard) {
-      // Clear dashboard from historical messages
-      artifactsToRender = { ...artifactsToRender, dashboard: null };
-    }
-    
     appendMessage(message.role, message.text, {
       smooth: false,
       animate: false,
-      artifacts: artifactsToRender,  // Use cleaned artifacts (no dashboard)
+      artifacts: message.metadata || null,
     });
   });
 
@@ -8892,10 +7725,10 @@ function openUtilityPanel(key) {
       }
     } catch (error) {
       console.warn(`Utility panel "${key}" render error:`, error);
-      }
+    }
   }
   setActiveNav(`open-${key}`);
-  if (["help", "kpi-library", "company-universe", "filing-viewer"].includes(key)) {
+  if (["help", "kpi-library", "company-universe", "filing-viewer", "portfolio"].includes(key)) {
     if (chatPanel) {
       chatPanel.classList.add("chat-panel--collapsed");
     }
@@ -9091,57 +7924,7 @@ function updateCompanyUniverseMeta({
   latestRecord = null,
   coverage = null,
 } = {}) {
-  // Update legacy elements (if they exist)
-  if (companyUniverseMetaUniverse) {
-    if (totalCount > 0) {
-      const displayFiltered = typeof filteredCount === "number" ? filteredCount : totalCount;
-      if (displayFiltered === totalCount) {
-        companyUniverseMetaUniverse.textContent = `${totalCount.toLocaleString()} companies tracked`;
-      } else {
-        companyUniverseMetaUniverse.textContent = `${displayFiltered.toLocaleString()} of ${totalCount.toLocaleString()} companies`;
-      }
-    } else if (typeof filteredCount === "number" && filteredCount > 0) {
-      companyUniverseMetaUniverse.textContent = `${filteredCount.toLocaleString()} companies`;
-    } else {
-      companyUniverseMetaUniverse.textContent = "No companies loaded";
-    }
-  }
-
-  if (companyUniverseMetaSectors) {
-    if (typeof sectorsCount === "number" && sectorsCount > 0) {
-      companyUniverseMetaSectors.textContent = `${sectorsCount} sector${sectorsCount === 1 ? "" : "s"} in view`;
-    } else {
-      companyUniverseMetaSectors.textContent = "No sectors";
-    }
-  }
-
-  if (companyUniverseMetaLatest) {
-    if (latestRecord && latestRecord.latest_filing) {
-      const dateLabel = formatDateHuman(latestRecord.latest_filing);
-      const ticker = latestRecord.ticker ? ` | ${latestRecord.ticker}` : "";
-      companyUniverseMetaLatest.textContent = `${dateLabel}${ticker}`;
-    } else {
-      companyUniverseMetaLatest.textContent = "No filings ingested";
-    }
-  }
-
-  if (companyUniverseMetaCoverage) {
-    const complete = coverage && typeof coverage.complete === "number" ? coverage.complete : 0;
-    const partial = coverage && typeof coverage.partial === "number" ? coverage.partial : 0;
-    const missing = coverage && typeof coverage.missing === "number" ? coverage.missing : 0;
-    const total = complete + partial + missing;
-    const detail = `${complete} complete | ${partial} partial | ${missing} missing`;
-    if (total > 0) {
-      const percent = Math.round((complete / total) * 100);
-      companyUniverseMetaCoverage.textContent = `${percent}% complete (${detail})`;
-    } else if (totalCount > 0) {
-      companyUniverseMetaCoverage.textContent = `No coverage for current filters (${detail})`;
-    } else {
-      companyUniverseMetaCoverage.textContent = "Coverage data unavailable";
-    }
-  }
-
-  // Update status cards in hero box (using querySelector to find elements in hero box)
+  // Update status cards in hero box
   const heroBox = document.querySelector(".company-universe__hero");
   if (heroBox) {
     const universeEl = heroBox.querySelector("[data-role='company-universe-meta-universe']");
@@ -9363,6 +8146,7 @@ function renderCompanyUniverseTable(data) {
     tbody.append(row);
   });
 }
+
 function applyCompanyUniverseFilters() {
   if (!companyUniverseData.length) {
     if (companyUniverseSkeleton) {
@@ -9390,6 +8174,18 @@ function applyCompanyUniverseFilters() {
     const matchesCoverage = !coverageFilter || entry.coverage === coverageFilter;
     return matchesTerm && matchesSector && matchesCoverage;
   });
+
+  // Update results counter
+  const resultsCountEl = document.querySelector("[data-role='company-universe-results-count']");
+  if (resultsCountEl) {
+    const totalCount = companyUniverseData.length;
+    const filteredCount = filteredCompanyData.length;
+    if (term || sectorFilter || coverageFilter) {
+      resultsCountEl.textContent = `${filteredCount} of ${totalCount} companies`;
+    } else {
+      resultsCountEl.textContent = "";
+    }
+  }
 
   renderCompanyUniverseMetrics(filteredCompanyData);
   renderCompanyUniverseTable(filteredCompanyData);
@@ -9460,7 +8256,13 @@ function setCachedPrompt(key, reply, artifacts) {
   }
 }
 
+let currentAbortController = null;
+
 async function sendPrompt(prompt, requestId) {
+  // Create new AbortController for this request
+  currentAbortController = new AbortController();
+  const signal = currentAbortController.signal;
+
   const payload = { prompt };
   if (requestId) {
     payload.request_id = requestId;
@@ -9469,256 +8271,43 @@ async function sendPrompt(prompt, requestId) {
     payload.conversation_id = activeConversation.remoteId;
   }
 
-  const response = await fetch(`${API_BASE}/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API ${response.status}: ${errorText || "Unknown error"}`);
-  }
-
-  const data = await response.json();
-  if (activeConversation && data.conversation_id) {
-    activeConversation.remoteId = data.conversation_id;
-    promoteConversation(activeConversation);
-    saveConversations();
-    renderConversationList();
-  }
-  return data;
-}
-
-// File upload handling - initialize after DOM is ready
-function initializeFileUpload() {
-  console.log("[Upload] Initializing file upload handler...");
-
-  const { input: chatFileUpload, button: chatFileUploadBtn } = getChatUploadElements();
-
-  if (!chatFileUpload) {
-    console.error("[Upload] File upload input not found in DOM");
-    return;
-  }
-
-  if (!chatFileUploadBtn) {
-    console.error("[Upload] File upload button not found in DOM");
-    return;
-  }
-
-  bindChatUploadHandlers("initialize");
-
-  console.log("[Upload] File upload elements ready", {
-    inputPresent: true,
-    buttonPresent: true,
-    inputVisible: chatFileUpload.offsetParent !== null,
-    buttonVisible: chatFileUploadBtn.offsetParent !== null,
-  });
-
-  if (!chatFileUpload.dataset.chatUploadChangeBound) {
-    chatFileUpload.addEventListener("change", onChatFileSelected);
-    chatFileUpload.dataset.chatUploadChangeBound = "true";
-    chatFileUpload.addEventListener("click", (event) => {
-      console.log("[Upload] File input clicked directly", {
-        target: event.target,
-        files: event.target.files?.length || 0,
-      });
-    });
-  }
-}
-
-async function onChatFileSelected(event) {
-  console.log("[Upload] File selection changed", {
-    fileCount: event.target.files?.length || 0,
-    fileName: event.target.files?.[0]?.name || "none",
-  });
-
-  const file = event.target.files[0];
-  if (!file) {
-    console.warn("[Upload] No file selected");
-    return;
-  }
-
-  console.log("[Upload] Starting file upload", {
-    fileName: file.name,
-    fileSize: file.size,
-    fileType: file.type || "unknown",
-  });
-
-  const conversation = ensureActiveConversation();
-  let remoteConversationId = conversation?.remoteId;
-  if (!remoteConversationId) {
-    const generatedId =
-      (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
-      `conv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    conversation.remoteId = generatedId;
-    remoteConversationId = generatedId;
-    promoteConversation(conversation);
-    saveConversations();
-  }
-
-  const uploadingMsgWrapper = appendMessage("user", `📎 Uploading ${file.name}...`, { forceScroll: true });
-  setSending(true);
-
   try {
-    console.log("[Upload] Creating FormData and preparing upload...");
-    const formData = new FormData();
-    formData.append("file", file);
-
-    if (remoteConversationId) {
-      formData.append("conversation_id", remoteConversationId);
-    }
-
-    const response = await fetch(`${API_BASE}/api/documents/upload`, {
+    const response = await fetch(`${API_BASE}/chat`, {
       method: "POST",
-      body: formData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: signal,
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Upload failed" }));
-      throw new Error(error.message || "Upload failed");
+      const errorText = await response.text();
+      throw new Error(`API ${response.status}: ${errorText || "Unknown error"}`);
     }
 
-    const result = await response.json();
-    console.log("[Upload] Upload response received", { success: result.success, result });
-
-    if (result.success) {
-      console.log("[Upload] Upload successful!");
-      if (result.conversation_id && result.conversation_id !== remoteConversationId) {
-        remoteConversationId = result.conversation_id;
-        conversation.remoteId = result.conversation_id;
-        promoteConversation(conversation);
-        saveConversations();
-      }
-      if (uploadingMsgWrapper) {
-        const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
-        if (bodyEl) {
-          bodyEl.textContent = `📎 Uploaded ${file.name} successfully`;
-          uploadingMsgWrapper.classList.add("upload-success");
-        }
-      }
-
-      const assistantMsg = result.message
-        ? result.message
-        : `✅ File "${file.name}" uploaded successfully. The document has been processed and is now available for analysis. You can ask questions about it or use it as a framework/template.`;
-      recordMessage("assistant", assistantMsg, {
-        upload: { documentId: result.document_id, filename: file.name },
-      });
-      appendMessage("assistant", assistantMsg, { forceScroll: true });
-
-      if (Array.isArray(result.warnings) && result.warnings.length) {
-        const warningText = `⚠️ Upload warnings for "${file.name}": ${result.warnings.join(" ")}`;
-        recordMessage("system", warningText);
-        appendMessage("system", warningText, { forceScroll: true });
-      }
-    } else {
-      console.error("[Upload] Upload failed:", result.errors);
-      throw new Error(result.errors?.[0] || "Upload failed");
+    const data = await response.json();
+    if (activeConversation && data.conversation_id) {
+      activeConversation.remoteId = data.conversation_id;
+      promoteConversation(activeConversation);
+      saveConversations();
+      renderConversationList();
     }
+    return data;
   } catch (error) {
-    console.error("[Upload] File upload error:", error);
-    if (uploadingMsgWrapper) {
-      const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
-      if (bodyEl) {
-        bodyEl.textContent = `❌ Upload failed: ${error.message}`;
-        uploadingMsgWrapper.classList.add("upload-error");
-      }
+    if (error.name === 'AbortError') {
+      throw new Error('Request cancelled');
     }
-
-    const errorMsg = `❌ Failed to upload ${file.name}: ${error.message}`;
-    recordMessage("system", errorMsg);
-    appendMessage("system", errorMsg, { forceScroll: true });
+    throw error;
   } finally {
-    setSending(false);
-    event.target.value = "";
+    currentAbortController = null;
   }
 }
 
-// Initialize file upload - try multiple times with aggressive retry
-let uploadInitAttempts = 0;
-const MAX_UPLOAD_INIT_ATTEMPTS = 50;
-
-function tryInitializeFileUpload() {
-  uploadInitAttempts++;
-  console.log(`[Upload] Attempt ${uploadInitAttempts} to initialize file upload...`);
-  
-  const chatFileUpload = document.getElementById("chat-file-upload");
-  const chatFileUploadBtn = document.getElementById("chat-file-upload-btn");
-  
-  console.log(`[Upload] Element check:`, {
-    input: !!chatFileUpload,
-    button: !!chatFileUploadBtn,
-    inputElement: chatFileUpload,
-    buttonElement: chatFileUploadBtn
-  });
-  
-  if (chatFileUpload && chatFileUploadBtn) {
-    console.log("[Upload] ✅ Elements found, initializing...");
-    initializeFileUpload();
-    return true;
-  } else {
-    if (uploadInitAttempts < MAX_UPLOAD_INIT_ATTEMPTS) {
-      console.log(`[Upload] ⏳ Elements not found yet, retrying in 100ms... (attempt ${uploadInitAttempts}/${MAX_UPLOAD_INIT_ATTEMPTS})`);
-      setTimeout(tryInitializeFileUpload, 100);
-    } else {
-      console.error("[Upload] ❌ Failed to find elements after", MAX_UPLOAD_INIT_ATTEMPTS, "attempts");
-      console.error("[Upload] Input element:", chatFileUpload);
-      console.error("[Upload] Button element:", chatFileUploadBtn);
+if (chatForm) {
+  chatForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (isSending) {
+      return;
     }
-    return false;
-  }
-}
-
-// Try immediately
-console.log("[Upload] Starting file upload initialization...");
-console.log("[Upload] Document ready state:", document.readyState);
-
-if (document.readyState === 'loading') {
-  console.log("[Upload] Document is loading, waiting for DOMContentLoaded...");
-  document.addEventListener('DOMContentLoaded', () => {
-    console.log("[Upload] DOMContentLoaded fired, initializing...");
-    tryInitializeFileUpload();
-  });
-} else {
-  console.log("[Upload] Document already ready, initializing immediately...");
-  tryInitializeFileUpload();
-}
-
-// Also try on window load as fallback
-window.addEventListener('load', () => {
-  console.log("[Upload] Window load event fired, checking elements...");
-  const chatFileUpload = document.getElementById("chat-file-upload");
-  const chatFileUploadBtn = document.getElementById("chat-file-upload-btn");
-  console.log("[Upload] Window load check:", {
-    input: !!chatFileUpload,
-    button: !!chatFileUploadBtn
-  });
-  if (chatFileUpload && chatFileUploadBtn) {
-    console.log("[Upload] ✅ Re-initializing on window load...");
-    initializeFileUpload();
-  } else {
-    console.error("[Upload] ❌ Elements still not found on window load");
-  }
-});
-
-// Final fallback - try after a longer delay
-setTimeout(() => {
-  console.log("[Upload] Final fallback check after 2 seconds...");
-  const chatFileUpload = document.getElementById("chat-file-upload");
-  const chatFileUploadBtn = document.getElementById("chat-file-upload-btn");
-  if (chatFileUpload && chatFileUploadBtn) {
-    console.log("[Upload] ✅ Final fallback: initializing...");
-    initializeFileUpload();
-  } else {
-    console.error("[Upload] ❌ Final fallback: elements still not found");
-  }
-}, 2000);
-
-chatForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (isSending) {
-    return;
-  }
 
   const prompt = chatInput.value.trim();
   if (!prompt) {
@@ -9743,9 +8332,18 @@ chatForm.addEventListener("submit", async (event) => {
   let pendingMessage = showAssistantTyping();
   const cachedEntry = getCachedPrompt(canonicalPrompt);
   if (cachedEntry && cachedEntry.reply) {
+    // Mark cached artifacts as portfolio-related if the prompt contains portfolio keywords
+    const isPortfolioPrompt = /portfolio|port_|holdings|exposure|allocation|optimize portfolio|portfolio analysis|analyze portfolio|portfolio management/i.test(prompt.toLowerCase());
+    let cachedArtifacts = cachedEntry.artifacts;
+    if (isPortfolioPrompt && cachedArtifacts) {
+      if (!cachedArtifacts.dashboard) {
+        cachedArtifacts.dashboard = {};
+      }
+      cachedArtifacts.dashboard.kind = cachedArtifacts.dashboard.kind || "portfolio";
+    }
     const resolved = resolvePendingMessage(pendingMessage, "assistant", cachedEntry.reply, {
       forceScroll: true,
-      artifacts: cachedEntry.artifacts,
+      artifacts: cachedArtifacts,
       stream: false,
     });
     if (resolved) {
@@ -9763,6 +8361,17 @@ chatForm.addEventListener("submit", async (event) => {
     const cleanReply = typeof response?.reply === "string" ? response.reply.trim() : "";
     const messageText = cleanReply || "(no content)";
     const artifacts = normaliseArtifacts(response);
+    
+    // Mark artifacts as portfolio-related if the prompt contains portfolio keywords
+    const isPortfolioPrompt = /portfolio|port_|holdings|exposure|allocation|optimize portfolio|portfolio analysis|analyze portfolio|portfolio management/i.test(prompt.toLowerCase());
+    if (isPortfolioPrompt && artifacts) {
+      // Add a flag to prevent dashboard rendering
+      if (!artifacts.dashboard) {
+        artifacts.dashboard = {};
+      }
+      artifacts.dashboard.kind = artifacts.dashboard.kind || "portfolio";
+    }
+    
     pushProgressEvents(requestId, response?.progress_events || []);
     recordMessage("assistant", messageText, artifacts);
     const shouldStream = !pendingMessage?.dataset?.cached && shouldStreamText(messageText);
@@ -9779,22 +8388,36 @@ chatForm.addEventListener("submit", async (event) => {
     }
     setCachedPrompt(canonicalPrompt, messageText, artifacts);
   } catch (error) {
-    const fallback = error && error.message ? error.message : "Something went wrong. Please try again.";
-    recordMessage("system", fallback);
-    resolvePendingMessage(pendingMessage, "system", fallback, { forceScroll: true });
+    // Don't show error for cancelled requests
+    if (error.message !== 'Request cancelled') {
+      const fallback = error && error.message ? error.message : "Something went wrong. Please try again.";
+      recordMessage("system", fallback);
+      resolvePendingMessage(pendingMessage, "system", fallback, { forceScroll: true });
+    } else {
+      // Show cancelled message
+      if (pendingMessage) {
+        resolvePendingMessage(pendingMessage, "system", "Request cancelled", { forceScroll: true });
+      }
+    }
   } finally {
     await stopProgressTracking(requestId, { flush: true });
     setSending(false);
+    currentAbortController = null;
     chatInput.focus();
   }
-});
+  });
+}
 
-chatInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    chatForm.requestSubmit();
-  }
-});
+// Stop button handler
+if (stopButton) {
+  stopButton.addEventListener("click", () => {
+    if (currentAbortController && isSending) {
+      currentAbortController.abort();
+      currentAbortController = null;
+      setSending(false);
+    }
+  });
+}
 
 // Disable Send when empty
 if (chatInput && sendButton) {
@@ -9806,6 +8429,25 @@ if (chatInput && sendButton) {
   chatInput.addEventListener("input", autoResizeTextarea);
   window.addEventListener("load", autoResizeTextarea);
   updateSendDisabled();
+}
+
+if (chatInput && chatForm) {
+  chatInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const hasText = chatInput.value && chatInput.value.trim().length > 0;
+      if (!hasText || (sendButton && sendButton.disabled)) {
+        return;
+      }
+      event.preventDefault();
+      if (typeof chatForm.requestSubmit === "function") {
+        chatForm.requestSubmit();
+      } else if (sendButton) {
+        sendButton.click();
+      } else {
+        chatForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      }
+    }
+  });
 }
 
 // Near-bottom detection and Jump-to-latest button
@@ -10024,152 +8666,23 @@ if (savedActiveConversationId) {
   startNewConversation({ focusInput: false });
 }
 
-// Global variables for status elements (will be set when DOM is ready)
-// Note: These may already be declared elsewhere in the file, so we use window object
-if (typeof window.statusMessage === 'undefined') {
-  window.statusMessage = null;
-}
-if (typeof window.statusDot === 'undefined') {
-  window.statusDot = null;
-}
-
 async function checkHealth() {
   try {
-    // Get elements - try multiple times if needed
-    // Use window object to avoid conflicts with existing declarations
-    const statusMsgEl = window.statusMessage || document.getElementById("status-message");
-    const statusDotEl = window.statusDot || document.getElementById("api-status");
-    
-    // Store references for later use
-    if (statusMsgEl && !window.statusMessage) window.statusMessage = statusMsgEl;
-    if (statusDotEl && !window.statusDot) window.statusDot = statusDotEl;
-    
-    // Build URL - use empty string if API_BASE is not set (relative URL)
-    const baseUrl = API_BASE || "";
-    const url = `${baseUrl}/health?ts=${Date.now()}`;
-    
-    console.log("Checking API health at:", url);
-    
-    // Try fetch with timeout - use no-cors mode if CORS fails
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-    
-    let res;
-    try {
-      res = await fetch(url, { 
-        cache: "no-store",
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json"
-        },
-        mode: "cors",
-        credentials: "omit",
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
-        throw new Error("API health check timed out after 5 seconds");
-      }
-      // Re-throw the original error - CORS should work with our server
-      throw fetchError;
-    }
-    
-    if (!res || !res.ok) {
-      throw new Error(`HTTP ${res ? res.status : 'unknown'}: ${res ? res.statusText : 'No response'}`);
-    }
-    
-    let data;
-    try {
-      data = await res.json();
-    } catch (jsonError) {
-      // If JSON parsing fails, check if response is ok
-      const text = await res.text();
-      console.warn("Failed to parse JSON, got:", text);
-      throw new Error(`Invalid JSON response from API: ${text.substring(0, 100)}`);
-    }
-    console.log("API health check successful:", data);
-    
-    // Update UI elements if they exist
-    if (statusDotEl) {
-      statusDotEl.classList.remove("offline");
-      statusDotEl.classList.add("online");
-    }
-    if (statusMsgEl) {
-      statusMsgEl.textContent = "API online";
-    }
-    
-    return true;
+    const url = `${API_BASE}/health?ts=${Date.now()}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error();
+    statusDot.classList.remove("offline");
+    statusDot.classList.add("online");
+    statusMessage.textContent = "API online";
   } catch (error) {
-    console.error("Health check failed:", error);
-    console.error("Error details:", {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      url: `${API_BASE || ""}/health`
-    });
-    
-    const statusMsgEl = window.statusMessage || document.getElementById("status-message");
-    const statusDotEl = window.statusDot || document.getElementById("api-status");
-    
-    // Update UI elements if they exist
-    if (statusDotEl) {
-      statusDotEl.classList.remove("online");
-      statusDotEl.classList.add("offline");
-    }
-    if (statusMsgEl) {
-      const errorMsg = error.message || "Cannot reach API";
-      statusMsgEl.textContent = errorMsg.length > 30 ? "Cannot reach API" : errorMsg;
-    }
-    
-    return false;
+    statusDot.classList.remove("online");
+    statusDot.classList.add("offline");
+    statusMessage.textContent = "Cannot reach API";
   }
 }
 
-// Wait for DOM to be ready before checking health
-function startHealthCheck() {
-  console.log("Starting health check...");
-  // Check immediately
-  checkHealth().catch(err => {
-    console.error("Initial health check error:", err);
-  });
-  // Then check every 30 seconds
-  setInterval(() => {
-    checkHealth().catch(err => {
-      console.error("Periodic health check error:", err);
-    });
-  }, 30000);
-}
-// Start health check - simplified approach
-(function initializeHealthCheck() {
-  console.log("App.js health check initializing...");
-  
-  // Simple function to run health check
-  function runCheck() {
-    console.log("Running health check from app.js...");
-    checkHealth().catch(err => {
-      console.error("App.js health check error:", err);
-    });
-  }
-  
-  // Run immediately if DOM is ready, otherwise wait
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', runCheck);
-    window.addEventListener('load', runCheck);
-  } else {
-    runCheck();
-  }
-  
-  // Also set up periodic checks
-  setTimeout(function() {
-    setInterval(runCheck, 30000); // Every 30 seconds
-  }, 2000);
-})();
-
-// Also expose checkHealth globally for manual testing
-window.checkHealth = checkHealth;
+checkHealth();
+setInterval(checkHealth, 30000);
 
 loadHelpContentOverrides();
 
@@ -10299,7 +8812,6 @@ function updateProgressTrackerWithEvent(tracker, event) {
     tracker.title.textContent = activeStep?.label || "Analysis ready";
   }
 }
-
 function renderProgressTracker(tracker) {
   if (!tracker?.list) {
     return;
@@ -10560,7 +9072,7 @@ async function fetchCfiDensePayload(options = {}) {
   if (options.ticker) {
     params.set("ticker", options.ticker);
   }
-  const url = `/api/dashboard/cfi-dense${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `/api/dashboard/cfi-dense${params.toString() ? `?${params.toString()}` : ""}`;
   const response = await fetch(url, { headers: { Accept: "application/json" } });
   if (!response.ok) {
     throw new Error(`Dashboard fetch failed (${response.status})`);
@@ -10622,7 +9134,7 @@ async function fetchCfiDashboardPayload(options = {}) {
   if (options.ticker) {
     params.set("ticker", options.ticker);
   }
-  const url = `/api/dashboard/cfi${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `/api/dashboard/cfi${params.toString() ? `?${params.toString()}` : ""}`;
   const response = await fetch(url, { headers: { Accept: "application/json" } });
   if (!response.ok) {
     throw new Error(`Dashboard fetch failed (${response.status})`);
@@ -10925,7 +9437,7 @@ async function fetchCfiComparePayload(options = {}) {
   if (options.date) {
     params.set("date", options.date);
   }
-  const url = `/api/dashboard/cfi-compare${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `/api/dashboard/cfi-compare${params.toString() ? `?${params.toString()}` : ""}`;
   const response = await fetch(url, { headers: { Accept: "application/json" } });
   if (!response.ok) {
     throw new Error(`CFI Compare fetch failed (${response.status})`);
@@ -10941,6 +9453,7 @@ async function loadCfiCompareMarkup(host) {
   const html = await response.text();
   host.innerHTML = prepareEmbeddedLayout(html, "cfi_compare");
 }
+
 async function showCfiCompareDashboard(options = {}) {
   const { container, payload: suppliedPayload, ...fetchOptions } = options || {};
   let host = null;
@@ -11016,4 +9529,3 @@ document.addEventListener("DOMContentLoaded", () => {
 window.showCfiDenseDashboard = showCfiDenseDashboard;
 window.showCfiDashboard = showCfiDashboard;
 window.showCfiCompareDashboard = showCfiCompareDashboard;
-}
