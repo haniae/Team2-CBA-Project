@@ -310,7 +310,7 @@ After ingestion completes, verify everything works:
 python scripts/utility/check_ingestion_status.py
 
 # Or use the simple checker
-python check_correct_database.py
+python scripts/utility/check_correct_database.py
 
 # Test the chatbot
 python run_chatbot.py
@@ -1607,7 +1607,7 @@ python scripts/ingestion/ingest_universe.py --universe sp500 --years 10 --chunk-
 ```bash
 python scripts/utility/check_ingestion_status.py
 # Or use the simple checker
-python check_correct_database.py
+python scripts/utility/check_correct_database.py
 ```
 
 **Common Issues:**
