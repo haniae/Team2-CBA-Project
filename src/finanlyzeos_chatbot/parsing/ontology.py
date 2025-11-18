@@ -215,6 +215,270 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "how are they doing": "net_income",
     "performing": "net_income",  # "how is X performing"
     "is performing": "net_income",  # Explicit pattern
+    "financial performance": "net_income",
+    "business performance": "net_income",
+    "company performance": "net_income",
+    
+    # NEW: Assets & Balance Sheet
+    "assets": "total_assets",
+    "total assets": "total_assets",
+    "asset base": "total_assets",
+    "asset value": "total_assets",
+    "how much assets": "total_assets",
+    
+    "liabilities": "total_liabilities",
+    "total liabilities": "total_liabilities",
+    "how much debt they owe": "total_liabilities",
+    "obligations": "total_liabilities",
+    
+    "equity": "shareholders_equity",
+    "shareholders equity": "shareholders_equity",
+    "shareholder equity": "shareholders_equity",
+    "book value": "shareholders_equity",
+    "owner equity": "shareholders_equity",
+    
+    # NEW: Liquidity metrics
+    "liquidity": "current_ratio",
+    "how liquid": "current_ratio",
+    "liquid": "current_ratio",
+    "current ratio": "current_ratio",
+    "quick ratio": "quick_ratio",
+    "acid test": "quick_ratio",
+    
+    # NEW: Efficiency metrics
+    "efficiency": "asset_turnover",
+    "how efficient": "asset_turnover",
+    "asset turnover": "asset_turnover",
+    "asset utilization": "asset_turnover",
+    "inventory turnover": "inventory_turnover",
+    
+    # NEW: Market metrics
+    "stock price": "stock_price",
+    "share price": "stock_price",
+    "price": "stock_price",
+    "trading at": "stock_price",
+    "current price": "stock_price",
+    
+    "volume": "trading_volume",
+    "trading volume": "trading_volume",
+    "share volume": "trading_volume",
+    "daily volume": "trading_volume",
+    
+    # NEW: Risk metrics
+    "risk": "beta",
+    "volatility": "beta",
+    "how risky": "beta",
+    "beta": "beta",
+    "market risk": "beta",
+    "price volatility": "beta",
+    
+    # NEW: Quality metrics
+    "quality": "roe",
+    "financial quality": "roe",
+    "business quality": "roe",
+    "how good": "roe",
+    "how strong": "roe",
+    
+    # NEW: Sustainability metrics
+    "sustainable": "debt_equity",
+    "sustainability": "debt_equity",
+    "how sustainable": "debt_equity",
+    "financial health": "debt_equity",
+    "financial strength": "debt_equity",
+    "how healthy": "debt_equity",
+    
+    # NEW: Investment metrics
+    "investment": "roic",
+    "investor returns": "roic",
+    "investment returns": "roic",
+    "capital returns": "roic",
+    "return on capital": "roic",
+    
+    # NEW: Cash metrics
+    "cash": "cash_and_equivalents",
+    "cash on hand": "cash_and_equivalents",
+    "cash reserves": "cash_and_equivalents",
+    "how much cash": "cash_and_equivalents",
+    "cash position": "cash_and_equivalents",
+    "cash holdings": "cash_and_equivalents",
+    
+    # NEW: Expense metrics
+    "expenses": "operating_expenses",
+    "costs": "operating_expenses",
+    "operating expenses": "operating_expenses",
+    "opex": "operating_expenses",
+    "how much they spend": "operating_expenses",
+    "spending": "operating_expenses",
+    
+    # NEW: Investment spending
+    "capex": "capex",
+    "capital expenditure": "capex",
+    "capital spending": "capex",
+    "investment spending": "capex",
+    "how much they invest": "capex",
+    
+    # NEW: Research & Development
+    "r&d": "r_and_d",
+    "research and development": "r_and_d",
+    "research development": "r_and_d",
+    "rd": "r_and_d",
+    "how much on research": "r_and_d",
+    
+    # NEW: Employee metrics
+    "employees": "employee_count",
+    "workforce": "employee_count",
+    "headcount": "employee_count",
+    "how many employees": "employee_count",
+    "staff": "employee_count",
+    
+    # NEW: Revenue breakdown
+    "revenue breakdown": "revenue",
+    "sales breakdown": "revenue",
+    "revenue by segment": "revenue",
+    "sales by segment": "revenue",
+    "revenue sources": "revenue",
+    "where revenue comes from": "revenue",
+    
+    # NEW: Geographic metrics
+    "geographic": "revenue",
+    "by region": "revenue",
+    "by geography": "revenue",
+    "international": "revenue",
+    "domestic": "revenue",
+    
+    # NEW: Product/service metrics
+    "products": "revenue",
+    "services": "revenue",
+    "product revenue": "revenue",
+    "service revenue": "revenue",
+    
+    # NEW: Customer metrics
+    "customers": "revenue",
+    "customer base": "revenue",
+    "customer count": "revenue",
+    "how many customers": "revenue",
+    
+    # NEW: Market share
+    "market share": "revenue",
+    "market position": "revenue",
+    "market dominance": "revenue",
+    "competitive position": "revenue",
+    
+    # NEW: Aggregation metrics
+    "sum": "revenue",
+    "total": "revenue",
+    "aggregate": "revenue",
+    "combined": "revenue",
+    "collective": "revenue",
+    "cumulative": "revenue",
+    "overall": "revenue",
+    
+    # NEW: Average/Mean metrics
+    "average": "revenue",
+    "mean": "revenue",
+    "median": "revenue",
+    "midpoint": "revenue",
+    
+    # NEW: Percentage/Share metrics
+    "percent": "revenue",
+    "percentage": "revenue",
+    "share": "revenue",
+    "portion": "revenue",
+    "fraction": "revenue",
+    "ratio": "revenue",
+    "proportion": "revenue",
+    
+    # NEW: Change magnitude
+    "increase by": "revenue",
+    "decrease by": "revenue",
+    "grow by": "revenue",
+    "shrink by": "revenue",
+    "rise by": "revenue",
+    "fall by": "revenue",
+    "up by": "revenue",
+    "down by": "revenue",
+    
+    # NEW: Relative position
+    "above average": "revenue",
+    "below average": "revenue",
+    "above median": "revenue",
+    "below median": "revenue",
+    "top percentile": "revenue",
+    "bottom percentile": "revenue",
+    
+    # NEW: Temporal modifiers
+    "recently": "revenue",
+    "lately": "revenue",
+    "currently": "revenue",
+    "previously": "revenue",
+    "historically": "revenue",
+    "going forward": "revenue",
+    "in the future": "revenue",
+    
+    # NEW: Sector/Industry
+    "sector": "revenue",
+    "industry": "revenue",
+    "sector wide": "revenue",
+    "industry wide": "revenue",
+    "across sectors": "revenue",
+    "across industries": "revenue",
+    
+    # NEW: Multi-company
+    "all of them": "revenue",
+    "both of them": "revenue",
+    "together": "revenue",
+    "combined": "revenue",
+    "collectively": "revenue",
+    "as a group": "revenue",
+    "as a whole": "revenue",
+    
+    # NEW: Causal
+    "because of": "revenue",
+    "due to": "revenue",
+    "as a result of": "revenue",
+    "owing to": "revenue",
+    "attributed to": "revenue",
+    "caused by": "revenue",
+    "resulted from": "revenue",
+    "led to": "revenue",
+    "resulted in": "revenue",
+    
+    # NEW: Negation
+    "not profitable": "net_income",
+    "not growing": "revenue_growth",
+    "no revenue": "revenue",
+    "no profit": "net_income",
+    "lack of": "revenue",
+    "missing": "revenue",
+    "without": "revenue",
+    
+    # NEW: Progressive/Adverb
+    "increasingly": "revenue_growth",
+    "decreasingly": "revenue_growth",
+    "gradually": "revenue_growth",
+    "rapidly": "revenue_growth",
+    "steadily": "revenue_growth",
+    "consistently": "revenue_growth",
+    "dramatically": "revenue_growth",
+    "significantly": "revenue_growth",
+    
+    # NEW: Certainty
+    "definitely": "revenue",
+    "certainly": "revenue",
+    "probably": "revenue",
+    "possibly": "revenue",
+    "likely": "revenue",
+    "unlikely": "revenue",
+    
+    # NEW: Frequency
+    "always": "revenue",
+    "often": "revenue",
+    "sometimes": "revenue",
+    "rarely": "revenue",
+    "never": "revenue",
+    "usually": "revenue",
+    "typically": "revenue",
+    "frequently": "revenue",
 }
 
 

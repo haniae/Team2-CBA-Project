@@ -3962,30 +3962,237 @@ class FinanlyzeOSChatbot:
                     # CRITICAL: Contractions MUST come first
                     r'\bwhat\'s\b',  # "what's" contraction - CRITICAL
                     r'\bhow\'s\b',   # "how's" contraction
-                    r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would|about|does|did)\b',
-                    r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would|about|to|do|profitable|fast|good|bad|strong|weak)\b',
-                    r'\bwhat\s+(?:happened|changed|improved|declined|increased|decreased|caused)\b',
-                    r'\bhow\s+(?:has|have|did|does|will|can|should|would)\s+\w+\s+(?:changed|grown|improved|declined|performed|trended)\b',
-                    r'\bhow\s+(?:does|do)\s+\w+\s+(?:affect|impact|influence)\b',
-                    r'\bwhat\s+(?:impact|effect)\s+does\b',
-                    r'\bwhat\s+(?:year|quarter|period)\s+(?:did|was|were)\b',
-                    r'\bwhen\s+(?:did|does|will)\s+\w+\s+(?:start|begin|become|turn|report)\b',
-                    r'\bhow\s+long\b',
+                    r'\bwho\'s\b',   # "who's" contraction
+                    r'\bwhere\'s\b', # "where's" contraction
+                    r'\bwhen\'s\b',  # "when's" contraction
+                    r'\bwhy\'s\b',   # "why's" contraction
+                    
+                    # What questions - expanded
+                    r'\bwhat\s+(?:is|are|was|were|has|have|will|can|should|would|about|does|did|makes|made|makes|drives|drove|causes|caused|means|meant|shows|showed|indicates|indicated)\b',
+                    r'\bwhat\s+(?:happened|changed|improved|declined|increased|decreased|caused|led|resulted|occurred|went|became|turned)\b',
+                    r'\bwhat\s+(?:year|quarter|period|time|date|month)\s+(?:did|was|were|is|are)\b',
+                    r'\bwhat\s+(?:impact|effect|influence|difference|relationship|correlation)\s+(?:does|did|will|has|have)\b',
+                    r'\bwhat\s+(?:are|is)\s+(?:the|their|its)\s+(?:key|main|primary|top|best|worst)\b',
+                    r'\bwhat\s+(?:kind|type|sort)\s+of\b',
+                    r'\bwhat\s+(?:would|will|could|should)\s+(?:happen|be|occur)\s+if\b',
+                    
+                    # How questions - expanded
+                    r'\bhow\s+(?:much|many|does|did|is|are|has|have|will|can|should|would|about|to|do|profitable|fast|good|bad|strong|weak|long|far|often|well|likely|possible|difficult|easy|important|significant|relevant)\b',
+                    r'\bhow\s+(?:has|have|did|does|will|can|should|would)\s+\w+\s+(?:changed|grown|improved|declined|performed|trended|evolved|developed|progressed|accelerated|decelerated)\b',
+                    r'\bhow\s+(?:does|do|did|will|can|should|would)\s+\w+\s+(?:affect|impact|influence|relate|connect|link|compare|differ|work|function|operate|perform)\b',
+                    r'\bhow\s+(?:to|do\s+you|can\s+you|should\s+you|would\s+you)\s+(?:calculate|compute|determine|find|get|analyze|assess|evaluate|measure|compare)\b',
+                    r'\bhow\s+(?:come|so|come\s+about|did\s+it\s+happen|is\s+it\s+that)\b',
+                    r'\bhow\s+(?:well|badly|good|bad|strong|weak|healthy|unhealthy|stable|volatile)\s+(?:is|are|was|were)\b',
+                    
+                    # Why questions - expanded
+                    r'\bwhy\s+(?:is|are|was|were|did|does|do|will|can|should|would|has|have|didn\'t|doesn\'t|won\'t|can\'t|shouldn\'t)\b',
+                    r'\bwhy\s+(?:did|does|will|has|have)\s+\w+\s+(?:happen|occur|change|improve|decline|increase|decrease|drop|rise|fall|grow|shrink)\b',
+                    r'\bwhy\s+(?:is|are|was|were)\s+\w+\s+(?:so|so\s+much|so\s+little|so\s+high|so\s+low|better|worse|higher|lower|more|less)\b',
+                    
+                    # When questions - expanded
+                    r'\bwhen\s+(?:is|are|was|were|did|does|will|can|should|would|has|have)\b',
+                    r'\bwhen\s+(?:did|does|will)\s+\w+\s+(?:start|begin|become|turn|report|announce|release|publish|occur|happen|peak|bottom|reach)\b',
+                    r'\bwhen\s+(?:was|were|is|are)\s+(?:the|their|its)\s+(?:last|first|next|previous|latest|earliest)\b',
+                    
+                    # Where questions - expanded
+                    r'\bwhere\s+(?:is|are|was|were|can|do|does|did|will|should|would)\b',
+                    r'\bwhere\s+(?:does|did|will|can|should|would)\s+\w+\s+(?:come|come\s+from|originate|source|generate|earn|make|get)\b',
+                    r'\bwhere\s+(?:is|are|was|were)\s+\w+\s+(?:now|currently|today|at|positioned|located|ranked|situated)\b',
+                    
+                    # Who/Which questions - expanded
+                    r'\bwho\s+(?:is|are|was|were|has|have|does|did|will|can|should|would)\b',
+                    r'\bwhich\s+(?:company|stock|one|is|has|have|was|were|does|did|will|can|should|would|performs|performed|grows|grew|makes|made)\b',
+                    r'\bwhich\s+(?:is|are|was|were)\s+(?:the|better|best|worst|highest|lowest|largest|smallest|fastest|slowest|strongest|weakest)\b',
+                    
+                    # Can/Could questions - expanded
+                    r'\bcan\s+(?:you|i|we|they|it)\s+(?:show|tell|explain|analyze|calculate|compare|find|get|help|provide|give|do|make|see|check|verify)\b',
+                    r'\bcould\s+(?:you|i|we|they|it)\s+(?:show|tell|explain|analyze|calculate|compare|find|get|help|provide|give|do|make|see|check|verify)\b',
+                    r'\bcan\s+(?:you|i|we|they|it)\s+(?:help|assist|support)\s+(?:me|us|with)\b',
+                    
+                    # Should questions - expanded
+                    r'\bshould\s+(?:i|we|you|they|it)\s+(?:buy|sell|invest|hold|avoid|consider|expect|anticipate|worry|be\s+concerned)\b',
+                    r'\bshould\s+(?:i|we|you|they|it)\s+(?:be|feel|think|believe|assume|expect|anticipate)\b',
+                    
+                    # Does/Do questions - expanded
+                    r'\bdoes\s+\w+\s+(?:have|make|earn|generate|produce|create|own|possess|contain|include|show|indicate|suggest|mean|imply)\b',
+                    r'\bdo\s+(?:they|we|you|companies|stocks)\s+(?:have|make|earn|generate|produce|create|own|possess|contain|include|show|indicate|suggest|mean|imply)\b',
+                    r'\bdoes\s+\w+\s+(?:mean|imply|suggest|indicate|show|prove|demonstrate|reveal)\b',
+                    
+                    # Is/Are questions - expanded
+                    r'\bis\s+\w+\s+(?:more|less|better|worse|higher|lower|larger|smaller|faster|slower|stronger|weaker|greater|smaller)\b',
+                    r'\bis\s+\w+\s+(?:overvalued|undervalued|expensive|cheap|good|bad|risky|safe|strong|weak|profitable|worth|worthwhile|viable|sustainable|healthy|unhealthy|stable|volatile|growing|declining|improving|worsening)\b',
+                    r'\bare\s+\w+\s+(?:more|less|better|worse|higher|lower|larger|smaller|faster|slower|stronger|weaker|greater|smaller)\b',
+                    r'\bis\s+(?:it|this|that|there)\s+(?:true|correct|accurate|right|wrong|possible|likely|probable|feasible|realistic)\b',
+                    r'\bis\s+(?:there|this|that)\s+(?:a|an|any|some)\s+(?:way|method|approach|strategy|solution|option|alternative)\b',
+                    
+                    # Tell me / Show me / Give me - expanded
+                    r'\btell\s+me\s+(?:about|why|how|what|when|where|who|which|if|whether)\b',
+                    r'\bshow\s+me\s+(?:the|their|its|how|what|why|when|where|which|if)\b',
+                    r'\bgive\s+me\s+(?:the|their|its|a|an|some|information|details|data|analysis|overview|summary)\b',
+                    r'\b(?:i\s+want|i\'d\s+like|i\s+need|i\'m\s+looking\s+for)\s+(?:to\s+know|to\s+see|to\s+understand|to\s+learn|information|details|data|analysis)\b',
+                    
+                    # Explain / Describe / Define - expanded
+                    r'\bexplain\s+(?:to\s+me|what|why|how|when|where|which|if|whether)\b',
+                    r'\bdescribe\s+(?:to\s+me|what|how|the|their|its)\b',
+                    r'\bdefine\s+(?:what|the|their|its)\b',
+                    r'\bclarify\s+(?:what|why|how|when|where|which|if|whether)\b',
+                    
+                    # Compare / Contrast - expanded
+                    r'\bcompare\s+(?:the|their|its|how|what|why|when|where|which)\b',
+                    r'\bcontrast\s+(?:the|their|its|how|what|why|when|where|which)\b',
+                    r'\b(?:what|how)\s+(?:is|are|was|were)\s+(?:the|their|its)\s+(?:difference|similarity|comparison|relationship|correlation)\s+(?:between|among|of|for)\b',
+                    
+                    # Analyze / Evaluate / Assess - expanded
+                    r'\b(?:analyze|analyse)\s+(?:the|their|its|how|what|why|when|where|which|if|whether)\b',
+                    r'\bevaluate\s+(?:the|their|its|how|what|why|when|where|which|if|whether)\b',
+                    r'\bassess\s+(?:the|their|its|how|what|why|when|where|which|if|whether)\b',
+                    r'\breview\s+(?:the|their|its|how|what|why|when|where|which|if|whether)\b',
+                    
+                    # Calculate / Compute / Determine - expanded
+                    r'\b(?:calculate|compute|determine|find|figure\s+out|work\s+out)\s+(?:the|their|its|how|what|why|when|where|which|if|whether)\b',
+                    r'\b(?:what|how)\s+(?:is|are|was|were)\s+(?:the|their|its)\s+(?:calculation|computation|formula|method|approach)\b',
+                    
+                    # If / What if / Scenario - expanded
                     r'\bwhat\s+if\b',
-                    r'\bif\b.*\bwhat\b',
-                    r'\bwhy\b',
-                    r'\bexplain\b',
-                    r'\btell\s+me\s+(?:about|why|how)\b',
-                    r'\bis\s+\w+\s+(?:more|less|better|worse|higher|lower)',
-                    r'\bis\s+\w+\s+(?:overvalued|undervalued|expensive|cheap|good|bad|risky|safe|strong|weak|profitable|worth)',
-                    r'\bwhich\s+(?:company|stock|one|is|has|have)\b',
-                    r'\bcan\s+you\b',
-                    r'\bdoes\s+\w+\s+have\b',
-                    r'\bshould\s+i\b',
-                    r'\bwhen\s+(?:is|are|was|were|did|will)\b',
-                    r'\bwhere\s+(?:is|are|can|do)\b',
+                    r'\bif\b.*\b(?:what|how|then|would|will|should|can|could)\b',
+                    r'\b(?:suppose|assume|imagine|pretend|hypothetically)\s+(?:that|if|what|how)\b',
+                    r'\b(?:scenario|scenarios|case|cases)\s+(?:where|when|if|what|how)\b',
+                    
                     # Forecasting patterns (also questions)
-                    r'\b(?:forecast|predict|estimate|project)\b',
+                    r'\b(?:forecast|predict|estimate|project|projection|outlook|forecasting|prediction|estimation)\b',
+                    r'\b(?:what|how|when|where|which)\s+(?:will|would|can|could|should|might|may)\s+(?:be|happen|occur|change|improve|decline|increase|decrease|grow|shrink)\b',
+                    
+                    # Relationship / Correlation questions
+                    r'\b(?:what|how)\s+(?:is|are|was|were)\s+(?:the|their|its)\s+(?:relationship|correlation|connection|link|association|tie)\s+(?:between|among|of|for)\b',
+                    r'\b(?:does|do|did|will|can|could|should|would)\s+\w+\s+(?:affect|impact|influence|relate|connect|link|correlate|associate)\s+\w+\b',
+                    r'\b(?:is|are|was|were)\s+(?:there|this|that)\s+(?:a|an|any)\s+(?:relationship|correlation|connection|link|association|tie)\s+(?:between|among|of|for)\b',
+                    
+                    # Ranking / Best / Worst questions
+                    r'\b(?:which|what)\s+(?:is|are|was|were)\s+(?:the|their|its)\s+(?:best|worst|top|bottom|highest|lowest|largest|smallest|fastest|slowest|strongest|weakest|most|least)\b',
+                    r'\b(?:who|which|what)\s+(?:has|have|had)\s+(?:the|their|its)\s+(?:best|worst|top|bottom|highest|lowest|largest|smallest|fastest|slowest|strongest|weakest|most|least)\b',
+                    
+                    # Recommendation / Advice questions
+                    r'\b(?:should|would|could|can|will)\s+(?:i|we|you|they)\s+(?:buy|sell|invest|hold|avoid|consider|expect|anticipate|worry|be\s+concerned|take\s+action)\b',
+                    r'\b(?:what|which|how)\s+(?:is|are|was|were)\s+(?:your|the|their|its)\s+(?:recommendation|advice|suggestion|opinion|view|take|perspective|assessment)\b',
+                    r'\b(?:do|does|did|will|can|could|should|would)\s+(?:you|they|it)\s+(?:recommend|suggest|advise|think|believe|feel|consider|view|see)\b',
+                    
+                    # Trend / Change questions
+                    r'\b(?:what|how)\s+(?:is|are|was|were)\s+(?:the|their|its)\s+(?:trend|trends|pattern|patterns|direction|trajectory|path|course|movement|shift|change|changes)\b',
+                    r'\b(?:has|have|had)\s+\w+\s+(?:changed|improved|declined|increased|decreased|grown|shrunk|evolved|developed|progressed|accelerated|decelerated)\b',
+                    r'\b(?:is|are|was|were)\s+\w+\s+(?:growing|declining|improving|worsening|increasing|decreasing|rising|falling|trending|changing|evolving|developing|progressing|accelerating|decelerating)\b',
+                    
+                    # Cause / Reason questions
+                    r'\b(?:what|which|how)\s+(?:is|are|was|were)\s+(?:the|their|its)\s+(?:cause|causes|reason|reasons|factor|factors|driver|drivers|explanation|explanations)\b',
+                    r'\b(?:what|which|how)\s+(?:caused|led|resulted|contributed|brought|made|drove|forced|pushed|pulled)\b',
+                    r'\b(?:what|which|how)\s+(?:is|are|was|were)\s+(?:behind|driving|leading|resulting|contributing|bringing|making|forcing|pushing|pulling)\b',
+                    
+                    # Time-based questions
+                    r'\b(?:how\s+long|how\s+far|how\s+often|how\s+frequently|how\s+recently|how\s+soon)\b',
+                    r'\b(?:since|until|before|after|during|throughout|over|within|for)\s+(?:when|what|how|which)\b',
+                    r'\b(?:in|at|on|by|from|to)\s+(?:what|which|when|how)\s+(?:year|quarter|period|time|date|month|week|day)\b',
+                    
+                    # General question indicators
+                    r'\b(?:i\s+don\'t\s+understand|i\s+need\s+help|help\s+me|can\s+you\s+help)\b',
+                    r'\b(?:please|pls|plz)\s+(?:explain|show|tell|give|help|calculate|analyze|compare)\b',
+                    
+                    # Imperative/Command patterns (expanded)
+                    r'\b(?:show|display|list|get|find|give|pull|fetch|retrieve|bring|present)\s+(?:me|us|the|their|its)?\s*(?:the|their|its)?\b',
+                    r'\b(?:show|display|list|get|find|give|pull|fetch|retrieve|bring|present)\s+(?:me|us)?\s+(?:the|their|its|a|an|some)\s+(?:information|data|details|metrics|financials|results|numbers|figures)\b',
+                    r'\b(?:show|display|list|get|find|give|pull|fetch|retrieve|bring|present)\s+(?:me|us)?\s+(?:how|what|why|when|where|which|if|whether)\b',
+                    
+                    # Request patterns (expanded)
+                    r'\b(?:i\'d\s+like|i\s+would\s+like|i\'m\s+interested|i\s+am\s+interested|i\'m\s+curious|i\s+am\s+curious)\s+(?:in|to|about|to\s+see|to\s+know|to\s+understand|to\s+learn)\b',
+                    r'\b(?:i\s+want|i\s+need|i\'m\s+looking|i\s+am\s+looking)\s+(?:to\s+see|to\s+know|to\s+understand|to\s+learn|for|information|data|details)\b',
+                    r'\b(?:i\'m\s+trying|i\s+am\s+trying|i\'m\s+attempting|i\s+am\s+attempting)\s+(?:to\s+understand|to\s+figure\s+out|to\s+find\s+out|to\s+learn)\b',
+                    
+                    # Quantitative comparison patterns
+                    r'\b(?:times|X\s+times|\d+\s+times)\s+(?:more|less|greater|smaller|larger|higher|lower|better|worse)\s+than\b',
+                    r'\b(?:twice|thrice|double|triple|quadruple)\s+(?:as\s+)?(?:much|many|large|small|high|low|good|bad)\b',
+                    r'\b(?:half|quarter|third)\s+(?:as\s+)?(?:much|many|large|small|high|low|good|bad)\b',
+                    r'\b(?:X%|\d+%|\d+\s+percent|percent|percentage|basis\s+points?)\s+(?:higher|lower|greater|less|more|less|better|worse)\s+than\b',
+                    r'\b(?:X\s+times|times|X\s+fold)\s+(?:larger|smaller|bigger|greater|higher|lower)\b',
+                    
+                    # Negation patterns (expanded)
+                    r'\b(?:isn\'t|aren\'t|wasn\'t|weren\'t|doesn\'t|don\'t|didn\'t|won\'t|can\'t|couldn\'t|shouldn\'t|hasn\'t|haven\'t|hadn\'t)\s+\w+\b',
+                    r'\b(?:is|are|was|were|does|do|did|will|can|could|should|has|have|had)\s+not\s+\w+\b',
+                    r'\b(?:no|not|none|neither|never|nothing|nobody|nowhere)\s+(?:revenue|profit|growth|increase|decrease|change|improvement|decline)\b',
+                    r'\b(?:lack|missing|absent|without|devoid)\s+of\b',
+                    
+                    # Causal patterns
+                    r'\b(?:because\s+of|due\s+to|as\s+a\s+result\s+of|owing\s+to|thanks\s+to|attributed\s+to)\b',
+                    r'\b(?:caused\s+by|resulted\s+from|stemmed\s+from|arose\s+from|originated\s+from)\b',
+                    r'\b(?:led\s+to|resulted\s+in|brought\s+about|gave\s+rise\s+to|contributed\s+to)\b',
+                    r'\b(?:as\s+a\s+consequence|consequently|therefore|thus|hence|so)\b',
+                    
+                    # Quantifier patterns
+                    r'\b(?:all|some|most|few|many|several|various|numerous|multiple|each|every)\s+(?:companies?|stocks?|firms?|businesses?|entities?)\b',
+                    r'\b(?:all|some|most|few|many|several|various|numerous|multiple|each|every)\s+(?:metrics?|kpis?|ratios?|measures?|indicators?)\b',
+                    r'\b(?:all|some|most|few|many|several|various|numerous|multiple|each|every)\s+(?:sectors?|industries?|markets?|segments?)\b',
+                    
+                    # Progressive/Adverb patterns
+                    r'\b(?:increasingly|decreasingly|gradually|rapidly|steadily|consistently|constantly|continuously|slowly|quickly|suddenly|dramatically|significantly|slightly|moderately)\s+(?:profitable|growing|declining|improving|worsening|increasing|decreasing|rising|falling)\b',
+                    r'\b(?:is|are|was|were|has|have|had)\s+(?:increasingly|decreasingly|gradually|rapidly|steadily|consistently|constantly|continuously|slowly|quickly|suddenly|dramatically|significantly|slightly|moderately)\b',
+                    
+                    # Certainty patterns
+                    r'\b(?:definitely|certainly|absolutely|undoubtedly|clearly|obviously|evidently|surely|undeniably)\s+(?:profitable|growing|declining|improving|worsening|increasing|decreasing)\b',
+                    r'\b(?:probably|possibly|perhaps|maybe|likely|unlikely|probably\s+not|possibly\s+not)\s+(?:to\s+be|to\s+have|to\s+do|that)\b',
+                    r'\b(?:is|are|was|were)\s+(?:definitely|certainly|absolutely|probably|possibly|likely|unlikely)\s+(?:profitable|growing|declining|improving|worsening)\b',
+                    
+                    # Frequency patterns
+                    r'\b(?:always|often|sometimes|rarely|never|usually|typically|generally|commonly|frequently|occasionally|seldom|hardly\s+ever)\s+(?:profitable|growing|declining|improving|worsening|increasing|decreasing)\b',
+                    r'\b(?:is|are|was|were)\s+(?:always|often|sometimes|rarely|never|usually|typically|generally|commonly|frequently|occasionally|seldom)\s+(?:profitable|growing|declining|improving|worsening)\b',
+                    
+                    # Aggregation patterns
+                    r'\b(?:sum|total|aggregate|combined|collective|cumulative|overall)\s+(?:of|for|across|over)\b',
+                    r'\b(?:average|mean|median|mode|midpoint)\s+(?:of|for|across|over)\b',
+                    r'\b(?:calculate|compute|determine|find|get)\s+(?:the\s+)?(?:sum|total|aggregate|average|mean|median)\s+(?:of|for|across|over)\b',
+                    
+                    # Percentage/Ratio patterns
+                    r'\b(?:X%|\d+%|\d+\s+percent|percent|percentage|basis\s+points?)\s+(?:of|from|in|for)\b',
+                    r'\b(?:ratio|proportion|share|portion|fraction|percentage)\s+(?:of|between|to|for)\b',
+                    r'\b(?:what|how\s+much)\s+(?:percent|percentage|share|portion|ratio)\s+(?:of|from|in|for)\b',
+                    
+                    # Change magnitude patterns
+                    r'\b(?:increase|decrease|grow|shrink|rise|fall|jump|drop|surge|plunge|soar|tumble)\s+by\s+(?:X%|\d+%|\d+\s+percent|X\s+times|\d+\s+times)\b',
+                    r'\b(?:up|down)\s+by\s+(?:X%|\d+%|\d+\s+percent|X\s+times|\d+\s+times)\b',
+                    r'\b(?:increased|decreased|grew|shrunk|rose|fell|jumped|dropped|surged|plunged|soared|tumbled)\s+by\s+(?:X%|\d+%|\d+\s+percent|X\s+times|\d+\s+times)\b',
+                    
+                    # State/Status patterns
+                    r'\b(?:is|are|was|were)\s+(?:currently|presently|now|right\s+now|at\s+present|at\s+the\s+moment)\s+(?:profitable|growing|declining|improving|worsening)\b',
+                    r'\b(?:has|have|had)\s+(?:been|become|became|remained|stayed|continued)\s+(?:profitable|growing|declining|improving|worsening)\b',
+                    r'\b(?:will|would|should|could|might|may)\s+be\s+(?:profitable|growing|declining|improving|worsening)\b',
+                    r'\b(?:was|were)\s+(?:previously|formerly|earlier|before|once|originally)\s+(?:profitable|growing|declining|improving|worsening)\b',
+                    
+                    # Relative position patterns
+                    r'\b(?:above|below|over|under|beyond|exceeding|surpassing|falling\s+short)\s+(?:average|median|mean|benchmark|threshold|target|expectation|norm|standard)\b',
+                    r'\b(?:in\s+the\s+)?(?:top|bottom|upper|lower|highest|lowest)\s+(?:X%|\d+%|\d+\s+percent|percentile|quartile|decile)\b',
+                    r'\b(?:above|below)\s+(?:or\s+)?(?:at|near)\s+(?:average|median|mean|benchmark|threshold)\b',
+                    
+                    # Temporal modifier patterns (expanded)
+                    r'\b(?:recently|lately|currently|now|presently|today|this\s+year|this\s+quarter|this\s+month)\b',
+                    r'\b(?:previously|formerly|historically|in\s+the\s+past|back\s+then|earlier|before|once)\b',
+                    r'\b(?:going\s+forward|in\s+the\s+future|ahead|down\s+the\s+road|down\s+the\s+line|eventually|ultimately)\b',
+                    r'\b(?:this|last|next|previous|upcoming|coming|past|recent)\s+(?:year|quarter|month|period|fiscal\s+year|fiscal\s+quarter)\b',
+                    
+                    # Sector/Industry patterns (expanded)
+                    r'\b(?:in|within|across|throughout|through)\s+(?:the\s+)?(?:tech|technology|financial|healthcare|energy|consumer|industrial|real\s+estate)\s+(?:sector|industry|market|space)\b',
+                    r'\b(?:sector|industry|market)\s+(?:wide|wide\s+trend|wide\s+performance|wide\s+analysis)\b',
+                    r'\b(?:across|throughout|through)\s+(?:all|the|multiple|various|different)\s+(?:sectors?|industries?|markets?)\b',
+                    
+                    # Multi-company patterns
+                    r'\b(?:all|both|each|every|some|most|few|many|several)\s+(?:of\s+)?(?:them|these|those|companies|stocks|firms)\b',
+                    r'\b(?:together|combined|collectively|jointly|as\s+a\s+group|as\s+a\s+whole|in\s+total|in\s+aggregate)\b',
+                    r'\b(?:individually|separately|one\s+by\s+one|one\s+at\s+a\s+time|independently)\b',
+                    
+                    # Hypothetical/Conditional patterns (expanded)
+                    r'\b(?:if|when|assuming|given|provided|supposing|presuming)\s+\w+\s+(?:then|what|how|would|will|should|can|could)\b',
+                    r'\b(?:in\s+case|in\s+the\s+event|should|were|had)\s+(?:of|that|X|X\s+to|X\s+happen|X\s+occur)\b',
+                    r'\b(?:what|how)\s+(?:if|when|assuming|given|provided|supposing|presuming)\s+\w+\b',
+                    r'\b(?:were|had)\s+\w+\s+(?:to|been|have)\s+(?:then|what|how|would|will|should|can|could)\b',
+                    
+                    # Question tag patterns
+                    r'\b(?:isn\'t|aren\'t|wasn\'t|weren\'t|doesn\'t|don\'t|didn\'t|won\'t|can\'t|couldn\'t|shouldn\'t|hasn\'t|haven\'t|hadn\'t)\s+(?:it|they|he|she|we|you)\b',
+                    r'\b(?:right|correct|true|accurate|accurate|is\s+that\s+right|is\s+that\s+correct|am\s+i\s+right|am\s+i\s+correct)\b',
                 ]
                 # Use module-level re import explicitly
                 import re as re_module

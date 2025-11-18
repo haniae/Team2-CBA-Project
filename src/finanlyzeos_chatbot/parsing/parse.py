@@ -12,22 +12,55 @@ from .time_grammar import parse_periods
 
 _METRIC_ITEMS = sorted(METRIC_SYNONYMS.items(), key=lambda item: -len(item[0]))
 
-INTENT_COMPARE_PATTERN = re.compile(r"\b(compare|vs|versus)\b")
-INTENT_TREND_PATTERN = re.compile(
-    r"(over time|over the last|history|trend|past \d+\s+(?:years?|quarters?))"
+INTENT_COMPARE_PATTERN = re.compile(
+    r"\b(compare|vs|versus|v\.?s\.?|compared\s+to|compared\s+with|"
+    r"comparison|contrast|difference\s+between|similarity\s+between|"
+    r"versus|against|relative\s+to|in\s+comparison|"
+    r"better\s+than|worse\s+than|higher\s+than|lower\s+than|"
+    r"more\s+than|less\s+than|stronger\s+than|weaker\s+than|"
+    r"times\s+more|times\s+less|X\s+times|twice|double|triple|"
+    r"X%|percent|percentage\s+higher|percent\s+lower|"
+    r"relative\s+performance|side\s+by\s+side|head\s+to\s+head)\b"
 )
-INTENT_LAST_PATTERN = re.compile(r"\blast\s+\d+\s+(quarters?|years?)\b")
+INTENT_TREND_PATTERN = re.compile(
+    r"(over\s+time|over\s+the\s+last|over\s+the\s+past|history|historical|"
+    r"trend|trends|trending|trajectory|direction|path|course|"
+    r"past\s+\d+\s+(?:years?|quarters?|months?)|"
+    r"last\s+\d+\s+(?:years?|quarters?|months?)|"
+    r"recent|recently|evolution|development|progression|"
+    r"how\s+has|how\s+have|how\s+did|how\s+does|"
+    r"changed\s+over|improved\s+over|declined\s+over|"
+    r"grown\s+over|shrunk\s+over|evolved\s+over|"
+    r"time\s+series|time\s+frame|period\s+over|"
+    r"year\s+over\s+year|yoy|quarter\s+over\s+quarter|qoq)\b"
+)
+INTENT_LAST_PATTERN = re.compile(
+    r"\b(last|past|previous|recent|recently|lately)\s+\d+\s+(quarters?|years?|months?|periods?)\b"
+)
 INTENT_RANK_PATTERN = re.compile(
-    r"\b(which|highest|lowest|top|best|worst|most|least|fastest|slowest|"
-    r"rank|ranking|ranked|best performing|worst performing|"
+    r"\b(which|who|what|highest|lowest|top|bottom|best|worst|most|least|"
+    r"fastest|slowest|strongest|weakest|largest|smallest|"
+    r"rank|ranking|ranked|ranks|"
+    r"best\s+performing|worst\s+performing|top\s+performing|"
     r"which.*has.*best|which.*has.*worst|which.*has.*highest|which.*has.*lowest|"
-    r"which.*company.*has|which.*stock.*has|which.*firm.*has)\b"
+    r"which.*company.*has|which.*stock.*has|which.*firm.*has|"
+    r"which.*is.*best|which.*is.*worst|which.*is.*highest|which.*is.*lowest|"
+    r"top\s+\d+|bottom\s+\d+|best\s+\d+|worst\s+\d+|"
+    r"leading|trailing|ahead|behind|outperforming|underperforming|"
+    r"number\s+one|#1|first\s+place|last\s+place)\b"
 )
 INTENT_EXPLAIN_PATTERN = re.compile(
-    r"\b(define|explain|tell me about|describe|break down|"
-    r"how (?:do|does|is|to).*(?:compute|calculate|calculated|work|mean)|"
-    r"what does.*mean|what.*mean|explain.*mean|"
-    r"definition of|meaning of|explanation of)\b"
+    r"\b(define|explain|tell\s+me\s+about|describe|break\s+down|"
+    r"clarify|elaborate|detail|expand|"
+    r"how\s+(?:do|does|is|to|can|should|would).*(?:compute|calculate|calculated|work|mean|function|operate)|"
+    r"what\s+does.*mean|what.*mean|explain.*mean|"
+    r"definition\s+of|meaning\s+of|explanation\s+of|"
+    r"what\s+is|what\s+are|what\s+was|what\s+were|"
+    r"tell\s+me\s+what|help\s+me\s+understand|"
+    r"can\s+you\s+explain|could\s+you\s+explain|"
+    r"i\s+don\'t\s+understand|i\s+need\s+to\s+understand|"
+    r"walk\s+me\s+through|break\s+it\s+down|"
+    r"in\s+simple\s+terms|in\s+layman\'s\s+terms)\b"
 )
 
 
