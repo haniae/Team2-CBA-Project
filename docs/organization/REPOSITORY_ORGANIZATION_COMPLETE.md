@@ -3,16 +3,24 @@
 ## 📁 Current Directory Structure
 
 ### Root Directory (Clean)
-**Essential files only:**
-- `README.md` - Project documentation
-- `LICENSE` - License file
-- `requirements.txt` - Python dependencies
-- `pyproject.toml` - Project configuration
-- `.gitignore` - Git ignore rules
+**Essential configuration files (MUST stay in root):**
+- `README.md` - Project documentation (GitHub displays this automatically)
+- `LICENSE` - License file (GitHub displays this automatically)
+- `requirements.txt` - Python dependencies (pip looks for this in root)
+- `pyproject.toml` - Python project configuration (standard location)
+- `.gitignore` - Git ignore rules (Git looks for this in root)
+- `.gitattributes` - Git attributes file (Git looks for this in root)
+- `.editorconfig` - Editor configuration (editors look for this in root)
+- `.env.example` - Environment variable template (convention: root level)
 
 **Database files (runtime):**
 - `benchmarkos_chatbot.sqlite3` - Main database (runtime file)
 - `test.db` - Test database (runtime file)
+
+**Why these files stay in root:**
+- Tools and services (GitHub, pip, Git, editors) automatically look for these files in the root directory
+- Moving them would break functionality (e.g., pip won't find requirements.txt if it's in a subdirectory)
+- This is standard practice for all Python/Git projects
 
 ---
 
