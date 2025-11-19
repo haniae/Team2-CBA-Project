@@ -181,6 +181,141 @@ class MetricInferenceEngine:
             r'\bbook\s+value\s+(?:of|is)?\s+\$[\d\.,]+[BMK]?\b',
             r'\b\$[\d\.,]+[BMK]?\s+book\s+value\b',
         ]),
+        
+        # NEW: Operating cash flow patterns
+        ('operating_cash_flow', [
+            r'\$[\d\.,]+[BMK]?\s+in\s+operating\s+cash\s+flow\b',  # "$25B in operating cash flow" - CHECK FIRST (no \b before $)
+            r'\b(?:OCF|operating\s+cash\s+flow)\s+(?:of|is|was)?\s+\$[\d\.,]+[BMK]?\b',
+            r'\$[\d\.,]+[BMK]?\s+(?:in\s+)?(?:OCF|operating\s+cash\s+flow)\b',  # No \b before $
+            r'\$[\d\.,]+[BMK]?\s+operating\s+cash\s+flow\b',  # "$25B operating cash flow" (no \b before $)
+            r'\b(?:generated|produced)\s+\$[\d\.,]+[BMK]?\s+(?:in\s+)?(?:operating\s+)?cash\s+flow\b',
+        ]),
+        
+        # NEW: Working capital patterns
+        ('working_capital', [
+            r'\bworking\s+capital\s+(?:of|is|was)?\s+\$[\d\.,]+[BMK]?\b',
+            r'\$[\d\.,]+[BMK]?\s+working\s+capital\b',  # "$8B working capital" (no \b before $)
+            r'\$[\d\.,]+[BMK]?\s+(?:in\s+)?working\s+capital\b',  # No \b before $
+            r'\bWC\s+(?:of|is)?\s+\$[\d\.,]+[BMK]?\b',
+        ]),
+        
+        # NEW: Current ratio patterns
+        ('current_ratio', [
+            r'\bcurrent\s+ratio\s+(?:of|is|was)?\s+(\d+(?:\.\d+)?)\b',
+            r'\b(\d+(?:\.\d+)?)\s+current\s+ratio\b',
+            r'\b(?:liquidity\s+)?ratio\s+(?:of|is)?\s+(\d+(?:\.\d+)?)\b',
+        ]),
+        
+        # NEW: Quick ratio patterns
+        ('quick_ratio', [
+            r'\bquick\s+ratio\s+(?:of|is|was)?\s+(\d+(?:\.\d+)?)\b',
+            r'\b(\d+(?:\.\d+)?)\s+quick\s+ratio\b',
+            r'\bacid\s+test\s+(?:ratio\s+)?(?:of|is)?\s+(\d+(?:\.\d+)?)\b',
+        ]),
+        
+        # NEW: Debt-to-equity patterns
+        ('debt_to_equity', [
+            r'\bdebt[\s\-]to[\s\-]equity\s+(?:ratio\s+)?(?:of|is|was)?\s+(\d+(?:\.\d+)?)\b',
+            r'\b(\d+(?:\.\d+)?)\s+debt[\s\-]to[\s\-]equity\b',
+            r'\bD/E\s+(?:ratio\s+)?(?:of|is)?\s+(\d+(?:\.\d+)?)\b',
+            r'\bD/E\s+ratio\s+(\d+(?:\.\d+)?)\b',  # "D/E ratio 0.3"
+        ]),
+        
+        # NEW: Interest coverage patterns
+        ('interest_coverage', [
+            r'\binterest\s+coverage\s+(?:ratio\s+)?(?:of|is|was)?\s+(\d+(?:\.\d+)?)\b',
+            r'\binterest\s+coverage\s+ratio\s+(\d+(?:\.\d+)?)\b',  # "interest coverage ratio 5.2"
+            r'\b(\d+(?:\.\d+)?)\s+interest\s+coverage\b',
+            r'\btimes\s+interest\s+earned\s+(?:of|is)?\s+(\d+(?:\.\d+)?)\b',
+        ]),
+        
+        # NEW: Inventory turnover patterns
+        ('inventory_turnover', [
+            r'\binventory\s+turnover\s+(?:of|is|was)?\s+(\d+(?:\.\d+)?)\b',
+            r'\binventory\s+turnover\s+(\d+(?:\.\d+)?)\b',  # "inventory turnover 8.3"
+            r'\b(\d+(?:\.\d+)?)\s+inventory\s+turnover\b',
+            r'\bturnover\s+ratio\s+(?:of|is)?\s+(\d+(?:\.\d+)?)\b',
+        ]),
+        
+        # NEW: Asset turnover patterns
+        ('asset_turnover', [
+            r'\basset\s+turnover\s+(?:of|is|was)?\s+(\d+(?:\.\d+)?)\b',
+            r'\basset\s+turnover\s+(\d+(?:\.\d+)?)\b',  # "asset turnover 1.2"
+            r'\b(\d+(?:\.\d+)?)\s+asset\s+turnover\b',
+        ]),
+        
+        # NEW: Price-to-sales patterns
+        ('price_to_sales', [
+            r'\bP/S\s+(?:ratio\s+)?(?:of|is|was)?\s+(\d+(?:\.\d+)?)\b',
+            r'\bprice[\s\-]to[\s\-]sales\s+(?:ratio\s+)?(?:of|is)?\s+(\d+(?:\.\d+)?)\b',
+            r'\bprice[\s\-]to[\s\-]sales\s+(\d+(?:\.\d+)?)\b',  # "price to sales 4.2"
+            r'\b(\d+(?:\.\d+)?)\s+price[\s\-]to[\s\-]sales\b',
+        ]),
+        
+        # NEW: EV/EBITDA patterns
+        ('ev_ebitda', [
+            r'\bEV/EBITDA\s+(?:of|is|was)?\s+(\d+(?:\.\d+)?)\b',
+            r'\b(\d+(?:\.\d+)?)\s+EV/EBITDA\b',
+            r'\benterprise\s+value\s+to\s+EBITDA\s+(?:of|is)?\s+(\d+(?:\.\d+)?)\b',
+            r'\benterprise\s+value\s+to\s+EBITDA\s+(\d+(?:\.\d+)?)\b',  # "enterprise value to EBITDA 15.0"
+        ]),
+        
+        # NEW: Dividend yield patterns
+        ('dividend_yield', [
+            r'\bdividend\s+yield\s+(\d+(?:\.\d+)?)\s*%',  # "dividend yield 3.0%" - CHECK FIRST (removed \b before %)
+            r'\bdividend\s+yield\s+(?:of|is|was)\s+(\d+(?:\.\d+)?)\s*%',  # "dividend yield of 2.5%" (removed \b before %)
+            r'\b(\d+(?:\.\d+)?)\s*%\s+dividend\s+yield\b',
+            r'\byield\s+(?:of|is)?\s+(\d+(?:\.\d+)?)\s*%',
+        ]),
+        
+        # NEW: Payout ratio patterns
+        ('payout_ratio', [
+            r'\bpayout\s+ratio\s+(\d+(?:\.\d+)?)\s*%',  # "payout ratio 40%" - CHECK FIRST (removed \b before %)
+            r'\bdividend\s+payout\s+(\d+(?:\.\d+)?)\s*%',  # "dividend payout 35%" - CHECK SECOND (removed \b before %)
+            r'\bpayout\s+ratio\s+(?:of|is|was)\s+(\d+(?:\.\d+)?)\s*%',  # (removed \b before %)
+            r'\b(\d+(?:\.\d+)?)\s*%\s+payout\s+ratio\b',
+            r'\bdividend\s+payout\s+(?:of|is)\s+(\d+(?:\.\d+)?)\s*%',  # (removed \b before %)
+        ]),
+        
+        # NEW: Gross profit patterns
+        ('gross_profit', [
+            r'\$[\d\.,]+[BMK]?\s+gross\s+profit\b',  # "$80B gross profit" - CHECK FIRST (no \b before $)
+            r'\bgross\s+profit\s+\$[\d\.,]+[BMK]?\b',  # "gross profit $100B"
+            r'\bgross\s+profit\s+(?:of|is|was)?\s+\$[\d\.,]+[BMK]?\b',
+            r'\$[\d\.,]+[BMK]?\s+(?:in\s+)?gross\s+profit\b',  # No \b before $
+            r'\b(?:made|earned|generated)\s+\$[\d\.,]+[BMK]?\s+(?:in\s+)?gross\s+profit\b',
+        ]),
+        
+        # NEW: Operating expenses patterns
+        ('operating_expenses', [
+            r'\$[\d\.,]+[BMK]?\s+operating\s+expenses?\b',  # "$25B operating expenses" - CHECK FIRST (no \b before $)
+            r'\bOPEX\s+\$[\d\.,]+[BMK]?\b',  # "OPEX $20B" - CHECK SECOND
+            r'\boperating\s+expenses?\s+\$[\d\.,]+[BMK]?\b',  # "operating expenses $30B"
+            r'\boperating\s+expenses?\s+(?:of|is|was|are|were)?\s+\$[\d\.,]+[BMK]?\b',
+            r'\$[\d\.,]+[BMK]?\s+(?:in\s+)?operating\s+expenses?\b',  # No \b before $
+            r'\bOPEX\s+(?:of|is)?\s+\$[\d\.,]+[BMK]?\b',
+        ]),
+        
+        # NEW: R&D expenses patterns
+        ('rd_expenses', [
+            r'\$[\d\.,]+[BMK]?\s+R&D\s+expenses?\b',  # "$12B R&D expenses" - CHECK FIRST (no \b before $)
+            r'\$[\d\.,]+[BMK]?\s+R\s*&\s*D\s+expenses?\b',  # "$12B R&D expenses" (with &) - CHECK SECOND (no \b before $)
+            r'\bR&D\s+expenses?\s+\$[\d\.,]+[BMK]?\b',  # "R&D expenses $15B"
+            r'\bR&D\s+(?:expenses?|spending|costs?)\s+(?:of|is|was|are|were)?\s+\$[\d\.,]+[BMK]?\b',
+            r'\bresearch\s+and\s+development\s+\$[\d\.,]+[BMK]?\b',  # "research and development $10B"
+            r'\bresearch\s+and\s+development\s+(?:expenses?|spending|costs?)\s+(?:of|is)?\s+\$[\d\.,]+[BMK]?\b',
+            r'\$[\d\.,]+[BMK]?\s+(?:in\s+)?(?:R&D|research\s+and\s+development)\b',  # No \b before $
+        ]),
+        
+        # NEW: CAPEX patterns
+        ('capex', [
+            r'\$[\d\.,]+[BMK]?\s+CAPEX\b',  # "$15B CAPEX" - CHECK FIRST (no \b before $)
+            r'\bCAPEX\s+\$[\d\.,]+[BMK]?\b',  # "CAPEX $15B" - CHECK SECOND
+            r'\bCAPEX\s+(?:of|is|was)?\s+\$[\d\.,]+[BMK]?\b',
+            r'\bcapital\s+expenditures?\s+\$[\d\.,]+[BMK]?\b',  # "capital expenditures $18B"
+            r'\bcapital\s+expenditures?\s+(?:of|is)?\s+\$[\d\.,]+[BMK]?\b',
+            r'\$[\d\.,]+[BMK]?\s+(?:in\s+)?(?:CAPEX|capital\s+expenditures?)\b',  # No \b before $
+        ]),
     ])
     
     def __init__(self):

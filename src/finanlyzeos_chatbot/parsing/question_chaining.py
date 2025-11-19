@@ -57,6 +57,12 @@ class QuestionChainDetector:
         r'\b(now\s+(?:show|tell|what|how))\b',
         r'\b(following\s+that,?\s+(?:show|tell))\b',
         r'\b(subsequently,?\s+(?:show|tell))\b',
+        r'\b(afterwards,?\s+(?:show|tell|what|how))\b',
+        r'\b(later,?\s+(?:show|tell|what|how))\b',
+        r'\b(secondly,?\s+(?:show|tell|what|how))\b',
+        r'\b(thirdly,?\s+(?:show|tell|what|how))\b',
+        r'\b(moving\s+on,?\s+(?:show|tell|what|how))\b',
+        r'\b(proceeding\s+to,?\s+(?:show|tell|what|how|analyze|check))\b',  # "proceeding to analyze"
     ]
     
     # Comparative chain patterns (comparing to previous) - EXPANDED
@@ -69,6 +75,10 @@ class QuestionChainDetector:
         r'\b(?:in\s+)?comparison\s+to\s+(?:that|the\s+previous)\b',
         r'\bagainst\s+(?:that|the\s+previous|the\s+last)\b',
         r'\bhow\s+(?:does|do)\s+(?:that|this|it)\s+(?:differ|vary)\b',
+        r'\b(?:relative\s+to|compared\s+with)\s+(?:that|the\s+previous|the\s+last)\b',
+        r'\b(?:is|are)\s+(?:that|this|it|they)\s+(?:better|worse|more|less|higher|lower)\s+than\s+(?:the\s+previous|the\s+last)\b',
+        r'\b(?:how|what)\s+(?:about|is)\s+(?:that|this|it)\s+(?:versus|vs|compared\s+to)\s+(?:the\s+previous|the\s+last)\b',
+        r'\b(?:same|similar|different)\s+(?:as|from)\s+(?:that|the\s+previous|the\s+last)\b',
     ]
     
     # Exploratory chain patterns (exploring related topics) - EXPANDED
@@ -79,6 +89,11 @@ class QuestionChainDetector:
         # NEW: More exploratory patterns
         r'\b(?:what|how)\s+if\s+(?:we|I)\s+(?:look|check)\b',
         r'\b(?:maybe|perhaps)\s+(?:check|look\s+at)\b',
+        r'\b(?:let\'s|let\s+us)\s+(?:also|also\s+look|check|see)\b',
+        r'\b(?:i\'d\s+also\s+like|i\s+would\s+also\s+like)\s+(?:to\s+know|to\s+see|to\s+check)\b',
+        r'\b(?:can\s+we|could\s+we)\s+(?:also|also\s+look|check|see)\b',
+        r'\b(?:another|one\s+more)\s+(?:thing|question|query)\b',
+        r'\b(?:speaking\s+of|on\s+that\s+note|while\s+we\'re\s+at\s+it)\b',
     ]
     
     # Continuation patterns (adding to previous) - EXPANDED
@@ -91,6 +106,11 @@ class QuestionChainDetector:
         r'\b(plus,?\s+(?:show|tell|get))\b',
         r'\b(as\s+well,?\s+(?:show|tell))\b',
         r'\b(on\s+top\s+of\s+that)\b',
+        r'\b(and\s+also|and\s+additionally)\b',
+        r'\b(not\s+only\s+that,?\s+but\s+also)\b',
+        r'\b(along\s+with\s+that)\b',
+        r'\b(while\s+we\'re\s+at\s+it)\b',
+        r'\b(by\s+the\s+way)\b',
     ]
     
     # Elaboration patterns (asking for more detail) - EXPANDED
@@ -102,7 +122,13 @@ class QuestionChainDetector:
         # NEW: More elaboration patterns
         r'\b(?:expand|dive\s+deeper)\s+(?:on|into)\b',
         r'\b(?:break|drill)\s+(?:down|into)\s+(?:that|this)\b',
+        r'\bdrill\s+down\s+into\b',  # "drill down into profit"
         r'\bcan\s+you\s+(?:elaborate|explain\s+more)\b',
+        r'\b(?:i\s+need|i\'d\s+like)\s+(?:more|further|additional)\s+(?:info|information|details?|data)\s+(?:on|about|regarding)\b',
+        r'\b(?:can|could|would)\s+you\s+(?:provide|give)\s+(?:more|further|additional)\s+(?:info|information|details?)\b',
+        r'\b(?:what\s+else|anything\s+else)\s+(?:can|could)\s+you\s+(?:tell|say|share)\s+(?:about|on|regarding)\b',
+        r'\b(?:dig\s+deeper|go\s+into\s+detail|provide\s+more\s+context)\b',
+        r'\b(?:break\s+it\s+down|break\s+down\s+that|break\s+down\s+this)\b',
     ]
     
     # NEW: False positive patterns (DON'T detect as chains)

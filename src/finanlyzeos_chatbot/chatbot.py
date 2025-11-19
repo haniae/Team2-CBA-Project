@@ -4235,6 +4235,65 @@ class FinanlyzeOSChatbot:
                     # Modal verb patterns for speculative queries (expanded)
                     r'\b(?:might|may|could|would|should)\s+(?:be|have|do|make|earn|generate|produce|create|perform|achieve|reach|exceed|surpass)\b',
                     r'\b(?:might|may|could|would|should)\s+(?:not|never)\s+(?:be|have|do|make|earn|generate|produce|create|perform|achieve|reach|exceed|surpass)\b',
+                    
+                    # NEW: Casual/conversational question patterns
+                    r'\b(?:i\s+wonder|i\'m\s+wondering|i\'ve\s+been\s+wondering)\s+(?:what|how|why|when|where|which|if|whether)\b',
+                    r'\b(?:curious|interested|intrigued)\s+(?:about|to\s+know|to\s+learn|to\s+find\s+out|to\s+understand)\b',
+                    r'\b(?:i\'m\s+curious|i\s+am\s+curious|i\'m\s+interested|i\s+am\s+interested)\s+(?:about|to\s+know|to\s+learn|to\s+find\s+out|to\s+understand)\b',
+                    r'\b(?:wondering|thinking|considering|pondering)\s+(?:what|how|why|when|where|which|if|whether|about)\b',
+                    
+                    # NEW: Clarification request patterns
+                    r'\b(?:can\s+you\s+clarify|could\s+you\s+clarify|would\s+you\s+clarify|please\s+clarify)\b',
+                    r'\b(?:what\s+do\s+you\s+mean|what\s+does\s+that\s+mean|what\s+does\s+this\s+mean)\b',
+                    r'\b(?:i\s+don\'t\s+get\s+it|i\s+don\'t\s+understand|i\'m\s+confused|i\'m\s+not\s+sure)\b',
+                    r'\b(?:could\s+you\s+explain|can\s+you\s+explain|would\s+you\s+explain|please\s+explain)\s+(?:that|this|it|more|further|in\s+detail)\b',
+                    
+                    # NEW: Follow-up question patterns
+                    r'\b(?:what\s+about|how\s+about|what\s+else|anything\s+else|any\s+other)\b',
+                    r'\b(?:and\s+what|and\s+how|and\s+why|and\s+when|and\s+where|and\s+which)\b',
+                    r'\b(?:also|additionally|furthermore|moreover|besides|in\s+addition)\s+(?:what|how|why|when|where|which|if|whether)\b',
+                    r'\b(?:speaking\s+of|on\s+that\s+note|while\s+we\'re\s+at\s+it|by\s+the\s+way)\s+(?:what|how|why|when|where|which|if|whether)\b',
+                    
+                    # NEW: Comparative question patterns (expanded)
+                    r'\b(?:how\s+does|how\s+do|how\s+did)\s+\w+\s+(?:stack\s+up|compare|measure\s+up|fare)\s+(?:against|to|with|versus|vs)\b',
+                    r'\b(?:is|are|was|were)\s+\w+\s+(?:better|worse|more|less|higher|lower|larger|smaller)\s+(?:than|compared\s+to|compared\s+with|relative\s+to)\b',
+                    r'\b(?:which\s+is|which\s+are|which\s+was|which\s+were)\s+(?:better|worse|more|less|higher|lower|larger|smaller|best|worst|most|least)\b',
+                    r'\b(?:what\'s\s+the\s+difference|what\s+are\s+the\s+differences|what\'s\s+the\s+gap)\s+(?:between|among|of|for)\b',
+                    
+                    # NEW: Contextual question patterns
+                    r'\b(?:in\s+context|in\s+perspective|relatively\s+speaking|comparatively\s+speaking)\s+(?:what|how|why|when|where|which|if|whether)\b',
+                    r'\b(?:given|considering|taking\s+into\s+account|in\s+light\s+of)\s+(?:that|this|the\s+fact|the\s+circumstances)\s+(?:what|how|why|when|where|which|if|whether)\b',
+                    r'\b(?:all\s+things\s+considered|everything\s+considered|overall)\s+(?:what|how|why|when|where|which|if|whether)\b',
+                    
+                    # NEW: Action-oriented question patterns
+                    r'\b(?:what\s+should|what\s+would|what\s+could|what\s+can)\s+(?:i|we|you|they)\s+(?:do|make|take|consider|think|expect|anticipate)\b',
+                    r'\b(?:how\s+should|how\s+would|how\s+could|how\s+can)\s+(?:i|we|you|they)\s+(?:proceed|approach|handle|deal\s+with|manage|address)\b',
+                    r'\b(?:what\'s\s+the\s+best|what\'s\s+the\s+optimal|what\'s\s+the\s+ideal)\s+(?:way|approach|strategy|method|course\s+of\s+action|action|move)\s+(?:to|for|in)\b',
+                    
+                    # NEW: Uncertainty/exploration patterns
+                    r'\b(?:i\'m\s+not\s+sure|i\'m\s+uncertain|i\'m\s+unsure)\s+(?:what|how|why|when|where|which|if|whether|about)\b',
+                    r'\b(?:trying\s+to\s+figure\s+out|trying\s+to\s+understand|trying\s+to\s+learn)\s+(?:what|how|why|when|where|which|if|whether|about|the)\b',  # Added "the" for "trying to figure out the revenue"
+                    r'\b(?:help\s+me\s+figure\s+out|help\s+me\s+understand|help\s+me\s+learn)\s+(?:what|how|why|when|where|which|if|whether|about)\b',
+                    
+                    # NEW: Preference/choice patterns
+                    r'\b(?:which\s+would\s+you|which\s+should\s+i|which\s+do\s+you)\s+(?:choose|pick|prefer|recommend|suggest|advise)\b',
+                    r'\b(?:what\s+would\s+you|what\s+should\s+i|what\s+do\s+you)\s+(?:choose|pick|prefer|recommend|suggest|advise)\b',
+                    r'\b(?:between|among)\s+\w+\s+(?:which|what)\s+(?:is|are|would\s+be|should\s+be)\s+(?:better|best|preferred|recommended)\b',
+                    
+                    # NEW: Validation/confirmation patterns
+                    r'\b(?:is\s+that\s+right|is\s+that\s+correct|is\s+that\s+accurate|am\s+i\s+right|am\s+i\s+correct)\b',
+                    r'\b(?:can\s+you\s+confirm|could\s+you\s+confirm|would\s+you\s+confirm|please\s+confirm)\b',
+                    r'\b(?:verify|validate|check|double\s+check)\s+(?:that|if|whether|what|how|why|when|where|which)\b',
+                    
+                    # NEW: Existence/availability patterns
+                    r'\b(?:is\s+there|are\s+there|was\s+there|were\s+there)\s+(?:any|a|an|some)\s+(?:way|method|approach|strategy|option|alternative|solution|possibility)\b',
+                    r'\b(?:does|do|did)\s+(?:there|it|this|that)\s+(?:exist|exist\s+any|exist\s+a|exist\s+an)\b',
+                    r'\b(?:available|unavailable|accessible|inaccessible)\s+(?:for|to|in|at|on|from)\b',
+                    
+                    # NEW: Scope/coverage patterns
+                    r'\b(?:what\s+all|what\s+else|what\s+other|everything|anything|nothing|something)\s+(?:is|are|was|were|does|do|did|will|would|can|could|should)\b',
+                    r'\b(?:in\s+detail|in\s+full|completely|thoroughly|comprehensively|extensively)\s+(?:what|how|why|when|where|which|if|whether|about)\b',
+                    r'\b(?:give\s+me|show\s+me|tell\s+me)\s+(?:everything|anything|something|all|the\s+full|the\s+complete|the\s+detailed)\s+(?:about|on|regarding|concerning)\b',
                     r'\b(?:is|are|was|were)\s+(?:likely|unlikely|possible|impossible|probable|improbable|certain|uncertain)\s+(?:to\s+be|to\s+have|to\s+do|that|to)\b',
                     r'\b(?:might|may|could|would|should)\s+(?:have|had)\s+(?:been|become|became|done|made|earned|generated|produced|created|performed|achieved|reached)\b',
                     

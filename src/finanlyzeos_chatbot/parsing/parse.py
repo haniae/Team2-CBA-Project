@@ -20,7 +20,8 @@ INTENT_COMPARE_PATTERN = re.compile(
     r"more\s+than|less\s+than|stronger\s+than|weaker\s+than|"
     r"times\s+more|times\s+less|X\s+times|twice|double|triple|"
     r"X%|percent|percentage\s+higher|percent\s+lower|"
-    r"relative\s+performance|side\s+by\s+side|head\s+to\s+head)\b"
+    r"relative\s+performance|side\s+by\s+side|head\s+to\s+head)\b",
+    re.IGNORECASE
 )
 INTENT_TREND_PATTERN = re.compile(
     r"(over\s+time|over\s+the\s+last|over\s+the\s+past|history|historical|"
@@ -140,6 +141,98 @@ INTENT_AGGREGATION_PATTERN = re.compile(
     r"add\s+up|sum\s+up|total\s+up|combine|aggregate|"
     r"all\s+together|everything\s+combined|altogether|"
     r"sum\s+all|total\s+all|add\s+all|aggregate\s+all|combined\s+value|combined\s+amount)\b"
+)
+
+# NEW: Recommendation/Advice intent patterns
+INTENT_RECOMMENDATION_PATTERN = re.compile(
+    r"\b(should\s+i|should\s+we|should\s+you|should\s+they|"
+    r"would\s+you\s+recommend|do\s+you\s+recommend|can\s+you\s+recommend|"
+    r"what\s+do\s+you\s+recommend|what\s+would\s+you\s+recommend|"
+    r"should\s+i\s+buy|should\s+i\s+sell|should\s+i\s+invest|should\s+i\s+hold|"
+    r"is\s+it\s+a\s+good\s+investment|is\s+it\s+worth\s+investing|"
+    r"would\s+you\s+advise|do\s+you\s+advise|what\s+is\s+your\s+advice|"
+    r"what\s+is\s+your\s+recommendation|what\s+is\s+your\s+suggestion|"
+    r"should\s+i\s+be\s+concerned|should\s+i\s+worry|"
+    r"is\s+this\s+a\s+buy|is\s+this\s+a\s+sell|is\s+this\s+a\s+hold|"
+    r"what\'s\s+your\s+take|what\'s\s+your\s+opinion|what\'s\s+your\s+view)\b"
+)
+
+# NEW: Risk analysis intent patterns
+INTENT_RISK_PATTERN = re.compile(
+    r"\b(risk|risks|risky|risk\s+analysis|risk\s+assessment|risk\s+profile|"
+    r"what\s+are\s+the\s+risks|what\s+is\s+the\s+risk|how\s+risky|"
+    r"volatility|volatile|volatility\s+analysis|"
+    r"downside\s+risk|upside\s+potential|risk\s+reward|"
+    r"how\s+safe|how\s+secure|is\s+it\s+safe|is\s+it\s+risky|"
+    r"what\s+could\s+go\s+wrong|what\s+are\s+the\s+dangers|"  # More specific than forecast "what could"
+    r"exposure|risk\s+exposure|risk\s+factors|risk\s+drivers|"
+    r"beta|correlation\s+risk|concentration\s+risk|"
+    r"credit\s+risk|market\s+risk|liquidity\s+risk|operational\s+risk)\b"
+)
+
+# NEW: Optimization intent patterns
+INTENT_OPTIMIZATION_PATTERN = re.compile(
+    r"\b(optimize|optimization|optimal|best\s+way|best\s+approach|"
+    r"how\s+to\s+optimize|how\s+to\s+improve|how\s+to\s+maximize|how\s+to\s+minimize|"
+    r"maximize|minimize|improve\s+performance|enhance|"
+    r"what\'s\s+the\s+best\s+strategy|what\'s\s+the\s+optimal|"
+    r"how\s+can\s+i\s+improve|how\s+can\s+we\s+improve|"
+    r"efficiency|efficient|inefficient|"
+    r"rebalance|rebalancing|portfolio\s+optimization|"
+    r"asset\s+allocation|optimal\s+allocation|best\s+allocation)\b"
+)
+
+# NEW: Valuation intent patterns
+INTENT_VALUATION_PATTERN = re.compile(
+    r"\b(valuation|value|valued|worth|pricing|price|"
+    r"is\s+it\s+overvalued|is\s+it\s+undervalued|is\s+it\s+fairly\s+valued|"
+    r"is\s+\w+\s+overvalued|is\s+\w+\s+undervalued|is\s+\w+\s+fairly\s+valued|"  # "is apple overvalued"
+    r"what\'s\s+it\s+worth|what\'s\s+the\s+value|how\s+much\s+is\s+it\s+worth|"
+    r"fair\s+value|intrinsic\s+value|book\s+value|market\s+value|"
+    r"P\s*[/\-]\s*E|P\s*[/\-]\s*E\s+ratio|P\s*[/\-]\s*E\s+of|P\s*[/\-]\s*E\s+of\s+\w+|"  # More flexible P/E matching - CHECK FIRST
+    r"P/E|P\/E|P\/E\s+ratio|P\/E\s+of|P\/E\s+of\s+\w+|price\s+to\s+earnings|P/B|P\/B|P\/B\s+ratio|price\s+to\s+book|"  # Allow P/E and P/B with ratio and "of"
+    r"EV/EBITDA|EV\/EBITDA|enterprise\s+value|"
+    r"expensive|cheap|reasonably\s+priced|"
+    r"valuation\s+metrics|valuation\s+analysis|DCF|DCF\s+analysis|discounted\s+cash\s+flow)\b",
+    re.IGNORECASE
+)
+
+# NEW: Performance attribution intent patterns
+INTENT_ATTRIBUTION_PATTERN = re.compile(
+    r"\b(attribution|performance\s+attribution|what\s+drove|what\s+contributed|"
+    r"what\s+led\s+to|what\s+caused\s+the|what\s+explains|"
+    r"breakdown\s+of|decomposition|factor\s+analysis|"
+    r"drivers|driving\s+factors|contributing\s+factors|"
+    r"why\s+did\s+it\s+perform|why\s+did\s+it\s+underperform|why\s+did\s+it\s+outperform|"
+    r"what\s+factors|which\s+factors|key\s+drivers|main\s+drivers)\b"
+)
+
+# NEW: Forecasting/Prediction intent patterns (more comprehensive)
+INTENT_FORECAST_PATTERN = re.compile(
+    r"\b(forecast|forecasting|predict|prediction|predicting|"
+    r"project|projection|projecting|projected|estimate|estimation|estimating|"  # Added "projected"
+    r"outlook|future|forward\s+looking|forward\s+projection|"
+    r"what\s+will|what\s+would|what\s+might|what\s+could\s+(?:happen|be|occur|change)|"  # More specific to avoid matching "what could go wrong"
+    r"how\s+will|how\s+would|how\s+might|how\s+could|"
+    r"expected|expectation|expectations|"
+    r"guidance|guidance\s+for|guidance\s+on|"
+    r"next\s+year|next\s+quarter|upcoming|coming\s+year|coming\s+quarter|"
+    r"future\s+performance|future\s+growth|future\s+earnings|"
+    r"scenario\s+analysis|sensitivity\s+analysis|"
+    r"what\s+if\s+analysis|model|modeling)\b"
+)
+
+# NEW: Efficiency/Productivity intent patterns
+INTENT_EFFICIENCY_PATTERN = re.compile(
+    r"\b(efficiency|efficient|inefficient|productivity|productive|"
+    r"how\s+efficient|how\s+productive|"
+    r"what\'s\s+the\s+ROE\b|what\'s\s+the\s+ROA\b|what\'s\s+the\s+ROIC\b|whats\s+the\s+ROE\b|whats\s+the\s+ROA\b|whats\s+the\s+ROIC\b|"  # "what's the ROE" (with and without apostrophe)
+    r"ROE|ROE\s+analysis|return\s+on\s+equity|"  # Added "ROE analysis"
+    r"ROA|ROA\s+analysis|return\s+on\s+assets|ROIC|ROIC\s+analysis|return\s+on\s+invested\s+capital|"  # Added "ROA analysis" and "ROIC analysis"
+    r"asset\s+turnover|capital\s+efficiency|operational\s+efficiency|"
+    r"utilization|utilization\s+rate|capacity\s+utilization|"
+    r"productivity\s+metrics|efficiency\s+metrics|efficiency\s+ratio)\b",
+    re.IGNORECASE
 )
 
 
@@ -388,12 +481,33 @@ def classify_intent(
     if periods and isinstance(periods, dict):
         period_type = periods.get("type")
 
-    # Priority order: what-if > why > when > relationship > benchmark > summary > 
-    #                 conditional > rank > explain > trend > compare > change > lookup
+    # Priority order: forecast > what-if > recommendation > risk > valuation > attribution > 
+    #                 why > when > relationship > benchmark > optimization > efficiency > 
+    #                 summary > conditional > rank > explain > trend > compare > change > lookup
     
-    # Check for what-if/scenario intent (highest priority - very specific)
+    # Check for forecast/prediction intent (highest priority - very specific)
+    if INTENT_FORECAST_PATTERN.search(norm_text):
+        return "forecast"
+    
+    # Check for what-if/scenario intent (very high priority - very specific)
     if INTENT_WHATIF_PATTERN.search(norm_text):
         return "scenario_analysis"
+    
+    # Check for recommendation/advice intent (high priority - actionable queries)
+    if INTENT_RECOMMENDATION_PATTERN.search(norm_text):
+        return "recommendation"
+    
+    # Check for risk analysis intent (high priority - specific risk queries)
+    if INTENT_RISK_PATTERN.search(norm_text):
+        return "risk_analysis"
+    
+    # Check for valuation intent (high priority - specific valuation queries)
+    if INTENT_VALUATION_PATTERN.search(norm_text):
+        return "valuation"
+    
+    # Check for performance attribution intent (high priority - specific attribution queries)
+    if INTENT_ATTRIBUTION_PATTERN.search(norm_text):
+        return "attribution"
 
     # Check for why/causal intent (high priority - specific reasoning queries)
     if INTENT_WHY_PATTERN.search(norm_text):
@@ -410,6 +524,16 @@ def classify_intent(
     # Check for benchmark intent (medium priority - similar to compare but more specific)
     if INTENT_BENCHMARK_PATTERN.search(norm_text):
         return "benchmark_analysis"
+    
+    # Check for efficiency intent (medium priority - efficiency queries)
+    # Check BEFORE optimization and rank since "how efficient" might match optimization
+    # and "what's the ROE" might match rank
+    if INTENT_EFFICIENCY_PATTERN.search(norm_text):
+        return "efficiency"
+    
+    # Check for optimization intent (medium priority - optimization queries)
+    if INTENT_OPTIMIZATION_PATTERN.search(norm_text):
+        return "optimization"
 
     # Check for aggregation intent FIRST (higher priority than summary - more specific)
     # This must come before summary since "sum", "total", "combined" might match summary pattern
@@ -425,7 +549,11 @@ def classify_intent(
         return "conditional_analysis"
 
     # Check for rank intent (medium priority for ranking questions)
+    # Check AFTER efficiency to avoid matching "what's the ROE" as rank
     if INTENT_RANK_PATTERN.search(norm_text):
+        # Skip rank if it's actually an efficiency query (e.g., "what's the ROE")
+        if re.search(r"what['\s]s\s+the\s+(ROE|ROA|ROIC)\b", norm_text, re.IGNORECASE):
+            return "efficiency"
         # For ranking queries, only parse tickers if explicitly mentioned
         if tickers and isinstance(tickers, list) and unique_tickers:
             norm_upper = norm_text.upper()
