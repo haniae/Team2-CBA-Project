@@ -79,6 +79,10 @@ _MANUAL_OVERRIDES: Dict[str, str] = {
     "bj's wholesale": "BJ",
     "booking": "BKNG",
     "booking holdings": "BKNG",
+    "bookng": "BKNG",  # Common misspelling
+    "bookng holdings": "BKNG",
+    "bookng holdings inc": "BKNG",  # With suffix
+    "bookng holdings incorporated": "BKNG",
     "crown": "CCK",
     "crown holdings": "CCK",
     "celsius": "CELH",
@@ -169,6 +173,13 @@ _MANUAL_OVERRIDES: Dict[str, str] = {
     "xerox": "XRX",
     "zimmer biomet": "ZBH",
     "zimmer": "ZBH",
+    # Common misspellings
+    "tesla": "TSLA",
+    "tesl": "TSLA",  # Common misspelling
+    "nvida": "NVDA",  # Common misspelling
+    "nvidia": "NVDA",
+    "appel": "AAPL",  # Common misspelling (Apple)
+    "appl": "AAPL",  # Another common misspelling
 }
 
 _TICKER_PATTERN = re.compile(r"\b([A-Za-z]{1,5})(?:\.[A-Za-z]{1,2})?\b")
@@ -181,6 +192,9 @@ _TICKER_SET: Optional[Set[str]] = None
 def _base_tokens(text: str) -> List[str]:
     normalized = unicodedata.normalize("NFKC", text or "")
     normalized = normalized.lower()
+    # Handle possessive forms - convert "company's" to "company" before removing punctuation
+    # This helps with queries like "Microsft's revenue" -> "microsft revenue"
+    normalized = re.sub(r"'s\b", " ", normalized)  # Remove possessive 's
     normalized = normalized.replace("&", " and ")
     normalized = re.sub(r"[^\w\s]", " ", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
@@ -426,7 +440,8 @@ def _ensure_lookup_loaded() -> Tuple[Dict[str, Set[str]], Dict[str, List[str]], 
 def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]]:
     """Resolve tickers from free-form text using aliases and fuzzy fallback."""
     alias_map, lookup, ticker_set = _ensure_lookup_loaded()
-    lowered_text = text or ""
+    lowered_text = (text or "").lower()
+    original_text = text or ""  # Keep original for case checking
     
     # Forecasting keyword detection - extract company names from forecasting query structures
     # Patterns like "Forecast Apple revenue", "Predict Microsoft revenue using LSTM"
@@ -608,7 +623,25 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
     def _try_add_alias(alias_key: str, source_value: str, mark_warning: bool = False) -> bool:
         if not alias_key:
             return False
-        for ticker in lookup.get(alias_key, []):
+        
+        # First try lookup
+        tickers_to_try = lookup.get(alias_key, [])
+        
+        # If not in lookup, check manual overrides directly (in case aliases.json wasn't regenerated)
+        if not tickers_to_try and alias_key in _MANUAL_OVERRIDES:
+            override_ticker = _MANUAL_OVERRIDES[alias_key]
+            if override_ticker in ticker_set:
+                tickers_to_try = [override_ticker]
+        
+        # Also try normalized version in manual overrides
+        if not tickers_to_try:
+            normalized_key = normalize_alias(alias_key)
+            if normalized_key and normalized_key != alias_key and normalized_key in _MANUAL_OVERRIDES:
+                override_ticker = _MANUAL_OVERRIDES[normalized_key]
+                if override_ticker in ticker_set:
+                    tickers_to_try = [override_ticker]
+        
+        for ticker in tickers_to_try:
             if ticker in seen:
                 continue
             resolved.append({"input": source_value, "ticker": ticker})
@@ -619,8 +652,113 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
         return False
 
     tokens = [token for token in _base_tokens(lowered_text) if token]
+    
+    # FIRST: Try single-word tokens for misspellings (e.g., "tesl", "bookng", "nvida")
+    # This is important for company names that are single words
+    for token in tokens:
+        if len(token) < 3:
+            continue
+        token_normalized = normalize_alias(token)
+        # Use original token if normalization returns empty (e.g., "holdings" -> "")
+        if not token_normalized:
+            token_normalized = token.lower().strip()
+        
+        # Check if token is a valid ticker FIRST (try both normalized and original)
+        is_valid_ticker = any(t in ticker_set for t in lookup.get(token_normalized, []))
+        if not is_valid_ticker and token != token_normalized:
+            # Also try original token
+            is_valid_ticker = any(t in ticker_set for t in lookup.get(token.lower().strip(), []))
+        
+        # Skip if it's a stopword and not a valid ticker
+        if token_normalized in QUESTION_STOPWORDS and not is_valid_ticker:
+            # Try with original token if normalized is stopword
+            if token.lower().strip() not in QUESTION_STOPWORDS:
+                token_normalized = token.lower().strip()
+                is_valid_ticker = any(t in ticker_set for t in lookup.get(token_normalized, []))
+            if token_normalized in QUESTION_STOPWORDS and not is_valid_ticker:
+                continue
+        
+        # Check manual overrides FIRST (before exact match, in case aliases.json wasn't regenerated)
+        if token_normalized in _MANUAL_OVERRIDES:
+            override_ticker = _MANUAL_OVERRIDES[token_normalized]
+            if override_ticker in ticker_set:
+                if _try_add_alias(token_normalized, token):
+                    continue
+        # Also check original token
+        if token.lower().strip() != token_normalized and token.lower().strip() in _MANUAL_OVERRIDES:
+            override_ticker = _MANUAL_OVERRIDES[token.lower().strip()]
+            if override_ticker in ticker_set:
+                if _try_add_alias(token.lower().strip(), token):
+                    continue
+        
+        # Try exact match first (with normalized)
+        if _try_add_alias(token_normalized, token):
+            continue
+        # Also try with original token if different
+        if token.lower().strip() != token_normalized and _try_add_alias(token.lower().strip(), token):
+            continue
+        
+        # If exact match fails, try fuzzy matching for misspellings
+        # Check if this looks like a company name (4+ chars or capitalized in original)
+        original_token_pos = lowered_text.find(token)
+        original_token = original_text[original_token_pos:original_token_pos+len(token)] if original_token_pos >= 0 else ""
+        looks_like_company = len(token) >= 4 or (original_token and original_token[0].isupper())
+        
+        if looks_like_company and not is_valid_ticker:
+            # Try fuzzy matching with progressive cutoffs for single-word misspellings
+            best_match = None
+            best_score = 0.0
+            best_cutoff = 0.0
+            
+            for cutoff in [0.85, 0.80, 0.75, 0.70, 0.65]:
+                close_matches = difflib.get_close_matches(token_normalized, alias_candidates, n=20, cutoff=cutoff)
+                if close_matches:
+                    for alias_candidate in close_matches:
+                        # Skip if alias is a stopword and not a valid ticker
+                        if alias_candidate in QUESTION_STOPWORDS:
+                            if not any(t in ticker_set for t in lookup.get(alias_candidate, [])):
+                                continue
+                        
+                        score = difflib.SequenceMatcher(None, token_normalized, alias_candidate).ratio()
+                        # Use adaptive threshold - be more lenient for misspellings
+                        # Prioritize matches that are longer and more similar
+                        threshold = 0.85 if cutoff >= 0.75 else 0.80 if cutoff >= 0.70 else 0.75
+                        
+                        # Boost score for longer matches and similar length
+                        if len(alias_candidate) >= 4:
+                            # Prefer matches with similar length (within 1-2 chars)
+                            length_diff = abs(len(token_normalized) - len(alias_candidate))
+                            if length_diff <= 2:
+                                score_boost = 0.05
+                            elif length_diff <= 3:
+                                score_boost = 0.02
+                            else:
+                                score_boost = 0.0
+                            adjusted_score = min(1.0, score + score_boost)
+                        else:
+                            adjusted_score = score
+                        
+                        if adjusted_score >= threshold:
+                            candidate_tickers = lookup.get(alias_candidate, [])
+                            if candidate_tickers:
+                                # Track the best match across all cutoffs
+                                if adjusted_score > best_score:
+                                    best_match = alias_candidate
+                                    best_score = adjusted_score
+                                    best_cutoff = cutoff
+                                # If we have a very good match, use it immediately
+                                if adjusted_score >= 0.90:
+                                    if _try_add_alias(alias_candidate, token):
+                                        break
+            
+            # Use the best match if we found one
+            if best_match and best_score >= 0.80:
+                if _try_add_alias(best_match, token):
+                    continue
+    
+    # THEN: Try multi-word phrases
     max_window = min(5, len(tokens))  # Increased from 4 to 5 for longer company names
-    for window in range(max_window, 0, -1):
+    for window in range(max_window, 2, -1):  # Start with longer phrases (5 words, then 4, then 3)
         for start_idx in range(len(tokens) - window + 1):
             phrase_tokens = tokens[start_idx : start_idx + window]
             candidate_phrase = " ".join(phrase_tokens)
@@ -628,21 +766,49 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                 continue
             normalised_phrase = normalize_alias(candidate_phrase)
             
-            # CRITICAL: Check if phrase matches a valid ticker FIRST
+            # CRITICAL: Check if phrase matches a valid ticker FIRST (including manual overrides)
             # This allows common words that are also company names (e.g., "booking", "enact")
             is_valid_ticker = any(t in ticker_set for t in lookup.get(normalised_phrase, []))
+            # Also check manual overrides before filtering
+            if not is_valid_ticker:
+                if normalised_phrase in _MANUAL_OVERRIDES:
+                    override_ticker = _MANUAL_OVERRIDES[normalised_phrase]
+                    if override_ticker in ticker_set:
+                        is_valid_ticker = True
+                elif candidate_phrase.lower().strip() in _MANUAL_OVERRIDES:
+                    override_ticker = _MANUAL_OVERRIDES[candidate_phrase.lower().strip()]
+                    if override_ticker in ticker_set:
+                        is_valid_ticker = True
             
-            # Only filter out stopwords if they're NOT valid tickers
+            # Only filter out stopwords if they're NOT valid tickers (including manual overrides)
             if normalised_phrase in QUESTION_STOPWORDS and not is_valid_ticker:
                 continue
-            # Also skip single-word phrases that are stopwords (unless valid ticker)
-            # BUT: Allow multi-word phrases even if they contain stopwords (e.g., "Booking Holdings")
-            if len(phrase_tokens) == 1 and phrase_tokens[0] in QUESTION_STOPWORDS and not is_valid_ticker:
-                continue
             
-            # Try exact match first
-            if normalised_phrase and _try_add_alias(normalised_phrase, candidate_phrase):
-                continue
+            # Try exact match first (including manual overrides)
+            # If normalization returns empty, try with original phrase
+            if not normalised_phrase:
+                normalised_phrase = candidate_phrase.lower().strip()
+            
+            # Check manual overrides FIRST (before lookup, in case aliases.json wasn't regenerated)
+            if normalised_phrase in _MANUAL_OVERRIDES:
+                override_ticker = _MANUAL_OVERRIDES[normalised_phrase]
+                if override_ticker in ticker_set:
+                    if _try_add_alias(normalised_phrase, candidate_phrase):
+                        continue
+            # Also check original phrase
+            if candidate_phrase.lower().strip() in _MANUAL_OVERRIDES:
+                override_ticker = _MANUAL_OVERRIDES[candidate_phrase.lower().strip()]
+                if override_ticker in ticker_set:
+                    if _try_add_alias(candidate_phrase.lower().strip(), candidate_phrase):
+                        continue
+            
+            if normalised_phrase:
+                if _try_add_alias(normalised_phrase, candidate_phrase):
+                    continue
+                # Also try with original phrase if different
+                if candidate_phrase.lower().strip() != normalised_phrase:
+                    if _try_add_alias(candidate_phrase.lower().strip(), candidate_phrase):
+                        continue
             
             # For multi-word phrases, try progressively shorter versions
             if len(phrase_tokens) > 1:
@@ -650,16 +816,45 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                 if phrase_tokens[-1] in ["holdings", "inc", "incorporated", "corp", "corporation", "ltd", "company", "co", "group", "parent", "ltd"]:
                     shorter_phrase = " ".join(phrase_tokens[:-1])
                     shorter_normalized = normalize_alias(shorter_phrase)
-                    if shorter_normalized and _try_add_alias(shorter_normalized, shorter_phrase):
-                        continue
+                    # If normalization returns empty, use original
+                    if not shorter_normalized:
+                        shorter_normalized = shorter_phrase.lower().strip()
+                    
+                    if shorter_normalized:
+                        # Try exact match with normalized
+                        if _try_add_alias(shorter_normalized, shorter_phrase):
+                            continue
+                        # Also try with original if different
+                        if shorter_phrase.lower().strip() != shorter_normalized:
+                            if _try_add_alias(shorter_phrase.lower().strip(), shorter_phrase):
+                                continue
                 
                 # Strategy 2: Try first word (important for company names like "Booking Holdings")
                 if len(phrase_tokens) >= 2:
                     first_word = phrase_tokens[0]
                     first_normalized = normalize_alias(first_word)
+                    # Use original word if normalization returns empty
+                    if not first_normalized:
+                        first_normalized = first_word.lower().strip()
+                    
                     if first_normalized:
                         # Always try first word if it's a valid ticker alias (even if it's a stopword)
                         is_first_word_ticker = any(t in ticker_set for t in lookup.get(first_normalized, []))
+                        if not is_first_word_ticker:
+                            # Also check manual overrides
+                            if first_normalized in _MANUAL_OVERRIDES:
+                                override_ticker = _MANUAL_OVERRIDES[first_normalized]
+                                if override_ticker in ticker_set:
+                                    is_first_word_ticker = True
+                                    if _try_add_alias(first_normalized, first_word):
+                                        continue
+                            if first_word.lower().strip() in _MANUAL_OVERRIDES:
+                                override_ticker = _MANUAL_OVERRIDES[first_word.lower().strip()]
+                                if override_ticker in ticker_set:
+                                    is_first_word_ticker = True
+                                    if _try_add_alias(first_word.lower().strip(), first_word):
+                                        continue
+                        
                         if is_first_word_ticker:
                             if _try_add_alias(first_normalized, first_word):
                                 continue
@@ -671,10 +866,33 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                 # Strategy 3: Try all individual words in the phrase (for cases like "Enact Holdings" -> try "enact")
                 for word in phrase_tokens:
                     word_normalized = normalize_alias(word)
+                    # Use original word if normalization returns empty
+                    if not word_normalized:
+                        word_normalized = word.lower().strip()
+                    
                     if word_normalized and len(word_normalized) >= 3:  # Only try words with 3+ chars
                         is_word_ticker = any(t in ticker_set for t in lookup.get(word_normalized, []))
+                        if not is_word_ticker and word != word_normalized:
+                            # Also try original word
+                            is_word_ticker = any(t in ticker_set for t in lookup.get(word.lower().strip(), []))
+                        
+                        # Also check manual overrides
+                        if not is_word_ticker:
+                            if word_normalized in _MANUAL_OVERRIDES:
+                                override_ticker = _MANUAL_OVERRIDES[word_normalized]
+                                if override_ticker in ticker_set:
+                                    is_word_ticker = True
+                            if not is_word_ticker and word.lower().strip() in _MANUAL_OVERRIDES:
+                                override_ticker = _MANUAL_OVERRIDES[word.lower().strip()]
+                                if override_ticker in ticker_set:
+                                    is_word_ticker = True
+                        
                         if is_word_ticker:
-                            if _try_add_alias(word_normalized, word):
+                            # Try with normalized first
+                            if word_normalized and _try_add_alias(word_normalized, word):
+                                continue
+                            # Also try with original if different
+                            if word.lower().strip() != word_normalized and _try_add_alias(word.lower().strip(), word):
                                 continue
                 
                 # Strategy 4: Try without multiple suffix words (e.g., "group holdings parent" -> just base)
@@ -699,19 +917,52 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
             first_char = normalised_phrase[0] if normalised_phrase else ''
             
             # Pre-filter: only check aliases with similar length and same first letter
+            # But be more lenient for spelling mistakes - allow slightly different first letters
             filtered_candidates = [
                 alias for alias in alias_candidates
                 if alias and
                 alias[0] == first_char and  # Same first letter
-                abs(len(alias) - phrase_len) <= 5  # Similar length (±5 chars, increased from 3)
+                abs(len(alias) - phrase_len) <= 6  # Similar length (±6 chars, increased from 5 for spelling mistakes)
             ]
             
             # If no candidates after filtering, try without first letter requirement for longer phrases
-            if not filtered_candidates and phrase_len >= 5:
+            # Also try similar first letters for common misspellings (e.g., "Appel" vs "Apple")
+            if not filtered_candidates and phrase_len >= 4:
+                # First try without first letter requirement
                 filtered_candidates = [
                     alias for alias in alias_candidates
-                    if alias and abs(len(alias) - phrase_len) <= 5
+                    if alias and abs(len(alias) - phrase_len) <= 6
                 ]
+                
+                # If still no matches, try similar first letters (common typos)
+                if not filtered_candidates and phrase_len >= 3:
+                    # Common first letter typos: a/e, e/a, i/e, o/u, etc.
+                    similar_first_chars = []
+                    if first_char in 'aeiou':
+                        # Vowel substitutions
+                        for v in 'aeiou':
+                            if v != first_char:
+                                similar_first_chars.append(v)
+                    else:
+                        # Consonant substitutions (common typos)
+                        char_map = {
+                            'b': 'p', 'p': 'b',
+                            'c': 'k', 'k': 'c',
+                            'd': 't', 't': 'd',
+                            'g': 'j', 'j': 'g',
+                            'm': 'n', 'n': 'm',
+                            'v': 'w', 'w': 'v',
+                        }
+                        if first_char in char_map:
+                            similar_first_chars.append(char_map[first_char])
+                    
+                    for similar_char in similar_first_chars:
+                        filtered_candidates = [
+                            alias for alias in alias_candidates
+                            if alias and alias[0] == similar_char and abs(len(alias) - phrase_len) <= 6
+                        ]
+                        if filtered_candidates:
+                            break
             
             # If still no candidates, skip fuzzy matching
             if not filtered_candidates:
@@ -732,8 +983,10 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                 if score >= 0.98:
                     break
             
-            # Lower threshold from 0.95 to 0.85 for better matching of company names and spelling mistakes
-            if best_alias and best_score >= 0.85:
+            # Lower threshold to 0.82 for better matching of company names and spelling mistakes
+            # Balance between catching misspellings and avoiding false positives
+            # This handles misspellings like "Microsft", "Appel", "Tesl" while maintaining accuracy
+            if best_alias and best_score >= 0.82:
                 if _try_add_alias(best_alias, candidate_phrase, mark_warning=True):
                     continue
 
@@ -743,29 +996,55 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
         suggestion_score: float = 0.0
         suggestion_source: Optional[str] = None
         
-        # Try individual tokens first
+        # Try individual tokens first (also check original tokens that might not have been normalized)
         unique_tokens = []
         for token in tokens:
             token_norm = normalize_alias(token)
             if token_norm and token_norm not in unique_tokens:
                 unique_tokens.append(token_norm)
+            # Also add original token if different and not empty
+            if token.lower().strip() and token.lower().strip() != token_norm and token.lower().strip() not in unique_tokens:
+                unique_tokens.append(token.lower().strip())
         
         for token_norm in unique_tokens:
             if len(token_norm) < 3:
                 continue
-            # Lower cutoff to 0.70 for better spelling mistake tolerance
-            close_matches = difflib.get_close_matches(token_norm, alias_candidates, n=5, cutoff=0.70)
-            if not close_matches:
-                continue
-            for alias_candidate in close_matches:
-                score = difflib.SequenceMatcher(None, token_norm, alias_candidate).ratio()
-                if score > suggestion_score:
-                    suggestion_score = score
-                    suggestion_alias = alias_candidate
+            # Check manual overrides FIRST (before any other checks)
+            if token_norm in _MANUAL_OVERRIDES:
+                override_ticker = _MANUAL_OVERRIDES[token_norm]
+                if override_ticker in ticker_set:
+                    # Direct match found in manual overrides
+                    suggestion_score = 1.0  # Perfect match for manual override
+                    suggestion_alias = token_norm
                     suggestion_source = token_norm
-                    if score >= 0.90:  # Early exit for very good matches
+                    break  # Exit early for manual override match
+            # Skip question words that are not valid tickers (but check manual overrides first)
+            if token_norm in QUESTION_STOPWORDS:
+                # Only skip if it's not a valid ticker alias and not in manual overrides
+                if not any(t in ticker_set for t in lookup.get(token_norm, [])):
+                    continue
+            # Lower cutoff to 0.60 for better spelling mistake tolerance
+            # Try even more aggressive matching for common misspellings
+            for cutoff in [0.75, 0.70, 0.65, 0.60]:
+                close_matches = difflib.get_close_matches(token_norm, alias_candidates, n=10, cutoff=cutoff)
+                if close_matches:
+                    for alias_candidate in close_matches:
+                        # Skip if alias is a stopword and not a valid ticker
+                        if alias_candidate in QUESTION_STOPWORDS:
+                            if not any(t in ticker_set for t in lookup.get(alias_candidate, [])):
+                                continue
+                        score = difflib.SequenceMatcher(None, token_norm, alias_candidate).ratio()
+                        # Use adaptive threshold based on cutoff
+                        threshold = 0.85 if cutoff >= 0.70 else 0.75
+                        if score >= threshold and score > suggestion_score:
+                            suggestion_score = score
+                            suggestion_alias = alias_candidate
+                            suggestion_source = token_norm
+                            if score >= 0.85:  # Early exit for good matches
+                                break
+                    if suggestion_score >= 0.85:
                         break
-            if suggestion_score >= 0.90:
+            if suggestion_score >= 0.85:
                 break
         
         # Also try multi-word phrases with spelling mistakes
@@ -779,27 +1058,59 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                     normalised_phrase = normalize_alias(candidate_phrase)
                     if len(normalised_phrase) < 4:
                         continue
-                    # Try fuzzy matching with lower threshold for spelling mistakes
-                    close_matches = difflib.get_close_matches(normalised_phrase, alias_candidates, n=5, cutoff=0.70)
-                    for alias_candidate in close_matches:
-                        score = difflib.SequenceMatcher(None, normalised_phrase, alias_candidate).ratio()
-                        if score > suggestion_score:
-                            suggestion_score = score
-                            suggestion_alias = alias_candidate
+                    # Check manual overrides FIRST (before fuzzy matching)
+                    if normalised_phrase in _MANUAL_OVERRIDES:
+                        override_ticker = _MANUAL_OVERRIDES[normalised_phrase]
+                        if override_ticker in ticker_set:
+                            # Direct match found in manual overrides
+                            suggestion_score = 1.0  # Perfect match for manual override
+                            suggestion_alias = normalised_phrase
                             suggestion_source = candidate_phrase
-                            if score >= 0.90:
+                            break  # Exit early for manual override match
+                    # Also check original phrase
+                    if candidate_phrase.lower().strip() in _MANUAL_OVERRIDES:
+                        override_ticker = _MANUAL_OVERRIDES[candidate_phrase.lower().strip()]
+                        if override_ticker in ticker_set:
+                            # Direct match found in manual overrides
+                            suggestion_score = 1.0  # Perfect match for manual override
+                            suggestion_alias = candidate_phrase.lower().strip()
+                            suggestion_source = candidate_phrase
+                            break  # Exit early for manual override match
+                    # Try fuzzy matching with progressive cutoffs for spelling mistakes
+                    for cutoff in [0.75, 0.70, 0.65, 0.60]:
+                        close_matches = difflib.get_close_matches(normalised_phrase, alias_candidates, n=10, cutoff=cutoff)
+                        if close_matches:
+                            for alias_candidate in close_matches:
+                                score = difflib.SequenceMatcher(None, normalised_phrase, alias_candidate).ratio()
+                                # Use adaptive threshold based on cutoff
+                                threshold = 0.85 if cutoff >= 0.70 else 0.75
+                                if score >= threshold and score > suggestion_score:
+                                    suggestion_score = score
+                                    suggestion_alias = alias_candidate
+                                    suggestion_source = candidate_phrase
+                                    if score >= 0.85:  # Early exit for good matches
+                                        break
+                            if suggestion_score >= 0.85:
                                 break
-                    if suggestion_score >= 0.90:
+                    if suggestion_score >= 0.85:
                         break
                 if suggestion_score >= 0.90:
                     break
         
-        if suggestion_alias and suggestion_score >= 0.80:  # Even lower threshold for spelling mistakes
-            tickers = lookup.get(suggestion_alias, [])
-            if tickers:
-                ticker = tickers[0]
-                resolved.append({"input": suggestion_source or suggestion_alias, "ticker": ticker})
-                warnings.append(f"suggested_ticker:{ticker}:{suggestion_source or suggestion_alias}")
+        if suggestion_alias and suggestion_score >= 0.78:  # Balanced threshold for spelling mistakes
+            # First check manual overrides
+            if suggestion_alias in _MANUAL_OVERRIDES:
+                override_ticker = _MANUAL_OVERRIDES[suggestion_alias]
+                if override_ticker in ticker_set:
+                    resolved.append({"input": suggestion_source or suggestion_alias, "ticker": override_ticker})
+                    warnings.append(f"suggested_ticker:{override_ticker}:{suggestion_source or suggestion_alias}")
+            else:
+                # Otherwise, use lookup
+                tickers = lookup.get(suggestion_alias, [])
+                if tickers:
+                    ticker = tickers[0]
+                    resolved.append({"input": suggestion_source or suggestion_alias, "ticker": ticker})
+                    warnings.append(f"suggested_ticker:{ticker}:{suggestion_source or suggestion_alias}")
 
     return resolved, warnings
 

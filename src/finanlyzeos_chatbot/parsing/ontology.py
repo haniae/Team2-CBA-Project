@@ -34,6 +34,7 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "netincome": "net_income",
     "net profit": "net_income",
     "profit": "net_income",
+    "profi": "net_income",  # Common misspelling (but may also map to gross_profit based on context)
     "earnings": "net_income",
     "bottom line": "net_income",
     # NEW: Natural language profit variations
@@ -52,6 +53,10 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "earnings a share": "eps_diluted",
     "profit per share": "eps_diluted",
     "eps diluted": "eps_diluted",
+    # Common misspellings
+    "earnngs per share": "eps_diluted",
+    "earnings per shar": "eps_diluted",
+    "earnngs per shar": "eps_diluted",
     
     # Operating metrics
     "ebitda": "ebitda",
@@ -59,6 +64,7 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "operating profit": "operating_income",
     "ebit": "operating_income",
     "gross profit": "gross_profit",
+    "gross profi": "gross_profit",  # Common misspelling
     "gross margin": "gross_margin",
     "operating margin": "operating_margin",
     "net margin": "net_margin",
@@ -100,6 +106,10 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "return on shareholders equity": "roe",
     "shareholder returns": "roe",
     "equity returns": "roe",
+    # Common misspellings
+    "retrn on equity": "roe",
+    "return on equty": "roe",
+    "retrn on equty": "roe",
     
     "return on assets": "roa",
     "roa": "roa",
@@ -132,6 +142,10 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "trading multiple": "pe_ratio",
     "p e ratio": "pe_ratio",
     "p to e": "pe_ratio",
+    # Common misspellings
+    "price to earnngs": "pe_ratio",
+    "price to earnigs": "pe_ratio",
+    "prie to earnings": "pe_ratio",
     
     "ev/ebitda": "ev_ebitda",
     "enterprise value to ebitda": "ev_ebitda",
@@ -678,6 +692,10 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "D/E ratio": "debt_to_equity",
     "d/e ratio": "debt_to_equity",
     "debt equity": "debt_to_equity",
+    # Common misspellings
+    "deb to equity": "debt_to_equity",
+    "debt to equty": "debt_to_equity",
+    "deb to equty": "debt_to_equity",
     
     # Depreciation and Amortization
     "depreciation and amortization": "depreciation_and_amortization",
@@ -756,6 +774,10 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "fcf margin": "free_cash_flow_margin",
     "fcf margins": "free_cash_flow_margin",
     "free cash flow margins": "free_cash_flow_margin",
+    # Common misspellings
+    "free cash flow margn": "free_cash_flow_margin",
+    "free cash flow margen": "free_cash_flow_margin",
+    "free cash flow marginn": "free_cash_flow_margin",
     
     # Income Tax Expense
     "income tax expense": "income_tax_expense",

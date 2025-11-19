@@ -708,17 +708,32 @@ def resolve_metrics(text: str, lowered_full: str) -> List[Dict[str, Any]]:
             if token in skip_words:
                 continue
             
-            # Try multiple cutoff levels for better spelling mistake tolerance (more aggressive)
-            for cutoff in [0.85, 0.80, 0.75, 0.70, 0.65]:
-                close_matches = difflib.get_close_matches(token, metric_aliases, n=10, cutoff=cutoff)
+            # Try multiple cutoff levels for better spelling mistake tolerance (very aggressive)
+            # Handle common misspellings like "earnngs" -> "earnings", "retrn" -> "return", "deb" -> "debt"
+            for cutoff in [0.85, 0.80, 0.75, 0.70, 0.65, 0.60]:
+                close_matches = difflib.get_close_matches(token, metric_aliases, n=15, cutoff=cutoff)
                 if close_matches:
                     for alias_match in close_matches:
                         score = difflib.SequenceMatcher(None, token, alias_match).ratio()
                         # Use more lenient thresholds for spelling mistakes
-                        threshold = 0.80 if cutoff >= 0.75 else 0.70
+                        # Lower threshold for lower cutoffs to catch more mistakes
+                        # But require higher score for very short tokens to avoid false positives
+                        min_length = min(len(token), len(alias_match))
+                        if cutoff >= 0.75:
+                            threshold = 0.80 if min_length >= 5 else 0.85
+                        elif cutoff >= 0.65:
+                            threshold = 0.70 if min_length >= 5 else 0.80
+                        else:
+                            threshold = 0.70 if min_length >= 5 else 0.75  # More careful for short tokens
+                        
                         if score >= threshold:
                             metric_id = METRIC_SYNONYMS.get(alias_match)
                             if metric_id and metric_id not in seen:
+                                # Additional check: ensure the match is meaningful
+                                # For very short tokens, require higher similarity
+                                if len(token) <= 3 and score < 0.90:
+                                    continue
+                                
                                 pos = lowered_full.find(token)
                                 if pos < 0:
                                     pos = 0
@@ -743,17 +758,34 @@ def resolve_metrics(text: str, lowered_full: str) -> List[Dict[str, Any]]:
                     if len(phrase) < 3:
                         continue
                     
-                    # Find close matches with spelling mistake tolerance (try multiple cutoff levels, more aggressive)
-                    for cutoff in [0.85, 0.80, 0.75, 0.70, 0.65]:
-                        close_matches = difflib.get_close_matches(phrase, metric_aliases, n=10, cutoff=cutoff)
+                    # Find close matches with spelling mistake tolerance (try multiple cutoff levels, very aggressive)
+                    # Handle common misspellings like "earnngs per share" -> "earnings per share"
+                    for cutoff in [0.85, 0.80, 0.75, 0.70, 0.65, 0.60]:
+                        close_matches = difflib.get_close_matches(phrase, metric_aliases, n=15, cutoff=cutoff)
                         if close_matches:
                             for alias_match in close_matches:
                                 score = difflib.SequenceMatcher(None, phrase, alias_match).ratio()
                                 # Use more lenient thresholds for spelling mistakes
-                                threshold = 0.80 if cutoff >= 0.75 else 0.70
+                                # Lower threshold for lower cutoffs to catch more mistakes
+                                # For multi-word phrases, be more lenient
+                                min_length = min(len(phrase.split()), len(alias_match.split()))
+                                if cutoff >= 0.75:
+                                    threshold = 0.80 if min_length >= 3 else 0.85
+                                elif cutoff >= 0.65:
+                                    threshold = 0.70 if min_length >= 3 else 0.80
+                                else:
+                                    threshold = 0.70 if min_length >= 3 else 0.75  # More lenient for multi-word phrases
+                                
                                 if score >= threshold:
                                     metric_id = METRIC_SYNONYMS.get(alias_match)
                                     if metric_id and metric_id not in seen:
+                                        # For multi-word phrases, prioritize them over single-word matches
+                                        # Remove any conflicting single-word matches if this is a better match
+                                        if window >= 2:
+                                            # This is a multi-word phrase - it's likely more accurate
+                                            # Remove any single-word matches that might conflict
+                                            pass  # Keep existing matches for now
+                                        
                                         # Find position in original text
                                         phrase_lower = phrase.lower()
                                         pos = lowered_full.find(phrase_lower)

@@ -117,6 +117,12 @@ class Settings:
     cross_validation_enabled: bool = True
     auto_correct_enabled: bool = True
     include_macro_context: bool = True
+    # Private Company API Settings
+    enable_private_companies: bool = False
+    private_api_url: Optional[str] = None
+    private_api_key: Optional[str] = None
+    private_api_secret: Optional[str] = None
+    private_api_timeout: float = 30.0
 
     @property
     def sqlite_uri(self) -> str:
@@ -353,6 +359,11 @@ def load_settings() -> Settings:
         cross_validation_enabled=_env_flag("CROSS_VALIDATION_ENABLED", default=True),
         auto_correct_enabled=_env_flag("AUTO_CORRECT_ENABLED", default=True),
         include_macro_context=_env_flag("ENABLE_MACRO_CONTEXT", default=True),
+        enable_private_companies=_env_flag("ENABLE_PRIVATE_COMPANIES", default=False),
+        private_api_url=os.getenv("PRIVATE_API_URL"),
+        private_api_key=os.getenv("PRIVATE_API_KEY"),
+        private_api_secret=os.getenv("PRIVATE_API_SECRET"),
+        private_api_timeout=_parse_float_env("PRIVATE_API_TIMEOUT", default=30.0),
     )
 
 
