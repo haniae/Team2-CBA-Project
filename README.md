@@ -18,8 +18,11 @@
 
 Contributors:  
 **Hania A.** haniaa@gwmail.gwu.edu
+
 **Van Nhi Vuong** vannhi.vuong@gwmail.gwu.edu
+
 **Malcolm Muoriyarwa** malcolm.munoriyarwa@gwmail.gwu.edu
+
 **Devarsh Patel** devarsh.patel@gwmail.gwu.edu . 
 
 **Acknowledgments** Special thanks to Professor Patrick Hall (The George Washington University) for his outstanding mentorship and tireless support. His guidance and encouragement made this project possible.
