@@ -10,6 +10,9 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/haniae/Team2-CBA-Project)
 [![Data Coverage](https://img.shields.io/badge/data-1,599%20companies%20%7C%2018%20years-success)](https://github.com/haniae/Team2-CBA-Project)
 [![NLU Coverage](https://img.shields.io/badge/NLU-100%25%20patterns%20%7C%2093%20metrics-blue)](https://github.com/haniae/Team2-CBA-Project)
+[![ML Models](https://img.shields.io/badge/ML-8%20forecasting%20models-purple)](https://github.com/haniae/Team2-CBA-Project)
+[![Intents](https://img.shields.io/badge/intents-40%2B%20types-orange)](https://github.com/haniae/Team2-CBA-Project)
+[![Spelling](https://img.shields.io/badge/spelling-90%25%20company%20%7C%20100%25%20metric-green)](https://github.com/haniae/Team2-CBA-Project)
 
 **FinalyzeOS** is an institutional-grade copilot for finance teams. It pairs deterministic market analytics with a conversational interface so analysts can ask natural-language questions, inspect lineage, and keep data pipelines auditable.
 
@@ -662,6 +665,8 @@ To improve coverage, run: `python scripts/ingestion/full_coverage_ingestion.py -
 - 🔄 **Task Orchestration** – Queue abstraction for ingestion and long-running commands
 - 🎯 **Advanced Natural Language Processing** – 100% query pattern detection, 90% company name spelling correction, 100% metric spelling correction, 40+ intent types, 150+ question patterns, 200+ metric synonyms
 - 🏢 **Comprehensive Company Coverage** – Full support for all 1,599 S&P 1500 companies (S&P 500 + S&P 400 + S&P 600) via ticker symbol or company name
+- 🤖 **8 ML Forecasting Models** – ARIMA, Prophet, ETS, LSTM, GRU, Transformer, Ensemble, and Auto selection for institutional-grade predictions
+- 📚 **Enhanced RAG Integration** – Explicit data dumps, comprehensive context building, response verification, and technical detail enforcement for ML forecasts
 
 ## 🚀 Advanced Analytics 
 
@@ -697,13 +702,14 @@ These modules transform FinalyzeOS into a professional analytics platform compar
 
 ## 🤖 Machine Learning Stack
 
-FinalyzeOS blends deterministic analytics with a modular ML layer so finance teams can prototype forecasts without giving up auditability.
+FinalyzeOS blends deterministic analytics with a modular ML layer so finance teams can prototype forecasts without giving up auditability. The ML forecasting system integrates seamlessly with the advanced natural language processing layer, automatically handling spelling mistakes in company names and metrics, and recognizing forecast-related queries through 40+ intent types.
 
 ### Architecture Overview
 
 - **Data Foundation:** `analytics_engine.AnalyticsEngine.refresh_metrics()` normalises SEC filings into `metric_snapshots`. Forecast pipelines consume the same curated metrics, keeping model inputs aligned with what the dashboard renders.
-- **Model Registry:** Classical (Prophet, ARIMA/ETS) and ML estimators live under `src/finanlyzeos_chatbot/ml_forecasting/`. Shared base classes (`ml_forecasting.ml_forecaster`) expose a consistent interface so new models can be dropped in with minimal wiring.
-- **Context Builder:** `context_builder.build_forecast_context()` assembles explicit data dumps (predictions, confidence bands, training diagnostics) that are injected verbatim into the LLM prompt. The bot cannot answer without citing these artefacts.
+- **Model Registry:** Classical (Prophet, ARIMA/ETS) and ML estimators (LSTM, GRU, Transformer) live under `src/finanlyzeos_chatbot/ml_forecasting/`. **8 forecasting models** available: ARIMA, Prophet, ETS, LSTM, GRU, Transformer, Ensemble, and Auto (automatic selection). Shared base classes (`ml_forecasting.ml_forecaster`) expose a consistent interface so new models can be dropped in with minimal wiring.
+- **Context Builder:** `context_builder.build_forecast_context()` assembles explicit data dumps (predictions, confidence bands, training diagnostics, model architecture, hyperparameters) that are injected verbatim into the LLM prompt. The bot cannot answer without citing these artefacts. Includes comprehensive technical details for institutional analysts.
+- **Natural Language Integration:** The ML forecasting system automatically recognizes forecast queries through advanced intent detection, handles spelling mistakes in company names (90% success rate) and metrics (100% success rate), and supports natural language variations like "forecast", "predict", "project", "outlook", "what if", etc.
 
 ### Forecast Workflow
 
@@ -1029,13 +1035,14 @@ FinalyzeOS supports **7 different ML forecasting models**, each optimized for di
 
 ### 🔍 Enhanced RAG Integration
 
-The ML forecasting system is **deeply integrated with the RAG layer** to provide comprehensive, technically detailed forecasts:
+The ML forecasting system is **deeply integrated with the RAG layer** to provide comprehensive, technically detailed forecasts. The system automatically handles spelling mistakes in company names and metrics, recognizes forecast-related queries through 40+ intent types, and supports natural language variations.
 
 #### **1. Explicit Data Dump Section**
 - **Purpose**: Ensures LLM receives ALL technical details in structured format
-- **Content**: Model architecture, hyperparameters, training details, computational details, model-specific parameters
+- **Content**: Model architecture (layers, units, activation functions), hyperparameters (learning rate, batch size, epochs, optimizer), training details (loss values, validation metrics, early stopping), computational details (training time, memory usage), model-specific parameters (ARIMA orders, Prophet seasonality, LSTM/GRU/Transformer architecture)
 - **Format**: Key-value pairs for easy extraction and inclusion in responses
-- **Mandate**: LLM is explicitly instructed to include EVERY value from this section
+- **Mandate**: LLM is explicitly instructed to include EVERY value from this section without summarization
+- **Spelling Handling**: Company names and metrics in forecasts are automatically corrected for spelling mistakes before model execution
 
 #### **2. Enhanced Context Building**
 The `context_builder.py` module builds comprehensive ML forecast context including:
@@ -1128,17 +1135,24 @@ FinalyzeOS combines **deterministic data prep** with **retrieval-augmented gener
 
 ### 🔤 Natural-Language Parsing (Deterministic)
 
-- src/finanlyzeos_chatbot/parsing/alias_builder.py loads a generated aliases.json covering the S&P 500. It normalises free-text mentions, resolves ticker aliases, applies manual overrides (Alphabet, Berkshire share classes, JP Morgan, AT&T), and when needed performs a fuzzy fallback and emits warnings.
-- parse_to_structured in parsing/parse.py orchestrates alias resolution, metric synonym detection, and the flexible time grammar (time_grammar.py). It returns a strict JSON intent schema that downstream planners consume and store (conversation.last_structured_response["parser"]).
+- **S&P 1500 Coverage**: `src/finanlyzeos_chatbot/parsing/alias_builder.py` loads a generated `aliases.json` covering all **1,599 S&P 1500 companies** (S&P 500 + S&P 400 + S&P 600). It normalises free-text mentions, resolves ticker aliases, applies 85+ manual overrides (common misspellings, share classes), and when needed performs fuzzy fallback with spelling mistake handling.
+- **Advanced NLP**: `parse_to_structured` in `parsing/parse.py` orchestrates alias resolution, metric synonym detection (93 metrics with 200+ synonyms), and the flexible time grammar (`time_grammar.py`). It returns a strict JSON intent schema that downstream planners consume.
+- **Spelling Mistake Handling**: 
+  - **90% Company Name Correction**: Automatically corrects misspellings (e.g., "Appel" → "Apple", "Microsft" → "Microsoft", "Bookng Holdings" → "Booking Holdings") using fuzzy matching with progressive cutoffs (0.85, 0.80, 0.75, 0.70, 0.65) and manual overrides.
+  - **100% Metric Correction**: Handles metric typos (e.g., "revenu" → "revenue", "earnngs" → "earnings", "operatng" → "operating") using multi-level fuzzy matching with adaptive thresholds.
+- **Intent Recognition**: Recognizes **40+ intent types** including compare, trend, rank, explain, forecast, scenario, relationship, benchmark, when, why, what-if, recommendation, risk, valuation, and more.
+- **Query Pattern Detection**: Supports **150+ question patterns** covering what, how, why, when, where, who, which, contractions, commands, and natural language variations with **100% detection rate**.
 - **Portfolio Detection**: The parser automatically detects portfolio-related queries and extracts portfolio identifiers (e.g., `port_abc123`) from user queries.
 - **ML Forecast Detection**: The parser detects forecast-related keywords (`forecast`, `predict`, `estimate`, `projection`, etc.) and routes queries to the ML forecasting system.
 
 ### 🔍 Retrieval Layer (RAG)
 
-- 📊 Structured intents route directly into AnalyticsEngine, reading metric snapshots, KPI overrides, and fact tables from SQLite/Postgres
+- 📊 Structured intents route directly into AnalyticsEngine, reading metric snapshots, KPI overrides, and fact tables from SQLite/Postgres. **Spelling mistakes in company names and metrics are automatically corrected** before retrieval (90% company name success, 100% metric success).
 - 🔐 Retrieved artefacts (tables, benchmark comparisons, audit trails) become RAG "system" messages that condition the LLM, ensuring no fabricated values slip through
+- **Natural Language Processing**: The RAG layer leverages advanced NLP capabilities including **150+ question patterns**, **40+ intent types**, and **spelling mistake handling** to accurately interpret user queries before retrieval.
+- **S&P 1500 Coverage**: Retrieves data for all **1,599 S&P 1500 companies** (S&P 500 + S&P 400 + S&P 600) with automatic company name and ticker resolution, including common misspellings.
 - **Portfolio Context**: When portfolio queries are detected, the system retrieves portfolio holdings, exposure data, risk metrics, and attribution results from the portfolio database
-- **ML Forecast Context**: When forecast queries are detected, the system retrieves historical time series data, runs ML forecasting models, and builds comprehensive technical context including model architecture, hyperparameters, training details, and forecast results
+- **ML Forecast Context**: When forecast queries are detected (via intent detection), the system retrieves historical time series data, runs ML forecasting models (**8 models available**), and builds comprehensive technical context including model architecture, hyperparameters, training details, and forecast results
 - **Multi-Source Aggregation**: The RAG layer aggregates data from multiple sources (SEC EDGAR, Yahoo Finance, FRED, IMF) to provide comprehensive context for financial queries
 
 ### 🎯 Generation / Machine Learning
@@ -1867,12 +1881,25 @@ Project/
 │       │   ├── temporal_relationships.py # Temporal relationship parsing
 │       │   └── trends.py              # Trend detection
 │       │
-│       ├── Spelling & Correction:
-│       ├── spelling/
-│       │   ├── company_corrector.py   # Company name spelling correction
-│       │   ├── correction_engine.py  # Main spelling correction engine
-│       │   ├── fuzzy_matcher.py      # Fuzzy string matching
-│       │   └── metric_corrector.py    # Metric name spelling correction
+│       ├── Parsing & NLP (continued):
+│       │   ├── abbreviations.py       # Abbreviation expansion
+│       │   ├── company_groups.py      # Company group detection
+│       │   ├── comparative.py         # Comparative language parsing
+│       │   ├── conditionals.py        # Conditional statement parsing
+│       │   ├── fuzzy_quantities.py    # Fuzzy quantity parsing
+│       │   ├── metric_inference.py   # Metric inference from context
+│       │   ├── multi_intent.py       # Multi-intent detection
+│       │   ├── natural_filters.py    # Natural language filters
+│       │   ├── negation.py            # Negation handling
+│       │   ├── question_chaining.py   # Question chaining detection
+│       │   ├── sentiment.py          # Sentiment analysis
+│       │   ├── temporal_relationships.py # Temporal relationship parsing
+│       │   └── trends.py              # Trend detection
+│       │
+│       ├── Spelling & Correction (integrated in parsing):
+│       │   └── Note: Spelling correction is integrated directly into alias_builder.py and parse.py
+│       │   └── Features: 90% company name spelling correction, 100% metric spelling correction
+│       │   └── Methods: Fuzzy matching with progressive cutoffs, manual overrides (85+ entries), adaptive thresholds
 │       │
 │       ├── Routing:
 │       ├── routing/
@@ -2349,10 +2376,10 @@ Project/
 
 | File | Description |
 |------|-------------|
-| src/finanlyzeos_chatbot/parsing/alias_builder.py | Ticker alias resolution for S&P 500. Normalizes company mentions, loads alias sets, applies overrides, and resolves tickers with fuzzy fallbacks. |
-| src/finanlyzeos_chatbot/parsing/aliases.json | Generated ticker aliases covering S&P 500 companies. Consumed at runtime by parser for ticker resolution. |
-| src/finanlyzeos_chatbot/parsing/ontology.py | Metric ontology defining KPI definitions, synonyms, and relationships. Provides structured knowledge base for financial metrics. |
-| src/finanlyzeos_chatbot/parsing/parse.py | Natural language parser converting prompts into structured intents. Extracts tickers, metrics, periods, and warnings from user queries. |
+| src/finanlyzeos_chatbot/parsing/alias_builder.py | Ticker alias resolution for **S&P 1500 (1,599 companies)**. Normalizes company mentions, loads alias sets, applies 85+ manual overrides for common misspellings, and resolves tickers with advanced fuzzy fallbacks. Handles 90% of company name spelling mistakes using progressive cutoff matching (0.85-0.65) and manual overrides. |
+| src/finanlyzeos_chatbot/parsing/aliases.json | Generated ticker aliases covering **all 1,599 S&P 1500 companies**. Includes company names, ticker symbols, and common variations. Consumed at runtime by parser for ticker resolution. |
+| src/finanlyzeos_chatbot/parsing/ontology.py | Metric ontology defining **93 KPI definitions** with **200+ synonyms** and natural language variations. Provides structured knowledge base for financial metrics. Handles 100% of metric spelling mistakes using multi-level fuzzy matching with adaptive thresholds. |
+| src/finanlyzeos_chatbot/parsing/parse.py | Natural language parser converting prompts into structured intents. Extracts tickers (with spelling correction), metrics (with spelling correction), periods, and recognizes **40+ intent types**. Supports **150+ question patterns** with 100% detection rate. |
 | src/finanlyzeos_chatbot/parsing/time_grammar.py | Time period parser handling fiscal/calendar ranges, lists, quarters, and relative windows. Flexible grammar for temporal expressions. |
 | src/finanlyzeos_chatbot/parsing/abbreviations.py | Abbreviation expansion. Expands common financial abbreviations (e.g., "rev" → "revenue"). |
 | src/finanlyzeos_chatbot/parsing/company_groups.py | Company group detection. Identifies and handles company groups (e.g., "FAANG", "tech companies"). |
