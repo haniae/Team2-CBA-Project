@@ -1751,13 +1751,14 @@ Project/
 ├── .env.example                       # Environment configuration template
 ├── run_chatbot.py                     # CLI chatbot entry point (REPL)
 ├── serve_chatbot.py                   # Web server entry point (FastAPI)
-├── run_data_ingestion.ps1             # Windows PowerShell ingestion script
-├── run_data_ingestion.sh              # Unix/Linux ingestion script
-├── generate_company_universe.py       # Generate company universe JSON for UI
-├── analyze_coverage_gaps.py           # Analyze coverage gaps (complete/partial/missing)
+├── run_data_ingestion.ps1             # Windows PowerShell ingestion script (moved to scripts/)
+├── run_data_ingestion.sh              # Unix/Linux ingestion script (moved to scripts/)
 │
 ├── scripts/
 │   ├── check_packages.py              # Package verification utility
+│   │
+│   ├── analysis/                       # Analysis scripts
+│   │   └── analyze_coverage_gaps.py   # Analyze coverage gaps (complete/partial/missing)
 │   │
 │   ├── ingestion/                      # Data ingestion scripts
 │   │   ├── fill_data_gaps.py          # ⭐ Recommended: Smart gap-filling script
@@ -1807,12 +1808,26 @@ Project/
 │       ├── improve_kpi_coverage.py   # Improve KPI coverage analysis
 │       ├── fix_remaining_kpis.py     # Fix remaining KPI issues
 │       ├── kpi_registry_cli.py        # KPI registry CLI tool
-│       ├── generate_company_universe.py # Generate company universe (utility version)
+│       ├── generate_company_universe.py # Generate company universe JSON for UI
+│       ├── generate_sp1500_names.py    # Generate S&P 1500 company names from SEC
 │       ├── generate_help_center_verification_tracker.py # Help center tracker generator
 │       ├── print_failed_prompts.py    # Print failed test prompts
 │       ├── smoke_chat_api.py          # Smoke test for chat API
 │       ├── verify_chatbot_connection.py # Verify chatbot connection
 │       └── main.py                    # Main utility CLI wrapper
+│   │
+│   ├── sp1500/                         # S&P 1500 setup and verification scripts
+│   │   ├── complete_sp1500.py         # Build complete S&P 1500 list from Wikipedia
+│   │   ├── create_sp1500_file.py      # Create S&P 1500 ticker file
+│   │   ├── extract_tickers_from_db.py # Extract tickers from database
+│   │   ├── find_and_test_sp1500.py    # Find and test S&P 1500 file
+│   │   ├── setup_and_test_sp1500.py   # Setup and test S&P 1500
+│   │   ├── setup_sp1500.py            # Setup S&P 1500 universe
+│   │   ├── verify_sp1500_file.py      # Verify S&P 1500 file exists
+│   │   └── verify_sp1500_setup.py     # Quick verification script
+│   │
+│   ├── run_data_ingestion.ps1         # Windows PowerShell ingestion script
+│   └── run_data_ingestion.sh          # Unix/Linux ingestion script
 │
 ├── src/
 │   └── finanlyzeos_chatbot/
@@ -1984,6 +1999,7 @@ Project/
 │   │   ├── PORTFOLIO_QUESTIONS_GUIDE.md # Portfolio questions guide
 │   │   ├── FINANCIAL_PROMPTS_GUIDE.md # Financial prompts guide
 │   │   ├── CHATBOT_PROMPT_GUIDE.md    # Chatbot prompt guide
+│   │   ├── EXPANDED_QUERY_CAPABILITIES.md # Expanded query capabilities guide
 │   │   ├── COMPREHENSIVE_DATA_SOURCES.md # Data sources guide
 │   │   ├── DASHBOARD_SOURCES_INSTRUCTIONS.md # Dashboard sources guide
 │   │   ├── DATA_INGESTION_PLAN.md     # Data ingestion planning
@@ -2003,7 +2019,7 @@ Project/
 │   │   ├── RAW_SEC_PARSER_IMPLEMENTATION_GUIDE.md # SEC parser guide
 │   │   ├── export_pipeline_scope.md  # Export pipeline scope
 │   │   ├── orchestration_playbook.md # Deployment orchestration guide
-│   │   ├── ticker_names.md           # Ticker coverage list
+│   │   ├── ticker_names.md           # Ticker coverage list (1,599 S&P 1500 companies)
 │   │   └── (additional guides)
 │   │
 │   ├── ingestion/                      # Ingestion documentation
@@ -2087,11 +2103,27 @@ Project/
 │   │   └── PLOTLY_NAN_FIX.md          # Plotly NaN fix
 │   │
 │   ├── summaries/                      # Summary documentation
+│   │   ├── PATTERN_EXPANSION_SUMMARY.md # Pattern expansion summary
 │   │   └── (28 summary files documenting various features and improvements)
 │   │
 │   ├── analysis/                       # Analysis documentation
 │   │   ├── README.md                   # Analysis documentation index
-│   │   └── (22 analysis reports and documentation files)
+│   │   └── (25+ analysis reports and documentation files)
+│   │
+│   ├── sp1500/                         # S&P 1500 documentation
+│   │   ├── SP1500_SETUP_COMPLETE.md   # S&P 1500 setup completion
+│   │   ├── SP1500_TESTING_INSTRUCTIONS.md # S&P 1500 testing guide
+│   │   ├── SP1500_SUPPORT_ANALYSIS.md # S&P 1500 support analysis
+│   │   ├── SP1500_SUPPORT_STATUS.md   # S&P 1500 support status
+│   │   ├── SP1500_FIXES_COMPLETE.md   # S&P 1500 fixes completion
+│   │   └── ADD_SP1500_SUPPORT.md      # Adding S&P 1500 support guide
+│   │
+│   ├── improvements/                   # Improvement documentation
+│   │   ├── COMPREHENSIVE_COVERAGE_REPORT.md # Coverage report
+│   │   ├── COMPREHENSIVE_IMPROVEMENTS_COMPLETE.md # Improvements completion
+│   │   ├── FINAL_IMPROVEMENTS_SUMMARY.md # Final improvements summary
+│   │   ├── IMPROVEMENTS_TO_100_PERCENT.md # Improvements to 100% accuracy
+│   │   └── (additional improvement docs)
 │   │
 │   └── reports/                        # Generated reports
 │       └── (various analysis and improvement reports)
@@ -2107,6 +2139,7 @@ Project/
 │   │   └── benchmarkos_chatbot.sqlite3 # Benchmark database
 │   ├── tickers/
 │   │   ├── universe_sp500.txt         # S&P 500 ticker list (475 companies)
+│   │   ├── universe_sp1500.txt        # S&P 1500 ticker list (1,599 companies)
 │   │   ├── sec_top100.txt             # Top 100 SEC companies
 │   │   ├── universe_custom.txt        # Custom universe list
 │   │   └── sample_watchlist.txt       # Sample watchlist
@@ -2172,9 +2205,16 @@ Project/
     ├── unit/                           # Unit tests
     │   ├── test_analytics.py           # Analytics unit tests
     │   ├── test_analytics_engine.py    # Analytics engine unit tests
+    │   ├── test_analysis_templates.py  # Analysis template unit tests
     │   ├── test_cli_tables.py          # CLI table rendering tests
+    │   ├── test_custom_kpis_workspace.py # Custom KPIs workspace tests
     │   ├── test_database.py            # Database unit tests
-    │   └── test_data_ingestion.py      # Data ingestion unit tests
+    │   ├── test_data_dictionary.py     # Data dictionary tests
+    │   ├── test_data_ingestion.py      # Data ingestion unit tests
+    │   ├── test_document_upload.py     # Document upload tests
+    │   ├── test_router_kpi_intents.py  # Router KPI intent tests
+    │   ├── test_uploaded_document_context.py # Uploaded document context tests
+    │   └── (additional unit tests)
     │
     ├── integration/                    # Integration tests
     │   ├── test_chatbot_sec_fix.py    # SEC integration tests
@@ -2194,6 +2234,36 @@ Project/
     │   ├── PORTFOLIO_STRESS_TEST_SUMMARY.md # Portfolio stress test summary
     │   └── test_ml_detailed_answers.py # ML detailed answers test
     │
+    ├── metric_recognition/             # Metric recognition tests
+    │   ├── test_metric_variations.py   # Metric variation tests
+    │   ├── test_metric_edge_cases.py   # Metric edge case tests
+    │   ├── test_metric_patterns.py     # Metric pattern tests
+    │   ├── test_metric_recognition.py  # Metric recognition tests
+    │   ├── test_comprehensive_coverage.py # Comprehensive metric coverage
+    │   ├── test_comprehensive_spelling.py # Comprehensive spelling tests
+    │   ├── test_metric_spelling_comprehensive.py # Metric spelling comprehensive
+    │   └── test_spelling_mistakes.py   # Spelling mistake tests
+    │
+    ├── sp1500/                         # S&P 1500 tests
+    │   ├── test_all_sp1500_companies.py # All S&P 1500 companies test
+    │   ├── test_all_sp1500_tickers.py # All S&P 1500 tickers test
+    │   ├── test_sp1500_comprehensive.py # Comprehensive S&P 1500 test
+    │   └── test_sp1500_support.py     # S&P 1500 support test
+    │
+    ├── debug/                          # Debug and troubleshooting scripts
+    │   ├── debug_company_names.py      # Debug company name recognition
+    │   ├── debug_failures.py           # Debug recognition failures
+    │   ├── debug_remaining_failures.py # Debug remaining failures
+    │   ├── debug_bookng.py             # Debug specific company (Booking)
+    │   ├── debug_bookng_detailed.py    # Detailed Booking debug
+    │   ├── debug_bookng_live.py        # Live Booking debug
+    │   ├── analyze_company_name_failures.py # Analyze company name failures
+    │   ├── get_all_failures.py         # Get all failures
+    │   ├── identify_all_failures.py    # Identify all failures
+    │   ├── test_all_failures_detailed.py # Detailed failure tests
+    │   ├── test_specific_failures.py   # Specific failure tests
+    │   └── test_specific_spelling_failures.py # Spelling failure tests
+    │
     ├── verification/                   # Verification scripts
     │   ├── verify_metrics.py           # Metric verification
     │   ├── verify_new_data.py          # New data verification
@@ -2209,6 +2279,42 @@ Project/
     │   ├── test_ticker_resolution.py   # Ticker resolution regression
     │   ├── test_time_fixes.py          # Time parsing fixes regression
     │   └── (additional regression tests)
+    │
+    ├── manual/                         # Manual test scripts
+    │   ├── test_100_percent_accuracy.py # 100% accuracy manual test
+    │   ├── test_100_percent_confidence.py # 100% confidence manual test
+    │   ├── test_100_prompts_accuracy.py # 100 prompts accuracy test
+    │   ├── test_accuracy_100_prompts.py # Accuracy 100 prompts test
+    │   ├── test_all_sp500_all_kpis.py  # All S&P 500 all KPIs test
+    │   ├── test_all_sp500_base_metrics.py # All S&P 500 base metrics test
+    │   ├── test_fixed_accuracy.py      # Fixed accuracy test
+    │   ├── test_global_ticker_fix.py   # Global ticker fix test
+    │   ├── test_real_chatbot_accuracy.py # Real chatbot accuracy test
+    │   ├── test_show_failed_facts.py   # Show failed facts test
+    │   ├── test_stress_50_companies.py # Stress test 50 companies
+    │   ├── test_stress_all_metrics.py  # Stress test all metrics
+    │   ├── test_stress_edge_cases.py   # Stress test edge cases
+    │   ├── test_stress_performance.py  # Stress test performance
+    │   ├── test_verification_coverage.py # Verification coverage test
+    │   └── test_verification_system.py # Verification system test
+    │
+    ├── standalone/                     # Standalone ML forecast tests
+    │   ├── test_all_ml_forecast_prompts.py # All ML forecast prompts
+    │   ├── test_all_ml_patterns_comprehensive.py # All ML patterns comprehensive
+    │   ├── test_all_ml_prompts_comprehensive.py # All ML prompts comprehensive
+    │   ├── test_ml_batch.py            # ML batch test
+    │   ├── test_ml_debug.py            # ML debug test
+    │   ├── test_ml_focused.py          # ML focused test
+    │   ├── test_ml_forecast_prompts.py # ML forecast prompts test
+    │   ├── test_ml_forecast_quality.py # ML forecast quality test
+    │   ├── test_ml_forecast_quick.py   # ML forecast quick test
+    │   └── test_ml_incremental.py      # ML incremental test
+    │
+    ├── outputs/                        # Test output files
+    │   ├── sp500_dashboard_test_results.txt # S&P 500 dashboard results
+    │   ├── sp500_test_output.txt       # S&P 500 test output
+    │   ├── ml_test_output.txt          # ML test output
+    │   └── test_single_company_payload.json # Single company test payload
     │
     ├── Parser & NLP Tests:
     ├── test_alias_resolution.py         # Alias resolution tests
