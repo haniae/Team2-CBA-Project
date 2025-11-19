@@ -1,24 +1,87 @@
 {
+  "AA": [
+    "aa",
+    "alcoa",
+    "alcoacorp"
+  ],
+  "AAL": [
+    "aal",
+    "american",
+    "americanairlines",
+    "american airlines",
+    "americanairlinesgroup",
+    "americanairlinesgroupinc"
+  ],
+  "AAN": [
+    "aan"
+  ],
+  "AAOI": [
+    "aaoi",
+    "applied",
+    "appliedoptoelectronics",
+    "applied optoelectronics",
+    "appliedoptoelectronicsinc"
+  ],
+  "AAON": [
+    "aaon",
+    "aaoninc"
+  ],
+  "AAP": [
+    "aap",
+    "advance",
+    "advanceautoparts",
+    "advance auto parts",
+    "advanceautopartsinc"
+  ],
   "AAPL": [
     "aapl",
     "apple",
     "appleinc"
+  ],
+  "AAWW": [
+    "aaww"
+  ],
+  "AAXN": [
+    "aaxn"
   ],
   "ABBV": [
     "abbv",
     "abbvie",
     "abbvieinc"
   ],
+  "ABMD": [
+    "abmd"
+  ],
   "ABNB": [
     "abnb",
     "airbnb",
     "airbnbinc"
+  ],
+  "ABR": [
+    "abr",
+    "arbor",
+    "arborrealtytrust",
+    "arbor realty trust",
+    "arborrealtytrustinc"
   ],
   "ABT": [
     "abt",
     "abbott",
     "abbottlaboratories",
     "abbott laboratories"
+  ],
+  "ABTX": [
+    "abtx"
+  ],
+  "ACAD": [
+    "acad",
+    "acadia",
+    "acadiapharmaceuticals",
+    "acadia pharmaceuticals",
+    "acadiapharmaceuticalsinc"
+  ],
+  "ACC": [
+    "acc"
   ],
   "ACGL": [
     "acgl",
@@ -28,15 +91,59 @@
     "archcapitalgroup",
     "archcapitalgroupltd"
   ],
+  "ACHC": [
+    "achc",
+    "acadia",
+    "acadiahealthcare",
+    "acadia healthcare",
+    "acadiahealthcarecompanyinc"
+  ],
+  "ACI": [
+    "aci",
+    "albertsons",
+    "albertsonscompanies",
+    "albertsons companies",
+    "albertsonscompaniesinc"
+  ],
+  "ACIW": [
+    "aci",
+    "aciw",
+    "aciworldwide",
+    "aci worldwide",
+    "aciworldwideinc"
+  ],
+  "ACMR": [
+    "acm",
+    "acmr",
+    "acmresearch",
+    "acm research",
+    "acmresearchinc"
+  ],
   "ACN": [
     "acn",
     "accenture",
     "accentureplc"
   ],
+  "ACOR": [
+    "acor"
+  ],
+  "ACT": [
+    "act",
+    "enact",
+    "enactholdings",
+    "enactholdingsinc"
+  ],
   "ADBE": [
     "adbe",
     "adobe",
     "adobeinc"
+  ],
+  "ADC": [
+    "adc",
+    "agree",
+    "agreerealty",
+    "agree realty",
+    "agreerealtycorp"
   ],
   "ADI": [
     "adi",
@@ -52,6 +159,17 @@
     "archer daniels midland",
     "archerdanielsmidlandcompany"
   ],
+  "ADMA": [
+    "adma",
+    "admabiologics",
+    "adma biologics",
+    "admabiologicsinc"
+  ],
+  "ADNT": [
+    "adnt",
+    "adient",
+    "adientplc"
+  ],
   "ADP": [
     "adp",
     "automatic",
@@ -59,10 +177,35 @@
     "automatic data processing",
     "automaticdataprocessinginc"
   ],
+  "ADS": [
+    "ads"
+  ],
   "ADSK": [
     "adsk",
     "autodesk",
     "autodeskinc"
+  ],
+  "ADTN": [
+    "adtn",
+    "adtran",
+    "adtranholdings",
+    "adtranholdingsinc"
+  ],
+  "ADVS": [
+    "advs"
+  ],
+  "AEGN": [
+    "aegn"
+  ],
+  "AEL": [
+    "ael"
+  ],
+  "AEO": [
+    "aeo",
+    "american",
+    "americaneagleoutfitters",
+    "american eagle outfitters",
+    "americaneagleoutfittersinc"
   ],
   "AEP": [
     "aep",
@@ -77,10 +220,40 @@
     "aescorporation",
     "theaescorporation"
   ],
+  "AESI": [
+    "aesi",
+    "atlas",
+    "atlasenergysolutions",
+    "atlas energy solutions",
+    "atlasenergysolutionsinc"
+  ],
   "AFL": [
     "afl",
     "aflac",
     "aflacincorporated"
+  ],
+  "AGO": [
+    "ago",
+    "assured",
+    "assuredguaranty",
+    "assured guaranty",
+    "assuredguarantyltd"
+  ],
+  "AGTI": [
+    "agti"
+  ],
+  "AHCO": [
+    "ahco",
+    "adapthealth",
+    "adapthealthcorp"
+  ],
+  "AHL": [
+    "ahl",
+    "aspen",
+    "aspeninsurance",
+    "aspen insurance",
+    "aspeninsuranceholdings",
+    "aspeninsuranceholdingsltd"
   ],
   "AIG": [
     "aig",
@@ -89,6 +262,16 @@
     "american international",
     "americaninternationalgroup",
     "americaninternationalgroupinc"
+  ],
+  "AIRC": [
+    "airc"
+  ],
+  "AIT": [
+    "ait",
+    "applied",
+    "appliedindustrialtechnologies",
+    "applied industrial technologies",
+    "appliedindustrialtechnologiesinc"
   ],
   "AIZ": [
     "aiz",
@@ -102,6 +285,9 @@
     "arthurjgallagherandco",
     "arthur j gallagher and"
   ],
+  "AJRD": [
+    "ajrd"
+  ],
   "AKAM": [
     "akam",
     "akamai",
@@ -109,10 +295,45 @@
     "akamai technologies",
     "akamaitechnologiesinc"
   ],
+  "AKORN": [
+    "akorn"
+  ],
+  "AKRX": [
+    "akrx"
+  ],
+  "AL": [
+    "al",
+    "air",
+    "airlease",
+    "air lease",
+    "airleasecorp"
+  ],
   "ALB": [
     "alb",
     "albemarle",
     "albemarlecorporation"
+  ],
+  "ALCOA": [
+    "alcoa"
+  ],
+  "ALE": [
+    "ale",
+    "allete",
+    "alleteinc"
+  ],
+  "ALEX": [
+    "alex",
+    "alexander",
+    "alexanderandbaldwin",
+    "alexander and baldwin",
+    "alexanderandbaldwininc"
+  ],
+  "ALGM": [
+    "algm",
+    "allegro",
+    "allegromicrosystems",
+    "allegro microsystems",
+    "allegromicrosystemsinc"
   ],
   "ALGN": [
     "algn",
@@ -121,12 +342,55 @@
     "align technology",
     "aligntechnologyinc"
   ],
+  "ALK": [
+    "alk",
+    "alaska",
+    "alaskaair",
+    "alaska air",
+    "alaskaairgroup",
+    "alaskaairgroupinc"
+  ],
+  "ALKS": [
+    "alks",
+    "alkermes",
+    "alkermesplc"
+  ],
   "ALL": [
     "all",
     "allstate",
     "theallstate",
     "allstatecorporation",
     "theallstatecorporation"
+  ],
+  "ALLY": [
+    "ally",
+    "allyfinancial",
+    "ally financial",
+    "allyfinancialinc"
+  ],
+  "ALSK": [
+    "alsk"
+  ],
+  "ALTM": [
+    "altm"
+  ],
+  "ALTR": [
+    "altr"
+  ],
+  "ALV": [
+    "alv",
+    "autoliv",
+    "autolivinc"
+  ],
+  "AM": [
+    "am",
+    "antero",
+    "anteromidstream",
+    "antero midstream",
+    "anteromidstreamcorp"
+  ],
+  "AMAG": [
+    "amag"
   ],
   "AMAT": [
     "amat",
@@ -135,10 +399,25 @@
     "applied materials",
     "appliedmaterialsinc"
   ],
+  "AMBC": [
+    "ambc",
+    "octave",
+    "octavespecialty",
+    "octave specialty",
+    "octavespecialtygroup",
+    "octavespecialtygroupinc"
+  ],
   "AMCR": [
     "amcr",
     "amcor",
     "amcorplc"
+  ],
+  "AMCX": [
+    "amc",
+    "amcx",
+    "amcnetworks",
+    "amc networks",
+    "amcnetworksinc"
   ],
   "AMD": [
     "amd",
@@ -152,10 +431,37 @@
     "ametek",
     "ametekinc"
   ],
+  "AMED": [
+    "amed"
+  ],
+  "AMEH": [
+    "ameh"
+  ],
+  "AMG": [
+    "amg",
+    "affiliated",
+    "affiliatedmanagers",
+    "affiliated managers",
+    "affiliatedmanagersgroup",
+    "affiliatedmanagersgroupinc"
+  ],
   "AMGN": [
     "amgn",
     "amgen",
     "amgeninc"
+  ],
+  "AMH": [
+    "amh",
+    "american",
+    "americanhomes4rent",
+    "american homes 4 rent"
+  ],
+  "AMKR": [
+    "amkr",
+    "amkor",
+    "amkortechnology",
+    "amkor technology",
+    "amkortechnologyinc"
   ],
   "AMP": [
     "amp",
@@ -164,12 +470,30 @@
     "ameriprise financial",
     "ameriprisefinancialinc"
   ],
+  "AMR": [
+    "amr",
+    "alpha",
+    "alphametallurgical",
+    "alpha metallurgical",
+    "alphametallurgicalresources",
+    "alpha metallurgical resources",
+    "alphametallurgicalresourcesinc"
+  ],
+  "AMSG": [
+    "amsg"
+  ],
   "AMT": [
     "amt",
     "american",
     "americantower",
     "american tower",
     "americantowercorporation"
+  ],
+  "AMTM": [
+    "amtm",
+    "amentum",
+    "amentumholdings",
+    "amentumholdingsinc"
   ],
   "AMZN": [
     "amzn",
@@ -178,6 +502,11 @@
     "amazon com",
     "amazoncominc"
   ],
+  "AN": [
+    "an",
+    "autonation",
+    "autonationinc"
+  ],
   "ANET": [
     "anet",
     "arista",
@@ -185,8 +514,26 @@
     "arista networks",
     "aristanetworksinc"
   ],
+  "ANF": [
+    "anf",
+    "abercrombie",
+    "abercrombieandfitchcode",
+    "abercrombie and fitch co de"
+  ],
+  "ANGI": [
+    "angi",
+    "angiinc"
+  ],
+  "ANGO": [
+    "ango",
+    "angiodynamics",
+    "angiodynamicsinc"
+  ],
   "ANSS": [
     "anss"
+  ],
+  "AOL": [
+    "aol"
   ],
   "AON": [
     "aon",
@@ -198,9 +545,25 @@
     "a o smith",
     "aosmithcorporation"
   ],
+  "AOSL": [
+    "aosl",
+    "alpha",
+    "alphaomegasemiconductor",
+    "alpha omega semiconductor",
+    "alphaandomegasemiconductor",
+    "alpha and omega semiconductor",
+    "alphaandomegasemiconductorltd"
+  ],
   "APA": [
     "apa",
     "apacorporation"
+  ],
+  "APAM": [
+    "apam",
+    "artisan",
+    "artisanpartnersassetmanagement",
+    "artisan partners asset management",
+    "artisanpartnersassetmanagementinc"
   ],
   "APD": [
     "air",
@@ -209,15 +572,63 @@
     "air products and chemicals",
     "airproductsandchemicalsinc"
   ],
+  "APEI": [
+    "apei",
+    "american",
+    "americanpubliceducation",
+    "american public education",
+    "americanpubliceducationinc"
+  ],
+  "APG": [
+    "apg",
+    "api",
+    "apigroup",
+    "apigroupcorp"
+  ],
   "APH": [
     "aph",
     "amphenol",
     "amphenolcorporation"
   ],
+  "APLE": [
+    "aple",
+    "apple",
+    "applehospitalityreit",
+    "apple hospitality reit",
+    "applehospitalityreitinc"
+  ],
+  "APOL": [
+    "apol"
+  ],
+  "APPF": [
+    "appf",
+    "appfolio",
+    "appfolioinc"
+  ],
+  "APPS": [
+    "apps",
+    "digital",
+    "digitalturbine",
+    "digital turbine",
+    "digitalturbineinc"
+  ],
   "APTV": [
     "aptv",
     "aptiv",
     "aptivplc"
+  ],
+  "APY": [
+    "apy"
+  ],
+  "AR": [
+    "ar",
+    "antero",
+    "anteroresources",
+    "antero resources",
+    "anteroresourcescorp"
+  ],
+  "ARCH": [
+    "arch"
   ],
   "ARE": [
     "are",
@@ -226,12 +637,89 @@
     "alexandria real estate equities",
     "alexandriarealestateequitiesinc"
   ],
+  "ARMK": [
+    "armk",
+    "aramark"
+  ],
+  "ARNC": [
+    "arnc"
+  ],
+  "ARRS": [
+    "arrs"
+  ],
+  "ARWR": [
+    "arwr",
+    "arrowhead",
+    "arrowheadpharmaceuticals",
+    "arrowhead pharmaceuticals",
+    "arrowheadpharmaceuticalsinc"
+  ],
+  "ASGN": [
+    "asgn",
+    "asgninc"
+  ],
+  "ASNA": [
+    "asna"
+  ],
+  "ASO": [
+    "aso",
+    "academy",
+    "academysportsandoutdoors",
+    "academy sports and outdoors",
+    "academysportsandoutdoorsinc"
+  ],
+  "ATEN": [
+    "a10",
+    "aten",
+    "a10networks",
+    "a10 networks",
+    "a10networksinc"
+  ],
+  "ATGE": [
+    "atge",
+    "adtalem",
+    "adtalemglobaleducation",
+    "adtalem global education",
+    "adtalemglobaleducationinc"
+  ],
+  "ATI": [
+    "ati",
+    "atiinc"
+  ],
+  "ATMEL": [
+    "atmel"
+  ],
+  "ATML": [
+    "atml"
+  ],
+  "ATNI": [
+    "atn",
+    "atni",
+    "atninternational",
+    "atn international",
+    "atninternationalinc"
+  ],
   "ATO": [
     "ato",
     "atmos",
     "atmosenergy",
     "atmos energy",
     "atmosenergycorporation"
+  ],
+  "ATW": [
+    "atw"
+  ],
+  "AUB": [
+    "aub",
+    "atlantic",
+    "atlanticunionbankshares",
+    "atlantic union bankshares",
+    "atlanticunionbanksharescorp"
+  ],
+  "AVAV": [
+    "avav",
+    "aerovironment",
+    "aerovironmentinc"
   ],
   "AVB": [
     "avb",
@@ -240,10 +728,38 @@
     "avalonbay communities",
     "avalonbaycommunitiesinc"
   ],
+  "AVD": [
+    "avd",
+    "american",
+    "americanvanguard",
+    "american vanguard",
+    "americanvanguardcorp"
+  ],
   "AVGO": [
     "avgo",
     "broadcom",
     "broadcominc"
+  ],
+  "AVID": [
+    "avid"
+  ],
+  "AVNS": [
+    "avns",
+    "avanos",
+    "avanosmedical",
+    "avanos medical",
+    "avanosmedicalinc"
+  ],
+  "AVP": [
+    "avp"
+  ],
+  "AVTA": [
+    "avta"
+  ],
+  "AVTR": [
+    "avtr",
+    "avantor",
+    "avantorinc"
   ],
   "AVY": [
     "avy",
@@ -251,6 +767,16 @@
     "averydennison",
     "avery dennison",
     "averydennisoncorporation"
+  ],
+  "AWI": [
+    "awi",
+    "armstrong",
+    "armstrongworldindustries",
+    "armstrong world industries",
+    "armstrongworldindustriesinc"
+  ],
+  "AXE": [
+    "axe"
   ],
   "AXON": [
     "axon",
@@ -265,10 +791,35 @@
     "american express",
     "americanexpresscompany"
   ],
+  "AXTA": [
+    "axta",
+    "axalta",
+    "axaltacoatingsystems",
+    "axalta coating systems",
+    "axaltacoatingsystemsltd"
+  ],
+  "AYI": [
+    "ayi"
+  ],
   "AZO": [
     "azo",
     "autozone",
     "autozoneinc"
+  ],
+  "AZPN": [
+    "azpn"
+  ],
+  "AZTA": [
+    "azta",
+    "azenta",
+    "azentainc"
+  ],
+  "B": [
+    "b",
+    "barrick",
+    "barrickmining",
+    "barrick mining",
+    "barrickminingcorp"
   ],
   "BA": [
     "ba",
@@ -288,12 +839,35 @@
     "ball",
     "ballcorporation"
   ],
+  "BANF": [
+    "banf",
+    "bancfirst",
+    "bancfirstcorpok",
+    "bancfirst corp ok"
+  ],
   "BAX": [
     "bax",
     "baxter",
     "baxterinternational",
     "baxter international",
     "baxterinternationalinc"
+  ],
+  "BBBY": [
+    "bed",
+    "bbby",
+    "bedbathandbeyond",
+    "bed bath and beyond",
+    "bedbathandbeyondinc"
+  ],
+  "BBG": [
+    "bbg"
+  ],
+  "BBT": [
+    "bbt",
+    "beacon",
+    "beaconfinancial",
+    "beacon financial",
+    "beaconfinancialcorp"
   ],
   "BBWI": [
     "bath",
@@ -309,12 +883,37 @@
     "best buy",
     "bestbuycoinc"
   ],
+  "BCO": [
+    "bco",
+    "brinks",
+    "brinksco"
+  ],
+  "BDN": [
+    "bdn",
+    "brandywine",
+    "brandywinerealtytrust",
+    "brandywine realty trust"
+  ],
   "BDX": [
     "bdx",
     "becton",
     "bectondickinsonand",
     "becton dickinson and",
     "bectondickinsonandcompany"
+  ],
+  "BEAT": [
+    "beat",
+    "heartbeam",
+    "heartbeaminc"
+  ],
+  "BEAV": [
+    "beav"
+  ],
+  "BELFB": [
+    "bel",
+    "belfb",
+    "belfuseincnj",
+    "bel fuse inc nj"
   ],
   "BEN": [
     "ben",
@@ -323,6 +922,9 @@
     "franklin resources",
     "franklinresourcesinc"
   ],
+  "BERY": [
+    "bery"
+  ],
   "BF-B": [
     "bf b",
     "brown",
@@ -330,16 +932,67 @@
     "brown forman",
     "brownformancorporation"
   ],
+  "BFH": [
+    "bfh",
+    "bread",
+    "breadfinancial",
+    "bread financial",
+    "breadfinancialholdings",
+    "breadfinancialholdingsinc"
+  ],
+  "BGC": [
+    "bgc",
+    "bgcgroup",
+    "bgcgroupinc"
+  ],
+  "BGG": [
+    "bgg"
+  ],
+  "BHF": [
+    "bhf",
+    "brighthouse",
+    "brighthousefinancial",
+    "brighthouse financial",
+    "brighthousefinancialinc"
+  ],
+  "BHLB": [
+    "bhlb"
+  ],
+  "BID": [
+    "bid"
+  ],
+  "BIG": [
+    "big"
+  ],
   "BIIB": [
     "biib",
     "biogen",
     "biogeninc"
+  ],
+  "BILL": [
+    "bill",
+    "billholdings",
+    "billholdingsinc"
   ],
   "BIO": [
     "bio",
     "bioradlaboratories",
     "bio rad laboratories",
     "bioradlaboratoriesinc"
+  ],
+  "BIVV": [
+    "bivv"
+  ],
+  "BJ": [
+    "bj",
+    "bjwholesale",
+    "bj wholesale",
+    "bjswholesale",
+    "bj s wholesale",
+    "bjswholesaleclub",
+    "bj s wholesale club",
+    "bjswholesaleclubholdings",
+    "bjswholesaleclubholdingsinc"
   ],
   "BK": [
     "bk",
@@ -363,6 +1016,21 @@
     "baker hughes",
     "bakerhughescompany"
   ],
+  "BKU": [
+    "bku",
+    "bankunited",
+    "bankunitedinc"
+  ],
+  "BL": [
+    "bl",
+    "blackline",
+    "blacklineinc"
+  ],
+  "BLD": [
+    "bld",
+    "topbuild",
+    "topbuildcorp"
+  ],
   "BLDR": [
     "bldr",
     "builders",
@@ -370,10 +1038,39 @@
     "builders firstsource",
     "buildersfirstsourceinc"
   ],
+  "BLFS": [
+    "blfs",
+    "biolife",
+    "biolifesolutions",
+    "biolife solutions",
+    "biolifesolutionsinc"
+  ],
   "BLK": [
     "blk",
     "blackrock",
     "blackrockinc"
+  ],
+  "BLKB": [
+    "blkb",
+    "blackbaud",
+    "blackbaudinc"
+  ],
+  "BMR": [
+    "bmr",
+    "beamr",
+    "beamrimaging",
+    "beamr imaging",
+    "beamrimagingltd"
+  ],
+  "BMRN": [
+    "bmrn",
+    "biomarin",
+    "biomarinpharmaceutical",
+    "biomarin pharmaceutical",
+    "biomarinpharmaceuticalinc"
+  ],
+  "BMS": [
+    "bms"
   ],
   "BMY": [
     "bmy",
@@ -382,12 +1079,50 @@
     "bristol myers squibb",
     "bristolmyerssquibbcompany"
   ],
+  "BNED": [
+    "bned",
+    "barnes",
+    "barnesandnobleeducation",
+    "barnes and noble education",
+    "barnesandnobleeducationinc"
+  ],
+  "BOH": [
+    "boh",
+    "bank",
+    "bankofhawaii",
+    "bank of hawaii",
+    "bankofhawaiicorp"
+  ],
+  "BOOM": [
+    "dmc",
+    "boom",
+    "dmcglobal",
+    "dmc global",
+    "dmcglobalinc"
+  ],
+  "BOX": [
+    "box",
+    "boxinc"
+  ],
+  "BPFH": [
+    "bpfh"
+  ],
   "BR": [
     "br",
     "broadridge",
     "broadridgefinancialsolutions",
     "broadridge financial solutions",
     "broadridgefinancialsolutionsinc"
+  ],
+  "BRBR": [
+    "brbr",
+    "bellring",
+    "bellringbrands",
+    "bellring brands",
+    "bellringbrandsinc"
+  ],
+  "BRCD": [
+    "brcd"
   ],
   "BRK-B": [
     "brk b",
@@ -396,12 +1131,34 @@
     "berkshire hathaway",
     "berkshirehathawayinc"
   ],
+  "BRKL": [
+    "brkl"
+  ],
+  "BRKR": [
+    "brkr",
+    "bruker",
+    "brukercorp"
+  ],
+  "BRKS": [
+    "brks"
+  ],
   "BRO": [
     "bro",
     "brown",
     "brownandbrown",
     "brown and brown",
     "brownandbrowninc"
+  ],
+  "BRX": [
+    "brx",
+    "brixmor",
+    "brixmorproperty",
+    "brixmor property",
+    "brixmorpropertygroup",
+    "brixmorpropertygroupinc"
+  ],
+  "BSIG": [
+    "bsig"
   ],
   "BSX": [
     "bsx",
@@ -410,19 +1167,95 @@
     "boston scientific",
     "bostonscientificcorporation"
   ],
+  "BSY": [
+    "bsy",
+    "bentley",
+    "bentleysystems",
+    "bentley systems",
+    "bentleysystemsinc"
+  ],
+  "BTSG": [
+    "btsg",
+    "brightspring",
+    "brightspringhealthservices",
+    "brightspring health services",
+    "brightspringhealthservicesinc"
+  ],
+  "BTU": [
+    "btu",
+    "peabody",
+    "peabodyenergy",
+    "peabody energy",
+    "peabodyenergycorp"
+  ],
+  "BURL": [
+    "burl",
+    "burlington",
+    "burlingtonstores",
+    "burlington stores",
+    "burlingtonstoresinc"
+  ],
   "BWA": [
     "bwa",
     "borgwarner",
     "borgwarnerinc"
   ],
+  "BWLD": [
+    "bwld"
+  ],
+  "BWXT": [
+    "bwx",
+    "bwxt",
+    "bwxtechnologies",
+    "bwx technologies",
+    "bwxtechnologiesinc"
+  ],
+  "BXMT": [
+    "bxmt",
+    "blackstone",
+    "blackstonemortgagetrust",
+    "blackstone mortgage trust",
+    "blackstonemortgagetrustinc"
+  ],
   "BXP": [
     "bxp",
     "bxpinc"
+  ],
+  "BYD": [
+    "byd",
+    "boyd",
+    "boydgaming",
+    "boyd gaming",
+    "boydgamingcorp"
   ],
   "C": [
     "c",
     "citigroup",
     "citigroupinc"
+  ],
+  "CAA": [
+    "caa"
+  ],
+  "CAB": [
+    "cab"
+  ],
+  "CABO": [
+    "cabo",
+    "cable",
+    "cableone",
+    "cable one",
+    "cableoneinc"
+  ],
+  "CACI": [
+    "caci",
+    "caciinternationalincde",
+    "caci international inc de"
+  ],
+  "CADE": [
+    "cade",
+    "cadence",
+    "cadencebank",
+    "cadence bank"
   ],
   "CAG": [
     "cag",
@@ -438,6 +1271,49 @@
     "cardinal health",
     "cardinalhealthinc"
   ],
+  "CAKE": [
+    "cake",
+    "cheesecake",
+    "cheesecakefactory",
+    "cheesecake factory",
+    "cheesecakefactoryinc"
+  ],
+  "CAL": [
+    "cal",
+    "caleres",
+    "caleresinc"
+  ],
+  "CALIX": [
+    "calix"
+  ],
+  "CALX": [
+    "calx",
+    "calix",
+    "calixinc"
+  ],
+  "CAMP": [
+    "camp",
+    "camp4",
+    "camp4therapeutics",
+    "camp4 therapeutics",
+    "camp4therapeuticscorp"
+  ],
+  "CAR": [
+    "car",
+    "avis",
+    "avisbudget",
+    "avis budget",
+    "avisbudgetgroup",
+    "avisbudgetgroupinc"
+  ],
+  "CARA": [
+    "cara"
+  ],
+  "CARG": [
+    "carg",
+    "cargurus",
+    "cargurusinc"
+  ],
   "CARR": [
     "carr",
     "carrier",
@@ -445,16 +1321,61 @@
     "carrier global",
     "carrierglobalcorporation"
   ],
+  "CARS": [
+    "cars",
+    "carscom",
+    "cars com",
+    "carscominc"
+  ],
+  "CART": [
+    "cart",
+    "maplebear",
+    "maplebearinc"
+  ],
+  "CASY": [
+    "casy",
+    "caseys",
+    "caseysgeneralstores",
+    "caseys general stores",
+    "caseysgeneralstoresinc"
+  ],
   "CAT": [
     "cat",
     "caterpillar",
     "caterpillarinc"
+  ],
+  "CATM": [
+    "catm"
+  ],
+  "CATO": [
+    "cato",
+    "catocorp"
+  ],
+  "CATY": [
+    "caty",
+    "cathay",
+    "cathaygeneralbancorp",
+    "cathay general bancorp"
+  ],
+  "CAVA": [
+    "cava",
+    "cavagroup",
+    "cavagroupinc"
   ],
   "CB": [
     "cb",
     "chubb",
     "chubblimited",
     "chubb limited"
+  ],
+  "CBB": [
+    "cbb"
+  ],
+  "CBL": [
+    "cbl",
+    "cblandassociatesproperties",
+    "cbl and associates properties",
+    "cblandassociatespropertiesinc"
   ],
   "CBOE": [
     "cboe",
@@ -467,12 +1388,29 @@
     "cbregroup",
     "cbregroupinc"
   ],
+  "CBRL": [
+    "cbrl",
+    "cracker",
+    "crackerbarreloldcountrystore",
+    "crackerbarreloldcountrystoreinc",
+    "cracker barrel old country store"
+  ],
+  "CC": [
+    "cc",
+    "chemours",
+    "chemoursco"
+  ],
   "CCI": [
     "cci",
-    "crown",
     "crowncastle",
     "crown castle",
     "crowncastleinc"
+  ],
+  "CCK": [
+    "cck",
+    "crown",
+    "crownholdings",
+    "crownholdingsinc"
   ],
   "CCL": [
     "ccl",
@@ -481,8 +1419,34 @@
     "carnival corporation and",
     "carnivalcorporationandplc"
   ],
+  "CCMP": [
+    "ccmp"
+  ],
+  "CCP": [
+    "ccp"
+  ],
+  "CCRN": [
+    "ccrn",
+    "cross",
+    "crosscountryhealthcare",
+    "cross country healthcare",
+    "crosscountryhealthcareinc"
+  ],
+  "CCSI": [
+    "ccsi",
+    "consensus",
+    "consensuscloudsolutions",
+    "consensus cloud solutions",
+    "consensuscloudsolutionsinc"
+  ],
   "CDAY": [
     "cday"
+  ],
+  "CDK": [
+    "cdk"
+  ],
+  "CDMO": [
+    "cdmo"
   ],
   "CDNS": [
     "cdns",
@@ -490,6 +1454,9 @@
     "cadencedesignsystems",
     "cadence design systems",
     "cadencedesignsystemsinc"
+  ],
+  "CDR": [
+    "cdr"
   ],
   "CDW": [
     "cdw",
@@ -500,8 +1467,22 @@
     "celanese",
     "celanesecorporation"
   ],
+  "CEB": [
+    "ceb"
+  ],
+  "CELH": [
+    "celh",
+    "celsius",
+    "celsiusholdings",
+    "celsiusholdingsinc"
+  ],
   "CERN": [
     "cern"
+  ],
+  "CERT": [
+    "cert",
+    "certara",
+    "certarainc"
   ],
   "CF": [
     "cf",
@@ -509,6 +1490,13 @@
     "cf industries",
     "cfindustriesholdings",
     "cfindustriesholdingsinc"
+  ],
+  "CFFN": [
+    "cffn",
+    "capitol",
+    "capitolfederalfinancial",
+    "capitol federal financial",
+    "capitolfederalfinancialinc"
   ],
   "CFG": [
     "cfg",
@@ -518,6 +1506,22 @@
     "citizensfinancialgroup",
     "citizensfinancialgroupinc"
   ],
+  "CFX": [
+    "cfx"
+  ],
+  "CG": [
+    "cg",
+    "carlyle",
+    "carlylegroup",
+    "carlylegroupinc"
+  ],
+  "CHCT": [
+    "chct",
+    "community",
+    "communityhealthcaretrust",
+    "community healthcare trust",
+    "communityhealthcaretrustinc"
+  ],
   "CHD": [
     "chd",
     "church",
@@ -525,11 +1529,50 @@
     "church and dwight",
     "churchanddwightcoinc"
   ],
+  "CHDN": [
+    "chdn",
+    "churchill",
+    "churchilldowns",
+    "churchill downs",
+    "churchilldownsinc"
+  ],
+  "CHEWY": [
+    "chewy"
+  ],
+  "CHFC": [
+    "chfc"
+  ],
+  "CHH": [
+    "chh",
+    "choice",
+    "choicehotelsinternationalincde",
+    "choice hotels international inc de"
+  ],
+  "CHK": [
+    "chk"
+  ],
+  "CHRD": [
+    "chrd",
+    "chord",
+    "chordenergy",
+    "chord energy",
+    "chordenergycorp"
+  ],
+  "CHRS": [
+    "chrs",
+    "coherus",
+    "coherusoncology",
+    "coherus oncology",
+    "coherusoncologyinc"
+  ],
   "CHRW": [
     "chrw",
     "chrobinsonworldwide",
     "c h robinson worldwide",
     "chrobinsonworldwideinc"
+  ],
+  "CHS": [
+    "chs"
   ],
   "CHTR": [
     "chtr",
@@ -538,12 +1581,39 @@
     "charter communications",
     "chartercommunicationsinc"
   ],
+  "CHUY": [
+    "chuy"
+  ],
+  "CHWY": [
+    "chwy",
+    "chewy",
+    "chewyinc"
+  ],
+  "CHX": [
+    "chx"
+  ],
   "CI": [
     "ci",
     "cigna",
     "thecigna",
     "cignagroup",
     "thecignagroup"
+  ],
+  "CIR": [
+    "cir"
+  ],
+  "CIT": [
+    "cit"
+  ],
+  "CIVI": [
+    "civi",
+    "civitas",
+    "civitasresources",
+    "civitas resources",
+    "civitasresourcesinc"
+  ],
+  "CKH": [
+    "ckh"
   ],
   "CL": [
     "cl",
@@ -552,6 +1622,54 @@
     "colgate palmolive",
     "colgatepalmolivecompany"
   ],
+  "CLB": [
+    "clb",
+    "core",
+    "corelaboratoriesincde",
+    "core laboratories inc de"
+  ],
+  "CLC": [
+    "clc"
+  ],
+  "CLDT": [
+    "cldt",
+    "chatham",
+    "chathamlodgingtrust",
+    "chatham lodging trust"
+  ],
+  "CLECO": [
+    "cleco"
+  ],
+  "CLF": [
+    "clf",
+    "cleveland",
+    "clevelandcliffs",
+    "cleveland cliffs",
+    "clevelandcliffsinc"
+  ],
+  "CLFD": [
+    "clfd",
+    "clearfield",
+    "clearfieldinc"
+  ],
+  "CLGX": [
+    "clgx"
+  ],
+  "CLI": [
+    "cli"
+  ],
+  "CLSK": [
+    "clsk",
+    "cleanspark",
+    "cleansparkinc"
+  ],
+  "CLW": [
+    "clw",
+    "clearwater",
+    "clearwaterpaper",
+    "clearwater paper",
+    "clearwaterpapercorp"
+  ],
   "CLX": [
     "clx",
     "clorox",
@@ -559,10 +1677,18 @@
     "cloroxcompany",
     "thecloroxcompany"
   ],
+  "CMA": [
+    "cma",
+    "comerica",
+    "comericainc"
+  ],
   "CMCSA": [
     "cmcsa",
     "comcast",
     "comcastcorporation"
+  ],
+  "CMD": [
+    "cmd"
   ],
   "CME": [
     "cme",
@@ -581,16 +1707,64 @@
     "cummins",
     "cumminsinc"
   ],
+  "CMO": [
+    "cmo"
+  ],
+  "CMP": [
+    "cmp",
+    "compass",
+    "compassmineralsinternational",
+    "compass minerals international",
+    "compassmineralsinternationalinc"
+  ],
   "CMS": [
     "cms",
     "cmsenergy",
     "cms energy",
     "cmsenergycorporation"
   ],
+  "CMTL": [
+    "cmtl",
+    "comtech",
+    "comtechtelecommunicationscorpde",
+    "comtech telecommunications corp de"
+  ],
   "CNC": [
     "cnc",
     "centene",
     "centenecorporation"
+  ],
+  "CNH": [
+    "cnh",
+    "cnhindustrialnv",
+    "cnh industrial n v"
+  ],
+  "CNK": [
+    "cnk",
+    "cinemark",
+    "cinemarkholdings",
+    "cinemarkholdingsinc"
+  ],
+  "CNL": [
+    "cnl",
+    "collective",
+    "collectivemining",
+    "collective mining",
+    "collectiveminingltd"
+  ],
+  "CNM": [
+    "cnm",
+    "core",
+    "coreandmain",
+    "core and main",
+    "coreandmaininc"
+  ],
+  "CNO": [
+    "cno",
+    "cnofinancial",
+    "cno financial",
+    "cnofinancialgroup",
+    "cnofinancialgroupinc"
   ],
   "CNP": [
     "cnp",
@@ -599,12 +1773,79 @@
     "centerpoint energy",
     "centerpointenergyinc"
   ],
+  "CNS": [
+    "cns",
+    "cohen",
+    "cohenandsteers",
+    "cohen and steers",
+    "cohenandsteersinc"
+  ],
+  "CNSL": [
+    "cnsl"
+  ],
+  "CNX": [
+    "cnx",
+    "cnxresources",
+    "cnx resources",
+    "cnxresourcescorp"
+  ],
+  "CNXC": [
+    "cnxc",
+    "concentrix",
+    "concentrixcorp"
+  ],
   "COF": [
     "cof",
     "capital",
     "capitalonefinancial",
     "capital one financial",
     "capitalonefinancialcorporation"
+  ],
+  "COHR": [
+    "cohr",
+    "coherent",
+    "coherentcorp"
+  ],
+  "COKE": [
+    "coca",
+    "coke",
+    "cocacolaconsolidated",
+    "coca cola consolidated",
+    "cocacolaconsolidatedinc"
+  ],
+  "COLB": [
+    "colb",
+    "columbia",
+    "columbiabankingsystem",
+    "columbia banking system",
+    "columbiabankingsysteminc"
+  ],
+  "COLL": [
+    "coll",
+    "collegium",
+    "collegiumpharmaceutical",
+    "collegium pharmaceutical",
+    "collegiumpharmaceuticalinc"
+  ],
+  "COLM": [
+    "colm",
+    "columbia",
+    "columbiasportswear",
+    "columbia sportswear",
+    "columbiasportswearco"
+  ],
+  "CON": [
+    "con",
+    "concentra",
+    "concentragroupholdingsparent",
+    "concentra group holdings parent",
+    "concentragroupholdingsparentinc"
+  ],
+  "CONE": [
+    "cone"
+  ],
+  "CONN": [
+    "conn"
   ],
   "COO": [
     "coo",
@@ -615,9 +1856,24 @@
     "thecoopercompanies",
     "thecoopercompaniesinc"
   ],
+  "COOP": [
+    "coop",
+    "maverick",
+    "maverickmergersub2",
+    "maverick merger sub 2",
+    "maverickmergersub2llc"
+  ],
   "COP": [
     "cop",
     "conocophillips"
+  ],
+  "COR": [
+    "cor",
+    "cencora",
+    "cencorainc"
+  ],
+  "CORE": [
+    "core"
   ],
   "COST": [
     "cost",
@@ -625,6 +1881,10 @@
     "costcowholesale",
     "costco wholesale",
     "costcowholesalecorporation"
+  ],
+  "COTY": [
+    "coty",
+    "cotyinc"
   ],
   "CPB": [
     "cpb",
@@ -635,10 +1895,84 @@
     "campbellscompany",
     "thecampbellscompany"
   ],
+  "CPE": [
+    "cpe"
+  ],
+  "CPK": [
+    "cpk",
+    "chesapeake",
+    "chesapeakeutilities",
+    "chesapeake utilities",
+    "chesapeakeutilitiescorp"
+  ],
+  "CPRI": [
+    "cpri",
+    "capri",
+    "capriholdings",
+    "capriholdingsltd"
+  ],
   "CPRT": [
     "cprt",
     "copart",
     "copartinc"
+  ],
+  "CPRX": [
+    "cprx",
+    "catalyst",
+    "catalystpharmaceuticals",
+    "catalyst pharmaceuticals",
+    "catalystpharmaceuticalsinc"
+  ],
+  "CPS": [
+    "cps",
+    "cooper",
+    "cooperstandard",
+    "cooper standard",
+    "cooperstandardholdings",
+    "cooperstandardholdingsinc"
+  ],
+  "CPSI": [
+    "cpsi"
+  ],
+  "CPT": [
+    "cpt",
+    "camden",
+    "camdenpropertytrust",
+    "camden property trust"
+  ],
+  "CR": [
+    "cr",
+    "crane",
+    "craneco"
+  ],
+  "CRC": [
+    "crc",
+    "california",
+    "californiaresources",
+    "california resources",
+    "californiaresourcescorp"
+  ],
+  "CRCM": [
+    "crcm"
+  ],
+  "CRGY": [
+    "crgy",
+    "crescent",
+    "crescentenergy",
+    "crescent energy",
+    "crescentenergyco"
+  ],
+  "CRI": [
+    "cri",
+    "carters",
+    "cartersinc"
+  ],
+  "CRK": [
+    "crk",
+    "comstock",
+    "comstockresources",
+    "comstock resources",
+    "comstockresourcesinc"
   ],
   "CRL": [
     "crl",
@@ -651,6 +1985,60 @@
     "crm",
     "salesforce",
     "salesforceinc"
+  ],
+  "CRMT": [
+    "crmt",
+    "americas",
+    "americascarmart",
+    "americas carmart",
+    "americascarmartinc"
+  ],
+  "CRNC": [
+    "crnc",
+    "cerence",
+    "cerenceinc"
+  ],
+  "CROCS": [
+    "crocs"
+  ],
+  "CROX": [
+    "crox",
+    "crocs",
+    "crocsinc"
+  ],
+  "CRS": [
+    "crs",
+    "carpenter",
+    "carpentertechnology",
+    "carpenter technology",
+    "carpentertechnologycorp"
+  ],
+  "CRSR": [
+    "crsr",
+    "corsair",
+    "corsairgaming",
+    "corsair gaming",
+    "corsairgaminginc"
+  ],
+  "CRUS": [
+    "crus",
+    "cirrus",
+    "cirruslogic",
+    "cirrus logic",
+    "cirruslogicinc"
+  ],
+  "CRZO": [
+    "crzo"
+  ],
+  "CSAL": [
+    "csal"
+  ],
+  "CSC": [
+    "csc",
+    "csccollective",
+    "csc collective",
+    "csccollectiveholdings",
+    "csccollectiveholdingsltd"
   ],
   "CSCO": [
     "csco",
@@ -665,6 +2053,18 @@
     "costargroup",
     "costargroupinc"
   ],
+  "CSII": [
+    "csii"
+  ],
+  "CST": [
+    "cst"
+  ],
+  "CSW": [
+    "csw",
+    "cswindustrials",
+    "csw industrials",
+    "cswindustrialsinc"
+  ],
   "CSX": [
     "csx",
     "csxcorporation"
@@ -673,6 +2073,16 @@
     "ctas",
     "cintas",
     "cintascorporation"
+  ],
+  "CTB": [
+    "ctb"
+  ],
+  "CTKB": [
+    "ctkb",
+    "cytek",
+    "cytekbiosciences",
+    "cytek biosciences",
+    "cytekbiosciencesinc"
   ],
   "CTLT": [
     "ctlt"
@@ -696,6 +2106,52 @@
     "corteva",
     "cortevainc"
   ],
+  "CUB": [
+    "cub",
+    "lionheart",
+    "lionheartholdings"
+  ],
+  "CUBE": [
+    "cube",
+    "cubesmart"
+  ],
+  "CURB": [
+    "curb",
+    "curbline",
+    "curblineproperties",
+    "curbline properties",
+    "curblinepropertiescorp"
+  ],
+  "CUTR": [
+    "cutr"
+  ],
+  "CUZ": [
+    "cuz",
+    "cousins",
+    "cousinsproperties",
+    "cousins properties",
+    "cousinspropertiesinc"
+  ],
+  "CVET": [
+    "cvet"
+  ],
+  "CVG": [
+    "cvg"
+  ],
+  "CVGW": [
+    "cvgw",
+    "calavo",
+    "calavogrowers",
+    "calavo growers",
+    "calavogrowersinc"
+  ],
+  "CVI": [
+    "cvi",
+    "cvr",
+    "cvrenergy",
+    "cvr energy",
+    "cvrenergyinc"
+  ],
   "CVS": [
     "cvs",
     "cvshealth",
@@ -706,6 +2162,53 @@
     "cvx",
     "chevron",
     "chevroncorporation"
+  ],
+  "CW": [
+    "cw",
+    "curtiss",
+    "curtisswright",
+    "curtiss wright",
+    "curtisswrightcorp"
+  ],
+  "CWK": [
+    "cwk",
+    "cushman",
+    "cushmanandwakefield",
+    "cushman and wakefield",
+    "cushmanandwakefieldplc"
+  ],
+  "CXM": [
+    "cxm",
+    "sprinklr",
+    "sprinklrinc"
+  ],
+  "CXW": [
+    "cxw",
+    "corecivic",
+    "corecivicinc"
+  ],
+  "CY": [
+    "cy"
+  ],
+  "CYH": [
+    "cyh",
+    "community",
+    "communityhealthsystems",
+    "community health systems",
+    "communityhealthsystemsinc"
+  ],
+  "CYN": [
+    "cyn",
+    "cyngn",
+    "cyngninc"
+  ],
+  "CYT": [
+    "cyt"
+  ],
+  "CYTK": [
+    "cytk",
+    "cytokinetics",
+    "cytokineticsinc"
   ],
   "CZR": [
     "czr",
@@ -721,12 +2224,52 @@
     "dominion energy",
     "dominionenergyinc"
   ],
+  "DAKT": [
+    "dakt",
+    "daktronics",
+    "daktronicsincsd",
+    "daktronics inc sd"
+  ],
   "DAL": [
     "dal",
     "delta",
     "deltaairlines",
     "delta air lines",
     "deltaairlinesinc"
+  ],
+  "DAN": [
+    "dan",
+    "dana",
+    "danainc"
+  ],
+  "DAR": [
+    "dar",
+    "darling",
+    "darlingingredients",
+    "darling ingredients",
+    "darlingingredientsinc"
+  ],
+  "DBD": [
+    "dbd",
+    "diebold",
+    "dieboldnixdorf",
+    "diebold nixdorf",
+    "dieboldnixdorfinc"
+  ],
+  "DBI": [
+    "dbi",
+    "designer",
+    "designerbrands",
+    "designer brands",
+    "designerbrandsinc"
+  ],
+  "DBX": [
+    "dbx",
+    "dropbox",
+    "dropboxinc"
+  ],
+  "DCT": [
+    "dct"
   ],
   "DD": [
     "dd",
@@ -735,12 +2278,49 @@
     "dupont de nemours",
     "dupontdenemoursinc"
   ],
+  "DDD": [
+    "ddd",
+    "3dsystems",
+    "3d systems",
+    "3dsystemscorp"
+  ],
+  "DDS": [
+    "dds",
+    "dillard",
+    "dillards",
+    "dillard s",
+    "dillardsinc"
+  ],
   "DE": [
     "de",
     "deere",
     "deereand",
     "deere and",
     "deereandcompany"
+  ],
+  "DECK": [
+    "deck",
+    "deckers",
+    "deckersoutdoor",
+    "deckers outdoor",
+    "deckersoutdoorcorp"
+  ],
+  "DEI": [
+    "dei",
+    "douglas",
+    "douglasemmett",
+    "douglas emmett",
+    "douglasemmettinc"
+  ],
+  "DF": [
+    "df"
+  ],
+  "DFH": [
+    "dfh",
+    "dream",
+    "dreamfindershomes",
+    "dream finders homes",
+    "dreamfindershomesinc"
   ],
   "DFS": [
     "dfs"
@@ -759,6 +2339,12 @@
     "quest diagnostics",
     "questdiagnosticsincorporated"
   ],
+  "DHC": [
+    "dhc",
+    "diversified",
+    "diversifiedhealthcaretrust",
+    "diversified healthcare trust"
+  ],
   "DHI": [
     "dhi",
     "drhorton",
@@ -770,6 +2356,13 @@
     "danaher",
     "danahercorporation"
   ],
+  "DIN": [
+    "din",
+    "dine",
+    "dinebrandsglobal",
+    "dine brands global",
+    "dinebrandsglobalinc"
+  ],
   "DIS": [
     "dis",
     "walt",
@@ -778,6 +2371,19 @@
     "thewaltdisney",
     "waltdisneycompany",
     "thewaltdisneycompany"
+  ],
+  "DISH": [
+    "dish"
+  ],
+  "DLB": [
+    "dlb",
+    "dolby",
+    "dolbylaboratories",
+    "dolby laboratories",
+    "dolbylaboratoriesinc"
+  ],
+  "DLPH": [
+    "dlph"
   ],
   "DLR": [
     "dlr",
@@ -793,6 +2399,61 @@
     "dollar tree",
     "dollartreeinc"
   ],
+  "DLX": [
+    "dlx",
+    "deluxe",
+    "deluxecorp"
+  ],
+  "DNB": [
+    "dnb"
+  ],
+  "DNKN": [
+    "dnkn"
+  ],
+  "DNOW": [
+    "dnow",
+    "dnowinc"
+  ],
+  "DNR": [
+    "dnr"
+  ],
+  "DO": [
+    "do"
+  ],
+  "DOC": [
+    "doc",
+    "healthpeak",
+    "healthpeakproperties",
+    "healthpeak properties",
+    "healthpeakpropertiesinc"
+  ],
+  "DOCN": [
+    "docn",
+    "digitalocean",
+    "digital ocean",
+    "digitaloceanholdings",
+    "digitaloceanholdingsinc"
+  ],
+  "DOCS": [
+    "docs",
+    "doximity",
+    "doximityinc"
+  ],
+  "DOCU": [
+    "docu",
+    "docusign",
+    "docusigninc"
+  ],
+  "DOLBY": [
+    "dolby"
+  ],
+  "DOUG": [
+    "doug",
+    "douglas",
+    "douglaselliman",
+    "douglas elliman",
+    "douglasellimaninc"
+  ],
   "DOV": [
     "dov",
     "dover",
@@ -802,12 +2463,21 @@
     "dow",
     "dowinc"
   ],
+  "DPLO": [
+    "dplo"
+  ],
   "DPZ": [
     "dpz",
     "domino",
     "dominospizza",
     "domino s pizza",
     "dominospizzainc"
+  ],
+  "DRC": [
+    "drc"
+  ],
+  "DRE": [
+    "dre"
   ],
   "DRI": [
     "dri",
@@ -816,11 +2486,31 @@
     "darden restaurants",
     "dardenrestaurantsinc"
   ],
+  "DRQ": [
+    "drq"
+  ],
+  "DSPG": [
+    "dspg"
+  ],
+  "DST": [
+    "dst"
+  ],
+  "DT": [
+    "dt",
+    "dynatrace",
+    "dynatraceinc"
+  ],
   "DTE": [
     "dte",
     "dteenergy",
     "dte energy",
     "dteenergycompany"
+  ],
+  "DTM": [
+    "dtm",
+    "dtmidstream",
+    "dt midstream",
+    "dtmidstreaminc"
   ],
   "DUK": [
     "duk",
@@ -829,10 +2519,29 @@
     "duke energy",
     "dukeenergycorporation"
   ],
+  "DUOL": [
+    "duol",
+    "duolingo",
+    "duolingoinc"
+  ],
+  "DV": [
+    "dv",
+    "doubleverify",
+    "double verify",
+    "doubleverifyholdings",
+    "doubleverifyholdingsinc"
+  ],
   "DVA": [
     "dva",
     "davita",
     "davitainc"
+  ],
+  "DVAX": [
+    "dvax",
+    "dynavax",
+    "dynavaxtechnologies",
+    "dynavax technologies",
+    "dynavaxtechnologiescorp"
   ],
   "DVN": [
     "dvn",
@@ -841,10 +2550,26 @@
     "devon energy",
     "devonenergycorporation"
   ],
+  "DWA": [
+    "dwa"
+  ],
+  "DXC": [
+    "dxc",
+    "dxctechnology",
+    "dxc technology",
+    "dxctechnologyco"
+  ],
   "DXCM": [
     "dxcm",
     "dexcom",
     "dexcominc"
+  ],
+  "DY": [
+    "dy",
+    "dycom",
+    "dycomindustries",
+    "dycom industries",
+    "dycomindustriesinc"
   ],
   "EA": [
     "ea",
@@ -853,14 +2578,45 @@
     "electronic arts",
     "electronicartsinc"
   ],
+  "EAT": [
+    "eat",
+    "brinker",
+    "brinkerinternational",
+    "brinker international",
+    "brinkerinternationalinc"
+  ],
   "EBAY": [
     "ebay",
     "ebayinc"
+  ],
+  "EBIX": [
+    "ebix"
+  ],
+  "EBS": [
+    "ebs",
+    "emergent",
+    "emergentbiosolutions",
+    "emergent biosolutions",
+    "emergentbiosolutionsinc"
+  ],
+  "ECG": [
+    "ecg",
+    "everus",
+    "everusconstruction",
+    "everus construction",
+    "everusconstructiongroup",
+    "everusconstructiongroupinc"
+  ],
+  "ECHO": [
+    "echo"
   ],
   "ECL": [
     "ecl",
     "ecolab",
     "ecolabinc"
+  ],
+  "ECOL": [
+    "ecol"
   ],
   "ED": [
     "ed",
@@ -869,10 +2625,73 @@
     "consolidated edison",
     "consolidatededisoninc"
   ],
+  "EDR": [
+    "edr"
+  ],
+  "EE": [
+    "ee",
+    "excelerate",
+    "excelerateenergy",
+    "excelerate energy",
+    "excelerateenergyinc"
+  ],
+  "EEFT": [
+    "eeft",
+    "euronet",
+    "euronetworldwide",
+    "euronet worldwide",
+    "euronetworldwideinc"
+  ],
+  "EFC": [
+    "efc",
+    "ellington",
+    "ellingtonfinancial",
+    "ellington financial",
+    "ellingtonfinancialinc"
+  ],
   "EFX": [
     "efx",
     "equifax",
     "equifaxinc"
+  ],
+  "EGHT": [
+    "8x8",
+    "eght",
+    "8x8incde",
+    "8x8 inc de"
+  ],
+  "EGN": [
+    "egn"
+  ],
+  "EGOV": [
+    "egov"
+  ],
+  "EGP": [
+    "egp",
+    "eastgroup",
+    "eastgroupproperties",
+    "eastgroup properties",
+    "eastgrouppropertiesinc"
+  ],
+  "EGRX": [
+    "egrx"
+  ],
+  "EHAB": [
+    "ehab",
+    "enhabit",
+    "enhabitinc"
+  ],
+  "EHC": [
+    "ehc",
+    "encompass",
+    "encompasshealth",
+    "encompass health",
+    "encompasshealthcorp"
+  ],
+  "EHTH": [
+    "ehth",
+    "ehealth",
+    "ehealthinc"
   ],
   "EIX": [
     "eix",
@@ -889,12 +2708,49 @@
     "theest\u00e9elaudercompanies",
     "theest\u00e9elaudercompaniesinc"
   ],
+  "ELAN": [
+    "elan",
+    "elanco",
+    "elancoanimalhealth",
+    "elanco animal health",
+    "elancoanimalhealthinc"
+  ],
+  "ELF": [
+    "elf",
+    "elfbeauty",
+    "e l f beauty",
+    "elfbeautyinc"
+  ],
+  "ELS": [
+    "els",
+    "equity",
+    "equitylifestyleproperties",
+    "equity lifestyle properties",
+    "equitylifestylepropertiesinc"
+  ],
   "ELV": [
     "elv",
     "elevance",
     "elevancehealth",
     "elevance health",
     "elevancehealthinc"
+  ],
+  "ELY": [
+    "ely"
+  ],
+  "EMBC": [
+    "embc",
+    "embecta",
+    "embectacorp"
+  ],
+  "EMCOR": [
+    "emcor"
+  ],
+  "EME": [
+    "eme",
+    "emcor",
+    "emcorgroup",
+    "emcorgroupinc"
   ],
   "EMN": [
     "emn",
@@ -910,12 +2766,47 @@
     "emerson electric",
     "emersonelectricco"
   ],
+  "ENDP": [
+    "endp"
+  ],
+  "ENH": [
+    "enh"
+  ],
+  "ENOV": [
+    "enov",
+    "enovis",
+    "enoviscorp"
+  ],
   "ENPH": [
     "enph",
     "enphase",
     "enphaseenergy",
     "enphase energy",
     "enphaseenergyinc"
+  ],
+  "ENR": [
+    "enr",
+    "energizer",
+    "energizerholdings",
+    "energizerholdingsinc"
+  ],
+  "ENS": [
+    "ens",
+    "enersys"
+  ],
+  "ENSG": [
+    "ensg",
+    "ensign",
+    "ensigngroup",
+    "ensigngroupinc"
+  ],
+  "ENTG": [
+    "entg",
+    "entegris",
+    "entegrisinc"
+  ],
+  "ENV": [
+    "env"
   ],
   "EOG": [
     "eog",
@@ -928,6 +2819,27 @@
     "epamsystems",
     "epam systems",
     "epamsystemsinc"
+  ],
+  "EPAY": [
+    "epay"
+  ],
+  "EPC": [
+    "epc",
+    "edgewell",
+    "edgewellpersonalcare",
+    "edgewell personal care",
+    "edgewellpersonalcareco"
+  ],
+  "EPR": [
+    "epr",
+    "eprproperties",
+    "epr properties"
+  ],
+  "EQH": [
+    "eqh",
+    "equitable",
+    "equitableholdings",
+    "equitableholdingsinc"
   ],
   "EQIX": [
     "eqix",
@@ -944,11 +2856,43 @@
     "eqt",
     "eqtcorporation"
   ],
+  "EQY": [
+    "eqy"
+  ],
+  "ERI": [
+    "eri"
+  ],
+  "ERIE": [
+    "erie",
+    "erieindemnity",
+    "erie indemnity",
+    "erieindemnityco"
+  ],
   "ES": [
     "es",
     "eversource",
     "eversourceenergy",
     "eversource energy"
+  ],
+  "ESAB": [
+    "esab",
+    "esabcorp"
+  ],
+  "ESI": [
+    "esi",
+    "element",
+    "elementsolutions",
+    "element solutions",
+    "elementsolutionsinc"
+  ],
+  "ESL": [
+    "esl"
+  ],
+  "ESNT": [
+    "esnt",
+    "essent",
+    "essentgroup",
+    "essentgroupltd"
   ],
   "ESS": [
     "ess",
@@ -956,6 +2900,9 @@
     "essexpropertytrust",
     "essex property trust",
     "essexpropertytrustinc"
+  ],
+  "ESV": [
+    "esv"
   ],
   "ETN": [
     "etn",
@@ -967,9 +2914,20 @@
     "entergy",
     "entergycorporation"
   ],
+  "ETRN": [
+    "etrn"
+  ],
   "ETSY": [
     "etsy",
     "etsyinc"
+  ],
+  "EV": [
+    "ev"
+  ],
+  "EVR": [
+    "evr",
+    "evercore",
+    "evercoreinc"
   ],
   "EVRG": [
     "evrg",
@@ -988,6 +2946,20 @@
     "exelon",
     "exeloncorporation"
   ],
+  "EXE": [
+    "exe",
+    "expand",
+    "expandenergy",
+    "expand energy",
+    "expandenergycorp"
+  ],
+  "EXLS": [
+    "exls",
+    "exlservice",
+    "exl service",
+    "exlserviceholdings",
+    "exlserviceholdingsinc"
+  ],
   "EXPD": [
     "expd",
     "expeditors",
@@ -1001,12 +2973,39 @@
     "expediagroup",
     "expediagroupinc"
   ],
+  "EXPI": [
+    "exp",
+    "expi",
+    "expworld",
+    "exp world",
+    "expworldholdings",
+    "expworldholdingsinc"
+  ],
+  "EXPO": [
+    "expo",
+    "exponent",
+    "exponentinc"
+  ],
+  "EXPR": [
+    "expr"
+  ],
   "EXR": [
     "exr",
     "extra",
     "extraspacestorage",
     "extra space storage",
     "extraspacestorageinc"
+  ],
+  "EXTN": [
+    "extn"
+  ],
+  "EYE": [
+    "eye",
+    "national",
+    "nationalvision",
+    "national vision",
+    "nationalvisionholdings",
+    "nationalvisionholdingsinc"
   ],
   "F": [
     "f",
@@ -1022,10 +3021,65 @@
     "diamondback energy",
     "diamondbackenergyinc"
   ],
+  "FARO": [
+    "faro"
+  ],
   "FAST": [
     "fast",
     "fastenal",
     "fastenalcompany"
+  ],
+  "FBC": [
+    "fbc"
+  ],
+  "FBHS": [
+    "fbhs"
+  ],
+  "FBIN": [
+    "fbin",
+    "fortune",
+    "fortunebrandsinnovations",
+    "fortune brands innovations",
+    "fortunebrandsinnovationsinc"
+  ],
+  "FBK": [
+    "fbk",
+    "fbfinancial",
+    "fb financial",
+    "fbfinancialcorp"
+  ],
+  "FBM": [
+    "fbm"
+  ],
+  "FBNC": [
+    "fbnc",
+    "first",
+    "firstbancorpnc",
+    "first bancorp nc"
+  ],
+  "FBRT": [
+    "fbrt",
+    "franklin",
+    "franklinbsprealtytrust",
+    "franklin bsp realty trust",
+    "franklinbsprealtytrustinc"
+  ],
+  "FCFS": [
+    "fcfs",
+    "firstcash",
+    "first cash",
+    "firstcashholdings",
+    "firstcashholdingsinc"
+  ],
+  "FCN": [
+    "fcn",
+    "fti",
+    "fticonsulting",
+    "fti consulting",
+    "fticonsultinginc"
+  ],
+  "FCS": [
+    "fcs"
   ],
   "FCX": [
     "fcx",
@@ -1051,10 +3105,45 @@
     "firstenergy",
     "firstenergycorp"
   ],
+  "FEIC": [
+    "feic"
+  ],
+  "FF": [
+    "ff",
+    "futurefuel",
+    "futurefuelcorp"
+  ],
+  "FFIN": [
+    "ffin",
+    "first",
+    "firstfinancialbankshares",
+    "first financial bankshares",
+    "firstfinancialbanksharesinc"
+  ],
   "FFIV": [
     "f5",
     "ffiv",
     "f5inc"
+  ],
+  "FG": [
+    "fg",
+    "fandgannuitiesandlife",
+    "fandgannuitiesandlifeinc",
+    "f and g annuities and life"
+  ],
+  "FHB": [
+    "fhb",
+    "first",
+    "firsthawaiian",
+    "first hawaiian",
+    "firsthawaiianinc"
+  ],
+  "FICO": [
+    "fair",
+    "fico",
+    "fairisaac",
+    "fair isaac",
+    "fairisaaccorp"
   ],
   "FIS": [
     "fis",
@@ -1072,12 +3161,44 @@
     "fifththirdbancorp",
     "fifth third bancorp"
   ],
+  "FIVE": [
+    "five",
+    "fivebelow",
+    "five below",
+    "fivebelowinc"
+  ],
+  "FIX": [
+    "fix",
+    "comfort",
+    "comfortsystemsusa",
+    "comfort systems usa",
+    "comfortsystemsusainc"
+  ],
   "FL": [
     "fl",
     "foot",
     "footlocker",
     "foot locker",
     "footlockerinc"
+  ],
+  "FLEX": [
+    "flex",
+    "flexltd"
+  ],
+  "FLGT": [
+    "flgt",
+    "fulgent",
+    "fulgentgenetics",
+    "fulgent genetics",
+    "fulgentgeneticsinc"
+  ],
+  "FLOW": [
+    "flow"
+  ],
+  "FLR": [
+    "flr",
+    "fluor",
+    "fluorcorp"
   ],
   "FLS": [
     "fls",
@@ -1087,9 +3208,70 @@
   "FLT": [
     "flt"
   ],
+  "FLUOR": [
+    "fluor"
+  ],
+  "FMBI": [
+    "fmbi"
+  ],
   "FMC": [
     "fmc",
     "fmccorporation"
+  ],
+  "FMER": [
+    "fmer"
+  ],
+  "FN": [
+    "fn",
+    "fabrinet"
+  ],
+  "FNB": [
+    "fnb",
+    "fnbcorppa",
+    "fnb corp pa"
+  ],
+  "FND": [
+    "fnd",
+    "floor",
+    "floordecor",
+    "floor decor",
+    "flooranddecor",
+    "floor and decor",
+    "flooranddecorholdings",
+    "flooranddecorholdingsinc"
+  ],
+  "FNF": [
+    "fnf",
+    "fidelity",
+    "fidelitynationalfinancial",
+    "fidelity national financial",
+    "fidelitynationalfinancialinc"
+  ],
+  "FNFG": [
+    "fnfg"
+  ],
+  "FOE": [
+    "foe"
+  ],
+  "FORR": [
+    "forr",
+    "forrester",
+    "forresterresearch",
+    "forrester research",
+    "forresterresearchinc"
+  ],
+  "FOSL": [
+    "fosl",
+    "fossil",
+    "fossilgroup",
+    "fossilgroupinc"
+  ],
+  "FOUR": [
+    "four",
+    "shift4",
+    "shift4payments",
+    "shift4 payments",
+    "shift4paymentsinc"
   ],
   "FOX": [
     "fox",
@@ -1100,21 +3282,123 @@
     "foxa",
     "foxcorporation"
   ],
+  "FOXF": [
+    "fox",
+    "foxf",
+    "foxfactoryholding",
+    "fox factory holding",
+    "foxfactoryholdingcorp"
+  ],
+  "FR": [
+    "fr",
+    "first",
+    "firstindustrialrealtytrust",
+    "first industrial realty trust",
+    "firstindustrialrealtytrustinc"
+  ],
+  "FRGI": [
+    "frgi"
+  ],
+  "FRPT": [
+    "frpt",
+    "freshpet",
+    "freshpetinc"
+  ],
   "FRT": [
     "frt",
     "federal",
     "federalrealtyinvestmenttrust",
     "federal realty investment trust"
   ],
+  "FSB": [
+    "fsb"
+  ],
+  "FSLR": [
+    "fslr",
+    "first",
+    "firstsolar",
+    "first solar",
+    "firstsolarinc"
+  ],
+  "FSP": [
+    "fsp",
+    "franklin",
+    "franklinstreetpropertiescorpma",
+    "franklin street properties corp ma"
+  ],
+  "FTDR": [
+    "ftdr",
+    "frontdoor",
+    "frontdoorinc"
+  ],
+  "FTI": [
+    "fti",
+    "technipfmc",
+    "technipfmcplc"
+  ],
   "FTNT": [
     "ftnt",
     "fortinet",
     "fortinetinc"
   ],
+  "FTR": [
+    "ftr"
+  ],
+  "FTRE": [
+    "ftre",
+    "fortrea",
+    "fortreaholdings",
+    "fortreaholdingsinc"
+  ],
   "FTV": [
     "ftv",
     "fortive",
     "fortivecorporation"
+  ],
+  "FULT": [
+    "fult",
+    "fulton",
+    "fultonfinancial",
+    "fulton financial",
+    "fultonfinancialcorp"
+  ],
+  "FYBR": [
+    "fybr",
+    "frontier",
+    "frontiercommunicationsparent",
+    "frontier communications parent",
+    "frontiercommunicationsparentinc"
+  ],
+  "G": [
+    "g",
+    "genpact",
+    "genpactltd"
+  ],
+  "GAP": [
+    "gap",
+    "gapinc"
+  ],
+  "GBCI": [
+    "gbci",
+    "glacier",
+    "glacierbancorp",
+    "glacier bancorp",
+    "glacierbancorpinc"
+  ],
+  "GCI": [
+    "gci",
+    "usa",
+    "usatoday",
+    "usa today",
+    "usatodaycoinc"
+  ],
+  "GCO": [
+    "gco",
+    "genesco",
+    "genescoinc"
+  ],
+  "GCP": [
+    "gcp"
   ],
   "GD": [
     "gd",
@@ -1123,10 +3407,40 @@
     "general dynamics",
     "generaldynamicscorporation"
   ],
+  "GDDY": [
+    "gddy",
+    "godaddy",
+    "godaddyinc"
+  ],
+  "GDEN": [
+    "gden",
+    "golden",
+    "goldenentertainment",
+    "golden entertainment",
+    "goldenentertainmentinc"
+  ],
+  "GDOT": [
+    "gdot",
+    "green",
+    "greendot",
+    "green dot",
+    "greendotcorp"
+  ],
+  "GDYN": [
+    "gdyn",
+    "grid",
+    "griddynamics",
+    "grid dynamics",
+    "griddynamicsholdings",
+    "griddynamicsholdingsinc"
+  ],
   "GE": [
     "ge",
     "geaerospace",
     "ge aerospace"
+  ],
+  "GEAR": [
+    "gear"
   ],
   "GEHC": [
     "gehc",
@@ -1139,6 +3453,26 @@
     "gendigital",
     "gen digital",
     "gendigitalinc"
+  ],
+  "GEO": [
+    "geo",
+    "geogroup",
+    "geogroupinc"
+  ],
+  "GEOS": [
+    "geos",
+    "geospace",
+    "geospacetechnologies",
+    "geospace technologies",
+    "geospacetechnologiescorp"
+  ],
+  "GES": [
+    "ges",
+    "guess",
+    "guessinc"
+  ],
+  "GHL": [
+    "ghl"
   ],
   "GILD": [
     "gild",
@@ -1161,6 +3495,19 @@
     "globe life",
     "globelifeinc"
   ],
+  "GLPI": [
+    "glpi",
+    "gaming",
+    "gamingandleisureproperties",
+    "gaming and leisure properties",
+    "gamingandleisurepropertiesinc"
+  ],
+  "GLT": [
+    "glt"
+  ],
+  "GLUU": [
+    "gluu"
+  ],
   "GLW": [
     "glw",
     "corning",
@@ -1173,11 +3520,50 @@
     "general motors",
     "generalmotorscompany"
   ],
+  "GME": [
+    "gme",
+    "gamestop",
+    "gamestopcorp"
+  ],
+  "GMED": [
+    "gmed",
+    "globus",
+    "globusmedical",
+    "globus medical",
+    "globusmedicalinc"
+  ],
+  "GMS": [
+    "gms"
+  ],
   "GNRC": [
     "gnrc",
     "generac",
     "generacholdings",
     "generacholdingsinc"
+  ],
+  "GNW": [
+    "gnw",
+    "genworth",
+    "genworthfinancial",
+    "genworth financial",
+    "genworthfinancialinc"
+  ],
+  "GO": [
+    "go",
+    "grocery",
+    "groceryoutletholding",
+    "grocery outlet holding",
+    "groceryoutletholdingcorp"
+  ],
+  "GOGO": [
+    "gogo",
+    "gogoinc"
+  ],
+  "GOLF": [
+    "golf",
+    "acushnet",
+    "acushnetholdings",
+    "acushnetholdingscorp"
   ],
   "GOOG": [
     "goog",
@@ -1200,6 +3586,20 @@
     "genuine parts",
     "genuinepartscompany"
   ],
+  "GPK": [
+    "gpk",
+    "graphic",
+    "graphicpackagingholding",
+    "graphic packaging holding",
+    "graphicpackagingholdingco"
+  ],
+  "GPMT": [
+    "gpmt",
+    "granite",
+    "granitepointmortgagetrust",
+    "granite point mortgage trust",
+    "granitepointmortgagetrustinc"
+  ],
   "GPN": [
     "gpn",
     "global",
@@ -1207,10 +3607,37 @@
     "global payments",
     "globalpaymentsinc"
   ],
+  "GPOR": [
+    "gpor",
+    "gulfport",
+    "gulfportenergy",
+    "gulfport energy",
+    "gulfportenergycorp"
+  ],
+  "GPRE": [
+    "gpre",
+    "green",
+    "greenplains",
+    "green plains",
+    "greenplainsinc"
+  ],
+  "GPS": [
+    "gps"
+  ],
+  "GRBK": [
+    "grbk",
+    "green",
+    "greenbrickpartners",
+    "green brick partners",
+    "greenbrickpartnersinc"
+  ],
   "GRMN": [
     "grmn",
     "garmin",
     "garminltd"
+  ],
+  "GRUB": [
+    "grub"
   ],
   "GS": [
     "gs",
@@ -1223,21 +3650,120 @@
     "thegoldmansachsgroup",
     "thegoldmansachsgroupinc"
   ],
+  "GSHD": [
+    "gshd",
+    "goosehead",
+    "gooseheadinsurance",
+    "goosehead insurance",
+    "gooseheadinsuranceinc"
+  ],
+  "GT": [
+    "gt",
+    "goodyear",
+    "goodyeartireandrubbercooh",
+    "goodyear tire and rubber co oh"
+  ],
+  "GTES": [
+    "gtes",
+    "gates",
+    "gatesindustrial",
+    "gates industrial",
+    "gatesindustrialcorpplc"
+  ],
+  "GTLS": [
+    "gtls",
+    "chart",
+    "chartindustries",
+    "chart industries",
+    "chartindustriesinc"
+  ],
+  "GTX": [
+    "gtx",
+    "garrett",
+    "garrettmotion",
+    "garrett motion",
+    "garrettmotioninc"
+  ],
+  "GVA": [
+    "gva",
+    "granite",
+    "graniteconstruction",
+    "granite construction",
+    "graniteconstructioninc"
+  ],
+  "GWB": [
+    "gwb"
+  ],
+  "GWR": [
+    "gwr"
+  ],
+  "GWRE": [
+    "gwre",
+    "guidewire",
+    "guidewiresoftware",
+    "guidewire software",
+    "guidewiresoftwareinc"
+  ],
   "GWW": [
     "gww",
     "wwgrainger",
     "w w grainger",
     "wwgraingerinc"
   ],
+  "GXO": [
+    "gxo",
+    "gxologistics",
+    "gxo logistics",
+    "gxologisticsinc"
+  ],
+  "H": [
+    "h",
+    "hyatt",
+    "hyatthotels",
+    "hyatt hotels",
+    "hyatthotelscorp"
+  ],
+  "HA": [
+    "ha"
+  ],
+  "HAIN": [
+    "hain",
+    "haincelestial",
+    "hain celestial",
+    "haincelestialgroup",
+    "haincelestialgroupinc"
+  ],
   "HAL": [
     "hal",
     "halliburton",
     "halliburtoncompany"
   ],
+  "HALO": [
+    "halo",
+    "halozyme",
+    "halozymetherapeutics",
+    "halozyme therapeutics",
+    "halozymetherapeuticsinc"
+  ],
   "HAS": [
     "has",
     "hasbro",
     "hasbroinc"
+  ],
+  "HASI": [
+    "hasi",
+    "hasustainableinfrastructurecapital",
+    "ha sustainable infrastructure capital",
+    "hasustainableinfrastructurecapitalinc"
+  ],
+  "HAYN": [
+    "hayn"
+  ],
+  "HAYW": [
+    "hayw",
+    "hayward",
+    "haywardholdings",
+    "haywardholdingsinc"
   ],
   "HBAN": [
     "hban",
@@ -1246,11 +3772,24 @@
     "huntington bancshares",
     "huntingtonbancsharesincorporated"
   ],
+  "HBI": [
+    "hbi",
+    "hanesbrands",
+    "hanesbrandsinc"
+  ],
   "HCA": [
     "hca",
     "hcahealthcare",
     "hca healthcare",
     "hcahealthcareinc"
+  ],
+  "HCSG": [
+    "hcsg",
+    "healthcare",
+    "healthcareservices",
+    "healthcare services",
+    "healthcareservicesgroup",
+    "healthcareservicesgroupinc"
   ],
   "HD": [
     "hd",
@@ -1261,8 +3800,37 @@
     "thehomedepot",
     "thehomedepotinc"
   ],
+  "HE": [
+    "he",
+    "hawaiian",
+    "hawaiianelectricindustries",
+    "hawaiian electric industries",
+    "hawaiianelectricindustriesinc"
+  ],
+  "HELE": [
+    "hele",
+    "helen",
+    "helenoftroy",
+    "helen of troy",
+    "helenoftroyltd"
+  ],
+  "HERTZ": [
+    "hertz"
+  ],
   "HES": [
     "hes"
+  ],
+  "HFC": [
+    "hfc"
+  ],
+  "HGV": [
+    "hgv",
+    "hiltongrandvacations",
+    "hilton grand vacations",
+    "hiltongrandvacationsinc"
+  ],
+  "HIBB": [
+    "hibb"
   ],
   "HIG": [
     "hig",
@@ -1282,6 +3850,36 @@
     "huntington ingalls industries",
     "huntingtoningallsindustriesinc"
   ],
+  "HIMS": [
+    "hims",
+    "himsandhershealth",
+    "hims and hers health",
+    "himsandhershealthinc"
+  ],
+  "HIW": [
+    "hiw",
+    "highwoods",
+    "highwoodsproperties",
+    "highwoods properties",
+    "highwoodspropertiesinc"
+  ],
+  "HLI": [
+    "hli",
+    "houlihan",
+    "houlihanlokey",
+    "houlihan lokey",
+    "houlihanlokeyinc"
+  ],
+  "HLNE": [
+    "hlne",
+    "hamilton",
+    "hamiltonlane",
+    "hamilton lane",
+    "hamiltonlaneinc"
+  ],
+  "HLS": [
+    "hls"
+  ],
   "HLT": [
     "hlt",
     "hilton",
@@ -1289,6 +3887,22 @@
     "hilton worldwide",
     "hiltonworldwideholdings",
     "hiltonworldwideholdingsinc"
+  ],
+  "HMST": [
+    "hmst"
+  ],
+  "HMSY": [
+    "hmsy"
+  ],
+  "HNGR": [
+    "hngr"
+  ],
+  "HNI": [
+    "hni",
+    "hnicorp"
+  ],
+  "HNT": [
+    "hnt"
   ],
   "HOG": [
     "hog",
@@ -1302,12 +3916,33 @@
     "hologic",
     "hologicinc"
   ],
+  "HOMB": [
+    "homb",
+    "home",
+    "homebancshares",
+    "home bancshares",
+    "homebancsharesinc"
+  ],
   "HON": [
     "hon",
     "honeywell",
     "honeywellinternational",
     "honeywell international",
     "honeywellinternationalinc"
+  ],
+  "HOUS": [
+    "hous",
+    "anywhere",
+    "anywhererealestate",
+    "anywhere real estate",
+    "anywhererealestateinc"
+  ],
+  "HP": [
+    "hp",
+    "helmerich",
+    "helmerichandpayne",
+    "helmerich and payne",
+    "helmerichandpayneinc"
   ],
   "HPE": [
     "hpe",
@@ -1316,10 +3951,41 @@
     "hewlett packard enterprise",
     "hewlettpackardenterprisecompany"
   ],
+  "HPP": [
+    "hpp",
+    "hudson",
+    "hudsonpacificproperties",
+    "hudson pacific properties",
+    "hudsonpacificpropertiesinc"
+  ],
   "HPQ": [
     "hp",
     "hpq",
     "hpinc"
+  ],
+  "HPR": [
+    "hpr"
+  ],
+  "HQY": [
+    "hqy",
+    "healthequity",
+    "healthequityinc"
+  ],
+  "HR": [
+    "hr",
+    "healthcare",
+    "healthcarerealtytrust",
+    "healthcare realty trust",
+    "healthcarerealtytrustinc"
+  ],
+  "HRB": [
+    "hrb",
+    "handrblock",
+    "h and r block",
+    "handrblockinc"
+  ],
+  "HRC": [
+    "hrc"
   ],
   "HRL": [
     "hrl",
@@ -1328,12 +3994,29 @@
     "hormel foods",
     "hormelfoodscorporation"
   ],
+  "HRMY": [
+    "hrmy",
+    "harmony",
+    "harmonybiosciences",
+    "harmony biosciences",
+    "harmonybiosciencesholdings",
+    "harmonybiosciencesholdingsinc"
+  ],
+  "HSC": [
+    "hsc"
+  ],
   "HSIC": [
     "hsic",
     "henry",
     "henryschein",
     "henry schein",
     "henryscheininc"
+  ],
+  "HSKA": [
+    "hska"
+  ],
+  "HSNI": [
+    "hsni"
   ],
   "HST": [
     "hst",
@@ -1349,6 +4032,26 @@
     "hersheycompany",
     "thehersheycompany"
   ],
+  "HT": [
+    "ht"
+  ],
+  "HTA": [
+    "hta"
+  ],
+  "HTH": [
+    "hth",
+    "hilltop",
+    "hilltopholdings",
+    "hilltopholdingsinc"
+  ],
+  "HTZ": [
+    "htz",
+    "hertz",
+    "hertzglobal",
+    "hertz global",
+    "hertzglobalholdings",
+    "hertzglobalholdingsinc"
+  ],
   "HUBB": [
     "hubb",
     "hubbell",
@@ -1359,12 +4062,51 @@
     "humana",
     "humanainc"
   ],
+  "HVT": [
+    "hvt",
+    "haverty",
+    "havertyfurniturecompanies",
+    "haverty furniture companies",
+    "havertyfurniturecompaniesinc"
+  ],
   "HWM": [
     "hwm",
     "howmet",
     "howmetaerospace",
     "howmet aerospace",
     "howmetaerospaceinc"
+  ],
+  "HXL": [
+    "hxl",
+    "hexcel",
+    "hexcelcorpde",
+    "hexcel corp de"
+  ],
+  "HYATT": [
+    "hyatt"
+  ],
+  "IAA": [
+    "iaa"
+  ],
+  "IAC": [
+    "iac",
+    "iacinc"
+  ],
+  "IART": [
+    "iart",
+    "integra",
+    "integralifesciences",
+    "integra lifesciences",
+    "integralifesciencesholdings",
+    "integralifesciencesholdingscorp"
+  ],
+  "IBKR": [
+    "ibkr",
+    "interactive",
+    "interactivebrokers",
+    "interactive brokers",
+    "interactivebrokersgroup",
+    "interactivebrokersgroupinc"
   ],
   "IBM": [
     "ibm",
@@ -1373,12 +4115,29 @@
     "international business machines",
     "internationalbusinessmachinescorporation"
   ],
+  "IBTX": [
+    "ibtx"
+  ],
   "ICE": [
     "ice",
     "intercontinental",
     "intercontinentalexchange",
     "intercontinental exchange",
     "intercontinentalexchangeinc"
+  ],
+  "ICUI": [
+    "icu",
+    "icui",
+    "icumedicalincde",
+    "icu medical inc de"
+  ],
+  "IDCC": [
+    "idcc",
+    "interdigital",
+    "interdigitalinc"
+  ],
+  "IDTI": [
+    "idti"
   ],
   "IDXX": [
     "idxx",
@@ -1399,15 +4158,57 @@
     "international flavors and fragrances",
     "internationalflavorsandfragrancesinc"
   ],
+  "IIVI": [
+    "iivi"
+  ],
+  "ILG": [
+    "ilg"
+  ],
   "ILMN": [
     "ilmn",
     "illumina",
     "illuminainc"
   ],
+  "ILPT": [
+    "ilpt",
+    "industrial",
+    "industriallogisticspropertiestrust",
+    "industrial logistics properties trust"
+  ],
+  "IM": [
+    "im"
+  ],
+  "INCR": [
+    "incr",
+    "intercure",
+    "intercureltd"
+  ],
   "INCY": [
     "incy",
     "incyte",
     "incytecorporation"
+  ],
+  "INGN": [
+    "ingn",
+    "inogen",
+    "inogeninc"
+  ],
+  "INSP": [
+    "insp",
+    "inspire",
+    "inspiremedicalsystems",
+    "inspire medical systems",
+    "inspiremedicalsystemsinc"
+  ],
+  "INSW": [
+    "insw",
+    "international",
+    "internationalseaways",
+    "international seaways",
+    "internationalseawaysinc"
+  ],
+  "INT": [
+    "int"
   ],
   "INTC": [
     "intc",
@@ -1442,6 +4243,13 @@
     "theinterpublicgroupofcompanies",
     "theinterpublicgroupofcompaniesinc"
   ],
+  "IPGP": [
+    "ipg",
+    "ipgp",
+    "ipgphotonics",
+    "ipg photonics",
+    "ipgphotonicscorp"
+  ],
   "IQV": [
     "iqv",
     "iqvia",
@@ -1455,12 +4263,47 @@
     "ingersoll rand",
     "ingersollrandinc"
   ],
+  "IRBT": [
+    "irbt",
+    "irobot",
+    "irobotcorp"
+  ],
+  "IRDM": [
+    "irdm",
+    "iridium",
+    "iridiumcommunications",
+    "iridium communications",
+    "iridiumcommunicationsinc"
+  ],
   "IRM": [
     "irm",
     "iron",
     "ironmountain",
     "iron mountain",
     "ironmountainincorporated"
+  ],
+  "IRT": [
+    "irt",
+    "independence",
+    "independencerealtytrust",
+    "independence realty trust",
+    "independencerealtytrustinc"
+  ],
+  "IRWD": [
+    "irwd",
+    "ironwood",
+    "ironwoodpharmaceuticals",
+    "ironwood pharmaceuticals",
+    "ironwoodpharmaceuticalsinc"
+  ],
+  "ISBC": [
+    "isbc"
+  ],
+  "ISCA": [
+    "isca"
+  ],
+  "ISIL": [
+    "isil"
   ],
   "ISRG": [
     "isrg",
@@ -1469,10 +4312,16 @@
     "intuitive surgical",
     "intuitivesurgicalinc"
   ],
+  "ISTAR": [
+    "istar"
+  ],
   "IT": [
     "it",
     "gartner",
     "gartnerinc"
+  ],
+  "ITOS": [
+    "itos"
   ],
   "ITW": [
     "itw",
@@ -1480,6 +4329,16 @@
     "illinoistoolworks",
     "illinois tool works",
     "illinoistoolworksinc"
+  ],
+  "IVC": [
+    "ivc"
+  ],
+  "IVR": [
+    "ivr",
+    "invesco",
+    "invescomortgagecapital",
+    "invesco mortgage capital",
+    "invescomortgagecapitalinc"
   ],
   "IVZ": [
     "ivz",
@@ -1493,11 +4352,47 @@
     "jacobs solutions",
     "jacobssolutionsinc"
   ],
+  "JABIL": [
+    "jabil"
+  ],
+  "JACK": [
+    "jack",
+    "jackinthebox",
+    "jack in the box",
+    "jackintheboxinc"
+  ],
+  "JAH": [
+    "jah"
+  ],
+  "JAZZ": [
+    "jazz",
+    "jazzpharmaceuticals",
+    "jazz pharmaceuticals",
+    "jazzpharmaceuticalsplc"
+  ],
+  "JBGS": [
+    "jbg",
+    "jbgs",
+    "jbgsmithproperties",
+    "jbg smith properties"
+  ],
   "JBHT": [
     "jbht",
     "jbhunttransportservices",
     "jbhunttransportservicesinc",
     "j b hunt transport services"
+  ],
+  "JBL": [
+    "jbl",
+    "jabil",
+    "jabilinc"
+  ],
+  "JBLU": [
+    "jblu",
+    "jetblue",
+    "jetblueairways",
+    "jetblue airways",
+    "jetblueairwayscorp"
   ],
   "JCI": [
     "jci",
@@ -1505,6 +4400,20 @@
     "johnsoncontrolsinternational",
     "johnson controls international",
     "johnsoncontrolsinternationalplc"
+  ],
+  "JCOM": [
+    "jcom"
+  ],
+  "JCP": [
+    "jcp"
+  ],
+  "JEF": [
+    "jef",
+    "jefferies",
+    "jefferiesfinancial",
+    "jefferies financial",
+    "jefferiesfinancialgroup",
+    "jefferiesfinancialgroupinc"
   ],
   "JKHY": [
     "jack",
@@ -1522,6 +4431,9 @@
   "JNPR": [
     "jnpr"
   ],
+  "JOY": [
+    "joy"
+  ],
   "JPM": [
     "jpm",
     "jpmorgan",
@@ -1531,9 +4443,54 @@
     "jpmorgan chase and",
     "jpmorganchaseandco"
   ],
+  "JRVR": [
+    "jrvr",
+    "james",
+    "jamesriver",
+    "james river",
+    "jamesrivergroupholdings",
+    "jamesrivergroupholdingsinc"
+  ],
+  "JWN": [
+    "jwn"
+  ],
+  "JXN": [
+    "jxn",
+    "jackson",
+    "jacksonfinancial",
+    "jackson financial",
+    "jacksonfinancialinc"
+  ],
+  "JYNT": [
+    "jynt",
+    "joint",
+    "jointcorp"
+  ],
   "K": [
     "k",
     "kellanova"
+  ],
+  "KAI": [
+    "kai",
+    "kadant",
+    "kadantinc"
+  ],
+  "KAMN": [
+    "kamn"
+  ],
+  "KAR": [
+    "kar",
+    "openlane",
+    "openlaneinc"
+  ],
+  "KATE": [
+    "kate"
+  ],
+  "KD": [
+    "kd",
+    "kyndryl",
+    "kyndrylholdings",
+    "kyndrylholdingsinc"
   ],
   "KDP": [
     "kdp",
@@ -1541,6 +4498,13 @@
     "keurigdrpepper",
     "keurig dr pepper",
     "keurigdrpepperinc"
+  ],
+  "KELYA": [
+    "kelly",
+    "kelya",
+    "kellyservices",
+    "kelly services",
+    "kellyservicesinc"
   ],
   "KEY": [
     "key",
@@ -1552,6 +4516,13 @@
     "keysighttechnologies",
     "keysight technologies",
     "keysighttechnologiesinc"
+  ],
+  "KGS": [
+    "kgs",
+    "kodiak",
+    "kodiakgasservices",
+    "kodiak gas services",
+    "kodiakgasservicesinc"
   ],
   "KHC": [
     "khc",
@@ -1574,6 +4545,12 @@
     "klac",
     "klacorporation"
   ],
+  "KLG": [
+    "klg"
+  ],
+  "KLXI": [
+    "klxi"
+  ],
   "KMB": [
     "kmb",
     "kimberly",
@@ -1588,10 +4565,51 @@
     "kinder morgan",
     "kindermorganinc"
   ],
+  "KMT": [
+    "kmt",
+    "kennametal",
+    "kennametalinc"
+  ],
   "KMX": [
     "kmx",
     "carmax",
     "carmaxinc"
+  ],
+  "KN": [
+    "kn",
+    "knowles",
+    "knowlescorp"
+  ],
+  "KNF": [
+    "knf",
+    "knife",
+    "kniferiver",
+    "knife river",
+    "kniferivercorp"
+  ],
+  "KNSL": [
+    "knsl",
+    "kinsale",
+    "kinsalecapital",
+    "kinsale capital",
+    "kinsalecapitalgroup",
+    "kinsalecapitalgroupinc"
+  ],
+  "KNTK": [
+    "kntk",
+    "kinetik",
+    "kinetikholdings",
+    "kinetikholdingsinc"
+  ],
+  "KNX": [
+    "knx",
+    "knight",
+    "knightswift",
+    "knight swift",
+    "knightswifttransportation",
+    "knight swift transportation",
+    "knightswifttransportationholdings",
+    "knightswifttransportationholdingsinc"
   ],
   "KO": [
     "ko",
@@ -1609,10 +4627,53 @@
     "thekroger",
     "thekrogerco"
   ],
+  "KRA": [
+    "kra"
+  ],
+  "KRG": [
+    "krg",
+    "kite",
+    "kiterealtygrouptrust",
+    "kite realty group trust"
+  ],
+  "KRYS": [
+    "krys",
+    "krystal",
+    "krystalbiotech",
+    "krystal biotech",
+    "krystalbiotechinc"
+  ],
+  "KSS": [
+    "kss",
+    "kohls",
+    "kohlscorp"
+  ],
+  "KTOS": [
+    "ktos",
+    "kratos",
+    "kratosdefenseandsecuritysolutions",
+    "kratosdefenseandsecuritysolutionsinc",
+    "kratos defense and security solutions"
+  ],
+  "KW": [
+    "kw",
+    "kennedy",
+    "kennedywilson",
+    "kennedy wilson",
+    "kennedywilsonholdings",
+    "kennedywilsonholdingsinc"
+  ],
   "L": [
     "l",
     "loews",
     "loewscorporation"
+  ],
+  "LAD": [
+    "lad",
+    "lithia",
+    "lithiamotors",
+    "lithia motors",
+    "lithiamotorsinc"
   ],
   "LBRDK": [
     "lbrdk",
@@ -1621,22 +4682,73 @@
     "liberty broadband",
     "libertybroadbandcorporation"
   ],
+  "LBRT": [
+    "lbrt",
+    "liberty",
+    "libertyenergy",
+    "liberty energy",
+    "libertyenergyinc"
+  ],
+  "LCI": [
+    "lci"
+  ],
+  "LDL": [
+    "ldl"
+  ],
   "LDOS": [
     "ldos",
     "leidos",
     "leidosholdings",
     "leidosholdingsinc"
   ],
+  "LEA": [
+    "lea",
+    "lear",
+    "learcorp"
+  ],
+  "LEG": [
+    "leg",
+    "leggett",
+    "leggettandplatt",
+    "leggett and platt",
+    "leggettandplattinc"
+  ],
   "LEN": [
     "len",
     "lennar",
     "lennarcorporation"
+  ],
+  "LESL": [
+    "lesl",
+    "leslie",
+    "leslies",
+    "leslie s",
+    "lesliesinc"
+  ],
+  "LFUS": [
+    "lfus",
+    "littelfuse",
+    "littelfuseincde",
+    "littelfuse inc de"
+  ],
+  "LGND": [
+    "lgnd",
+    "ligand",
+    "ligandpharmaceuticals",
+    "ligand pharmaceuticals",
+    "ligandpharmaceuticalsinc"
   ],
   "LH": [
     "lh",
     "labcorp",
     "labcorpholdings",
     "labcorpholdingsinc"
+  ],
+  "LHCG": [
+    "lhcg"
+  ],
+  "LHO": [
+    "lho"
   ],
   "LHX": [
     "lhx",
@@ -1645,14 +4757,37 @@
     "l3harris technologies",
     "l3harristechnologiesinc"
   ],
+  "LII": [
+    "lii",
+    "lennox",
+    "lennoxinternational",
+    "lennox international",
+    "lennoxinternationalinc"
+  ],
   "LIN": [
     "lin",
     "linde",
     "lindeplc"
   ],
+  "LITE": [
+    "lite",
+    "lumentum",
+    "lumentumholdings",
+    "lumentumholdingsinc"
+  ],
+  "LKFN": [
+    "lkfn",
+    "lakeland",
+    "lakelandfinancial",
+    "lakeland financial",
+    "lakelandfinancialcorp"
+  ],
   "LKQ": [
     "lkq",
     "lkqcorporation"
+  ],
+  "LL": [
+    "ll"
   ],
   "LLY": [
     "eli",
@@ -1660,6 +4795,12 @@
     "elilillyand",
     "eli lilly and",
     "elilillyandcompany"
+  ],
+  "LM": [
+    "lm"
+  ],
+  "LMNX": [
+    "lmnx"
   ],
   "LMT": [
     "lmt",
@@ -1675,12 +4816,38 @@
     "lincoln national",
     "lincolnnationalcorporation"
   ],
+  "LNCE": [
+    "lnce"
+  ],
   "LNT": [
     "lnt",
     "alliant",
     "alliantenergy",
     "alliant energy",
     "alliantenergycorporation"
+  ],
+  "LNTH": [
+    "lnth",
+    "lantheus",
+    "lantheusholdings",
+    "lantheusholdingsinc"
+  ],
+  "LOCO": [
+    "loco",
+    "elpolloloco",
+    "el pollo loco",
+    "elpollolocoholdings",
+    "elpollolocoholdingsinc"
+  ],
+  "LOGM": [
+    "logm"
+  ],
+  "LOPE": [
+    "lope",
+    "grand",
+    "grandcanyoneducation",
+    "grand canyon education",
+    "grandcanyoneducationinc"
   ],
   "LOW": [
     "low",
@@ -1689,6 +4856,17 @@
     "lowe s companies",
     "lowescompaniesinc"
   ],
+  "LPNT": [
+    "lpnt"
+  ],
+  "LPSN": [
+    "lpsn",
+    "liveperson",
+    "livepersoninc"
+  ],
+  "LPT": [
+    "lpt"
+  ],
   "LRCX": [
     "lam",
     "lrcx",
@@ -1696,12 +4874,43 @@
     "lam research",
     "lamresearchcorporation"
   ],
+  "LRN": [
+    "lrn",
+    "stride",
+    "strideinc"
+  ],
+  "LSCC": [
+    "lscc",
+    "lattice",
+    "latticesemiconductor",
+    "lattice semiconductor",
+    "latticesemiconductorcorp"
+  ],
+  "LSI": [
+    "lsi"
+  ],
+  "LTHM": [
+    "lthm"
+  ],
+  "LTM": [
+    "ltm",
+    "latam",
+    "latamairlinesgroupsa",
+    "latam airlines group s a"
+  ],
   "LULU": [
     "lulu",
     "lululemon",
     "lululemonathletica",
     "lululemon athletica",
     "lululemonathleticainc"
+  ],
+  "LUMN": [
+    "lumn",
+    "lumen",
+    "lumentechnologies",
+    "lumen technologies",
+    "lumentechnologiesinc"
   ],
   "LUV": [
     "luv",
@@ -1725,11 +4934,24 @@
     "lambwestonholdings",
     "lambwestonholdingsinc"
   ],
+  "LXK": [
+    "lxk"
+  ],
+  "LXU": [
+    "lsb",
+    "lxu",
+    "lsbindustries",
+    "lsb industries",
+    "lsbindustriesinc"
+  ],
   "LYB": [
     "lyb",
     "lyondellbasell",
     "lyondellbasellindustriesnv",
     "lyondellbasell industries n v"
+  ],
+  "LYLT": [
+    "lylt"
   ],
   "LYV": [
     "lyv",
@@ -1737,6 +4959,13 @@
     "livenationentertainment",
     "live nation entertainment",
     "livenationentertainmentinc"
+  ],
+  "M": [
+    "m",
+    "macy",
+    "macys",
+    "macy s",
+    "macysinc"
   ],
   "MA": [
     "ma",
@@ -1750,6 +4979,21 @@
     "mid america apartment communities",
     "midamericaapartmentcommunitiesinc"
   ],
+  "MAC": [
+    "mac",
+    "macerich",
+    "macerichco"
+  ],
+  "MANH": [
+    "manh",
+    "manhattan",
+    "manhattanassociates",
+    "manhattan associates",
+    "manhattanassociatesinc"
+  ],
+  "MANT": [
+    "mant"
+  ],
   "MAR": [
     "mar",
     "marriott",
@@ -1757,10 +5001,47 @@
     "marriott international",
     "marriottinternationalinc"
   ],
+  "MARA": [
+    "mara",
+    "maraholdings",
+    "maraholdingsinc"
+  ],
   "MAS": [
     "mas",
     "masco",
     "mascocorporation"
+  ],
+  "MASI": [
+    "masi",
+    "masimo",
+    "masimocorp"
+  ],
+  "MAT": [
+    "mat",
+    "mattel",
+    "mattelincde",
+    "mattel inc de"
+  ],
+  "MATV": [
+    "matv",
+    "mativ",
+    "mativholdings",
+    "mativholdingsinc"
+  ],
+  "MBC": [
+    "mbc",
+    "masterbrand",
+    "masterbrandinc"
+  ],
+  "MBFI": [
+    "mbfi"
+  ],
+  "MC": [
+    "mc",
+    "moelis",
+    "moelisand",
+    "moelis and",
+    "moelisandco"
   ],
   "MCD": [
     "mcd",
@@ -1788,6 +5069,36 @@
     "moody s",
     "moodyscorporation"
   ],
+  "MCS": [
+    "mcs",
+    "marcus",
+    "marcuscorp"
+  ],
+  "MCW": [
+    "mcw",
+    "mister",
+    "mistercarwash",
+    "mister car wash",
+    "mistercarwashinc"
+  ],
+  "MCY": [
+    "mcy",
+    "mercury",
+    "mercurygeneral",
+    "mercury general",
+    "mercurygeneralcorp"
+  ],
+  "MD": [
+    "md",
+    "pediatrix",
+    "pediatrixmedical",
+    "pediatrix medical",
+    "pediatrixmedicalgroup",
+    "pediatrixmedicalgroupinc"
+  ],
+  "MDC": [
+    "mdc"
+  ],
   "MDLZ": [
     "mdlz",
     "mondelez",
@@ -1795,10 +5106,57 @@
     "mondelez international",
     "mondelezinternationalinc"
   ],
+  "MDP": [
+    "mdp"
+  ],
+  "MDR": [
+    "mdr"
+  ],
+  "MDRX": [
+    "mdrx"
+  ],
+  "MDSO": [
+    "mdso"
+  ],
   "MDT": [
     "mdt",
     "medtronic",
     "medtronicplc"
+  ],
+  "MDU": [
+    "mdu",
+    "mduresources",
+    "mdu resources",
+    "mduresourcesgroup",
+    "mduresourcesgroupinc"
+  ],
+  "MED": [
+    "med",
+    "medifast",
+    "medifastinc"
+  ],
+  "MEDP": [
+    "medp",
+    "medpace",
+    "medpaceholdings",
+    "medpaceholdingsinc"
+  ],
+  "MEI": [
+    "mei",
+    "methode",
+    "methodeelectronics",
+    "methode electronics",
+    "methodeelectronicsinc"
+  ],
+  "MENT": [
+    "ment"
+  ],
+  "MERC": [
+    "merc",
+    "mercer",
+    "mercerinternational",
+    "mercer international",
+    "mercerinternationalinc"
   ],
   "MET": [
     "met",
@@ -1812,10 +5170,27 @@
     "meta platforms",
     "metaplatformsinc"
   ],
+  "MGEE": [
+    "mge",
+    "mgee",
+    "mgeenergy",
+    "mge energy",
+    "mgeenergyinc"
+  ],
+  "MGLN": [
+    "mgln"
+  ],
   "MGM": [
     "mgm",
     "mgmresortsinternational",
     "mgm resorts international"
+  ],
+  "MGY": [
+    "mgy",
+    "magnolia",
+    "magnoliaoilandgas",
+    "magnolia oil and gas",
+    "magnoliaoilandgascorp"
   ],
   "MHK": [
     "mhk",
@@ -1824,6 +5199,24 @@
     "mohawk industries",
     "mohawkindustriesinc"
   ],
+  "MIDD": [
+    "midd",
+    "middleby",
+    "middlebycorp"
+  ],
+  "MIK": [
+    "mik"
+  ],
+  "MIME": [
+    "mime"
+  ],
+  "MIR": [
+    "mir",
+    "mirion",
+    "miriontechnologies",
+    "mirion technologies",
+    "miriontechnologiesinc"
+  ],
   "MKC": [
     "mkc",
     "mccormick",
@@ -1831,11 +5224,28 @@
     "mccormick and",
     "mccormickandcompanyincorporated"
   ],
+  "MKSI": [
+    "mks",
+    "mksi",
+    "mksinc"
+  ],
   "MKTX": [
     "mktx",
     "marketaxess",
     "marketaxessholdings",
     "marketaxessholdingsinc"
+  ],
+  "MLI": [
+    "mli",
+    "mueller",
+    "muellerindustries",
+    "mueller industries",
+    "muellerindustriesinc"
+  ],
+  "MLKN": [
+    "mlkn",
+    "millerknoll",
+    "millerknollinc"
   ],
   "MLM": [
     "mlm",
@@ -1856,6 +5266,9 @@
     "mmm",
     "3mcompany"
   ],
+  "MNK": [
+    "mnk"
+  ],
   "MNST": [
     "mnst",
     "monster",
@@ -1863,11 +5276,24 @@
     "monster beverage",
     "monsterbeveragecorporation"
   ],
+  "MNTA": [
+    "mnta"
+  ],
   "MO": [
     "mo",
     "altria",
     "altriagroup",
     "altriagroupinc"
+  ],
+  "MODG": [
+    "modg",
+    "topgolf",
+    "topgolfcallawaybrands",
+    "topgolf callaway brands",
+    "topgolfcallawaybrandscorp"
+  ],
+  "MODV": [
+    "modv"
   ],
   "MOH": [
     "moh",
@@ -1876,12 +5302,35 @@
     "molina healthcare",
     "molinahealthcareinc"
   ],
+  "MORN": [
+    "morn",
+    "morningstar",
+    "morningstarinc"
+  ],
   "MOS": [
     "mos",
     "mosaic",
     "themosaic",
     "mosaiccompany",
     "themosaiccompany"
+  ],
+  "MOV": [
+    "mov",
+    "movado",
+    "movadogroup",
+    "movadogroupinc"
+  ],
+  "MP": [
+    "mp",
+    "mpmaterialscorpde",
+    "mp materials corp de"
+  ],
+  "MPAA": [
+    "mpaa",
+    "motorcar",
+    "motorcarpartsofamerica",
+    "motorcar parts of america",
+    "motorcarpartsofamericainc"
   ],
   "MPC": [
     "mpc",
@@ -1890,12 +5339,26 @@
     "marathon petroleum",
     "marathonpetroleumcorporation"
   ],
+  "MPW": [
+    "mpw",
+    "medical",
+    "medicalpropertiestrust",
+    "medical properties trust",
+    "medicalpropertiestrustinc"
+  ],
   "MPWR": [
     "mpwr",
     "monolithic",
     "monolithicpowersystems",
     "monolithic power systems",
     "monolithicpowersystemsinc"
+  ],
+  "MRCY": [
+    "mrcy",
+    "mercury",
+    "mercurysystems",
+    "mercury systems",
+    "mercurysystemsinc"
   ],
   "MRK": [
     "mrk",
@@ -1912,20 +5375,44 @@
   "MRO": [
     "mro"
   ],
+  "MRP": [
+    "mrp",
+    "millrose",
+    "millroseproperties",
+    "millrose properties",
+    "millrosepropertiesinc"
+  ],
   "MS": [
     "ms",
     "morgan",
     "morganstanley",
     "morgan stanley"
   ],
+  "MSCC": [
+    "mscc"
+  ],
   "MSCI": [
     "msci",
     "msciinc"
+  ],
+  "MSEX": [
+    "msex",
+    "middlesex",
+    "middlesexwater",
+    "middlesex water",
+    "middlesexwaterco"
   ],
   "MSFT": [
     "msft",
     "microsoft",
     "microsoftcorporation"
+  ],
+  "MSGS": [
+    "msgs",
+    "madison",
+    "madisonsquaregardensports",
+    "madison square garden sports",
+    "madisonsquaregardensportscorp"
   ],
   "MSI": [
     "msi",
@@ -1933,6 +5420,11 @@
     "motorolasolutions",
     "motorola solutions",
     "motorolasolutionsinc"
+  ],
+  "MSTR": [
+    "mstr",
+    "strategy",
+    "strategyinc"
   ],
   "MTB": [
     "mtb",
@@ -1953,6 +5445,60 @@
     "mettler toledo international",
     "mettlertoledointernationalinc"
   ],
+  "MTDR": [
+    "mtdr",
+    "matador",
+    "matadorresources",
+    "matador resources",
+    "matadorresourcesco"
+  ],
+  "MTG": [
+    "mtg",
+    "mgic",
+    "mgicinvestment",
+    "mgic investment",
+    "mgicinvestmentcorp"
+  ],
+  "MTN": [
+    "mtn",
+    "vail",
+    "vailresorts",
+    "vail resorts",
+    "vailresortsinc"
+  ],
+  "MTOR": [
+    "mtor"
+  ],
+  "MTRX": [
+    "mtrx",
+    "matrix",
+    "matrixservice",
+    "matrix service",
+    "matrixserviceco"
+  ],
+  "MTSC": [
+    "mtsc"
+  ],
+  "MTSI": [
+    "mtsi",
+    "macom",
+    "macomtechnologysolutions",
+    "macom technology solutions",
+    "macomtechnologysolutionsholdings",
+    "macomtechnologysolutionsholdingsinc"
+  ],
+  "MTX": [
+    "mtx",
+    "minerals",
+    "mineralstechnologies",
+    "minerals technologies",
+    "mineralstechnologiesinc"
+  ],
+  "MTZ": [
+    "mtz",
+    "mastec",
+    "mastecinc"
+  ],
   "MU": [
     "mu",
     "micron",
@@ -1960,9 +5506,70 @@
     "micron technology",
     "microntechnologyinc"
   ],
+  "MUR": [
+    "mur",
+    "murphy",
+    "murphyoil",
+    "murphy oil",
+    "murphyoilcorp"
+  ],
+  "MWA": [
+    "mwa",
+    "mueller",
+    "muellerwaterproducts",
+    "mueller water products",
+    "muellerwaterproductsinc"
+  ],
+  "MYE": [
+    "mye",
+    "myers",
+    "myersindustries",
+    "myers industries",
+    "myersindustriesinc"
+  ],
+  "NABL": [
+    "nabl",
+    "nable",
+    "n able",
+    "nableinc"
+  ],
+  "NARI": [
+    "nari"
+  ],
+  "NATI": [
+    "nati"
+  ],
+  "NATL": [
+    "ncr",
+    "natl",
+    "ncratleos",
+    "ncr atleos",
+    "ncratleoscorp"
+  ],
+  "NAVI": [
+    "navi",
+    "navient",
+    "navientcorp"
+  ],
+  "NBIX": [
+    "nbix",
+    "neurocrine",
+    "neurocrinebiosciences",
+    "neurocrine biosciences",
+    "neurocrinebiosciencesinc"
+  ],
+  "NBR": [
+    "nbr",
+    "nabors",
+    "naborsindustries",
+    "nabors industries",
+    "naborsindustriesltd"
+  ],
   "NCLH": [
     "nclh",
     "norwegian",
+    "norwegiancruise",
+    "norwegian cruise",
     "norwegiancruiseline",
     "norwegian cruise line",
     "norwegiancruiselineholdings",
@@ -1978,6 +5585,11 @@
     "nordson",
     "nordsoncorporation"
   ],
+  "NE": [
+    "ne",
+    "noble",
+    "noblecorpplc"
+  ],
   "NEE": [
     "nee",
     "nextera",
@@ -1990,20 +5602,67 @@
     "newmont",
     "newmontcorporation"
   ],
+  "NEOG": [
+    "neog",
+    "neogen",
+    "neogencorp"
+  ],
+  "NEX": [
+    "nex"
+  ],
+  "NFBK": [
+    "nfbk",
+    "northfield",
+    "northfieldbancorp",
+    "northfield bancorp",
+    "northfieldbancorpinc"
+  ],
   "NFLX": [
     "nflx",
     "netflix",
     "netflixinc"
+  ],
+  "NGVT": [
+    "ngvt",
+    "ingevity",
+    "ingevitycorp"
+  ],
+  "NHC": [
+    "nhc",
+    "national",
+    "nationalhealthcare",
+    "national healthcare",
+    "nationalhealthcarecorp"
   ],
   "NI": [
     "ni",
     "nisource",
     "nisourceinc"
   ],
+  "NJR": [
+    "new",
+    "njr",
+    "newjerseyresources",
+    "new jersey resources",
+    "newjerseyresourcescorp"
+  ],
   "NKE": [
     "nke",
     "nike",
     "nikeinc"
+  ],
+  "NKTR": [
+    "nktr",
+    "nektar",
+    "nektartherapeutics",
+    "nektar therapeutics"
+  ],
+  "NLY": [
+    "nly",
+    "annaly",
+    "annalycapitalmanagement",
+    "annaly capital management",
+    "annalycapitalmanagementinc"
   ],
   "NOC": [
     "noc",
@@ -2012,16 +5671,49 @@
     "northrop grumman",
     "northropgrummancorporation"
   ],
+  "NOG": [
+    "nog",
+    "northern",
+    "northernoilandgas",
+    "northern oil and gas",
+    "northernoilandgasinc"
+  ],
+  "NOV": [
+    "nov",
+    "novinc"
+  ],
+  "NOVT": [
+    "novt",
+    "novanta",
+    "novantainc"
+  ],
   "NOW": [
     "now",
     "servicenow",
     "servicenowinc"
+  ],
+  "NP": [
+    "np",
+    "neptune",
+    "neptuneinsurance",
+    "neptune insurance",
+    "neptuneinsuranceholdings",
+    "neptuneinsuranceholdingsinc"
+  ],
+  "NR": [
+    "nr"
   ],
   "NRG": [
     "nrg",
     "nrgenergy",
     "nrg energy",
     "nrgenergyinc"
+  ],
+  "NSA": [
+    "nsa",
+    "national",
+    "nationalstorageaffiliatestrust",
+    "national storage affiliates trust"
   ],
   "NSC": [
     "nsc",
@@ -2030,10 +5722,30 @@
     "norfolk southern",
     "norfolksoutherncorporation"
   ],
+  "NSP": [
+    "nsp",
+    "insperity",
+    "insperityinc"
+  ],
+  "NSR": [
+    "nsr"
+  ],
   "NTAP": [
     "ntap",
     "netapp",
     "netappinc"
+  ],
+  "NTCT": [
+    "ntct",
+    "netscout",
+    "netscoutsystems",
+    "netscout systems",
+    "netscoutsystemsinc"
+  ],
+  "NTGR": [
+    "ntgr",
+    "netgear",
+    "netgearinc"
   ],
   "NTRS": [
     "ntrs",
@@ -2042,25 +5754,84 @@
     "northern trust",
     "northerntrustcorporation"
   ],
+  "NTUS": [
+    "ntus"
+  ],
   "NUE": [
     "nue",
     "nucor",
     "nucorcorporation"
+  ],
+  "NUS": [
+    "nus",
+    "nuskinenterprises",
+    "nu skin enterprises",
+    "nuskinenterprisesinc"
+  ],
+  "NUVA": [
+    "nuva"
   ],
   "NVDA": [
     "nvda",
     "nvidia",
     "nvidiacorporation"
   ],
+  "NVEE": [
+    "nvee"
+  ],
   "NVR": [
     "nvr",
     "nvrinc"
+  ],
+  "NVST": [
+    "nvst",
+    "envista",
+    "envistaholdings",
+    "envistaholdingscorp"
+  ],
+  "NVT": [
+    "nvt",
+    "nvent",
+    "nventelectric",
+    "nvent electric",
+    "nventelectricplc"
+  ],
+  "NWE": [
+    "nwe",
+    "northwestern",
+    "northwesternenergy",
+    "northwestern energy",
+    "northwesternenergygroup",
+    "northwesternenergygroupinc"
+  ],
+  "NWL": [
+    "nwl",
+    "newell",
+    "newellbrands",
+    "newell brands",
+    "newellbrandsinc"
+  ],
+  "NXGN": [
+    "nxgn"
   ],
   "NXPI": [
     "nxp",
     "nxpi",
     "nxpsemiconductorsnv",
     "nxp semiconductors n v"
+  ],
+  "NXST": [
+    "nxst",
+    "nexstar",
+    "nexstarmedia",
+    "nexstar media",
+    "nexstarmediagroup",
+    "nexstarmediagroupinc"
+  ],
+  "NXT": [
+    "nxt",
+    "nextpower",
+    "nextpowerinc"
   ],
   "O": [
     "o",
@@ -2069,6 +5840,15 @@
     "realty income",
     "realtyincomecorporation"
   ],
+  "OAS": [
+    "oas"
+  ],
+  "OC": [
+    "oc",
+    "owens",
+    "owenscorning",
+    "owens corning"
+  ],
   "ODFL": [
     "old",
     "odfl",
@@ -2076,10 +5856,56 @@
     "old dominion freight line",
     "olddominionfreightlineinc"
   ],
+  "ODP": [
+    "odp",
+    "odpcorp"
+  ],
+  "OFIX": [
+    "ofix",
+    "orthofix",
+    "orthofixmedical",
+    "orthofix medical",
+    "orthofixmedicalinc"
+  ],
+  "OGN": [
+    "ogn",
+    "organon",
+    "organonand",
+    "organon and",
+    "organonandco"
+  ],
+  "OI": [
+    "oi",
+    "oiglassincde",
+    "o i glass inc de"
+  ],
+  "OII": [
+    "oii",
+    "oceaneering",
+    "oceaneeringinternational",
+    "oceaneering international",
+    "oceaneeringinternationalinc"
+  ],
+  "OIS": [
+    "oil",
+    "ois",
+    "oilstatesinternational",
+    "oil states international",
+    "oilstatesinternationalinc"
+  ],
   "OKE": [
     "oke",
     "oneok",
     "oneokinc"
+  ],
+  "OKTA": [
+    "okta",
+    "oktainc"
+  ],
+  "OLED": [
+    "oled",
+    "universaldisplaycorppa",
+    "universal display corp pa"
   ],
   "OMC": [
     "omc",
@@ -2087,16 +5913,80 @@
     "omnicomgroup",
     "omnicomgroupinc"
   ],
+  "OMCL": [
+    "omcl",
+    "omnicell",
+    "omnicellinc"
+  ],
+  "OMI": [
+    "omi",
+    "owens",
+    "owensandminorincva",
+    "owens and minor inc va"
+  ],
   "ON": [
     "on",
     "onsemiconductor",
     "on semiconductor",
     "onsemiconductorcorporation"
   ],
+  "ONB": [
+    "old",
+    "onb",
+    "oldnationalbancorpin",
+    "old national bancorp in"
+  ],
+  "ONL": [
+    "onl",
+    "orion",
+    "orionproperties",
+    "orion properties",
+    "orionpropertiesinc"
+  ],
+  "ONTO": [
+    "onto",
+    "ontoinnovation",
+    "onto innovation",
+    "ontoinnovationinc"
+  ],
+  "OPB": [
+    "opb"
+  ],
+  "OPCH": [
+    "opch",
+    "option",
+    "optioncarehealth",
+    "option care health",
+    "optioncarehealthinc"
+  ],
+  "OPI": [
+    "opi",
+    "office",
+    "officepropertiesincometrust",
+    "office properties income trust"
+  ],
+  "OPRX": [
+    "oprx",
+    "optimizerx",
+    "optimizerxcorp"
+  ],
+  "ORA": [
+    "ora",
+    "ormat",
+    "ormattechnologies",
+    "ormat technologies",
+    "ormattechnologiesinc"
+  ],
   "ORCL": [
     "orcl",
     "oracle",
     "oraclecorporation"
+  ],
+  "ORGO": [
+    "orgo",
+    "organogenesis",
+    "organogenesisholdings",
+    "organogenesisholdingsinc"
   ],
   "ORLY": [
     "orly",
@@ -2104,11 +5994,42 @@
     "o reilly automotive",
     "oreillyautomotiveinc"
   ],
+  "OSPN": [
+    "ospn",
+    "onespan",
+    "onespaninc"
+  ],
+  "OSUR": [
+    "osur",
+    "orasure",
+    "orasuretechnologies",
+    "orasure technologies",
+    "orasuretechnologiesinc"
+  ],
   "OTIS": [
     "otis",
     "otisworldwide",
     "otis worldwide",
     "otisworldwidecorporation"
+  ],
+  "OTTR": [
+    "ottr",
+    "otter",
+    "ottertail",
+    "otter tail",
+    "ottertailcorp"
+  ],
+  "OUT": [
+    "out",
+    "outfront",
+    "outfrontmedia",
+    "outfront media",
+    "outfrontmediainc"
+  ],
+  "OVV": [
+    "ovv",
+    "ovintiv",
+    "ovintivinc"
   ],
   "OXY": [
     "oxy",
@@ -2117,12 +6038,32 @@
     "occidental petroleum",
     "occidentalpetroleumcorporation"
   ],
+  "OZRK": [
+    "ozrk"
+  ],
+  "PACW": [
+    "pacw"
+  ],
+  "PAG": [
+    "pag",
+    "penske",
+    "penskeautomotive",
+    "penske automotive",
+    "penskeautomotivegroup",
+    "penskeautomotivegroupinc"
+  ],
   "PANW": [
     "palo",
     "panw",
     "paloaltonetworks",
     "palo alto networks",
     "paloaltonetworksinc"
+  ],
+  "PAY": [
+    "pay",
+    "paymentus",
+    "paymentusholdings",
+    "paymentusholdingsinc"
   ],
   "PAYC": [
     "payc",
@@ -2131,10 +6072,36 @@
     "paycom software",
     "paycomsoftwareinc"
   ],
+  "PAYO": [
+    "payo",
+    "payoneer",
+    "payoneerglobal",
+    "payoneer global",
+    "payoneerglobalinc"
+  ],
   "PAYX": [
     "payx",
     "paychex",
     "paychexinc"
+  ],
+  "PBF": [
+    "pbf",
+    "pbfenergy",
+    "pbf energy",
+    "pbfenergyinc"
+  ],
+  "PBH": [
+    "pbh",
+    "prestige",
+    "prestigeconsumerhealthcare",
+    "prestige consumer healthcare",
+    "prestigeconsumerhealthcareinc"
+  ],
+  "PBI": [
+    "pbi",
+    "pitney",
+    "pitneybowesincde",
+    "pitney bowes inc de"
   ],
   "PCAR": [
     "pcar",
@@ -2147,8 +6114,34 @@
     "pg and e",
     "pgandecorporation"
   ],
+  "PCTY": [
+    "pcty",
+    "paylocity",
+    "paylocityholding",
+    "paylocity holding",
+    "paylocityholdingcorp"
+  ],
+  "PDCE": [
+    "pdce"
+  ],
+  "PDCO": [
+    "pdco"
+  ],
   "PEAK": [
     "peak"
+  ],
+  "PEB": [
+    "peb",
+    "pebblebrook",
+    "pebblebrookhoteltrust",
+    "pebblebrook hotel trust"
+  ],
+  "PECO": [
+    "peco",
+    "phillips",
+    "phillipsedisonand",
+    "phillips edison and",
+    "phillipsedisonandcompanyinc"
   ],
   "PEG": [
     "peg",
@@ -2158,10 +6151,36 @@
     "publicserviceenterprisegroup",
     "publicserviceenterprisegroupincorporated"
   ],
+  "PEGA": [
+    "pega",
+    "pegasystems",
+    "pegasystemsinc"
+  ],
+  "PEI": [
+    "pei"
+  ],
+  "PEN": [
+    "pen",
+    "penumbra",
+    "penumbrainc"
+  ],
+  "PENN": [
+    "penn",
+    "pennentertainment",
+    "penn entertainment",
+    "pennentertainmentinc"
+  ],
   "PEP": [
     "pep",
     "pepsico",
     "pepsicoinc"
+  ],
+  "PETS": [
+    "pets",
+    "petmed",
+    "petmedexpress",
+    "petmed express",
+    "petmedexpressinc"
   ],
   "PFE": [
     "pfe",
@@ -2176,6 +6195,14 @@
     "principalfinancialgroup",
     "principalfinancialgroupinc"
   ],
+  "PFGC": [
+    "pfgc",
+    "performance",
+    "performancefood",
+    "performance food",
+    "performancefoodgroup",
+    "performancefoodgroupco"
+  ],
   "PG": [
     "pg",
     "procter",
@@ -2185,12 +6212,20 @@
     "procterandgamblecompany",
     "theprocterandgamblecompany"
   ],
+  "PGNY": [
+    "pgny",
+    "progyny",
+    "progynyinc"
+  ],
   "PGR": [
     "pgr",
     "progressive",
     "theprogressive",
     "progressivecorporation",
     "theprogressivecorporation"
+  ],
+  "PGTI": [
+    "pgti"
   ],
   "PH": [
     "ph",
@@ -2199,10 +6234,40 @@
     "parker hannifin",
     "parkerhannifincorporation"
   ],
+  "PHIN": [
+    "phin",
+    "phinia",
+    "phiniainc"
+  ],
   "PHM": [
     "phm",
     "pultegroup",
     "pultegroupinc"
+  ],
+  "PI": [
+    "pi",
+    "impinj",
+    "impinjinc"
+  ],
+  "PJT": [
+    "pjt",
+    "pjtpartners",
+    "pjt partners",
+    "pjtpartnersinc"
+  ],
+  "PK": [
+    "pk",
+    "park",
+    "parkhotelsandresorts",
+    "park hotels and resorts",
+    "parkhotelsandresortsinc"
+  ],
+  "PKE": [
+    "pke",
+    "park",
+    "parkaerospace",
+    "park aerospace",
+    "parkaerospacecorp"
   ],
   "PKG": [
     "pkg",
@@ -2210,10 +6275,36 @@
     "packagingcorporationofamerica",
     "packaging corporation of america"
   ],
+  "PLCE": [
+    "plce",
+    "childrens",
+    "childrensplace",
+    "childrens place",
+    "childrensplaceinc"
+  ],
+  "PLCM": [
+    "plcm"
+  ],
   "PLD": [
     "pld",
     "prologis",
     "prologisinc"
+  ],
+  "PLMR": [
+    "plmr",
+    "palomar",
+    "palomarholdings",
+    "palomarholdingsinc"
+  ],
+  "PLNT": [
+    "plnt",
+    "planet",
+    "planetfitness",
+    "planet fitness",
+    "planetfitnessinc"
+  ],
+  "PLT": [
+    "plt"
   ],
   "PM": [
     "pm",
@@ -2232,10 +6323,26 @@
     "thepncfinancialservicesgroup",
     "thepncfinancialservicesgroupinc"
   ],
+  "PNFP": [
+    "pnfp",
+    "pinnacle",
+    "pinnaclefinancialpartners",
+    "pinnacle financial partners",
+    "pinnaclefinancialpartnersinc"
+  ],
   "PNR": [
     "pnr",
     "pentair",
     "pentairplc"
+  ],
+  "PNRA": [
+    "pnra"
+  ],
+  "PNTG": [
+    "pntg",
+    "pennant",
+    "pennantgroup",
+    "pennantgroupinc"
   ],
   "PNW": [
     "pnw",
@@ -2244,9 +6351,35 @@
     "pinnacle west capital",
     "pinnaclewestcapitalcorporation"
   ],
+  "POLY": [
+    "poly"
+  ],
   "POOL": [
     "pool",
     "poolcorporation"
+  ],
+  "POR": [
+    "por",
+    "portland",
+    "portlandgeneralelectriccoor",
+    "portland general electric co or"
+  ],
+  "POWI": [
+    "powi",
+    "power",
+    "powerintegrations",
+    "power integrations",
+    "powerintegrationsinc"
+  ],
+  "PPBI": [
+    "ppbi"
+  ],
+  "PPC": [
+    "ppc",
+    "pilgrims",
+    "pilgrimspride",
+    "pilgrims pride",
+    "pilgrimspridecorp"
   ],
   "PPG": [
     "ppg",
@@ -2258,6 +6391,42 @@
     "ppl",
     "pplcorporation"
   ],
+  "PPS": [
+    "pps"
+  ],
+  "PR": [
+    "pr",
+    "permian",
+    "permianresources",
+    "permian resources",
+    "permianresourcescorp"
+  ],
+  "PRAH": [
+    "prah"
+  ],
+  "PRFT": [
+    "prft"
+  ],
+  "PRG": [
+    "prg",
+    "prog",
+    "progholdings",
+    "progholdingsinc"
+  ],
+  "PRGO": [
+    "prgo",
+    "perrigo",
+    "perrigocoplc"
+  ],
+  "PRKS": [
+    "prks",
+    "unitedparksandresorts",
+    "united parks and resorts",
+    "unitedparksandresortsinc"
+  ],
+  "PRSP": [
+    "prsp"
+  ],
   "PRU": [
     "pru",
     "prudential",
@@ -2265,11 +6434,37 @@
     "prudential financial",
     "prudentialfinancialinc"
   ],
+  "PRVA": [
+    "prva",
+    "privia",
+    "priviahealth",
+    "privia health",
+    "priviahealthgroup",
+    "priviahealthgroupinc"
+  ],
+  "PRXL": [
+    "prxl"
+  ],
   "PSA": [
     "psa",
     "public",
     "publicstorage",
     "public storage"
+  ],
+  "PSB": [
+    "psb"
+  ],
+  "PSN": [
+    "psn",
+    "parsons",
+    "parsonscorp"
+  ],
+  "PSTG": [
+    "pstg",
+    "pure",
+    "purestorage",
+    "pure storage",
+    "purestorageinc"
   ],
   "PSX": [
     "psx",
@@ -2280,6 +6475,28 @@
   "PTC": [
     "ptc",
     "ptcinc"
+  ],
+  "PTEN": [
+    "pten",
+    "patterson",
+    "pattersonutienergy",
+    "patterson uti energy",
+    "pattersonutienergyinc"
+  ],
+  "PTGX": [
+    "ptgx",
+    "protagonist",
+    "protagonisttherapeutics",
+    "protagonist therapeutics",
+    "protagonisttherapeuticsinc"
+  ],
+  "PVH": [
+    "pvh",
+    "pvhcorpde",
+    "pvh corp de"
+  ],
+  "PVTB": [
+    "pvtb"
   ],
   "PWR": [
     "pwr",
@@ -2297,15 +6514,87 @@
     "paypalholdings",
     "paypalholdingsinc"
   ],
+  "PZZA": [
+    "papa",
+    "pzza",
+    "papajohnsinternational",
+    "papa johns international",
+    "papajohnsinternationalinc"
+  ],
   "QCOM": [
     "qcom",
     "qualcomm",
     "qualcommincorporated"
   ],
+  "QCP": [
+    "qcp"
+  ],
+  "QDEL": [
+    "qdel",
+    "quidelortho",
+    "quidelorthocorp"
+  ],
+  "QEP": [
+    "qep"
+  ],
+  "QLYS": [
+    "qlys",
+    "qualys",
+    "qualysinc"
+  ],
+  "QORVO": [
+    "qorvo"
+  ],
   "QRVO": [
     "qrvo",
     "qorvo",
     "qorvoinc"
+  ],
+  "QURE": [
+    "qure",
+    "uniqure",
+    "uniqurenv",
+    "uniqure n v"
+  ],
+  "R": [
+    "r",
+    "ryder",
+    "rydersystem",
+    "ryder system",
+    "rydersysteminc"
+  ],
+  "RAL": [
+    "ral",
+    "ralliant",
+    "ralliantcorp"
+  ],
+  "RAMP": [
+    "ramp",
+    "liveramp",
+    "live ramp",
+    "liverampholdings",
+    "liverampholdingsinc"
+  ],
+  "RAVN": [
+    "ravn"
+  ],
+  "RAX": [
+    "rax"
+  ],
+  "RBA": [
+    "rba",
+    "rbglobal",
+    "rb global",
+    "rbglobalinc"
+  ],
+  "RBC": [
+    "rbc",
+    "rbcbearings",
+    "rbc bearings",
+    "rbcbearingsinc"
+  ],
+  "RCII": [
+    "rcii"
   ],
   "RCL": [
     "rcl",
@@ -2314,12 +6603,37 @@
     "royal caribbean cruises",
     "royalcaribbeancruisesltd"
   ],
+  "RCM": [
+    "rcm"
+  ],
+  "RCUS": [
+    "rcus",
+    "arcus",
+    "arcusbiosciences",
+    "arcus biosciences",
+    "arcusbiosciencesinc"
+  ],
+  "RDC": [
+    "rdc"
+  ],
+  "RDN": [
+    "rdn",
+    "radian",
+    "radiangroup",
+    "radiangroupinc"
+  ],
+  "RE": [
+    "re"
+  ],
   "REG": [
     "reg",
     "regency",
     "regencycenters",
     "regency centers",
     "regencycenterscorporation"
+  ],
+  "REGI": [
+    "regi"
   ],
   "REGN": [
     "regn",
@@ -2328,6 +6642,34 @@
     "regeneron pharmaceuticals",
     "regeneronpharmaceuticalsinc"
   ],
+  "REI": [
+    "rei",
+    "ring",
+    "ringenergy",
+    "ring energy",
+    "ringenergyinc"
+  ],
+  "REXR": [
+    "rexr",
+    "rexford",
+    "rexfordindustrialrealty",
+    "rexford industrial realty",
+    "rexfordindustrialrealtyinc"
+  ],
+  "REYN": [
+    "reyn",
+    "reynolds",
+    "reynoldsconsumerproducts",
+    "reynolds consumer products",
+    "reynoldsconsumerproductsinc"
+  ],
+  "REZI": [
+    "rezi",
+    "resideo",
+    "resideotechnologies",
+    "resideo technologies",
+    "resideotechnologiesinc"
+  ],
   "RF": [
     "rf",
     "regions",
@@ -2335,12 +6677,55 @@
     "regions financial",
     "regionsfinancialcorporation"
   ],
+  "RGEN": [
+    "rgen",
+    "repligen",
+    "repligencorp"
+  ],
+  "RGNX": [
+    "rgnx",
+    "regenxbio",
+    "regenxbioinc"
+  ],
+  "RGP": [
+    "rgp",
+    "resources",
+    "resourcesconnection",
+    "resources connection",
+    "resourcesconnectioninc"
+  ],
+  "RGS": [
+    "rgs",
+    "regis",
+    "regiscorp"
+  ],
+  "RH": [
+    "rh"
+  ],
   "RHI": [
     "rhi",
     "robert",
     "roberthalf",
     "robert half",
     "roberthalfinc"
+  ],
+  "RHP": [
+    "rhp",
+    "ryman",
+    "rymanhospitalityproperties",
+    "ryman hospitality properties",
+    "rymanhospitalitypropertiesinc"
+  ],
+  "RIG": [
+    "rig",
+    "transocean",
+    "transoceanltd"
+  ],
+  "RILY": [
+    "rily",
+    "brileyfinancial",
+    "b riley financial",
+    "brileyfinancialinc"
   ],
   "RJF": [
     "rjf",
@@ -2356,10 +6741,47 @@
     "ralph lauren",
     "ralphlaurencorporation"
   ],
+  "RLGY": [
+    "rlgy"
+  ],
+  "RLI": [
+    "rli",
+    "rlicorp"
+  ],
+  "RMAX": [
+    "rmax",
+    "remax",
+    "re max",
+    "remaxholdings",
+    "remaxholdingsinc"
+  ],
+  "RMBS": [
+    "rmbs",
+    "rambus",
+    "rambusinc"
+  ],
   "RMD": [
     "rmd",
     "resmed",
     "resmedinc"
+  ],
+  "RNST": [
+    "rnst",
+    "renasant",
+    "renasantcorp"
+  ],
+  "ROCC": [
+    "rocc"
+  ],
+  "ROIC": [
+    "roic"
+  ],
+  "ROIV": [
+    "roiv",
+    "roivant",
+    "roivantsciences",
+    "roivant sciences",
+    "roivantsciencesltd"
   ],
   "ROK": [
     "rok",
@@ -2387,6 +6809,43 @@
     "ross stores",
     "rossstoresinc"
   ],
+  "ROVI": [
+    "rovi"
+  ],
+  "RPAI": [
+    "rpai"
+  ],
+  "RPT": [
+    "rpt",
+    "rithm",
+    "rithmpropertytrust",
+    "rithm property trust",
+    "rithmpropertytrustinc"
+  ],
+  "RRC": [
+    "rrc",
+    "range",
+    "rangeresources",
+    "range resources",
+    "rangeresourcescorp"
+  ],
+  "RRD": [
+    "rrd"
+  ],
+  "RRGB": [
+    "red",
+    "rrgb",
+    "redrobingourmetburgers",
+    "red robin gourmet burgers",
+    "redrobingourmetburgersinc"
+  ],
+  "RRR": [
+    "red",
+    "rrr",
+    "redrockresorts",
+    "red rock resorts",
+    "redrockresortsinc"
+  ],
   "RSG": [
     "rsg",
     "republic",
@@ -2398,12 +6857,90 @@
     "rtx",
     "rtxcorporation"
   ],
+  "RUN": [
+    "run",
+    "sunrun",
+    "sunruninc"
+  ],
+  "RUSHA": [
+    "rush",
+    "rusha",
+    "rushenterprisesinctx",
+    "rush enterprises inc tx"
+  ],
+  "RUTH": [
+    "ruth"
+  ],
+  "RVBD": [
+    "rvbd"
+  ],
+  "RXO": [
+    "rxo",
+    "rxoinc"
+  ],
+  "RYAM": [
+    "ryam",
+    "rayonier",
+    "rayonieradvancedmaterials",
+    "rayonier advanced materials",
+    "rayonieradvancedmaterialsinc"
+  ],
+  "RYAN": [
+    "ryan",
+    "ryanspecialty",
+    "ryan specialty",
+    "ryanspecialtyholdings",
+    "ryanspecialtyholdingsinc"
+  ],
+  "SABR": [
+    "sabr",
+    "sabre",
+    "sabrecorp"
+  ],
+  "SABRE": [
+    "sabre"
+  ],
+  "SAFM": [
+    "safm"
+  ],
+  "SAIA": [
+    "saia",
+    "saiainc"
+  ],
+  "SAIL": [
+    "sail",
+    "sailpoint",
+    "sailpointinc"
+  ],
+  "SATS": [
+    "sats",
+    "echostar",
+    "echostarcorp"
+  ],
   "SBAC": [
     "sba",
     "sbac",
     "sbacommunications",
     "sba communications",
     "sbacommunicationscorporation"
+  ],
+  "SBH": [
+    "sbh",
+    "sally",
+    "sallybeauty",
+    "sally beauty",
+    "sallybeautyholdings",
+    "sallybeautyholdingsinc"
+  ],
+  "SBNY": [
+    "sbny"
+  ],
+  "SBRA": [
+    "sbra",
+    "sabra",
+    "sabrahealthcarereit",
+    "sabra health care reit",
+    "sabrahealthcarereitinc"
   ],
   "SBUX": [
     "sbux",
@@ -2419,6 +6956,16 @@
     "charlesschwabcorporation",
     "thecharlesschwabcorporation"
   ],
+  "SCOR": [
+    "scor",
+    "comscore",
+    "comscoreinc"
+  ],
+  "SDGR": [
+    "sdgr",
+    "schrodinger",
+    "schrodingerinc"
+  ],
   "SEDG": [
     "sedg",
     "solaredge",
@@ -2433,6 +6980,40 @@
     "sealed air",
     "sealedaircorporation"
   ],
+  "SENEA": [
+    "senea",
+    "seneca",
+    "senecafoods",
+    "seneca foods",
+    "senecafoodscorp"
+  ],
+  "SFG": [
+    "sfg"
+  ],
+  "SFM": [
+    "sfm",
+    "sprouts",
+    "sproutsfarmersmarket",
+    "sprouts farmers market",
+    "sproutsfarmersmarketinc"
+  ],
+  "SGMS": [
+    "sgms"
+  ],
+  "SHC": [
+    "shc",
+    "sotera",
+    "soterahealth",
+    "sotera health",
+    "soterahealthco"
+  ],
+  "SHO": [
+    "sho",
+    "sunstone",
+    "sunstonehotelinvestors",
+    "sunstone hotel investors",
+    "sunstonehotelinvestorsinc"
+  ],
   "SHW": [
     "shw",
     "sherwin",
@@ -2442,6 +7023,38 @@
     "sherwinwilliamscompany",
     "thesherwinwilliamscompany"
   ],
+  "SIG": [
+    "sig",
+    "signet",
+    "signetjewelers",
+    "signet jewelers",
+    "signetjewelersltd"
+  ],
+  "SIGI": [
+    "sigi",
+    "selective",
+    "selectiveinsurance",
+    "selective insurance",
+    "selectiveinsurancegroup",
+    "selectiveinsurancegroupinc"
+  ],
+  "SIRO": [
+    "siro"
+  ],
+  "SITM": [
+    "sitm",
+    "sitime",
+    "sitimecorp"
+  ],
+  "SIVB": [
+    "sivb"
+  ],
+  "SIX": [
+    "six"
+  ],
+  "SJI": [
+    "sji"
+  ],
   "SJM": [
     "sjm",
     "jmsmucker",
@@ -2450,10 +7063,85 @@
     "jmsmuckercompany",
     "thejmsmuckercompany"
   ],
+  "SJW": [
+    "sjw"
+  ],
+  "SKT": [
+    "skt",
+    "tanger",
+    "tangerinc"
+  ],
+  "SKX": [
+    "skx"
+  ],
+  "SKY": [
+    "sky",
+    "champion",
+    "championhomes",
+    "champion homes",
+    "championhomesinc"
+  ],
   "SLB": [
     "slb",
     "slbnv",
     "slb n v"
+  ],
+  "SLCA": [
+    "slca"
+  ],
+  "SLG": [
+    "slg",
+    "slgreenrealty",
+    "sl green realty",
+    "slgreenrealtycorp"
+  ],
+  "SLH": [
+    "slh"
+  ],
+  "SLP": [
+    "slp",
+    "simulations",
+    "simulationsplus",
+    "simulations plus",
+    "simulationsplusinc"
+  ],
+  "SLQT": [
+    "slqt",
+    "selectquote",
+    "selectquoteinc"
+  ],
+  "SLVM": [
+    "slvm",
+    "sylvamo",
+    "sylvamocorp"
+  ],
+  "SLXP": [
+    "slxp"
+  ],
+  "SM": [
+    "sm",
+    "smenergy",
+    "sm energy",
+    "smenergyco"
+  ],
+  "SMCI": [
+    "smci",
+    "super",
+    "supermicrocomputer",
+    "super micro computer",
+    "supermicrocomputerinc"
+  ],
+  "SMPL": [
+    "smpl",
+    "simply",
+    "simplygoodfoods",
+    "simply good foods",
+    "simplygoodfoodsco"
+  ],
+  "SMTC": [
+    "smtc",
+    "semtech",
+    "semtechcorp"
   ],
   "SNA": [
     "sna",
@@ -2462,10 +7150,45 @@
     "snap on",
     "snaponincorporated"
   ],
+  "SNBR": [
+    "snbr",
+    "sleep",
+    "sleepnumber",
+    "sleep number",
+    "sleepnumbercorp"
+  ],
+  "SNCY": [
+    "sun",
+    "sncy",
+    "suncountry",
+    "sun country",
+    "suncountryairlines",
+    "sun country airlines",
+    "suncountryairlinesholdings",
+    "suncountryairlinesholdingsinc"
+  ],
+  "SNDK": [
+    "sndk",
+    "sandisk",
+    "sandiskcorp"
+  ],
+  "SNDR": [
+    "sndr",
+    "schneider",
+    "schneidernational",
+    "schneider national",
+    "schneidernationalinc"
+  ],
   "SNPS": [
     "snps",
     "synopsys",
     "synopsysinc"
+  ],
+  "SNX": [
+    "snx",
+    "tdsynnex",
+    "td synnex",
+    "tdsynnexcorp"
   ],
   "SO": [
     "so",
@@ -2473,6 +7196,14 @@
     "thesouthern",
     "southerncompany",
     "thesoutherncompany"
+  ],
+  "SONO": [
+    "sono",
+    "sonos",
+    "sonosinc"
+  ],
+  "SONOS": [
+    "sonos"
   ],
   "SPG": [
     "spg",
@@ -2488,14 +7219,110 @@
     "s and p global",
     "sandpglobalinc"
   ],
+  "SPN": [
+    "spn"
+  ],
+  "SPOK": [
+    "spok",
+    "spokholdings",
+    "spokholdingsinc"
+  ],
+  "SPPI": [
+    "sppi"
+  ],
+  "SPTN": [
+    "sptn"
+  ],
+  "SPWR": [
+    "spwr",
+    "sunpower",
+    "sunpowerinc"
+  ],
+  "SRC": [
+    "src"
+  ],
+  "SRCL": [
+    "srcl"
+  ],
+  "SRDX": [
+    "srdx",
+    "surmodics",
+    "surmodicsinc"
+  ],
   "SRE": [
     "sre",
     "sempra"
+  ],
+  "SRPT": [
+    "srpt",
+    "sarepta",
+    "sareptatherapeutics",
+    "sarepta therapeutics",
+    "sareptatherapeuticsinc"
+  ],
+  "SSB": [
+    "ssb",
+    "southstate",
+    "southstatebank",
+    "southstate bank",
+    "southstatebankcorp"
+  ],
+  "SSD": [
+    "ssd",
+    "simpson",
+    "simpsonmanufacturing",
+    "simpson manufacturing",
+    "simpsonmanufacturingcoinc"
+  ],
+  "SSP": [
+    "ssp",
+    "ewscripps",
+    "e w scripps",
+    "ewscrippsco"
+  ],
+  "ST": [
+    "st",
+    "sensata",
+    "sensatatechnologiesholding",
+    "sensata technologies holding",
+    "sensatatechnologiesholdingplc"
+  ],
+  "STAA": [
+    "staa",
+    "staar",
+    "staarsurgical",
+    "staar surgical",
+    "staarsurgicalco"
+  ],
+  "STAG": [
+    "stag",
+    "stagindustrial",
+    "stag industrial",
+    "stagindustrialinc"
+  ],
+  "STAR": [
+    "star"
   ],
   "STE": [
     "ste",
     "steris",
     "sterisplc"
+  ],
+  "STEL": [
+    "stel",
+    "stellar",
+    "stellarbancorp",
+    "stellar bancorp",
+    "stellarbancorpinc"
+  ],
+  "STEP": [
+    "step",
+    "stepstone",
+    "stepstonegroup",
+    "stepstonegroupinc"
+  ],
+  "STL": [
+    "stl"
   ],
   "STLD": [
     "stld",
@@ -2504,12 +7331,42 @@
     "steel dynamics",
     "steeldynamicsinc"
   ],
+  "STMP": [
+    "stmp"
+  ],
+  "STOR": [
+    "stor"
+  ],
+  "STR": [
+    "str"
+  ],
+  "STRA": [
+    "stra",
+    "strategic",
+    "strategiceducation",
+    "strategic education",
+    "strategiceducationinc"
+  ],
+  "STRL": [
+    "strl",
+    "sterling",
+    "sterlinginfrastructure",
+    "sterling infrastructure",
+    "sterlinginfrastructureinc"
+  ],
   "STT": [
     "stt",
     "state",
     "statestreet",
     "state street",
     "statestreetcorporation"
+  ],
+  "STWD": [
+    "stwd",
+    "starwood",
+    "starwoodpropertytrust",
+    "starwood property trust",
+    "starwoodpropertytrustinc"
   ],
   "STX": [
     "stx",
@@ -2526,6 +7383,28 @@
     "constellation brands",
     "constellationbrandsinc"
   ],
+  "SUNE": [
+    "sune",
+    "sunation",
+    "sunationenergy",
+    "sunation energy",
+    "sunationenergyinc"
+  ],
+  "SVC": [
+    "svc",
+    "service",
+    "servicepropertiestrust",
+    "service properties trust"
+  ],
+  "SVU": [
+    "svu"
+  ],
+  "SWAV": [
+    "swav"
+  ],
+  "SWI": [
+    "swi"
+  ],
   "SWK": [
     "swk",
     "stanley",
@@ -2540,6 +7419,24 @@
     "skyworks solutions",
     "skyworkssolutionsinc"
   ],
+  "SWN": [
+    "swn"
+  ],
+  "SWX": [
+    "swx",
+    "southwest",
+    "southwestgas",
+    "southwest gas",
+    "southwestgasholdings",
+    "southwestgasholdingsinc"
+  ],
+  "SXT": [
+    "sxt",
+    "sensient",
+    "sensienttechnologies",
+    "sensient technologies",
+    "sensienttechnologiescorp"
+  ],
   "SYF": [
     "syf",
     "synchrony",
@@ -2550,6 +7447,12 @@
     "syk",
     "stryker",
     "strykercorporation"
+  ],
+  "SYKE": [
+    "syke"
+  ],
+  "SYNH": [
+    "synh"
   ],
   "SYY": [
     "syy",
@@ -2571,11 +7474,57 @@
     "molson coors beverage",
     "molsoncoorsbeveragecompany"
   ],
+  "TBBK": [
+    "tbbk",
+    "bancorp",
+    "bancorpinc"
+  ],
+  "TBI": [
+    "tbi",
+    "trueblue",
+    "trueblueinc"
+  ],
+  "TCBI": [
+    "tcbi",
+    "texas",
+    "texascapitalbancsharesinctx",
+    "texas capital bancshares inc tx"
+  ],
+  "TCF": [
+    "tcf"
+  ],
+  "TCMD": [
+    "tcmd",
+    "tactile",
+    "tactilesystemstechnology",
+    "tactile systems technology",
+    "tactilesystemstechnologyinc"
+  ],
+  "TCO": [
+    "tco"
+  ],
+  "TDC": [
+    "tdc",
+    "teradata",
+    "teradatacorpde",
+    "teradata corp de"
+  ],
   "TDG": [
     "tdg",
     "transdigm",
     "transdigmgroup",
     "transdigmgroupincorporated"
+  ],
+  "TDS": [
+    "tds",
+    "telephone",
+    "telephoneanddatasystemsincde",
+    "telephone and data systems inc de"
+  ],
+  "TDW": [
+    "tdw",
+    "tidewater",
+    "tidewaterinc"
   ],
   "TDY": [
     "tdy",
@@ -2583,6 +7532,9 @@
     "teledynetechnologies",
     "teledyne technologies",
     "teledynetechnologiesincorporated"
+  ],
+  "TECD": [
+    "tecd"
   ],
   "TECH": [
     "bio",
@@ -2614,10 +7566,63 @@
     "teleflex",
     "teleflexincorporated"
   ],
+  "TG": [
+    "tg",
+    "tredegar",
+    "tredegarcorp"
+  ],
+  "TGI": [
+    "tgi"
+  ],
+  "TGNA": [
+    "tgna",
+    "tegna",
+    "tegnainc"
+  ],
   "TGT": [
     "tgt",
     "target",
     "targetcorporation"
+  ],
+  "TGTX": [
+    "tgtx",
+    "tgtherapeutics",
+    "tg therapeutics",
+    "tgtherapeuticsinc"
+  ],
+  "THC": [
+    "thc",
+    "tenet",
+    "tenethealthcare",
+    "tenet healthcare",
+    "tenethealthcarecorp"
+  ],
+  "THRY": [
+    "thry",
+    "thryv",
+    "thryvholdings",
+    "thryvholdingsinc"
+  ],
+  "THRYV": [
+    "thryv"
+  ],
+  "THS": [
+    "ths",
+    "treehouse",
+    "treehousefoods",
+    "treehouse foods",
+    "treehousefoodsinc"
+  ],
+  "TIME": [
+    "time"
+  ],
+  "TISI": [
+    "team",
+    "tisi",
+    "teaminc"
+  ],
+  "TIVO": [
+    "tivo"
   ],
   "TJX": [
     "tjx",
@@ -2627,6 +7632,34 @@
     "tjxcompaniesinc",
     "thetjxcompaniesinc"
   ],
+  "TKO": [
+    "tko",
+    "tkogroupholdings",
+    "tkogroupholdingsinc"
+  ],
+  "TLN": [
+    "tln",
+    "talen",
+    "talenenergy",
+    "talen energy",
+    "talenenergycorp"
+  ],
+  "TLRD": [
+    "tlrd"
+  ],
+  "TMDX": [
+    "tmdx",
+    "transmedics",
+    "transmedicsgroup",
+    "transmedicsgroupinc"
+  ],
+  "TMHC": [
+    "tmhc",
+    "taylor",
+    "taylormorrisonhome",
+    "taylor morrison home",
+    "taylormorrisonhomecorp"
+  ],
   "TMO": [
     "tmo",
     "thermo",
@@ -2634,21 +7667,95 @@
     "thermo fisher scientific",
     "thermofisherscientificinc"
   ],
+  "TMST": [
+    "tmst"
+  ],
   "TMUS": [
     "tmus",
     "tmobileus",
     "t mobile us",
     "tmobileusinc"
   ],
+  "TNDM": [
+    "tndm",
+    "tandem",
+    "tandemdiabetescare",
+    "tandem diabetes care",
+    "tandemdiabetescareinc"
+  ],
+  "TPH": [
+    "tph",
+    "tri",
+    "tripointehomes",
+    "tri pointe homes",
+    "tripointehomesinc"
+  ],
+  "TPL": [
+    "tpl",
+    "texas",
+    "texaspacificland",
+    "texas pacific land",
+    "texaspacificlandcorp"
+  ],
   "TPR": [
     "tpr",
     "tapestry",
     "tapestryinc"
   ],
+  "TR": [
+    "tr",
+    "tootsie",
+    "tootsierollindustries",
+    "tootsie roll industries",
+    "tootsierollindustriesinc"
+  ],
+  "TREE": [
+    "tree",
+    "lendingtree",
+    "lendingtreeinc"
+  ],
+  "TREX": [
+    "trex",
+    "trexcoinc"
+  ],
+  "TRGP": [
+    "trgp",
+    "targa",
+    "targaresources",
+    "targa resources",
+    "targaresourcescorp"
+  ],
+  "TRHC": [
+    "trhc"
+  ],
+  "TRIP": [
+    "trip",
+    "tripadvisor",
+    "tripadvisorinc"
+  ],
   "TRMB": [
     "trmb",
     "trimble",
     "trimbleinc"
+  ],
+  "TRMK": [
+    "trmk",
+    "trustmark",
+    "trustmarkcorp"
+  ],
+  "TRN": [
+    "trn",
+    "trinity",
+    "trinityindustries",
+    "trinity industries",
+    "trinityindustriesinc"
+  ],
+  "TRNO": [
+    "trno",
+    "terreno",
+    "terrenorealty",
+    "terreno realty",
+    "terrenorealtycorp"
   ],
   "TROW": [
     "trow",
@@ -2656,6 +7763,11 @@
     "t rowe price",
     "trowepricegroup",
     "trowepricegroupinc"
+  ],
+  "TRUP": [
+    "trup",
+    "trupanion",
+    "trupanioninc"
   ],
   "TRV": [
     "trv",
@@ -2672,6 +7784,11 @@
     "tractorsupply",
     "tractor supply",
     "tractorsupplycompany"
+  ],
+  "TSE": [
+    "tse",
+    "trinseo",
+    "trinseoplc"
   ],
   "TSLA": [
     "tsla",
@@ -2692,6 +7809,25 @@
     "trane technologies",
     "tranetechnologiesplc"
   ],
+  "TTEC": [
+    "ttec",
+    "ttecholdings",
+    "ttecholdingsinc"
+  ],
+  "TTEK": [
+    "ttek",
+    "tetra",
+    "tetratech",
+    "tetra tech",
+    "tetratechinc"
+  ],
+  "TTI": [
+    "tti",
+    "tetra",
+    "tetratechnologies",
+    "tetra technologies",
+    "tetratechnologiesinc"
+  ],
   "TTWO": [
     "take",
     "ttwo",
@@ -2699,12 +7835,46 @@
     "take two interactive software",
     "taketwointeractivesoftwareinc"
   ],
+  "TUP": [
+    "tup"
+  ],
+  "TVTY": [
+    "tvty"
+  ],
+  "TW": [
+    "tw",
+    "tradeweb",
+    "tradewebmarkets",
+    "tradeweb markets",
+    "tradewebmarketsinc"
+  ],
+  "TWLO": [
+    "twlo",
+    "twilio",
+    "twilioinc"
+  ],
+  "TWNK": [
+    "twnk"
+  ],
+  "TWO": [
+    "two",
+    "twoharborsinvestment",
+    "two harbors investment",
+    "twoharborsinvestmentcorp"
+  ],
   "TXN": [
     "txn",
     "texas",
     "texasinstruments",
     "texas instruments",
     "texasinstrumentsincorporated"
+  ],
+  "TXRH": [
+    "txrh",
+    "texas",
+    "texasroadhouse",
+    "texas roadhouse",
+    "texasroadhouseinc"
   ],
   "TXT": [
     "txt",
@@ -2726,22 +7896,90 @@
     "unitedairlinesholdings",
     "unitedairlinesholdingsinc"
   ],
+  "UBA": [
+    "uba"
+  ],
+  "UBSI": [
+    "ubsi",
+    "unitedbanksharesincwv",
+    "united bankshares inc wv"
+  ],
   "UDR": [
     "udr",
     "udrinc"
   ],
+  "UE": [
+    "ue",
+    "urban",
+    "urbanedgeproperties",
+    "urban edge properties"
+  ],
+  "UEIC": [
+    "ueic",
+    "universalelectronics",
+    "universal electronics",
+    "universalelectronicsinc"
+  ],
+  "UFI": [
+    "ufi",
+    "unifi",
+    "unifiinc"
+  ],
+  "UFPI": [
+    "ufp",
+    "ufpi",
+    "ufpindustries",
+    "ufp industries",
+    "ufpindustriesinc"
+  ],
+  "UFPT": [
+    "ufp",
+    "ufpt",
+    "ufptechnologies",
+    "ufp technologies",
+    "ufptechnologiesinc"
+  ],
+  "UFS": [
+    "ufs"
+  ],
   "UHS": [
     "uhs",
-    "universal",
     "universalhealthservices",
     "universal health services",
     "universalhealthservicesinc"
+  ],
+  "UIHC": [
+    "uihc"
+  ],
+  "UIS": [
+    "uis",
+    "unisys",
+    "unisyscorp"
   ],
   "ULTA": [
     "ulta",
     "ultabeauty",
     "ulta beauty",
     "ultabeautyinc"
+  ],
+  "ULTI": [
+    "ulti"
+  ],
+  "UMBF": [
+    "umb",
+    "umbf",
+    "umbfinancial",
+    "umb financial",
+    "umbfinancialcorp"
+  ],
+  "UMPQ": [
+    "umpq"
+  ],
+  "UNFI": [
+    "unfi",
+    "unitednaturalfoods",
+    "united natural foods",
+    "unitednaturalfoodsinc"
   ],
   "UNH": [
     "unh",
@@ -2750,6 +7988,20 @@
     "unitedhealthgroup",
     "unitedhealthgroupincorporated"
   ],
+  "UNIFI": [
+    "unifi"
+  ],
+  "UNIT": [
+    "unit",
+    "uniti",
+    "unitigroup",
+    "unitigroupinc"
+  ],
+  "UNM": [
+    "unm",
+    "unum",
+    "unumgroup"
+  ],
   "UNP": [
     "unp",
     "union",
@@ -2757,16 +8009,30 @@
     "union pacific",
     "unionpacificcorporation"
   ],
+  "UNT": [
+    "unt"
+  ],
+  "UNUM": [
+    "unum"
+  ],
+  "UNVR": [
+    "unvr"
+  ],
   "UPS": [
     "ups",
-    "united",
     "unitedparcelservice",
     "united parcel service",
     "unitedparcelserviceinc"
   ],
+  "URBN": [
+    "urbn",
+    "urban",
+    "urbanoutfitters",
+    "urban outfitters",
+    "urbanoutfittersinc"
+  ],
   "URI": [
     "uri",
-    "united",
     "unitedrentals",
     "united rentals",
     "unitedrentalsinc"
@@ -2776,10 +8042,75 @@
     "usbancorp",
     "u s bancorp"
   ],
+  "USCR": [
+    "uscr"
+  ],
+  "USFD": [
+    "usfd",
+    "usfoodsholding",
+    "us foods holding",
+    "usfoodsholdingcorp"
+  ],
+  "USNA": [
+    "usna",
+    "usana",
+    "usanahealthsciences",
+    "usana health sciences",
+    "usanahealthsciencesinc"
+  ],
+  "UTL": [
+    "utl",
+    "unitil",
+    "unitilcorp"
+  ],
+  "UVE": [
+    "uve",
+    "universal",
+    "universalinsurance",
+    "universal insurance",
+    "universalinsuranceholdings",
+    "universalinsuranceholdingsinc"
+  ],
   "V": [
     "v",
     "visa",
     "visainc"
+  ],
+  "VAC": [
+    "vac",
+    "marriott",
+    "marriottvacationsworldwide",
+    "marriott vacations worldwide",
+    "marriottvacationsworldwidecorp"
+  ],
+  "VAL": [
+    "val",
+    "valaris",
+    "valarisltd"
+  ],
+  "VBTX": [
+    "vbtx",
+    "veritex",
+    "veritexholdings",
+    "veritexholdingsinc"
+  ],
+  "VCEL": [
+    "vcel",
+    "vericel",
+    "vericelcorp"
+  ],
+  "VCTR": [
+    "vctr",
+    "victory",
+    "victorycapital",
+    "victory capital",
+    "victorycapitalholdings",
+    "victorycapitalholdingsinc"
+  ],
+  "VCYT": [
+    "vcyt",
+    "veracyte",
+    "veracyteinc"
   ],
   "VFC": [
     "vf",
@@ -2787,11 +8118,45 @@
     "vfc",
     "vfcorporation"
   ],
+  "VG": [
+    "vg",
+    "venture",
+    "ventureglobal",
+    "venture global",
+    "ventureglobalinc"
+  ],
+  "VGR": [
+    "vgr"
+  ],
   "VICI": [
     "vici",
     "viciproperties",
     "vici properties",
     "vicipropertiesinc"
+  ],
+  "VICOR": [
+    "vicor"
+  ],
+  "VICR": [
+    "vicr",
+    "vicor",
+    "vicorcorp"
+  ],
+  "VIR": [
+    "vir",
+    "virbiotechnology",
+    "vir biotechnology",
+    "virbiotechnologyinc"
+  ],
+  "VIRT": [
+    "virt",
+    "virtu",
+    "virtufinancial",
+    "virtu financial",
+    "virtufinancialinc"
+  ],
+  "VIVO": [
+    "vivo"
   ],
   "VLO": [
     "vlo",
@@ -2807,6 +8172,58 @@
     "vulcan materials",
     "vulcanmaterialscompany"
   ],
+  "VNDA": [
+    "vnda",
+    "vanda",
+    "vandapharmaceuticals",
+    "vanda pharmaceuticals",
+    "vandapharmaceuticalsinc"
+  ],
+  "VNO": [
+    "vno",
+    "vornado",
+    "vornadorealtytrust",
+    "vornado realty trust"
+  ],
+  "VNOM": [
+    "vnom",
+    "viper",
+    "viperenergy",
+    "viper energy",
+    "viperenergyinc"
+  ],
+  "VNT": [
+    "vnt",
+    "vontier",
+    "vontiercorp"
+  ],
+  "VOYA": [
+    "voya",
+    "voyafinancial",
+    "voya financial",
+    "voyafinancialinc"
+  ],
+  "VRA": [
+    "vra",
+    "vera",
+    "verabradley",
+    "vera bradley",
+    "verabradleyinc"
+  ],
+  "VREX": [
+    "vrex",
+    "varex",
+    "vareximaging",
+    "varex imaging",
+    "vareximagingcorp"
+  ],
+  "VRRM": [
+    "vrrm",
+    "verra",
+    "verramobility",
+    "verra mobility",
+    "verramobilitycorp"
+  ],
   "VRSK": [
     "vrsk",
     "verisk",
@@ -2819,6 +8236,12 @@
     "verisign",
     "verisigninc"
   ],
+  "VRTU": [
+    "vrtu"
+  ],
+  "VRTV": [
+    "vrtv"
+  ],
   "VRTX": [
     "vrtx",
     "vertex",
@@ -2826,10 +8249,63 @@
     "vertex pharmaceuticals",
     "vertexpharmaceuticalsincorporated"
   ],
+  "VSAT": [
+    "vsat",
+    "viasat",
+    "viasatinc"
+  ],
+  "VSCO": [
+    "vsco",
+    "victoria",
+    "victoriassecretand",
+    "victoriassecretandco",
+    "victoria s secret and"
+  ],
+  "VSH": [
+    "vsh",
+    "vishay",
+    "vishayintertechnology",
+    "vishay intertechnology",
+    "vishayintertechnologyinc"
+  ],
+  "VSI": [
+    "vsi"
+  ],
+  "VSM": [
+    "vsm"
+  ],
+  "VST": [
+    "vst",
+    "vistra",
+    "vistracorp"
+  ],
+  "VSTO": [
+    "vsto"
+  ],
+  "VSTS": [
+    "vsts",
+    "vestis",
+    "vestiscorp"
+  ],
   "VTR": [
     "vtr",
     "ventas",
     "ventasinc"
+  ],
+  "VVC": [
+    "vvc"
+  ],
+  "VVV": [
+    "vvv",
+    "valvoline",
+    "valvolineinc"
+  ],
+  "VYX": [
+    "ncr",
+    "vyx",
+    "ncrvoyix",
+    "ncr voyix",
+    "ncrvoyixcorp"
   ],
   "VZ": [
     "vz",
@@ -2844,6 +8320,16 @@
     "westinghouseairbraketechnologies",
     "westinghouse air brake technologies",
     "westinghouseairbraketechnologiescorporation"
+  ],
+  "WAFD": [
+    "wafd",
+    "wafdinc"
+  ],
+  "WAL": [
+    "wal",
+    "western",
+    "westernalliancebancorporation",
+    "western alliance bancorporation"
   ],
   "WAT": [
     "wat",
@@ -2864,12 +8350,38 @@
     "warner bros discovery",
     "warnerbrosdiscoveryinc"
   ],
+  "WBMD": [
+    "wbmd"
+  ],
+  "WCC": [
+    "wcc",
+    "wesco",
+    "wescointernational",
+    "wesco international",
+    "wescointernationalinc"
+  ],
+  "WCG": [
+    "wcg"
+  ],
+  "WCN": [
+    "wcn",
+    "waste",
+    "wasteconnections",
+    "waste connections",
+    "wasteconnectionsinc"
+  ],
   "WDC": [
     "wdc",
     "western",
     "westerndigital",
     "western digital",
     "westerndigitalcorporation"
+  ],
+  "WDR": [
+    "wdr"
+  ],
+  "WEBMD": [
+    "webmd"
   ],
   "WEC": [
     "wec",
@@ -2883,12 +8395,66 @@
     "welltower",
     "welltowerinc"
   ],
+  "WERN": [
+    "wern",
+    "werner",
+    "wernerenterprises",
+    "werner enterprises",
+    "wernerenterprisesinc"
+  ],
+  "WETF": [
+    "wetf"
+  ],
   "WFC": [
     "wfc",
     "wells",
     "wellsfargoand",
     "wells fargo and",
     "wellsfargoandcompany"
+  ],
+  "WFRD": [
+    "wfrd",
+    "weatherford",
+    "weatherfordinternational",
+    "weatherford international",
+    "weatherfordinternationalplc"
+  ],
+  "WHD": [
+    "whd",
+    "cactus",
+    "cactusinc"
+  ],
+  "WHR": [
+    "whr",
+    "whirlpool",
+    "whirlpoolcorpde",
+    "whirlpool corp de"
+  ],
+  "WIN": [
+    "win"
+  ],
+  "WING": [
+    "wing",
+    "wingstop",
+    "wingstopinc"
+  ],
+  "WIRE": [
+    "wire"
+  ],
+  "WLH": [
+    "wlh"
+  ],
+  "WLK": [
+    "wlk",
+    "westlake",
+    "westlakecorp"
+  ],
+  "WLY": [
+    "wly",
+    "john",
+    "johnwileyandsons",
+    "john wiley and sons",
+    "johnwileyandsonsinc"
   ],
   "WM": [
     "wm",
@@ -2906,10 +8472,66 @@
     "williamscompaniesinc",
     "thewilliamscompaniesinc"
   ],
+  "WMG": [
+    "wmg",
+    "warner",
+    "warnermusic",
+    "warner music",
+    "warnermusicgroup",
+    "warnermusicgroupcorp"
+  ],
+  "WMS": [
+    "wms",
+    "advanced",
+    "advanceddrainagesystems",
+    "advanced drainage systems",
+    "advanceddrainagesystemsinc"
+  ],
   "WMT": [
     "wmt",
     "walmart",
     "walmartinc"
+  ],
+  "WNC": [
+    "wnc",
+    "wabash",
+    "wabashnational",
+    "wabash national",
+    "wabashnationalcorp"
+  ],
+  "WNR": [
+    "wnr"
+  ],
+  "WOLF": [
+    "wolf",
+    "wolfspeed",
+    "wolfspeedinc"
+  ],
+  "WOOF": [
+    "woof",
+    "petco",
+    "petcohealthandwellness",
+    "petco health and wellness",
+    "petcohealthandwellnesscompanyinc"
+  ],
+  "WOR": [
+    "wor",
+    "worthington",
+    "worthingtonenterprises",
+    "worthington enterprises",
+    "worthingtonenterprisesinc"
+  ],
+  "WPC": [
+    "wpc",
+    "wpcarey",
+    "w p carey",
+    "wpcareyinc"
+  ],
+  "WPG": [
+    "wpg"
+  ],
+  "WPX": [
+    "wpx"
   ],
   "WRB": [
     "wrb",
@@ -2917,18 +8539,104 @@
     "w r berkley",
     "wrberkleycorporation"
   ],
+  "WRI": [
+    "wri"
+  ],
   "WRK": [
     "wrk"
+  ],
+  "WS": [
+    "ws",
+    "worthington",
+    "worthingtonsteel",
+    "worthington steel",
+    "worthingtonsteelinc"
+  ],
+  "WSC": [
+    "wsc",
+    "willscot",
+    "will scot",
+    "willscotholdings",
+    "willscotholdingscorp"
+  ],
+  "WSFS": [
+    "wsfs",
+    "wsfsfinancial",
+    "wsfs financial",
+    "wsfsfinancialcorp"
+  ],
+  "WSM": [
+    "wsm",
+    "williams",
+    "williamssonoma",
+    "williams sonoma",
+    "williamssonomainc"
+  ],
+  "WST": [
+    "wst",
+    "west",
+    "westpharmaceuticalservices",
+    "west pharmaceutical services",
+    "westpharmaceuticalservicesinc"
+  ],
+  "WTFC": [
+    "wtfc",
+    "wintrust",
+    "wintrustfinancial",
+    "wintrust financial",
+    "wintrustfinancialcorp"
+  ],
+  "WTS": [
+    "wts",
+    "watts",
+    "wattswatertechnologies",
+    "watts water technologies",
+    "wattswatertechnologiesinc"
+  ],
+  "WTW": [
+    "wtw",
+    "willis",
+    "willistowerswatson",
+    "willis towers watson",
+    "willistowerswatsonplc"
+  ],
+  "WU": [
+    "wu",
+    "western",
+    "westernunion",
+    "western union",
+    "westernunionco"
+  ],
+  "WW": [
+    "ww",
+    "wwinternational",
+    "ww international",
+    "wwinternationalinc"
+  ],
+  "WWAV": [
+    "wwav"
+  ],
+  "WWE": [
+    "wwe"
   ],
   "WY": [
     "wy",
     "weyerhaeuser",
     "weyerhaeusercompany"
   ],
+  "WYND": [
+    "wynd"
+  ],
   "WYNN": [
     "wynn",
     "wynnresortslimited",
     "wynn resorts limited"
+  ],
+  "X": [
+    "x"
+  ],
+  "XEC": [
+    "xec"
   ],
   "XEL": [
     "xel",
@@ -2937,12 +8645,34 @@
     "xcel energy",
     "xcelenergyinc"
   ],
+  "XEROX": [
+    "xerox"
+  ],
+  "XLS": [
+    "xls"
+  ],
   "XOM": [
     "xom",
     "exxon",
     "exxonmobil",
     "exxon mobil",
     "exxonmobilcorporation"
+  ],
+  "XPEL": [
+    "xpel",
+    "xpelinc"
+  ],
+  "XPER": [
+    "xper",
+    "xperi",
+    "xperiinc"
+  ],
+  "XPERI": [
+    "xperi"
+  ],
+  "XPO": [
+    "xpo",
+    "xpoinc"
   ],
   "XRAY": [
     "xray",
@@ -2951,10 +8681,35 @@
     "dentsply sirona",
     "dentsplysironainc"
   ],
+  "XRX": [
+    "xrx",
+    "xerox",
+    "xeroxholdings",
+    "xeroxholdingscorp"
+  ],
   "XYL": [
     "xyl",
     "xylem",
     "xyleminc"
+  ],
+  "Y": [
+    "y"
+  ],
+  "YELP": [
+    "yelp",
+    "yelpinc"
+  ],
+  "YETI": [
+    "yeti",
+    "yetiholdings",
+    "yetiholdingsinc"
+  ],
+  "YOU": [
+    "you",
+    "clear",
+    "clearsecure",
+    "clear secure",
+    "clearsecureinc"
   ],
   "YUM": [
     "yum",
@@ -2977,6 +8732,28 @@
     "zebra technologies",
     "zebratechnologiescorporation"
   ],
+  "ZD": [
+    "zd",
+    "ziff",
+    "ziffdavis",
+    "ziff davis",
+    "ziffdavisinc"
+  ],
+  "ZEUS": [
+    "zeus",
+    "olympic",
+    "olympicsteel",
+    "olympic steel",
+    "olympicsteelinc"
+  ],
+  "ZI": [
+    "zi"
+  ],
+  "ZIMV": [
+    "zimv",
+    "zimvie",
+    "zimvieinc"
+  ],
   "ZION": [
     "zion",
     "zions",
@@ -2987,5 +8764,25 @@
     "zts",
     "zoetis",
     "zoetisinc"
+  ],
+  "ZUMZ": [
+    "zumz",
+    "zumiez",
+    "zumiezinc"
+  ],
+  "ZWS": [
+    "zws",
+    "zurn",
+    "zurnelkaywatersolutions",
+    "zurn elkay water solutions",
+    "zurnelkaywatersolutionscorp"
+  ],
+  "ZYNEX": [
+    "zynex"
+  ],
+  "ZYXI": [
+    "zyxi",
+    "zynex",
+    "zynexinc"
   ]
 }

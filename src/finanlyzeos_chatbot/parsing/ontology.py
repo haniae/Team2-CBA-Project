@@ -31,6 +31,7 @@ METRIC_SYNONYMS: Dict[str, str] = {
     
     # Profitability
     "net income": "net_income",
+    "netincome": "net_income",
     "net profit": "net_income",
     "profit": "net_income",
     "earnings": "net_income",
@@ -70,6 +71,7 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "profit margins": "net_margin",
     "profitability margin": "net_margin",
     "margins": "net_margin",
+    "margin": "net_margin",
     "operating margins": "operating_margin",
     "gross margins": "gross_margin",
     
@@ -117,7 +119,10 @@ METRIC_SYNONYMS: Dict[str, str] = {
     # Valuation
     "pe": "pe_ratio",
     "p/e": "pe_ratio",
+    "p e": "pe_ratio",
+    "P E": "pe_ratio",
     "price to earnings": "pe_ratio",
+    "price/earnings": "pe_ratio",  # Slash variation
     "pe ratio": "pe_ratio",
     "price earnings": "pe_ratio",
     # NEW: P/E natural language
@@ -158,6 +163,7 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "market value": "market_cap",
     "market capitalization": "market_cap",
     "market cap": "market_cap",
+    "marketcap": "market_cap",
     
     # Shareholder returns
     "dividend yield": "dividend_yield",
@@ -197,11 +203,139 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "debt": "debt_equity",
     "debt level": "debt_equity",
     "how much debt": "debt_equity",
-    "leverage": "debt_equity",
-    "debt burden": "debt_equity",
-    "financial leverage": "debt_equity",
     "debt to equity": "debt_equity",
-    "debt equity": "debt_equity",
+    "debt equity ratio": "debt_equity",
+    "leverage": "debt_equity",
+    "leverage ratio": "debt_equity",
+    "financial leverage": "debt_equity",
+    "gearing": "debt_equity",
+    "gearing ratio": "debt_equity",
+    
+    # NEW: Credit and solvency metrics
+    "credit rating": "credit_rating",
+    "credit score": "credit_rating",
+    "bond rating": "credit_rating",
+    "default risk": "credit_rating",
+    "solvency": "debt_equity",
+    "solvency ratio": "debt_equity",
+    "interest coverage": "interest_coverage",
+    "times interest earned": "interest_coverage",
+    "debt service coverage": "interest_coverage",
+    
+    # NEW: Liquidity metrics
+    "current ratio": "current_ratio",
+    "currentratio": "current_ratio",
+    "working capital": "working_capital",
+    "workingcapital": "working_capital",
+    "wc": "working_capital",
+    "quick ratio": "quick_ratio",
+    "quickratio": "quick_ratio",
+    "acid test": "quick_ratio",
+    "liquidity": "current_ratio",
+    "liquidity ratio": "current_ratio",
+    "cash position": "cash",
+    "cash reserves": "cash",
+    "cash on hand": "cash",
+    
+    # NEW: Capital structure metrics
+    "capital structure": "debt_equity",
+    "equity structure": "equity",
+    "share capital": "equity",
+    "outstanding shares": "shares_outstanding",
+    "shares outstanding": "shares_outstanding",
+    "authorized shares": "shares_outstanding",
+    "share buyback": "share_buyback_intensity",
+    "stock buyback": "share_buyback_intensity",
+    "share repurchase": "share_buyback_intensity",
+    "buyback program": "share_buyback_intensity",
+    "capital allocation": "share_buyback_intensity",
+    "capital expenditure": "capex",
+    "capex": "capex",
+    "capital spending": "capex",
+    "investments": "capex",
+    
+    # NEW: Operating metrics
+    "operating cash flow": "cash_operations",
+    "OCF": "cash_operations",
+    "cash from operations": "cash_operations",
+    "operating expenses": "operating_expenses",
+    "opex": "operating_expenses",
+    "operating costs": "operating_expenses",
+    "R&D": "rd_expenses",
+    "research and development": "rd_expenses",
+    "R&D expenses": "rd_expenses",
+    "research expenses": "rd_expenses",
+    "development expenses": "rd_expenses",
+    
+    # NEW: Efficiency metrics
+    "asset turnover": "asset_turnover",
+    "assetturnover": "asset_turnover",
+    "inventory turnover": "inventory_turnover",
+    "inventoryturnover": "inventory_turnover",
+    "receivables turnover": "receivables_turnover",
+    "days sales outstanding": "dsi",
+    "DSO": "dsi",
+    "days inventory": "dsi",
+    "inventory days": "dsi",
+    
+    # NEW: Valuation multiples
+    "price to sales": "price_to_sales",
+    "P/S": "price_to_sales",
+    "P/S ratio": "price_to_sales",
+    "price sales": "price_to_sales",
+    "sales multiple": "price_to_sales",
+    "EV/Sales": "ev_sales",
+    "enterprise value to sales": "ev_sales",
+    "EV/Revenue": "ev_sales",
+    "enterprise value to revenue": "ev_sales",
+    
+    # NEW: Profitability ratios
+    "gross profit": "gross_profit",
+    "grossprofit": "gross_profit",
+    "gross profit margin": "gross_margin",
+    "operating profit": "operating_income",
+    "operating profit margin": "operating_margin",
+    "net profit margin": "net_margin",
+    "profitability": "net_margin",
+    "margins": "net_margin",
+    
+    # NEW: Market metrics
+    "market share": "market_share",
+    "market position": "market_share",
+    "competitive position": "market_share",
+    "beta": "beta",
+    "volatility": "beta",
+    "stock volatility": "beta",
+    
+    # NEW: Dividend metrics
+    "dividend per share": "dividend_per_share",
+    "DPS": "dividend_per_share",
+    "dividend payout ratio": "payout_ratio",
+    "payout ratio": "payout_ratio",
+    "dividend coverage": "payout_ratio",
+    
+    # NEW: Economic indicators
+    "GDP": "gdp",
+    "gross domestic product": "gdp",
+    "inflation": "inflation",
+    "CPI": "inflation",
+    "consumer price index": "inflation",
+    "unemployment": "unemployment",
+    "unemployment rate": "unemployment",
+    "interest rate": "interest_rate",
+    "fed rate": "interest_rate",
+    "federal funds rate": "interest_rate",
+    
+    # NEW: ESG metrics
+    "ESG score": "esg_score",
+    "ESG rating": "esg_score",
+    "environmental score": "esg_score",
+    "social score": "esg_score",
+    "governance score": "esg_score",
+    "carbon footprint": "carbon_footprint",
+    "emissions": "carbon_footprint",
+    "GHG emissions": "carbon_footprint",
+    "greenhouse gas": "carbon_footprint",
     "debt equity ratio": "debt_equity",
     "d/e": "debt_equity",
     "leveraged": "debt_equity",
@@ -318,11 +452,10 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "how much they invest": "capex",
     
     # NEW: Research & Development
-    "r&d": "r_and_d",
-    "research and development": "r_and_d",
-    "research development": "r_and_d",
-    "rd": "r_and_d",
-    "how much on research": "r_and_d",
+    "r&d": "rd_expenses",  # Map to rd_expenses for consistency
+    "research development": "rd_expenses",  # Alternative phrasing
+    "rd": "rd_expenses",  # Abbreviation
+    "how much on research": "rd_expenses",
     
     # NEW: Employee metrics
     "employees": "employee_count",
@@ -479,6 +612,278 @@ METRIC_SYNONYMS: Dict[str, str] = {
     "usually": "revenue",
     "typically": "revenue",
     "frequently": "revenue",
+    
+    # Missing metrics - comprehensive natural language support
+    
+    # Adjusted EBITDA
+    "adjusted ebitda": "adjusted_ebitda",
+    "adjusted-ebitda": "adjusted_ebitda",
+    "adj ebitda": "adjusted_ebitda",
+    "normalized ebitda": "adjusted_ebitda",
+    
+    # Adjusted EBITDA Margin
+    "adjusted ebitda margin": "adjusted_ebitda_margin",
+    "adjusted-ebitda-margin": "adjusted_ebitda_margin",
+    "adj ebitda margin": "adjusted_ebitda_margin",
+    "normalized ebitda margin": "adjusted_ebitda_margin",
+    
+    # Capital Expenditures (already has "capex" but adding more)
+    "capital expenditures": "capital_expenditures",
+    "capital-expenditures": "capital_expenditures",
+    "cap ex": "capital_expenditures",
+    "cap-ex": "capital_expenditures",
+    "capital spending": "capital_expenditures",
+    "capex spending": "capital_expenditures",
+    
+    # Cash and Cash Equivalents (already has "cash" but adding more)
+    "cash and cash equivalents": "cash_and_cash_equivalents",
+    "cash-and-cash-equivalents": "cash_and_cash_equivalents",
+    "cash equivalents": "cash_and_cash_equivalents",
+    "cash & equivalents": "cash_and_cash_equivalents",
+    "total cash": "cash_and_cash_equivalents",
+    
+    # Cash from Financing
+    "cash from financing": "cash_from_financing",
+    "cash-from-financing": "cash_from_financing",
+    "financing cash flow": "cash_from_financing",
+    "cash flow from financing": "cash_from_financing",
+    "CFF": "cash_from_financing",
+    "cff": "cash_from_financing",
+    
+    # Cash from Operations (already has some but adding more)
+    "cash from operations": "cash_from_operations",
+    "cash-from-operations": "cash_from_operations",
+    "operating cash flow": "cash_from_operations",
+    "cash flow from operations": "cash_from_operations",
+    "operational cash flow": "cash_from_operations",
+    "CFO": "cash_from_operations",
+    "cfo": "cash_from_operations",
+    
+    # Current Assets
+    "current assets": "current_assets",
+    "current-assets": "current_assets",
+    "short term assets": "current_assets",
+    "short-term assets": "current_assets",
+    
+    # Current Liabilities
+    "current liabilities": "current_liabilities",
+    "current-liabilities": "current_liabilities",
+    "short term liabilities": "current_liabilities",
+    "short-term liabilities": "current_liabilities",
+    
+    # Debt to Equity (mapping to correct ID)
+    "debt to equity": "debt_to_equity",
+    "debt-to-equity": "debt_to_equity",
+    "debt/equity": "debt_to_equity",
+    "D/E ratio": "debt_to_equity",
+    "d/e ratio": "debt_to_equity",
+    "debt equity": "debt_to_equity",
+    
+    # Depreciation and Amortization
+    "depreciation and amortization": "depreciation_and_amortization",
+    "depreciation-and-amortization": "depreciation_and_amortization",
+    "D&A": "depreciation_and_amortization",
+    "d&a": "depreciation_and_amortization",
+    "depreciation amortization": "depreciation_and_amortization",
+    "depreciation": "depreciation_and_amortization",
+    "amortization": "depreciation_and_amortization",
+    
+    # Dividends Paid
+    "dividends paid": "dividends_paid",
+    "dividends-paid": "dividends_paid",
+    "total dividends": "dividends_paid",
+    "dividend payments": "dividends_paid",
+    "dividend payout": "dividends_paid",
+    
+    # Dividends Per Share
+    "dividends per share": "dividends_per_share",
+    "dividends-per-share": "dividends_per_share",
+    "DPS": "dividends_per_share",
+    "dps": "dividends_per_share",
+    "dividend per share": "dividends_per_share",
+    
+    # EBIT (already has "operating income" but adding EBIT specifically)
+    "EBIT": "ebit",
+    "ebit": "ebit",
+    "earnings before interest and tax": "ebit",
+    "operating earnings": "ebit",
+    
+    # EBITDA Growth
+    "ebitda growth": "ebitda_growth",
+    "ebitda-growth": "ebitda_growth",
+    "ebitda growth rate": "ebitda_growth",
+    "ebitda expansion": "ebitda_growth",
+    
+    # EBITDA Margin
+    "ebitda margin": "ebitda_margin",
+    "ebitda-margin": "ebitda_margin",
+    "ebitda profitability": "ebitda_margin",
+    "ebitda margins": "ebitda_margin",
+    
+    # Enterprise Value
+    "enterprise value": "enterprise_value",
+    "enterprise-value": "enterprise_value",
+    "EV": "enterprise_value",
+    "ev": "enterprise_value",
+    "firm value": "enterprise_value",
+    "total enterprise value": "enterprise_value",
+    
+    # EPS Basic
+    "eps basic": "eps_basic",
+    "eps-basic": "eps_basic",
+    "basic eps": "eps_basic",
+    "basic earnings per share": "eps_basic",
+    "basic EPS": "eps_basic",
+    
+    # EPS CAGR
+    "eps cagr": "eps_cagr",
+    "eps-cagr": "eps_cagr",
+    "eps compound annual growth": "eps_cagr",
+    "eps growth rate": "eps_cagr",
+    "earnings per share cagr": "eps_cagr",
+    
+    # EPS CAGR 3Y
+    "eps cagr 3y": "eps_cagr_3y",
+    "eps-cagr-3y": "eps_cagr_3y",
+    "eps cagr 3 year": "eps_cagr_3y",
+    "eps 3 year cagr": "eps_cagr_3y",
+    "3 year eps cagr": "eps_cagr_3y",
+    
+    # Free Cash Flow Margin
+    "free cash flow margin": "free_cash_flow_margin",
+    "free-cash-flow-margin": "free_cash_flow_margin",
+    "FCF margin": "free_cash_flow_margin",
+    "fcf margin": "free_cash_flow_margin",
+    "fcf margins": "free_cash_flow_margin",
+    "free cash flow margins": "free_cash_flow_margin",
+    
+    # Income Tax Expense
+    "income tax expense": "income_tax_expense",
+    "income-tax-expense": "income_tax_expense",
+    "tax expense": "income_tax_expense",
+    "income taxes": "income_tax_expense",
+    "taxes": "income_tax_expense",
+    
+    # Interest Expense
+    "interest expense": "interest_expense",
+    "interest-expense": "interest_expense",
+    "interest cost": "interest_expense",
+    "interest paid": "interest_expense",
+    "interest charges": "interest_expense",
+    
+    # Long Term Debt
+    "long term debt": "long_term_debt",
+    "long-term-debt": "long_term_debt",
+    "long term liabilities": "long_term_debt",
+    "long-term liabilities": "long_term_debt",
+    "LTD": "long_term_debt",
+    "ltd": "long_term_debt",
+    
+    # Long Term Debt Current
+    "long term debt current": "long_term_debt_current",
+    "long-term-debt-current": "long_term_debt_current",
+    "current portion of long term debt": "long_term_debt_current",
+    "current long term debt": "long_term_debt_current",
+    
+    # Price
+    "stock price": "price",
+    "share price": "price",
+    "price": "price",
+    "current price": "price",
+    "trading price": "price",
+    
+    # Profit Margin (already has "net margin" but adding profit margin specifically)
+    "profit margin": "profit_margin",
+    "profit-margin": "profit_margin",
+    "profit margins": "profit_margin",
+    "net profit margin": "profit_margin",
+    
+    # P/S Ratio
+    "P/S": "ps_ratio",
+    "p/s": "ps_ratio",
+    "P S": "ps_ratio",
+    "p s": "ps_ratio",
+    "ps ratio": "ps_ratio",
+    "ps-ratio": "ps_ratio",
+    "price to sales": "ps_ratio",
+    "price-to-sales": "ps_ratio",
+    "price/sales": "ps_ratio",
+    "price sales": "ps_ratio",
+    
+    # Return on Assets (already has "roa" but adding full name)
+    "return on assets": "return_on_assets",
+    "return-on-assets": "return_on_assets",
+    "ROA": "return_on_assets",
+    "roa": "return_on_assets",
+    "asset returns": "return_on_assets",
+    
+    # Return on Equity (already has "roe" but adding full name)
+    "return on equity": "return_on_equity",
+    "return-on-equity": "return_on_equity",
+    "ROE": "return_on_equity",
+    "roe": "return_on_equity",
+    "equity returns": "return_on_equity",
+    
+    # Return on Invested Capital (already has "roic" but adding full name)
+    "return on invested capital": "return_on_invested_capital",
+    "return-on-invested-capital": "return_on_invested_capital",
+    "ROIC": "return_on_invested_capital",
+    "roic": "return_on_invested_capital",
+    "ROI": "return_on_invested_capital",
+    "roi": "return_on_invested_capital",
+    "capital returns": "return_on_invested_capital",
+    
+    # Revenue CAGR
+    "revenue cagr": "revenue_cagr",
+    "revenue-cagr": "revenue_cagr",
+    "revenue compound annual growth": "revenue_cagr",
+    "revenue growth rate": "revenue_cagr",
+    "sales cagr": "revenue_cagr",
+    
+    # Revenue CAGR 3Y
+    "revenue cagr 3y": "revenue_cagr_3y",
+    "revenue-cagr-3y": "revenue_cagr_3y",
+    "revenue cagr 3 year": "revenue_cagr_3y",
+    "revenue 3 year cagr": "revenue_cagr_3y",
+    "3 year revenue cagr": "revenue_cagr_3y",
+    
+    # Share Repurchases
+    "share repurchases": "share_repurchases",
+    "share-repurchases": "share_repurchases",
+    "stock repurchases": "share_repurchases",
+    "share buybacks": "share_repurchases",
+    "stock buybacks": "share_repurchases",
+    "buybacks": "share_repurchases",
+    "repurchases": "share_repurchases",
+    
+    # Short Term Debt
+    "short term debt": "short_term_debt",
+    "short-term-debt": "short_term_debt",
+    "STD": "short_term_debt",
+    "std": "short_term_debt",
+    "current debt": "short_term_debt",
+    
+    # Total Debt
+    "total debt": "total_debt",
+    "total-debt": "total_debt",
+    "all debt": "total_debt",
+    "combined debt": "total_debt",
+    "total borrowings": "total_debt",
+    
+    # Weighted Avg Diluted Shares
+    "weighted avg diluted shares": "weighted_avg_diluted_shares",
+    "weighted-avg-diluted-shares": "weighted_avg_diluted_shares",
+    "weighted average diluted shares": "weighted_avg_diluted_shares",
+    "diluted shares outstanding": "weighted_avg_diluted_shares",
+    "average diluted shares": "weighted_avg_diluted_shares",
+    
+    # Working Capital Change
+    "working capital change": "working_capital_change",
+    "working-capital-change": "working_capital_change",
+    "WC change": "working_capital_change",
+    "wc change": "working_capital_change",
+    "working capital delta": "working_capital_change",
+    "change in working capital": "working_capital_change",
 }
 
 

@@ -1499,6 +1499,72 @@ SYSTEM_PROMPT = (
     "- \"Compare ROI across mega-cap tech\"\n"
     "- \"What's Amazon's cash conversion cycle?\"\n\n"
     
+    "**Sector & Industry Analysis:**\n"
+    "- \"How is the tech sector performing?\"\n"
+    "- \"What's happening in the financial services industry?\"\n"
+    "- \"Compare healthcare sector peers\"\n"
+    "- \"What are the trends in the energy sector?\"\n"
+    "- \"Sector analysis for consumer discretionary\"\n\n"
+    
+    "**Market Analysis & Competition:**\n"
+    "- \"What's Apple's market share?\"\n"
+    "- \"How is Tesla positioned in the EV market?\"\n"
+    "- \"Competitive analysis of Microsoft vs. Google\"\n"
+    "- \"Market outlook for cloud computing\"\n"
+    "- \"What's the addressable market for AI?\"\n\n"
+    
+    "**M&A & Corporate Actions:**\n"
+    "- \"Has Apple acquired any companies recently?\"\n"
+    "- \"What M&A deals has Microsoft done?\"\n"
+    "- \"Is Tesla a takeover target?\"\n"
+    "- \"Analyze Amazon's acquisition strategy\"\n"
+    "- \"What spin-offs has Google done?\"\n\n"
+    
+    "**IPO & Public Offerings:**\n"
+    "- \"When did Tesla go public?\"\n"
+    "- \"What was Apple's IPO price?\"\n"
+    "- \"Is there an upcoming IPO in tech?\"\n"
+    "- \"Analyze recent IPO performance\"\n\n"
+    
+    "**ESG & Sustainability:**\n"
+    "- \"What's Apple's ESG score?\"\n"
+    "- \"How sustainable is Tesla's business?\"\n"
+    "- \"What's Microsoft's carbon footprint?\"\n"
+    "- \"ESG analysis of Amazon\"\n"
+    "- \"Compare ESG ratings across tech\"\n\n"
+    
+    "**Credit & Debt Analysis:**\n"
+    "- \"What's Apple's credit rating?\"\n"
+    "- \"How much debt does Tesla have?\"\n"
+    "- \"What's Microsoft's interest coverage ratio?\"\n"
+    "- \"Is Amazon's debt sustainable?\"\n"
+    "- \"Credit analysis of Google\"\n\n"
+    
+    "**Liquidity Analysis:**\n"
+    "- \"What's Apple's current ratio?\"\n"
+    "- \"How liquid is Tesla?\"\n"
+    "- \"What's Microsoft's working capital?\"\n"
+    "- \"Can Amazon pay its short-term obligations?\"\n\n"
+    
+    "**Capital Structure:**\n"
+    "- \"How is Apple allocating capital?\"\n"
+    "- \"What's Tesla's share buyback program?\"\n"
+    "- \"Microsoft's dividend policy\"\n"
+    "- \"Amazon's capital expenditure plans\"\n"
+    "- \"Analyze Google's capital structure\"\n\n"
+    
+    "**Economic Indicators & Macro:**\n"
+    "- \"How does inflation affect tech stocks?\"\n"
+    "- \"What's the impact of interest rates on Apple?\"\n"
+    "- \"How does GDP growth affect Microsoft?\"\n"
+    "- \"Economic outlook for the tech sector\"\n\n"
+    
+    "**Regulatory & Compliance:**\n"
+    "- \"What are the regulatory risks for Tesla?\"\n"
+    "- \"SEC filings for Apple\"\n"
+    "- \"Compliance issues for Microsoft\"\n"
+    "- \"Regulatory environment for tech\"\n\n"
+    
     "**Investment Analysis (Must follow 8-Layer Framework):**\n"
     "- \"Should I invest in Apple or Microsoft?\" → Include: Segment analysis, KPIs, Sensitivity, FX, Valuation, Peer comparison, Strategic implications\n"
     "- \"What's the bull case for Tesla?\" → Include: All 8 layers with bullish scenario assumptions\n"
@@ -5276,17 +5342,35 @@ class FinanlyzeOSChatbot:
             
             # Fall back to LLM if:
             # 1. Intent is unclear or parsing seems forced
+            # BUT: Be more permissive - allow new financial intents to go to LLM
+            new_financial_intents = [
+                "sector_analysis", "market_analysis", "merger_acquisition", "ipo",
+                "esg", "credit_analysis", "liquidity_analysis", "capital_structure",
+                "economic_indicators", "regulatory", "recommendation", "risk_analysis"
+            ]
+            
+            # If it's a new financial intent, always use LLM (they need comprehensive analysis)
+            if intent in new_financial_intents:
+                return True
+            
+            # For other intents, check if parsing seems forced
             if not intent or (intent == "lookup" and not tickers and not metrics):
                 return True
             
             # 2. Too many ambiguous tickers parsed (likely over-parsing)
-            if len(tickers) > 3:
+            # BUT: Be more lenient - allow up to 5 tickers for sector/market analysis
+            if len(tickers) > 5:
                 return True
                 
             # 3. Complex natural language patterns that don't fit structured intents
+            # Expanded list to include more financial query types
             complex_patterns = [
                 "tell me about", "how is", "what are the key", "explain the risks",
-                "sector analysis", "market outlook", "investment advice"
+                "sector analysis", "market outlook", "investment advice",
+                "what's happening", "what's going on", "analyze", "evaluate",
+                "assess", "review", "examine", "investigate", "study",
+                "what can you tell me", "what do you know", "what information",
+                "help me understand", "break down", "walk me through"
             ]
             
             for pattern in complex_patterns:
