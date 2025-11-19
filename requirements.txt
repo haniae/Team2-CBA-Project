@@ -116,3 +116,10 @@ scipy>=1.11.0  # Statistical functions, box-cox transformation
 # statsmodels>=0.14.0  # Already in requirements.txt (decomposition)
 shap>=0.42.0  # Explainability (SHAP values for feature importance)
 ruptures>=1.1.8  # Change point detection (PELT algorithm for regime detection)
+
+# Portfolio Optimization (Optional - has fallback if missing)
+cvxpy>=1.4.0  # Convex optimization for portfolio optimization (optional, portfolio modules have fallback)
+
+# PDF Processing (Optional - has fallback if missing)
+pdfplumber>=0.10.0  # PDF text extraction (optional, used in portfolio.py and document_processor.py)
+PyPDF2>=3.0.0  # PDF processing (optional, used in portfolio.py and document_processor.py, alternative to pdfplumber)
