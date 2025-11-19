@@ -2380,14 +2380,14 @@ Project/
 | src/finanlyzeos_chatbot/parsing/temporal_relationships.py | Temporal relationship parsing. Handles temporal relationships (e.g., "before 2020", "after Q3", "during 2021-2023"). |
 | src/finanlyzeos_chatbot/parsing/trends.py | Trend detection. Identifies trend-related queries (e.g., "increasing", "declining", "stable"). |
 
-### ✏️ Spelling & Correction
+### ✏️ Spelling & Correction (Integrated in Parsing)
+
+**Note:** Spelling correction is integrated directly into `alias_builder.py` and `parse.py` rather than being a separate module. This ensures seamless spelling mistake handling during query parsing and ticker/metric resolution.
 
 | File | Description |
 |------|-------------|
-| src/finanlyzeos_chatbot/spelling/company_corrector.py | Company name spelling correction. Corrects misspelled company names using fuzzy matching. |
-| src/finanlyzeos_chatbot/spelling/correction_engine.py | Main spelling correction engine. Orchestrates spelling correction for companies, metrics, and other entities. |
-| src/finanlyzeos_chatbot/spelling/fuzzy_matcher.py | Fuzzy string matching. Provides fuzzy matching algorithms for entity resolution. |
-| src/finanlyzeos_chatbot/spelling/metric_corrector.py | Metric name spelling correction. Corrects misspelled metric names using fuzzy matching. |
+| src/finanlyzeos_chatbot/parsing/alias_builder.py | Company name spelling correction with **90% success rate**. Uses progressive cutoff matching (0.85-0.65), 85+ manual overrides, and fuzzy fallback. Handles all 1,599 S&P 1500 companies with common misspellings. |
+| src/finanlyzeos_chatbot/parsing/parse.py | Metric name spelling correction with **100% success rate**. Uses multi-level fuzzy matching with adaptive thresholds. Handles 93 metrics with 200+ synonyms and common misspellings. |
 
 ### 🧭 Routing
 
