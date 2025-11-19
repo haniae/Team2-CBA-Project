@@ -18,7 +18,8 @@
 
 This repository underpins our Fall 2025 DNSC 6317 practicum 🎓at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing FinalyzeOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
 
-Contributors:  **Hania A.**  , **Van Nhi Vuong** , **Malcolm Muoriyarwa** & **Devarsh Patel** . Special thanks to: supervising faculty (The George Washington University): **Professor Patrick Hall**
+Contributors:  **Hania A.**  , **Van Nhi Vuong** , **Malcolm Muoriyarwa** & **Devarsh Patel** . 
+**Acknowledgments** Special thanks to Professor Patrick Hall (The George Washington University) for his outstanding mentorship and tireless support. His guidance and encouragement made this project possible.
 
 [Setup Guide](#️-complete-setup-guide) • [Documentation](docs/) • [Features](#core-capabilities) • [Example Queries](#-example-queries) • [Contributing](CONTRIBUTING.md)
 
