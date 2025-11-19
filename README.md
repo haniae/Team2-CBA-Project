@@ -26,7 +26,7 @@ Contributors:  **Hania A.**  , **Van Nhi Vuong** , **Malcolm Muoriyarwa** & **De
 
 ---
 
-## ⚡ TL;DR - Quick Start
+## ⚡Quick Start
 
 **Get started in 30 seconds:**
 
