@@ -235,6 +235,122 @@ INTENT_EFFICIENCY_PATTERN = re.compile(
     re.IGNORECASE
 )
 
+# NEW: Sector/Industry Analysis intent patterns
+INTENT_SECTOR_ANALYSIS_PATTERN = re.compile(
+    r"\b(sector\s+analysis|industry\s+analysis|sector\s+performance|industry\s+performance|"
+    r"sector\s+outlook|industry\s+outlook|sector\s+trends|industry\s+trends|"
+    r"sector\s+comparison|industry\s+comparison|sector\s+benchmark|industry\s+benchmark|"
+    r"how\s+is\s+the\s+(?:tech|financial|healthcare|energy|consumer|industrial|real\s+estate)\s+(?:sector|industry)|"
+    r"what\'s\s+happening\s+in\s+the\s+(?:tech|financial|healthcare|energy|consumer|industrial|real\s+estate)\s+(?:sector|industry)|"
+    r"sector\s+overview|industry\s+overview|sector\s+health|industry\s+health|"
+    r"peer\s+group|peer\s+analysis|sector\s+peers|industry\s+peers)\b",
+    re.IGNORECASE
+)
+
+# NEW: Market Analysis intent patterns
+INTENT_MARKET_ANALYSIS_PATTERN = re.compile(
+    r"\b(market\s+analysis|market\s+outlook|market\s+trends|market\s+performance|"
+    r"market\s+conditions|market\s+environment|market\s+dynamics|"
+    r"market\s+share|market\s+position|market\s+leadership|market\s+dominance|"
+    r"competitive\s+position|competitive\s+landscape|competitive\s+analysis|"
+    r"market\s+opportunity|market\s+potential|addressable\s+market|TAM|SAM|"
+    r"market\s+growth|market\s+expansion|market\s+penetration|"
+    r"how\s+is\s+the\s+market|what\'s\s+the\s+market|market\s+overview)\b",
+    re.IGNORECASE
+)
+
+# NEW: M&A and Corporate Actions intent patterns
+INTENT_MERGER_ACQUISITION_PATTERN = re.compile(
+    r"\b(merger|acquisition|M&A|M\s*&\s*A|mergers\s+and\s+acquisitions|"
+    r"takeover|buyout|acquisition\s+target|merger\s+target|"
+    r"deal|deal\s+analysis|transaction|transaction\s+analysis|"
+    r"spin\s+off|spin\s+off|divestiture|divestment|"
+    r"corporate\s+action|corporate\s+restructuring|"
+    r"has\s+\w+\s+(?:acquired|bought|merged|taken\s+over)|"
+    r"did\s+\w+\s+(?:acquire|buy|merge|take\s+over)|"
+    r"is\s+\w+\s+(?:acquiring|buying|merging|being\s+acquired|being\s+bought))\b",
+    re.IGNORECASE
+)
+
+# NEW: IPO and Public Offering intent patterns
+INTENT_IPO_PATTERN = re.compile(
+    r"\b(IPO|initial\s+public\s+offering|going\s+public|public\s+offering|"
+    r"listing|stock\s+listing|equity\s+offering|secondary\s+offering|"
+    r"when\s+did\s+\w+\s+go\s+public|when\s+was\s+\w+\s+IPO|"
+    r"IPO\s+date|IPO\s+price|IPO\s+valuation|"
+    r"is\s+\w+\s+going\s+public|will\s+\w+\s+go\s+public|"
+    r"public\s+company|private\s+company)\b",
+    re.IGNORECASE
+)
+
+# NEW: ESG and Sustainability intent patterns
+INTENT_ESG_PATTERN = re.compile(
+    r"\b(ESG|environmental|social|governance|sustainability|"
+    r"ESG\s+score|ESG\s+rating|ESG\s+performance|ESG\s+metrics|"
+    r"carbon\s+footprint|emissions|greenhouse\s+gas|GHG|"
+    r"diversity|inclusion|corporate\s+responsibility|CSR|"
+    r"ethical|ethics|compliance|regulatory\s+compliance|"
+    r"ESG\s+report|sustainability\s+report|impact|social\s+impact)\b",
+    re.IGNORECASE
+)
+
+# NEW: Credit and Debt Analysis intent patterns
+INTENT_CREDIT_ANALYSIS_PATTERN = re.compile(
+    r"\b(credit\s+analysis|credit\s+rating|credit\s+risk|credit\s+quality|"
+    r"debt\s+analysis|debt\s+structure|debt\s+profile|leverage\s+analysis|"
+    r"credit\s+default|default\s+risk|bankruptcy\s+risk|solvency|"
+    r"debt\s+to\s+equity|debt\s+ratio|leverage\s+ratio|"
+    r"interest\s+coverage|debt\s+service|debt\s+capacity|"
+    r"bond\s+rating|credit\s+spread|yield|"
+    r"how\s+leveraged|how\s+much\s+debt|debt\s+level|debt\s+burden)\b",
+    re.IGNORECASE
+)
+
+# NEW: Liquidity Analysis intent patterns
+INTENT_LIQUIDITY_PATTERN = re.compile(
+    r"\b(liquidity|liquid|liquidity\s+analysis|liquidity\s+ratio|"
+    r"current\s+ratio|quick\s+ratio|acid\s+test|working\s+capital|"
+    r"cash\s+position|cash\s+reserves|cash\s+on\s+hand|"
+    r"cash\s+equivalents|short\s+term\s+liquidity|"
+    r"can\s+they\s+pay|ability\s+to\s+pay|payment\s+ability|"
+    r"liquidity\s+crisis|liquidity\s+risk|illiquid)\b",
+    re.IGNORECASE
+)
+
+# NEW: Capital Structure intent patterns
+INTENT_CAPITAL_STRUCTURE_PATTERN = re.compile(
+    r"\b(capital\s+structure|capital\s+allocation|capital\s+management|"
+    r"equity\s+structure|debt\s+structure|financing\s+structure|"
+    r"share\s+capital|authorized\s+shares|outstanding\s+shares|"
+    r"share\s+buyback|stock\s+buyback|repurchase|share\s+repurchase|"
+    r"dividend\s+policy|dividend\s+strategy|payout\s+policy|"
+    r"capital\s+expenditure|CAPEX|capital\s+spending|"
+    r"how\s+is\s+capital\s+allocated|capital\s+allocation\s+strategy)\b",
+    re.IGNORECASE
+)
+
+# NEW: Economic Indicators intent patterns
+INTENT_ECONOMIC_INDICATORS_PATTERN = re.compile(
+    r"\b(economic\s+indicators|economic\s+data|macro\s+economic|macroeconomic|"
+    r"GDP|gross\s+domestic\s+product|inflation|deflation|CPI|consumer\s+price\s+index|"
+    r"unemployment|employment|job\s+market|interest\s+rates|fed\s+rate|federal\s+funds\s+rate|"
+    r"yield\s+curve|bond\s+yield|treasury|economic\s+growth|economic\s+outlook|"
+    r"recession|economic\s+downturn|economic\s+cycle|business\s+cycle|"
+    r"how\s+does\s+the\s+economy|economic\s+impact|macro\s+environment)\b",
+    re.IGNORECASE
+)
+
+# NEW: Regulatory and Compliance intent patterns
+INTENT_REGULATORY_PATTERN = re.compile(
+    r"\b(regulatory|regulation|compliance|regulatory\s+compliance|"
+    r"SEC|securities\s+and\s+exchange\s+commission|filing|10-K|10-Q|8-K|"
+    r"regulatory\s+risk|compliance\s+risk|regulatory\s+environment|"
+    r"audit|auditor|audit\s+opinion|internal\s+controls|"
+    r"regulatory\s+action|enforcement|regulatory\s+scrutiny|"
+    r"legal\s+issues|litigation|lawsuits|legal\s+risk)\b",
+    re.IGNORECASE
+)
+
 
 def normalize(text: str) -> str:
     """Return a lower-cased, whitespace-collapsed representation.
@@ -429,30 +545,237 @@ def parse_to_structured(text: str) -> Dict[str, Any]:
 
 
 def resolve_metrics(text: str, lowered_full: str) -> List[Dict[str, Any]]:
-    """Detect requested metrics from synonyms and canonical names."""
+    """Detect requested metrics from synonyms and canonical names.
+    
+    Enhanced to handle:
+    - Apostrophes and punctuation (e.g., "Apple's revenue")
+    - Case variations
+    - Compound words without spaces (e.g., "netincome" -> "net income")
+    - Hyphenated variations (e.g., "price-to-earnings" -> "price to earnings")
+    - Space-separated abbreviations (e.g., "p e" -> "pe")
+    - Partial matches when exact matches fail
+    - Word boundaries that work with punctuation
+    """
     matches: List[Dict[str, Any]] = []
     seen: set[str] = set()
+    
+    # Normalize the text for better matching:
+    # 1. Replace hyphens with spaces (e.g., "price-to-earnings" -> "price to earnings")
+    # 2. Normalize multiple spaces to single space
+    # 3. Handle compound words by trying to split common patterns
+    normalized_text = lowered_full
+    
+    # Replace hyphens with spaces for better matching
+    normalized_text = re.sub(r'[\-–—]', ' ', normalized_text)
+    
+    # Normalize multiple spaces
+    normalized_text = re.sub(r'\s+', ' ', normalized_text).strip()
+    
+    # Create a version with common compound word splits
+    # This helps match "netincome" -> "net income", "marketcap" -> "market cap", etc.
+    compound_splits = normalized_text
+    # Try to split common compound patterns (camelCase-like but all lowercase)
+    # Pattern: lowercase word followed by uppercase or another word boundary
+    # For now, we'll handle this in the matching logic below
 
     for alias, metric_id in _METRIC_ITEMS:
         if not alias:
             continue
+        
+        # Try multiple matching strategies
+        found = None
+        original_fragment = None
+        
+        # Strategy 1: Exact match with flexible word boundaries
+        # Handle apostrophes, hyphens, and other punctuation
         escaped = re.escape(alias).replace(r"\ ", r"\s+")
-        pattern = re.compile(r"\b" + escaped + r"\b")
-        found = pattern.search(lowered_full)
+        # Allow word boundary OR apostrophe/hyphen before/after
+        pattern1 = re.compile(r"(?<![a-zA-Z0-9])" + escaped + r"(?![a-zA-Z0-9])", re.IGNORECASE)
+        found = pattern1.search(normalized_text)
+        
+        # Strategy 2: If exact match fails, try without strict word boundaries
+        # (for phrases like "top line" that might be split)
+        if not found:
+            # Replace spaces with flexible whitespace matching
+            flexible_alias = alias.replace(" ", r"\s+")
+            pattern2 = re.compile(flexible_alias, re.IGNORECASE)
+            found = pattern2.search(normalized_text)
+        
+        # Strategy 3: Handle compound words (e.g., "netincome" -> "net income")
+        # Try matching alias without spaces against compound words
+        if not found:
+            alias_no_spaces = alias.replace(" ", "").replace("-", "").replace("_", "")
+            if len(alias_no_spaces) > 2:  # Only for meaningful aliases
+                # Try to find compound word that matches (e.g., "netincome" contains "net" and "income")
+                # Create pattern that matches the compound word
+                compound_pattern = re.compile(
+                    r"(?<![a-zA-Z0-9])" + re.escape(alias_no_spaces) + r"(?![a-zA-Z0-9])",
+                    re.IGNORECASE
+                )
+                found = compound_pattern.search(normalized_text)
+                
+                # Also try matching individual words from alias in compound
+                if not found and " " in alias:
+                    words = alias.split()
+                    if len(words) == 2:
+                        # Try to match compound like "netincome" for "net income"
+                        first_word = words[0].lower()
+                        second_word = words[1].lower()
+                        # Pattern: first word immediately followed by second word (no space)
+                        compound_word_pattern = re.compile(
+                            r"(?<![a-zA-Z0-9])" + re.escape(first_word + second_word) + r"(?![a-zA-Z0-9])",
+                            re.IGNORECASE
+                        )
+                        found = compound_word_pattern.search(normalized_text)
+        
+        # Strategy 4: Handle space-separated abbreviations (e.g., "p e" -> "pe")
+        if not found:
+            alias_no_spaces = alias.replace(" ", "").replace("-", "").replace("_", "")
+            if len(alias_no_spaces) <= 5 and len(alias.split()) == 1:  # Short abbreviations
+                # Try to match space-separated version (e.g., "p e" for "pe")
+                if len(alias_no_spaces) >= 2:
+                    # Create pattern like "p\s+e" for "pe"
+                    spaced_pattern = r"\s+".join(list(alias_no_spaces))
+                    spaced_regex = re.compile(
+                        r"(?<![a-zA-Z0-9])" + spaced_pattern + r"(?![a-zA-Z0-9])",
+                        re.IGNORECASE
+                    )
+                    found = spaced_regex.search(normalized_text)
+        
+        # Strategy 5: Try partial match (alias contained in text)
+        if not found:
+            if alias.lower() in normalized_text:
+                # Find the position
+                idx = normalized_text.find(alias.lower())
+                if idx >= 0:
+                    # Create a match-like object
+                    class Match:
+                        def __init__(self, start, end):
+                            self.start = lambda: start
+                            self.end = lambda: end
+                    found = Match(idx, idx + len(alias))
+        
         if not found:
             continue
+        
         if metric_id in seen:
             continue
-        original_fragment = text[found.start():found.end()]
+        
+        # Extract original fragment preserving case
+        # Map back to original text position if possible
+        start_pos = found.start()
+        end_pos = found.end()
+        
+        # Try to find the corresponding position in original text
+        # by searching for the matched text in the original
+        matched_text = normalized_text[start_pos:end_pos]
+        # Find in original lowered_full (which preserves more structure)
+        orig_idx = lowered_full.find(matched_text)
+        if orig_idx >= 0:
+            original_fragment = text[orig_idx:orig_idx + len(matched_text)]
+            position = orig_idx
+        else:
+            # Fallback: use normalized position
+            original_fragment = matched_text
+            position = start_pos
+        
         matches.append(
             {
                 "input": original_fragment,
                 "metric_id": metric_id,
-                "position": found.start(),
+                "position": position,
             }
         )
         seen.add(metric_id)
 
+    # Always try fuzzy matching for spelling mistakes (even if we have some matches)
+    # This helps catch misspelled metrics that weren't found by exact matching
+    if True:  # Always try fuzzy matching
+        import difflib
+        normalized_lower = normalized_text.lower()
+        metric_aliases = [alias for alias, _ in _METRIC_ITEMS]
+        
+        # Try fuzzy matching on individual words and phrases
+        tokens = normalized_lower.split()
+        
+        # First, try to match individual words that might be misspelled metrics
+        for token in tokens:
+            if len(token) < 3:
+                continue
+            # Skip common words that aren't metrics
+            skip_words = ["what", "is", "the", "show", "me", "get", "tell", "how", "when", "where", "why", "which", "who", 
+                         "a", "an", "to", "of", "for", "with", "from", "by", "on", "at", "in", "as", "are", "was", "were"]
+            if token in skip_words:
+                continue
+            
+            # Try multiple cutoff levels for better spelling mistake tolerance (more aggressive)
+            for cutoff in [0.85, 0.80, 0.75, 0.70, 0.65]:
+                close_matches = difflib.get_close_matches(token, metric_aliases, n=10, cutoff=cutoff)
+                if close_matches:
+                    for alias_match in close_matches:
+                        score = difflib.SequenceMatcher(None, token, alias_match).ratio()
+                        # Use more lenient thresholds for spelling mistakes
+                        threshold = 0.80 if cutoff >= 0.75 else 0.70
+                        if score >= threshold:
+                            metric_id = METRIC_SYNONYMS.get(alias_match)
+                            if metric_id and metric_id not in seen:
+                                pos = lowered_full.find(token)
+                                if pos < 0:
+                                    pos = 0
+                                
+                                matches.append({
+                                    "input": token,
+                                    "metric_id": metric_id,
+                                    "position": pos,
+                                })
+                                seen.add(metric_id)
+                                break
+                    if any(METRIC_SYNONYMS.get(m) in seen for m in close_matches):
+                        break
+                if any(METRIC_SYNONYMS.get(m) in seen for m in close_matches if METRIC_SYNONYMS.get(m)):
+                    break
+        
+        # Then try multi-word phrases (even if we already have some matches)
+        if True:  # Always try phrases
+            for window in range(min(4, len(tokens)), 0, -1):
+                for start_idx in range(len(tokens) - window + 1):
+                    phrase = " ".join(tokens[start_idx : start_idx + window])
+                    if len(phrase) < 3:
+                        continue
+                    
+                    # Find close matches with spelling mistake tolerance (try multiple cutoff levels, more aggressive)
+                    for cutoff in [0.85, 0.80, 0.75, 0.70, 0.65]:
+                        close_matches = difflib.get_close_matches(phrase, metric_aliases, n=10, cutoff=cutoff)
+                        if close_matches:
+                            for alias_match in close_matches:
+                                score = difflib.SequenceMatcher(None, phrase, alias_match).ratio()
+                                # Use more lenient thresholds for spelling mistakes
+                                threshold = 0.80 if cutoff >= 0.75 else 0.70
+                                if score >= threshold:
+                                    metric_id = METRIC_SYNONYMS.get(alias_match)
+                                    if metric_id and metric_id not in seen:
+                                        # Find position in original text
+                                        phrase_lower = phrase.lower()
+                                        pos = lowered_full.find(phrase_lower)
+                                        if pos < 0:
+                                            pos = 0
+                                        
+                                        matches.append({
+                                            "input": phrase,
+                                            "metric_id": metric_id,
+                                            "position": pos,
+                                        })
+                                        seen.add(metric_id)
+                                        break  # Only one match per phrase
+                            if any(METRIC_SYNONYMS.get(m) in seen for m in close_matches if METRIC_SYNONYMS.get(m)):
+                                break
+                        if any(METRIC_SYNONYMS.get(m) in seen for m in close_matches if METRIC_SYNONYMS.get(m)):
+                            break
+                    if matches:
+                        break
+                if matches:
+                    break
+    
     matches.sort(key=lambda item: item["position"])
     return [{"input": item["input"], "metric_id": item["metric_id"]} for item in matches]
 
@@ -482,8 +805,10 @@ def classify_intent(
         period_type = periods.get("type")
 
     # Priority order: forecast > what-if > recommendation > risk > valuation > attribution > 
-    #                 why > when > relationship > benchmark > optimization > efficiency > 
-    #                 summary > conditional > rank > explain > trend > compare > change > lookup
+    #                 sector > market > M&A > IPO > ESG > credit > liquidity > capital_structure >
+    #                 economic > regulatory > why > when > relationship > benchmark > 
+    #                 optimization > efficiency > summary > conditional > rank > explain > 
+    #                 trend > compare > change > lookup
     
     # Check for forecast/prediction intent (highest priority - very specific)
     if INTENT_FORECAST_PATTERN.search(norm_text):
@@ -508,6 +833,46 @@ def classify_intent(
     # Check for performance attribution intent (high priority - specific attribution queries)
     if INTENT_ATTRIBUTION_PATTERN.search(norm_text):
         return "attribution"
+    
+    # Check for sector/industry analysis intent (high priority - sector-specific queries)
+    if INTENT_SECTOR_ANALYSIS_PATTERN.search(norm_text):
+        return "sector_analysis"
+    
+    # Check for market analysis intent (high priority - market-specific queries)
+    if INTENT_MARKET_ANALYSIS_PATTERN.search(norm_text):
+        return "market_analysis"
+    
+    # Check for M&A intent (high priority - M&A-specific queries)
+    if INTENT_MERGER_ACQUISITION_PATTERN.search(norm_text):
+        return "merger_acquisition"
+    
+    # Check for IPO intent (high priority - IPO-specific queries)
+    if INTENT_IPO_PATTERN.search(norm_text):
+        return "ipo"
+    
+    # Check for ESG intent (high priority - ESG-specific queries)
+    if INTENT_ESG_PATTERN.search(norm_text):
+        return "esg"
+    
+    # Check for credit analysis intent (high priority - credit-specific queries)
+    if INTENT_CREDIT_ANALYSIS_PATTERN.search(norm_text):
+        return "credit_analysis"
+    
+    # Check for liquidity analysis intent (high priority - liquidity-specific queries)
+    if INTENT_LIQUIDITY_PATTERN.search(norm_text):
+        return "liquidity_analysis"
+    
+    # Check for capital structure intent (high priority - capital structure queries)
+    if INTENT_CAPITAL_STRUCTURE_PATTERN.search(norm_text):
+        return "capital_structure"
+    
+    # Check for economic indicators intent (high priority - macroeconomic queries)
+    if INTENT_ECONOMIC_INDICATORS_PATTERN.search(norm_text):
+        return "economic_indicators"
+    
+    # Check for regulatory intent (high priority - regulatory queries)
+    if INTENT_REGULATORY_PATTERN.search(norm_text):
+        return "regulatory"
 
     # Check for why/causal intent (high priority - specific reasoning queries)
     if INTENT_WHY_PATTERN.search(norm_text):

@@ -14,7 +14,8 @@ LOGGER = logging.getLogger(__name__)
 
 _ALIASES_PATH = Path(__file__).resolve().with_name("aliases.json")
 _UNIVERSE_PATH = Path(__file__).resolve().parents[3] / "data" / "tickers" / "universe_sp500.txt"
-_TICKER_NAMES_PATH = Path(__file__).resolve().parents[3] / "docs" / "ticker_names.md"
+_UNIVERSE_SP1500_PATH = Path(__file__).resolve().parents[3] / "data" / "tickers" / "universe_sp1500.txt"
+_TICKER_NAMES_PATH = Path(__file__).resolve().parents[3] / "docs" / "guides" / "ticker_names.md"
 
 _CORPORATE_SUFFIXES = {
     "inc",
@@ -61,6 +62,113 @@ _MANUAL_OVERRIDES: Dict[str, str] = {
     "berkshire class a": "BRK.A",
     "berkshire b": "BRK.B",
     "berkshire a": "BRK.A",
+    # Common failing company names
+    "enact": "ACT",
+    "enact holdings": "ACT",
+    "adtran": "ADTN",
+    "adtran holdings": "ADTN",
+    "aspen insurance": "AHL",
+    "aspen": "AHL",
+    "alpha metallurgical": "AMR",
+    "amentum": "AMTM",
+    "alpha omega semiconductor": "AOSL",
+    "bread financial": "BFH",
+    "bread": "BFH",
+    "bill": "BILL",
+    "bj wholesale": "BJ",
+    "bj's wholesale": "BJ",
+    "booking": "BKNG",
+    "booking holdings": "BKNG",
+    "crown": "CCK",
+    "crown holdings": "CCK",
+    "celsius": "CELH",
+    "celsius holdings": "CELH",
+    "cf industries": "CF",
+    "cinemark": "CNK",
+    "concentra": "CON",
+    "cooper standard": "CPS",
+    "cooper-standard": "CPS",
+    "csc collective": "CSC",
+    "lionheart": "CUB",
+    "digital ocean": "DOCN",
+    "digitalocean": "DOCN",
+    "double verify": "DV",
+    "doubleverify": "DV",
+    "energizer": "ENR",
+    "equitable": "EQH",
+    "exl service": "EXLS",
+    "exlservice": "EXLS",
+    "national vision": "EYE",
+    "first cash": "FCFS",
+    "firstcash": "FCFS",
+    "floor decor": "FND",
+    "floor & decor": "FND",
+    "fortrea": "FTRE",
+    "grid dynamics": "GDYN",
+    "generac": "GNRC",
+    "acushnet": "GOLF",
+    "hayward": "HAYW",
+    "hilton worldwide": "HLT",
+    "hilton": "HLT",
+    "harmony biosciences": "HRMY",
+    "hilltop": "HTH",
+    "hertz": "HTZ",
+    "hertz global": "HTZ",
+    "james river": "JRVR",
+    "kyndryl": "KD",
+    "kinetik": "KNTK",
+    "knight swift": "KNX",
+    "kennedy wilson": "KW",
+    "leidos": "LDOS",
+    "labcorp": "LH",
+    "lantheus": "LNTH",
+    "el pollo loco": "LOCO",
+    "lamb weston": "LW",
+    "mara": "MARA",
+    "mativ": "MATV",
+    "medpace": "MEDP",
+    "marketaxess": "MKTX",
+    "norwegian cruise line": "NCLH",
+    "norwegian cruise": "NCLH",
+    "neptune insurance": "NP",
+    "neptune": "NP",
+    "envista": "NVST",
+    "organogenesis": "ORGO",
+    "paymentus": "PAY",
+    "performance food": "PFGC",
+    "palomar": "PLMR",
+    "prog": "PRG",
+    "paypal": "PYPL",
+    "liveramp": "RAMP",
+    "live ramp": "RAMP",
+    "remax": "RMAX",
+    "re max": "RMAX",
+    "ryan specialty": "RYAN",
+    "ryan": "RYAN",
+    "sally beauty": "SBH",
+    "sally": "SBH",
+    "sun country": "SNCY",
+    "sun": "SNCY",
+    "spok": "SPOK",
+    "seagate": "STX",
+    "seagate technology": "STX",
+    "southwest gas": "SWX",
+    "thryv": "THRY",
+    "tko": "TKO",
+    "tko group": "TKO",
+    "ttec": "TTEC",
+    "united airlines": "UAL",
+    "united": "UAL",
+    "universal insurance": "UVE",
+    "universal": "UVE",
+    "veritex": "VBTX",
+    "victory capital": "VCTR",
+    "victory": "VCTR",
+    "willscot": "WSC",
+    "will scot": "WSC",
+    "xerox": "XRX",
+    "zimmer biomet": "ZBH",
+    "zimmer": "ZBH",
 }
 
 _TICKER_PATTERN = re.compile(r"\b([A-Za-z]{1,5})(?:\.[A-Za-z]{1,2})?\b")
@@ -146,6 +254,18 @@ def _alias_variants(tokens: Sequence[str]) -> Set[str]:
 
 
 def _load_universe() -> List[str]:
+    """Load ticker universe - prefers S&P 1500 if available, falls back to S&P 500."""
+    # Try S&P 1500 first (if file exists)
+    if _UNIVERSE_SP1500_PATH.exists():
+        tickers: List[str] = []
+        for line in _UNIVERSE_SP1500_PATH.read_text(encoding="utf-8").splitlines():
+            token = line.strip().upper()
+            if not token or token.startswith("#"):
+                continue
+            tickers.append(token)
+        return tickers
+    
+    # Fall back to S&P 500
     if not _UNIVERSE_PATH.exists():
         raise FileNotFoundError(f"S&P 500 universe file missing: {_UNIVERSE_PATH}")
     tickers: List[str] = []
@@ -418,15 +538,9 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
     for match in _TICKER_PATTERN.finditer(lowered_text):
         raw_token = match.group(0)
         token = raw_token.upper()
-        
-        # CRITICAL: Check if token is a question stopword BEFORE trying to match it as a ticker
-        # This prevents false matches like "What's" -> CPB, "risk?" -> VRSK
         token_lower = raw_token.lower().rstrip('?.,!;:')
-        if token_lower in QUESTION_STOPWORDS:
-            continue
         
-        if len(token) <= 2 and not raw_token.isupper():
-            continue
+        # Check if token is a valid ticker FIRST - if it is, don't filter it out
         candidate = token
         if candidate in ticker_set:
             if candidate not in seen:
@@ -438,14 +552,47 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
             if normalized_candidate not in seen:
                 matches.append((match.start(), token, normalized_candidate))
                 seen.add(normalized_candidate)
+            continue
+        
+        # Only filter out stopwords if they're NOT valid tickers
+        # This prevents false matches like "What's" -> CPB, "risk?" -> VRSK
+        # But allows legitimate tickers like AN, DO, ON
+        if token_lower in QUESTION_STOPWORDS:
+            continue
+        
+        if len(token) <= 2 and not raw_token.isupper():
+            continue
 
     for alias, tickers in lookup.items():
+        # Try multiple matching strategies for each alias
+        # Strategy 1: Exact phrase match
         marker = f" {alias} "
         position = padded_text.find(marker)
+        
+        # Strategy 2: Word boundary match (for single words that might be part of phrases)
+        if position == -1 and len(alias.split()) == 1:
+            # Try finding the word with word boundaries
+            word_pattern = re.compile(r'\b' + re.escape(alias) + r'\b', re.IGNORECASE)
+            match = word_pattern.search(normalized_text)
+            if match:
+                position = match.start()
+        
         if position == -1:
             continue
+        
+        # Allow short aliases if they're valid tickers (e.g., AN, DO, ON)
+        # Only skip very short aliases that aren't in ticker_set
         if len(alias) <= 2:
-            continue
+            # Check if any of the tickers for this alias are valid
+            has_valid_ticker = any(t in ticker_set for t in tickers)
+            if not has_valid_ticker:
+                continue
+        # For longer aliases that are stopwords, still allow if they're valid tickers
+        # This handles cases like "booking", "enact", "bread" which are stopwords but also company names
+        elif alias in QUESTION_STOPWORDS:
+            has_valid_ticker = any(t in ticker_set for t in tickers)
+            if not has_valid_ticker:
+                continue
         for target in tickers:
             if target in seen:
                 continue
@@ -472,7 +619,7 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
         return False
 
     tokens = [token for token in _base_tokens(lowered_text) if token]
-    max_window = min(4, len(tokens))
+    max_window = min(5, len(tokens))  # Increased from 4 to 5 for longer company names
     for window in range(max_window, 0, -1):
         for start_idx in range(len(tokens) - window + 1):
             phrase_tokens = tokens[start_idx : start_idx + window]
@@ -481,17 +628,70 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                 continue
             normalised_phrase = normalize_alias(candidate_phrase)
             
-            # CRITICAL: Skip if phrase is a question stopword
-            if normalised_phrase in QUESTION_STOPWORDS:
+            # CRITICAL: Check if phrase matches a valid ticker FIRST
+            # This allows common words that are also company names (e.g., "booking", "enact")
+            is_valid_ticker = any(t in ticker_set for t in lookup.get(normalised_phrase, []))
+            
+            # Only filter out stopwords if they're NOT valid tickers
+            if normalised_phrase in QUESTION_STOPWORDS and not is_valid_ticker:
                 continue
-            # Also skip single-word phrases that are stopwords
-            if len(phrase_tokens) == 1 and phrase_tokens[0] in QUESTION_STOPWORDS:
+            # Also skip single-word phrases that are stopwords (unless valid ticker)
+            # BUT: Allow multi-word phrases even if they contain stopwords (e.g., "Booking Holdings")
+            if len(phrase_tokens) == 1 and phrase_tokens[0] in QUESTION_STOPWORDS and not is_valid_ticker:
                 continue
             
+            # Try exact match first
             if normalised_phrase and _try_add_alias(normalised_phrase, candidate_phrase):
                 continue
+            
+            # For multi-word phrases, try progressively shorter versions
+            if len(phrase_tokens) > 1:
+                # Strategy 1: Try without last word if it's a common suffix
+                if phrase_tokens[-1] in ["holdings", "inc", "incorporated", "corp", "corporation", "ltd", "company", "co", "group", "parent", "ltd"]:
+                    shorter_phrase = " ".join(phrase_tokens[:-1])
+                    shorter_normalized = normalize_alias(shorter_phrase)
+                    if shorter_normalized and _try_add_alias(shorter_normalized, shorter_phrase):
+                        continue
+                
+                # Strategy 2: Try first word (important for company names like "Booking Holdings")
+                if len(phrase_tokens) >= 2:
+                    first_word = phrase_tokens[0]
+                    first_normalized = normalize_alias(first_word)
+                    if first_normalized:
+                        # Always try first word if it's a valid ticker alias (even if it's a stopword)
+                        is_first_word_ticker = any(t in ticker_set for t in lookup.get(first_normalized, []))
+                        if is_first_word_ticker:
+                            if _try_add_alias(first_normalized, first_word):
+                                continue
+                        # Also try if it's not a stopword
+                        elif first_normalized not in QUESTION_STOPWORDS:
+                            if _try_add_alias(first_normalized, first_word):
+                                continue
+                
+                # Strategy 3: Try all individual words in the phrase (for cases like "Enact Holdings" -> try "enact")
+                for word in phrase_tokens:
+                    word_normalized = normalize_alias(word)
+                    if word_normalized and len(word_normalized) >= 3:  # Only try words with 3+ chars
+                        is_word_ticker = any(t in ticker_set for t in lookup.get(word_normalized, []))
+                        if is_word_ticker:
+                            if _try_add_alias(word_normalized, word):
+                                continue
+                
+                # Strategy 4: Try without multiple suffix words (e.g., "group holdings parent" -> just base)
+                if len(phrase_tokens) >= 3:
+                    # Try first N-2 words (removing last 2 if they're suffixes)
+                    if phrase_tokens[-1] in ["holdings", "inc", "incorporated", "corp", "corporation", "ltd", "company", "co", "group", "parent"] and \
+                       phrase_tokens[-2] in ["holdings", "inc", "incorporated", "corp", "corporation", "ltd", "company", "co", "group", "parent"]:
+                        base_phrase = " ".join(phrase_tokens[:-2])
+                        base_normalized = normalize_alias(base_phrase)
+                        if base_normalized and _try_add_alias(base_normalized, base_phrase):
+                            continue
+            
+            # Allow short phrases if they're valid tickers
             if len(normalised_phrase) <= 2:
-                continue
+                # Check if it's a valid ticker before skipping
+                if not any(t in ticker_set for t in lookup.get(normalised_phrase, [])):
+                    continue
             
             # OPTIMIZATION: Pre-filter candidates before expensive fuzzy matching
             # Only consider aliases with similar characteristics
@@ -503,16 +703,23 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                 alias for alias in alias_candidates
                 if alias and
                 alias[0] == first_char and  # Same first letter
-                abs(len(alias) - phrase_len) <= 3  # Similar length (±3 chars)
+                abs(len(alias) - phrase_len) <= 5  # Similar length (±5 chars, increased from 3)
             ]
             
-            # If no candidates after filtering, skip fuzzy matching entirely
+            # If no candidates after filtering, try without first letter requirement for longer phrases
+            if not filtered_candidates and phrase_len >= 5:
+                filtered_candidates = [
+                    alias for alias in alias_candidates
+                    if alias and abs(len(alias) - phrase_len) <= 5
+                ]
+            
+            # If still no candidates, skip fuzzy matching
             if not filtered_candidates:
                 continue
             
-            # Limit to top 50 candidates max (for very long candidate lists)
-            if len(filtered_candidates) > 50:
-                filtered_candidates = filtered_candidates[:50]
+            # Limit to top 100 candidates max (increased from 50 for better coverage)
+            if len(filtered_candidates) > 100:
+                filtered_candidates = filtered_candidates[:100]
             
             best_alias = None
             best_score = 0.0
@@ -525,33 +732,69 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                 if score >= 0.98:
                     break
             
-            if best_alias and best_score >= 0.95:
+            # Lower threshold from 0.95 to 0.85 for better matching of company names and spelling mistakes
+            if best_alias and best_score >= 0.85:
                 if _try_add_alias(best_alias, candidate_phrase, mark_warning=True):
                     continue
 
-    # If nothing resolved yet, attempt a softer suggestion
+    # If nothing resolved yet, attempt a softer suggestion with spelling mistake tolerance
     if not resolved:
         suggestion_alias: Optional[str] = None
         suggestion_score: float = 0.0
         suggestion_source: Optional[str] = None
+        
+        # Try individual tokens first
         unique_tokens = []
         for token in tokens:
             token_norm = normalize_alias(token)
             if token_norm and token_norm not in unique_tokens:
                 unique_tokens.append(token_norm)
+        
         for token_norm in unique_tokens:
             if len(token_norm) < 3:
                 continue
-            close_matches = difflib.get_close_matches(token_norm, alias_candidates, n=1, cutoff=0.88)
+            # Lower cutoff to 0.70 for better spelling mistake tolerance
+            close_matches = difflib.get_close_matches(token_norm, alias_candidates, n=5, cutoff=0.70)
             if not close_matches:
                 continue
-            alias_candidate = close_matches[0]
-            score = difflib.SequenceMatcher(None, token_norm, alias_candidate).ratio()
-            if score > suggestion_score:
-                suggestion_score = score
-                suggestion_alias = alias_candidate
-                suggestion_source = token_norm
-        if suggestion_alias and suggestion_score >= 0.9:
+            for alias_candidate in close_matches:
+                score = difflib.SequenceMatcher(None, token_norm, alias_candidate).ratio()
+                if score > suggestion_score:
+                    suggestion_score = score
+                    suggestion_alias = alias_candidate
+                    suggestion_source = token_norm
+                    if score >= 0.90:  # Early exit for very good matches
+                        break
+            if suggestion_score >= 0.90:
+                break
+        
+        # Also try multi-word phrases with spelling mistakes
+        if suggestion_score < 0.85:
+            for window in range(min(3, len(tokens)), 0, -1):
+                for start_idx in range(len(tokens) - window + 1):
+                    phrase_tokens = tokens[start_idx : start_idx + window]
+                    candidate_phrase = " ".join(phrase_tokens)
+                    if not candidate_phrase:
+                        continue
+                    normalised_phrase = normalize_alias(candidate_phrase)
+                    if len(normalised_phrase) < 4:
+                        continue
+                    # Try fuzzy matching with lower threshold for spelling mistakes
+                    close_matches = difflib.get_close_matches(normalised_phrase, alias_candidates, n=5, cutoff=0.70)
+                    for alias_candidate in close_matches:
+                        score = difflib.SequenceMatcher(None, normalised_phrase, alias_candidate).ratio()
+                        if score > suggestion_score:
+                            suggestion_score = score
+                            suggestion_alias = alias_candidate
+                            suggestion_source = candidate_phrase
+                            if score >= 0.90:
+                                break
+                    if suggestion_score >= 0.90:
+                        break
+                if suggestion_score >= 0.90:
+                    break
+        
+        if suggestion_alias and suggestion_score >= 0.80:  # Even lower threshold for spelling mistakes
             tickers = lookup.get(suggestion_alias, [])
             if tickers:
                 ticker = tickers[0]
