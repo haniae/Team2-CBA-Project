@@ -1862,26 +1862,11 @@ Project/
 │       │
 │       ├── Parsing & NLP:
 │       ├── parsing/
-│       │   ├── alias_builder.py       # Ticker alias resolution (S&P 500)
-│       │   ├── aliases.json           # Generated ticker aliases (S&P 500 coverage)
-│       │   ├── ontology.py           # Metric ontology (KPI definitions)
-│       │   ├── parse.py               # Natural language parser (structured intents)
+│       │   ├── alias_builder.py       # Ticker alias resolution (S&P 1500, 1,599 companies, 90% spelling correction)
+│       │   ├── aliases.json           # Generated ticker aliases (S&P 1500 coverage, company names)
+│       │   ├── ontology.py           # Metric ontology (93 KPIs, 200+ synonyms, 100% spelling correction)
+│       │   ├── parse.py               # Natural language parser (40+ intents, 150+ patterns, structured intents)
 │       │   ├── time_grammar.py        # Time period parser (FY, quarters, ranges)
-│       │   ├── abbreviations.py       # Abbreviation expansion
-│       │   ├── company_groups.py      # Company group detection
-│       │   ├── comparative.py         # Comparative language parsing
-│       │   ├── conditionals.py        # Conditional statement parsing
-│       │   ├── fuzzy_quantities.py    # Fuzzy quantity parsing
-│       │   ├── metric_inference.py   # Metric inference from context
-│       │   ├── multi_intent.py       # Multi-intent detection
-│       │   ├── natural_filters.py    # Natural language filters
-│       │   ├── negation.py            # Negation handling
-│       │   ├── question_chaining.py   # Question chaining detection
-│       │   ├── sentiment.py          # Sentiment analysis
-│       │   ├── temporal_relationships.py # Temporal relationship parsing
-│       │   └── trends.py              # Trend detection
-│       │
-│       ├── Parsing & NLP (continued):
 │       │   ├── abbreviations.py       # Abbreviation expansion
 │       │   ├── company_groups.py      # Company group detection
 │       │   ├── comparative.py         # Comparative language parsing
@@ -2317,7 +2302,7 @@ Project/
 | scripts/ingestion/load_prices_stooq.py | Stooq price loader (fallback). Imports Stooq prices as a fallback when Yahoo throttles. |
 | scripts/ingestion/load_prices_yfinance.py | Yahoo Finance price loader. Fetches real-time and historical prices from Yahoo Finance. |
 | scripts/ingestion/load_ticker_cik.py | Ticker to CIK mapping loader. Maps ticker symbols to SEC CIK numbers. |
-| scripts/generate_aliases.py | Regenerates the S&P 500 alias universe (aliases.json). Updates ticker aliases for parser. |
+| scripts/generate_aliases.py | Regenerates the S&P 1500 alias universe (aliases.json) covering all 1,599 companies. Updates ticker aliases for parser with company names and spelling corrections. |
 
 #### Utility Scripts
 
