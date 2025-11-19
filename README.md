@@ -16,7 +16,7 @@
 
 **FinalyzeOS** is an institutional-grade copilot for finance teams. It pairs deterministic market analytics with a conversational interface so analysts can ask natural-language questions, inspect lineage, and keep data pipelines auditable.
 
-🎓 Practicum Context: This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing FinalyzeOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
+This repository underpins our Fall 2025 DNSC 6317 practicum 🎓at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing FinalyzeOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
 
 Contributors:  **Hania A.**  , **Van Nhi Vuong** , **Malcolm Muoriyarwa** & **Devarsh Patel** . Special thanks to: supervising faculty (The George Washington University): **Professor Patrick Hall**
 
