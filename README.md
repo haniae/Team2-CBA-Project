@@ -61,102 +61,34 @@ python run_chatbot.py
 
 ## 📚 Table of Contents
 
-### 🚀 Getting Started
+### Quick Navigation
 - [⚡ TL;DR - Quick Start](#-tldr---quick-start)
 - [🛠️ Complete Setup Guide](#️-complete-setup-guide)
-  - [Step 1: Install Dependencies](#step-1-install-dependencies)
-  - [Step 2: Choose Your Data Ingestion Option](#step-2-choose-your-data-ingestion-option)
-  - [Step 3: Verify Your Setup](#step-3-verify-your-setup)
-  - [Step 4: Start Using FinalyzeOS](#step-4-start-using-finalyzeos)
-- [💬 Running FinalyzeOS](#-running-finalyzeos)
-  - [CLI REPL](#️-cli-repl)
-  - [FastAPI + SPA](#-fastapi--spa)
-  - [REST Endpoints](#-rest-endpoints)
-
-### 📖 About & Overview
-- [🎓 Practicum Context](#-practicum-context)
-- [📖 Overview](#-overview)
+- [💡 Example Queries](#-example-queries)
 - [⚡ Core Capabilities](#-core-capabilities)
 - [📊 Current Data Coverage](#-current-data-coverage)
 
-### 💡 Usage & Examples
-- [💡 Example Queries](#-example-queries)
-  - [Single Metric Queries](#-single-metric-queries)
-  - ["Why" Questions (Multi-Factor Analysis)](#-why-questions-multi-factor-analysis)
-  - [Comparison Queries](#-comparison-queries)
-  - [Time-Based Queries](#-time-based-queries)
-  - [Dashboard Requests](#-dashboard-requests)
-  - [Forecasting Queries](#-forecasting-queries)
-  - [Portfolio Queries](#-portfolio-queries)
-  - [Advanced Analytics](#-advanced-analytics)
-
-### 🎯 Features & Capabilities
+### Features
 - [🚀 Advanced Analytics](#-advanced-analytics)
-  - [Sector Benchmarking](#1️⃣-sector-benchmarking-sector_analyticspy)
-  - [Anomaly Detection](#2️⃣-anomaly-detection-anomaly_detectionpy)
-  - [Predictive Analytics](#3️⃣-predictive-analytics-predictive_analyticspy)
-  - [Advanced KPI Calculator](#4️⃣-advanced-kpi-calculator-advanced_kpispy)
 - [🤖 Machine Learning Stack](#-machine-learning-stack)
-  - [Architecture Overview](#architecture-overview)
-  - [Forecast Workflow](#forecast-workflow)
-  - [Guardrails & Verification](#guardrails--verification)
-- [🤖 Machine Learning Forecasting (NEW)](#-machine-learning-forecasting-new)
-  - [ML Forecasting Models](#-ml-forecasting-models)
-  - [Forecasting Capabilities](#-forecasting-capabilities)
-  - [Enhanced RAG Integration](#-enhanced-rag-integration)
+- [🤖 Machine Learning Forecasting](#-machine-learning-forecasting-new)
 - [📚 Retrieval-Augmented Generation](#-retrieval-augmented-generation)
-  - [Document Lifecycle](#document-lifecycle)
-  - [Prompt-Aware Retrieval](#prompt-aware-retrieval)
-  - [Context Fusion](#context-fusion)
 - [📊 Portfolio Management](#-portfolio-management)
-  - [Core Portfolio Features](#-core-portfolio-features)
-  - [Portfolio Data Structure](#-portfolio-data-structure)
-  - [Technical Implementation](#-technical-implementation)
 
-### 🏗️ Architecture & Technical Details
-- [🏗️ Architecture Map](#️-architecture-map)
+### Technical Documentation
 - [🧠 Retrieval & ML Internals](#-retrieval--ml-internals)
-  - [Natural-Language Parsing (Deterministic)](#-natural-language-parsing-deterministic)
-  - [Retrieval Layer (RAG)](#-retrieval-layer-rag)
-  - [Generation / Machine Learning](#-generation--machine-learning)
-  - [RAG Enhancements for ML Forecasting](#-rag-enhancements-for-ml-forecasting)
-  - [RAG Enhancements for Portfolio Management](#-rag-enhancements-for-portfolio-management)
-- [🗄️ Database Schema](#️-database-schema)
-- [⚙️ Configuration Reference](#️-configuration-reference)
-
-### 📥 Data & Ingestion
 - [📥 Data Ingestion Guide](#-data-ingestion-guide)
-  - [Smart Gap Filling Script](#-recommended-smart-gap-filling-script)
-  - [Alternative: Legacy Batch Scripts](#alternative-legacy-batch-scripts)
-  - [On-Demand Ingestion](#on-demand-ingestion)
-  - [Price-refresh workflow](#price-refresh-workflow)
-- [📊 Advanced Ingestion Techniques](#-advanced-ingestion-techniques)
+- [💬 Running FinalyzeOS](#-running-finalyzeos)
+- [⚙️ Configuration Reference](#️-configuration-reference)
+- [🗄️ Database Schema](#️-database-schema)
 
-### 📁 Project Structure
+### Project Structure
 - [📁 Project Layout](#-project-layout)
 - [📝 File Reference](#-file-reference)
-  - [Root Scripts & Helpers](#-root-scripts--helpers)
-  - [Scripts](#-scripts)
-  - [Core Components](#️-core-components)
-  - [Data & Ingestion](#-data--ingestion)
-  - [Context & RAG](#-context--rag)
-  - [Parsing & NLP](#-parsing--nlp)
-  - [Spelling & Correction](#️-spelling--correction-integrated-in-parsing)
-  - [Routing](#-routing)
-  - [Analytics Modules](#-analytics-modules)
-  - [Portfolio Management](#-portfolio-management)
-  - [ML Forecasting](#-ml-forecasting)
-  - [Export & Presentation](#-export--presentation)
-  - [Utilities](#️-utilities)
-  - [Web Assets](#-web-assets)
-  - [Tests](#-tests)
 
-### 🔧 Maintenance & Support
+### Support
 - [✅ Quality and Testing](#-quality-and-testing)
 - [🔧 Troubleshooting](#-troubleshooting)
-  - [General Issues](#️-general-issues)
-  - [Data Ingestion Issues](#-data-ingestion-issues)
-  - [Verifying Ingestion Success](#verifying-ingestion-success)
 - [📚 Further Reading](#-further-reading)
 - [🧭 Full Docs Index](docs/README.md)
 
