@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import Iterable, List, Optional, Set, Tuple
+from typing import Any, Iterable, List, Optional, Set, Tuple
 
 from . import database
 
@@ -27,10 +27,39 @@ def build_uploaded_document_context(
     max_chars: int = 6000,
     max_snippet_per_doc: int = 2000,
     chunk_overlap: int = 200,
+    use_semantic_search: bool = True,
 ) -> Optional[str]:
+    """
+    Build context from uploaded documents.
+    
+    Args:
+        use_semantic_search: If True, use vector search when available; 
+                            falls back to token overlap if vector store unavailable.
+    """
     if not conversation_id:
         return None
 
+    # Try semantic search first if enabled
+    if use_semantic_search:
+        try:
+            from .rag_retriever import VectorStore
+            
+            vector_store = VectorStore(database_path)
+            if vector_store._available:
+                # Use semantic search
+                results = vector_store.search_uploaded_docs(
+                    query=user_input,
+                    n_results=max_documents,
+                    filter_metadata={"conversation_id": conversation_id} if conversation_id else None,
+                )
+                
+                if results:
+                    return _format_semantic_search_results(results, max_chars)
+        except (ImportError, Exception) as e:
+            # Fall back to token overlap if semantic search fails
+            LOGGER.debug(f"Semantic search unavailable, using token overlap: {e}")
+
+    # Fallback: Token overlap matching (original implementation)
     try:
         documents = database.fetch_uploaded_documents(
             database_path,
@@ -230,6 +259,61 @@ def build_uploaded_document_context(
     header = [
         banner,
         "UPLOADED FINANCIAL DOCUMENTS",
+        "Use these excerpts when answering the user's question. Cite filenames in your response.",
+        banner,
+    ]
+    body = f"\n\n{banner}\n".join(sections)
+    return "\n".join(header) + "\n\n" + body
+
+
+def _format_semantic_search_results(
+    results: List[Any],  # List[RetrievedDocument]
+    max_chars: int = 6000,
+) -> str:
+    """Format semantic search results from vector store."""
+    banner = "=" * 80
+    sections: List[str] = []
+    remaining_chars = max(max_chars, 0)
+    
+    for result in results:
+        if remaining_chars <= 0:
+            break
+            
+        metadata = result.metadata or {}
+        text = result.text or ""
+        
+        # Truncate if needed
+        if len(text) > remaining_chars:
+            text = text[:remaining_chars].rstrip() + "\n[…]"
+            remaining_chars = 0
+        else:
+            remaining_chars -= len(text)
+        
+        section_lines = [
+            f"Filename: {metadata.get('filename', 'unknown')}",
+            f"Type: {metadata.get('file_type', 'unknown')}",
+        ]
+        
+        if result.score is not None:
+            # Convert distance to similarity (ChromaDB returns distance, lower = more similar)
+            similarity = 1.0 - result.score if result.score <= 1.0 else 1.0 / (1.0 + result.score)
+            section_lines.append(f"Relevance Score: {similarity:.2f}")
+        
+        uploaded_at = metadata.get("uploaded_at")
+        if uploaded_at:
+            section_lines.append(f"Uploaded: {uploaded_at}")
+        
+        section_lines.append("Content Preview:")
+        section_lines.append(text.strip() or "[No readable text extracted]")
+        
+        sections.append("\n".join(section_lines))
+    
+    if not sections:
+        return None
+    
+    header = [
+        banner,
+        "UPLOADED FINANCIAL DOCUMENTS (Semantic Search)",
         "Use these excerpts when answering the user's question. Cite filenames in your response.",
         banner,
     ]

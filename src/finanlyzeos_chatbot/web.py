@@ -2110,6 +2110,62 @@ async def document_upload(
         
         LOGGER.info(f"Document uploaded: {document_id} ({file.filename}, {file_type}, {len(extracted_text)} chars)")
         
+        # Automatically index the document for semantic search (non-blocking)
+        try:
+            from .rag_retriever import VectorStore
+            vector_store = VectorStore(db_path)
+            if vector_store._available and extracted_text.strip():
+                # Chunk and index the document
+                chunk_size = 1500
+                chunk_overlap = 200
+                chunks = []
+                start = 0
+                text = extracted_text
+                while start < len(text):
+                    end = min(start + chunk_size, len(text))
+                    chunk = text[start:end].strip()
+                    if chunk:
+                        chunks.append({
+                            "text": chunk,
+                            "metadata": {
+                                "filename": file.filename,
+                                "file_type": file_type,
+                                "uploaded_at": created_at,
+                                "conversation_id": conversation_id,
+                                "document_id": document_id,
+                            }
+                        })
+                    if end >= len(text):
+                        break
+                    start = max(start - chunk_overlap, 0) + chunk_size
+                
+                if chunks:
+                    vector_store.add_uploaded_documents(chunks)
+                    LOGGER.info(f"Auto-indexed {len(chunks)} chunks for document {document_id}")
+                    
+                    # Register in memory-augmented RAG
+                    try:
+                        from .rag_memory import MemoryAugmentedRAG
+                        # Get or create memory instance (could be singleton)
+                        # For now, create new instance (in production, use singleton)
+                        memory_rag = MemoryAugmentedRAG()
+                        chunk_ids = [f"{document_id}_chunk_{i}" for i in range(len(chunks))]
+                        memory_rag.register_document(
+                            document_id=document_id,
+                            conversation_id=conversation_id,
+                            user_id=None,  # Could extract from session if available
+                            filename=file.filename,
+                            chunk_ids=chunk_ids,
+                            uploaded_at=datetime.fromisoformat(created_at.replace('Z', '+00:00')) if 'Z' in created_at else datetime.fromisoformat(created_at),
+                        )
+                        LOGGER.debug(f"Registered document {document_id} in memory-augmented RAG")
+                    except Exception as e:
+                        # Non-critical: memory tracking can fail without breaking upload
+                        LOGGER.debug(f"Memory-augmented RAG registration failed (non-critical): {e}")
+        except Exception as e:
+            # Non-critical: indexing can be done manually later
+            LOGGER.debug(f"Auto-indexing failed (non-critical): {e}")
+        
         return DocumentUploadResponse(
             success=True,
             document_id=document_id,

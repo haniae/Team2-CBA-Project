@@ -1,0 +1,17 @@
+[
+  {
+    "query": "What is Apple's revenue?",
+    "tickers": [
+      "AAPL"
+    ],
+    "relevant_doc_ids": [
+      "sec:AAPL_10K_2024",
+      "metric:revenue"
+    ],
+    "expected_answer": "Apple's revenue is $394.3 billion in FY2024",
+    "key_facts": [
+      "$394.3 billion",
+      "FY2024"
+    ]
+  }
+]

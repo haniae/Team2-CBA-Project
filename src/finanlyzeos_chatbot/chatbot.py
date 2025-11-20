@@ -39,6 +39,15 @@ from .dashboard_utils import (
 )
 from .routing import enhance_structured_parse, should_build_dashboard, EnhancedIntent
 from .context_builder import build_financial_context
+# Optional RAG components (imported when needed)
+try:
+    from .rag_retriever import RAGRetriever
+    from .rag_prompt_template import build_rag_prompt
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
+from .rag_retriever import RAGRetriever
+from .rag_prompt_template import build_rag_prompt
 from .custom_kpis import CustomKPICalculator, KPIIntentParser, CustomKPIDefinition
 from .interactive_modeling import ModelBuilder
 from .ml_forecasting.user_plugins import (
@@ -4619,7 +4628,8 @@ class FinanlyzeOSChatbot:
                         context += "**Note:** This is a forecasting query. Please provide a forecast based on available data.\n"
                         context += f"{'='*80}\n"
 
-                    context_detail = "Context compiled" if context else "Context not required"
+                    if not use_unified_rag:
+                        context_detail = "Context compiled" if context else "Context not required"
                     
                     # ENHANCED: Ensure LLM always has context, even if empty
                     # This prevents the LLM from being called with no context at all
