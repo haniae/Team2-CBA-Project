@@ -883,6 +883,30 @@ const PROGRESS_BLUEPRINT = [
     },
   },
 ];
+
+// Status messages for progress indicator
+const STATUS_MESSAGES = [
+  "Analyzing prompt phrasing...",
+  "Retrieving financial data...",
+  "Running LSTM forecast...",
+  "Generating insights...",
+  "Finalizing analysis..."
+];
+
+// Stage-specific status messages for contextual feedback
+const STAGE_STATUS_MAP = {
+  "intent": "Analyzing prompt phrasing...",
+  "help_lookup": "Searching knowledge base...",
+  "cache": "Checking recent answers...",
+  "context": "Retrieving financial data...",
+  "summary": "Processing market data...",
+  "metrics": "Calculating key metrics...",
+  "ticker": "Analyzing company data...",
+  "llm": "Running LSTM forecast...",
+  "forecast": "Generating predictions...",
+  "finalize": "Finalizing analysis...",
+  "complete": "Analysis complete"
+};
 let companyUniverseData = [];
 let filteredCompanyData = [];
 let companyUniverseMetrics = null;
@@ -5742,19 +5766,47 @@ function ensureMessageProgress(wrapper) {
   if (!container) {
     container = document.createElement("div");
     container.className = "message-progress";
-    const title = document.createElement("div");
-    title.className = "message-progress-title";
-    title.textContent = "Preparing analysis...";
-    container.append(title);
+    
+    // Create ChatGPT-style thinking indicator
+    const indicator = document.createElement("div");
+    indicator.className = "chatgpt-thinking-indicator";
+    indicator.setAttribute('role', 'status');
+    indicator.setAttribute('aria-live', 'polite');
+    indicator.setAttribute('aria-label', 'Thinking');
+    
+    // ChatGPT-style bouncing dots with status text
+    const dotsContainer = document.createElement("div");
+    dotsContainer.className = "chatgpt-dots";
+    dotsContainer.setAttribute('aria-hidden', 'true');
+    
+    for (let i = 1; i <= 3; i++) {
+      const dot = document.createElement("span");
+      dot.className = "chatgpt-dot";
+      dotsContainer.appendChild(dot);
+    }
+    
+    // Status text
+    const statusText = document.createElement("div");
+    statusText.className = "progress-status-text";
+    statusText.textContent = "Analyzing prompt phrasing...";
+    
+    indicator.appendChild(dotsContainer);
+    indicator.appendChild(statusText);
+    container.appendChild(indicator);
+    
+    // Keep the old list for compatibility but hide it
     const list = document.createElement("ul");
     list.className = "message-progress-list";
+    list.style.display = "none";
     container.append(list);
+    
     body.append(container);
   }
   return {
     container,
     list: container.querySelector(".message-progress-list"),
-    title: container.querySelector(".message-progress-title"),
+    title: container.querySelector(".progress-status-text"),
+    indicator: container.querySelector(".chatgpt-thinking-indicator"),
   };
 }
 
@@ -5818,7 +5870,7 @@ function startProgressTracking(requestId, wrapper) {
   if (!progressElements || !progressElements.list) {
     return null;
   }
-  const { container, list, title } = progressElements;
+  const { container, list, title, indicator } = progressElements;
   container.classList.add("active", "pending");
   wrapper.dataset.requestId = requestId;
   const tracker = {
@@ -5827,6 +5879,7 @@ function startProgressTracking(requestId, wrapper) {
     list,
     container,
     title,
+    indicator,
     steps: createProgressSteps(),
     seen: new Set(),
     lastSequence: 0,
@@ -5836,8 +5889,28 @@ function startProgressTracking(requestId, wrapper) {
     progressStarted: false,
     events: [],
     startedAt: Number.NaN,
+    isThinking: false,
+    isStreaming: false,
+    statusRotationTimer: null,
+    currentStatusIndex: 0,
+    lastStageMessage: null,
     render() {
       renderProgressTracker(this);
+    },
+    showThinking() {
+      showThinkingDots(this);
+    },
+    hideThinking() {
+      hideThinkingDots(this);
+    },
+    updateStatus(message) {
+      updateProgressStatus(this, message);
+    },
+    startStatusRotation() {
+      startStatusMessageRotation(this);
+    },
+    stopStatusRotation() {
+      stopStatusMessageRotation(this);
     },
   };
 
@@ -5883,6 +5956,8 @@ function startProgressTracking(requestId, wrapper) {
   tracker.poll = poll;
   progressTrackers.set(requestId, tracker);
   tracker.render();
+  tracker.showThinking(); // Show ChatGPT-style thinking dots
+  tracker.startStatusRotation(); // Start rotating status messages
   tracker.poll().catch(() => {});
   tracker.timer = window.setInterval(() => {
     tracker.poll().catch(() => {});
@@ -5899,6 +5974,17 @@ async function stopProgressTracking(requestId, { flush = false } = {}) {
     window.clearInterval(tracker.timer);
     tracker.timer = null;
   }
+  
+  // Clean up ChatGPT-style progress
+  tracker.hideThinking?.();
+  tracker.stopStatusRotation?.();
+  
+  // Clean up scroll observer
+  if (tracker.scrollObserver) {
+    tracker.scrollObserver.disconnect();
+    tracker.scrollObserver = null;
+  }
+  
   if (flush) {
     try {
       await tracker.poll();
@@ -8910,11 +8996,20 @@ function updateProgressTrackerWithEvent(tracker, event) {
     tracker.container.classList.remove("pending");
     tracker.container.classList.remove("complete");
     tracker.container.classList.add("error");
+    tracker.isStreaming = false;
+    tracker.stopStatusRotation();
+    
     const activeStep = tracker.steps.find((step) => step.status === "active") || tracker.steps[tracker.steps.length - 1];
     pushMessage(activeStep, event.detail || "An unexpected error occurred");
-    if (tracker.title) {
-      tracker.title.textContent = "Something went wrong";
-    }
+    
+    // Update status to show error message
+    tracker.updateStatus("⚠️ Analysis failed: " + (event.detail || "An unexpected error occurred"));
+    
+    // Hide thinking dots after showing error message briefly
+    setTimeout(() => {
+      tracker.hideThinking();
+    }, 2000);
+    
     return;
   }
 
@@ -8928,11 +9023,27 @@ function updateProgressTrackerWithEvent(tracker, event) {
     tracker.container.classList.remove("pending");
     tracker.container.classList.remove("error");
     tracker.container.classList.add("complete");
+    tracker.complete = true;
+    tracker.isStreaming = false;
+    tracker.stopStatusRotation();
+    
     const finalStep = tracker.steps[tracker.steps.length - 1];
     pushMessage(finalStep, event.detail || "Analysis ready");
-    if (tracker.title) {
-      tracker.title.textContent = "Analysis ready";
+    
+    // Update status to completion message
+    tracker.updateStatus("Analysis complete");
+    
+    // Hide thinking dots after showing completion message briefly
+    setTimeout(() => {
+      tracker.hideThinking();
+    }, 1000);
+    
+    // Remove streaming cursor from message body
+    const messageBody = tracker.wrapper?.querySelector('.message-content');
+    if (messageBody) {
+      removeStreamingCursor(messageBody);
     }
+    
     return;
   }
 
@@ -8978,9 +9089,44 @@ function updateProgressTrackerWithEvent(tracker, event) {
     }
   }
 
-  const activeStep = tracker.steps.find((step) => step.status === "active");
-  if (tracker.title) {
-    tracker.title.textContent = activeStep?.label || "Analysis ready";
+  // Update status message with stage-specific text
+  const stageMessage = getStatusMessageForStage(stage);
+  if (stageMessage) {
+    tracker.stopStatusRotation(); // Stop rotation when we have a specific message
+    tracker.updateStatus(stageMessage);
+  } else {
+    // If no specific message, resume rotation if not already running
+    if (!tracker.statusRotationTimer && !tracker.complete) {
+      tracker.startStatusRotation();
+    }
+  }
+
+  // Handle ChatGPT-style thinking -> streaming transition
+  if (!tracker.isStreaming && (stage.startsWith("llm") || stage === "finalize")) {
+    // First content is arriving - transition from thinking to streaming
+    tracker.hideThinking();
+    tracker.stopStatusRotation();
+    tracker.isStreaming = true;
+    
+    // Add streaming cursor to message body
+    const messageBody = tracker.wrapper?.querySelector('.message-content');
+    if (messageBody) {
+      addStreamingCursor(messageBody);
+      
+      // Enable auto-scroll for streaming content
+      const scrollHandler = () => enableAutoScroll(tracker.wrapper);
+      
+      // Set up mutation observer to detect content changes
+      const observer = new MutationObserver(scrollHandler);
+      observer.observe(messageBody, { 
+        childList: true, 
+        subtree: true, 
+        characterData: true 
+      });
+      
+      // Store observer for cleanup
+      tracker.scrollObserver = observer;
+    }
   }
 }
 function renderProgressTracker(tracker) {
@@ -9105,6 +9251,130 @@ function renderProgressSummary(tracker) {
   summary.append(list);
   body.prepend(summary);
 }
+
+// ChatGPT-Style Progress Functions with Status Messages
+function updateProgressStatus(tracker, message) {
+  if (!tracker?.title) {
+    return;
+  }
+  
+  const statusText = tracker.title;
+  if (message && message !== statusText.textContent) {
+    // Smooth transition between status messages
+    statusText.style.opacity = '0.6';
+    statusText.style.transform = 'translateY(-2px)';
+    
+    setTimeout(() => {
+      statusText.textContent = message;
+      statusText.style.opacity = '1';
+      statusText.style.transform = 'translateY(0)';
+    }, 150);
+    
+    tracker.lastStageMessage = message;
+  }
+}
+
+function startStatusMessageRotation(tracker) {
+  if (!tracker?.title) {
+    return;
+  }
+  
+  // Don't rotate if we have a specific stage message
+  if (tracker.lastStageMessage) {
+    return;
+  }
+  
+  tracker.statusRotationTimer = setInterval(() => {
+    // Don't rotate if we have a specific stage message or if complete
+    if (tracker.lastStageMessage || tracker.complete) {
+      return;
+    }
+    
+    tracker.currentStatusIndex = (tracker.currentStatusIndex + 1) % STATUS_MESSAGES.length;
+    const nextMessage = STATUS_MESSAGES[tracker.currentStatusIndex];
+    updateProgressStatus(tracker, nextMessage);
+  }, 2500); // Rotate every 2.5 seconds
+}
+
+function stopStatusMessageRotation(tracker) {
+  if (tracker?.statusRotationTimer) {
+    clearInterval(tracker.statusRotationTimer);
+    tracker.statusRotationTimer = null;
+  }
+}
+
+function getStatusMessageForStage(stage) {
+  if (!stage) {
+    return null;
+  }
+  
+  // Check for exact matches first
+  if (STAGE_STATUS_MAP[stage]) {
+    return STAGE_STATUS_MAP[stage];
+  }
+  
+  // Check for partial matches
+  for (const [key, message] of Object.entries(STAGE_STATUS_MAP)) {
+    if (stage.startsWith(key)) {
+      return message;
+    }
+  }
+  
+  return null;
+}
+
+function showThinkingDots(tracker) {
+  if (!tracker?.indicator) {
+    return;
+  }
+  
+  // Show thinking dots with status text
+  tracker.indicator.style.display = 'flex';
+  tracker.indicator.style.opacity = '1';
+  tracker.isThinking = true;
+}
+
+function hideThinkingDots(tracker) {
+  if (!tracker?.indicator) {
+    return;
+  }
+  
+  // Hide thinking dots instantly when streaming starts
+  tracker.indicator.style.display = 'none';
+  tracker.isThinking = false;
+}
+
+function addStreamingCursor(messageBody) {
+  // Add blinking cursor to the end of streaming content
+  let cursor = messageBody.querySelector('.streaming-cursor');
+  if (!cursor) {
+    cursor = document.createElement('span');
+    cursor.className = 'streaming-cursor';
+    cursor.textContent = '█';
+    cursor.setAttribute('aria-hidden', 'true');
+    messageBody.appendChild(cursor);
+  }
+  return cursor;
+}
+
+function removeStreamingCursor(messageBody) {
+  // Remove cursor when streaming is complete
+  const cursor = messageBody.querySelector('.streaming-cursor');
+  if (cursor) {
+    cursor.remove();
+  }
+}
+
+function enableAutoScroll(wrapper) {
+  // Auto-scroll to keep new content visible (ChatGPT behavior)
+  if (wrapper) {
+    wrapper.scrollIntoView({ 
+      behavior: 'smooth', 
+      block: 'nearest' 
+    });
+  }
+}
+
 
 function resolveStaticAsset(path) {
   if (!path) {

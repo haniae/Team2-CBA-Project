@@ -107,35 +107,9 @@ def add_verification_footer(
     Returns:
         Response with verification footer appended
     """
-    # Find existing footer or end of response
-    footer_marker = "\n\n---\n"
-    if footer_marker in response:
-        # Remove existing footer
-        response = response.split(footer_marker)[0]
-    
-    total_facts = len(verification_results)
-    correct_facts = sum(1 for r in verification_results if r.is_correct)
-    corrections_applied = sum(
-        1 for r in verification_results
-        if not r.is_correct and r.actual_value is not None
-    )
-    
-    # Build footer
-    footer = "\n\n---\n"
-    footer += f"**Verified:** {correct_facts}/{total_facts} facts correct"
-    
-    if corrections_applied > 0 and include_corrections:
-        footer += f" | {corrections_applied} corrections applied"
-    
-    if include_corrections and corrections_applied > 0:
-        footer += "\n\n**Corrections Applied:**\n"
-        for result in verification_results:
-            if not result.is_correct and result.actual_value is not None:
-                fact = result.fact
-                footer += f"- {fact.metric or 'Value'}: "
-                footer += f"{result.actual_value:.2f} (was {fact.value:.2f})\n"
-    
-    return response + footer
+    # Data verification footers are disabled - return response unchanged
+    # The verification still runs in the background for logging/monitoring
+    return response
 
 
 def apply_corrections_with_notes(

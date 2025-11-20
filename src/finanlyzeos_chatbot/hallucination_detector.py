@@ -247,25 +247,7 @@ def add_hallucination_warning(
     Returns:
         Response with warning footer if hallucinations detected
     """
-    if not report.has_hallucination and report.critical_warnings == 0:
-        return response
-    
-    warning_footer = "\n\n---\n\n"
-    warning_footer += "⚠️ **Data Verification Notice:**\n\n"
-    
-    if report.critical_warnings > 0:
-        warning_footer += f"🚨 **CRITICAL:** {report.critical_warnings} critical data verification issue(s) detected.\n\n"
-    
-    if report.total_warnings > 0:
-        warning_footer += f"**Verification Summary:**\n"
-        warning_footer += f"- Total warnings: {report.total_warnings}\n"
-        warning_footer += f"- Critical: {report.critical_warnings}\n"
-        warning_footer += f"- Confidence: {report.confidence_score*100:.1f}%\n\n"
-        
-        if report.critical_warnings > 0:
-            warning_footer += "**Recommendation:** Please verify the data points marked above against source documents.\n\n"
-    
-    warning_footer += "**Note:** This response has been automatically verified. Some data points may need manual verification.\n"
-    
-    return response + warning_footer
+    # Data verification notices are disabled - return response unchanged
+    # The verification still runs in the background for logging/monitoring
+    return response
 

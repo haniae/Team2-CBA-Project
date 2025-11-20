@@ -113,8 +113,8 @@ class TestAddVerificationFooter:
         
         result = add_verification_footer(response, results)
         
-        assert "Verified:" in result
-        assert "1/1 facts correct" in result
+        # Verification footers are disabled - should return original response
+        assert result == response
     
     def test_add_verification_footer_with_corrections(self):
         """Test adding footer with corrections applied."""
@@ -144,8 +144,8 @@ class TestAddVerificationFooter:
         
         result = add_verification_footer(response, results, include_corrections=True)
         
-        assert "Verified:" in result
-        assert "corrections applied" in result.lower() or "corrections" in result.lower()
+        # Verification footers are disabled - should return original response
+        assert result == response
 
 
 class TestApplyCorrectionsWithNotes:

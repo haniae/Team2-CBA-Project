@@ -3106,16 +3106,122 @@ body::-webkit-scrollbar {
 .message-progress {
   display: none;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px 18px;
-  border: 2px solid rgba(59, 130, 246, 0.35);
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.1), 0 2px 8px rgba(59, 130, 246, 0.05);
-  font-size: 13px;
+  gap: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 14px;
   color: var(--text-primary);
-  backdrop-filter: blur(8px);
+  backdrop-filter: none;
   transition: all 0.3s ease;
+}
+
+/* ChatGPT-Style Thinking Indicator */
+.chatgpt-thinking-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  opacity: 0;
+  animation: fadeInThinking 0.2s ease-out forwards;
+}
+
+@keyframes fadeInThinking {
+  to {
+    opacity: 1;
+  }
+}
+
+.chatgpt-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress-status-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6B7280;
+  transition: all 0.2s ease;
+  line-height: 1.4;
+}
+
+.chatgpt-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3B82F6; /* FinalyzeOS blue theme */
+  display: inline-block;
+  animation: chatgpt-bounce 1.4s infinite ease-in-out;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.3); /* Subtle blue glow */
+}
+
+.chatgpt-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.chatgpt-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.chatgpt-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Enhanced bounce animation for blue theme */
+@keyframes chatgpt-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5; /* Slightly more visible at rest */
+  }
+  30% {
+    transform: translateY(-8px);
+    opacity: 1;
+    box-shadow: 0 2px 12px rgba(59, 130, 246, 0.5); /* Enhanced glow at peak */
+  }
+}
+
+/* Streaming Cursor */
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: #3B82F6; /* FinalyzeOS blue theme */
+  margin-left: 2px;
+  animation: blink 1s step-end infinite;
+  vertical-align: baseline;
+}
+
+@keyframes blink {
+  0%, 49% { 
+    opacity: 1; 
+  }
+  50%, 100% { 
+    opacity: 0; 
+  }
+}
+
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .chatgpt-dot {
+    animation: none;
+    opacity: 0.6;
+    transform: translateY(0);
+  }
+  
+  .chatgpt-thinking-indicator {
+    animation: none;
+    opacity: 1;
+  }
+  
+  .streaming-cursor {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 .message-progress.active {
@@ -3511,11 +3617,23 @@ body::-webkit-scrollbar {
 
 /* Dark mode support for progress indicator */
 [data-theme="dark"] .message-progress {
-  border-color: rgba(59, 130, 246, 0.4);
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.08) 100%);
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2), 0 2px 8px rgba(59, 130, 246, 0.1);
+  background: transparent;
   color: #e2e8f0;
 }
+
+[data-theme="dark"] .chatgpt-dot {
+  background: #60A5FA; /* Brighter blue for dark theme visibility */
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.4); /* Enhanced glow for dark mode */
+}
+
+[data-theme="dark"] .streaming-cursor {
+  background: #60A5FA; /* Matching blue for dark theme */
+}
+
+[data-theme="dark"] .progress-status-text {
+  color: #94a3b8;
+}
+
 
 [data-theme="dark"] .message-progress.complete {
   border-color: rgba(34, 197, 94, 0.45);
