@@ -1991,10 +1991,33 @@ class FinanlyzeOSChatbot:
     _metrics_cache: "OrderedDict[Tuple[str, Tuple[Tuple[int, int], ...]], Tuple[List[database.MetricRecord], float]]" = field(default_factory=OrderedDict, init=False, repr=False)
     _summary_cache: "OrderedDict[str, Tuple[str, float]]" = field(default_factory=OrderedDict, init=False, repr=False)
     _active_progress_callback: Optional[Callable[[str, str], None]] = field(default=None, init=False, repr=False)
+    _rag_orchestrator: Optional[Any] = field(default=None, init=False, repr=False)  # RAGOrchestrator instance
 
     def __post_init__(self) -> None:
         """Initialise mutable response state containers."""
         self._reset_structured_response()
+        # Initialize RAG Orchestrator (lazy initialization)
+        self._rag_orchestrator = None
+
+    def _get_rag_orchestrator(self) -> Optional[Any]:
+        """Get or create RAG Orchestrator instance (lazy initialization)."""
+        if self._rag_orchestrator is None:
+            try:
+                from .rag_orchestrator import RAGOrchestrator
+                self._rag_orchestrator = RAGOrchestrator(
+                    database_path=Path(self.settings.database_path),
+                    analytics_engine=self.analytics_engine,
+                    use_reranking=True,
+                    use_multi_hop=True,
+                    use_fusion=True,
+                    use_grounded_decision=True,
+                    use_memory=True,
+                )
+                LOGGER.info("RAG Orchestrator initialized with all advanced features")
+            except Exception as e:
+                LOGGER.warning(f"Failed to initialize RAG Orchestrator: {e}. Falling back to legacy context building.", exc_info=True)
+                return None
+        return self._rag_orchestrator
 
     def _reset_structured_response(self) -> None:
         """Clear any structured payload captured during the last response."""
@@ -4612,47 +4635,105 @@ class FinanlyzeOSChatbot:
                     context_detail = "Portfolio context compiled - using actual portfolio data"
                     LOGGER.info("Using portfolio context for query")
                 else:
-                    # Use build_financial_context for all queries (including forecasting)
-                    context = build_financial_context(
-                        query=user_input,
-                        analytics_engine=self.analytics_engine,
-                        database_path=str(self.settings.database_path),
-                        max_tickers=3,
-                        include_macro_context=True
-                    )
-
-                    if is_forecasting and not context:
-                        LOGGER.warning("Forecasting query detected but context is empty - will still call LLM")
-                        context = f"\n{'='*80}\n📊 FORECASTING QUERY DETECTED\n{'='*80}\n"
-                        context += f"**Query:** {user_input}\n"
-                        context += "**Note:** This is a forecasting query. Please provide a forecast based on available data.\n"
-                        context += f"{'='*80}\n"
-
-                    if not use_unified_rag:
-                        context_detail = "Context compiled" if context else "Context not required"
+                    # Try RAG Orchestrator first (with all advanced features)
+                    rag_orchestrator = self._get_rag_orchestrator()
+                    use_rag_orchestrator = rag_orchestrator is not None
                     
-                    # ENHANCED: Ensure LLM always has context, even if empty
-                    # This prevents the LLM from being called with no context at all
-                    if not context:
-                        # Provide minimal helpful context for the LLM
-                        context = f"\n{'='*80}\n"
-                        context += f"📊 USER QUERY\n"
-                        context += f"{'='*80}\n\n"
-                        context += f"**Query:** {user_input}\n\n"
-                        context += f"**Note:** No specific financial data was extracted from this query. "
-                        context += f"Please provide a helpful response based on your knowledge. "
-                        context += f"If the query is unclear, ask for clarification in a friendly way. "
-                        context += f"Never say 'I don't understand' - always try to help!\n"
-                        context += f"{'='*80}\n"
-                        context_detail = "Minimal context provided for LLM"
+                    if use_rag_orchestrator:
+                        try:
+                            emit("rag_orchestrator_start", "Using advanced RAG pipeline with reranking, fusion, and multi-hop")
+                            conversation_id = getattr(self.conversation, "conversation_id", None)
+                            
+                            # Process query through complete RAG pipeline
+                            rag_prompt, rag_result, rag_metadata = rag_orchestrator.process_query(
+                                query=user_input,
+                                conversation_id=conversation_id,
+                                user_id=None,  # Could extract from session if available
+                            )
+                            
+                            # Check if grounded decision says we shouldn't answer
+                            if not rag_metadata.get("should_answer", True):
+                                # Return early with suggested response
+                                grounded_decision_obj = rag_metadata.get("grounded_decision")
+                                suggested_response = None
+                                
+                                # Handle both dict and object access
+                                if isinstance(grounded_decision_obj, dict):
+                                    suggested_response = grounded_decision_obj.get("suggested_response")
+                                elif hasattr(grounded_decision_obj, "suggested_response"):
+                                    suggested_response = grounded_decision_obj.suggested_response
+                                
+                                if suggested_response:
+                                    reply = suggested_response
+                                    emit("rag_grounded_decision", "Low confidence - returning suggested response")
+                                    LOGGER.info(f"Grounded decision: {rag_metadata.get('grounded_decision', 'N/A')}")
+                                    # Continue to reply processing below (don't skip LLM path, just use the suggested response)
+                                    context = None  # No context needed since we have the response
+                                    context_detail = "Grounded decision: low confidence response"
+                                else:
+                                    context = rag_prompt
+                                    context_detail = f"RAG context (confidence: {rag_metadata.get('confidence', 0.0):.2f})"
+                            else:
+                                context = rag_prompt
+                                context_detail = (
+                                    f"RAG context (confidence: {rag_metadata.get('confidence', 0.0):.2f}, "
+                                    f"complexity: {rag_metadata.get('complexity', 'unknown')}, "
+                                    f"docs: {rag_metadata.get('num_sec_docs', 0)} SEC + {rag_metadata.get('num_uploaded_docs', 0)} uploaded)"
+                                )
+                                LOGGER.info(
+                                    f"RAG Orchestrator: confidence={rag_metadata.get('confidence', 0.0):.3f}, "
+                                    f"complexity={rag_metadata.get('complexity', 'unknown')}, "
+                                    f"metrics={rag_metadata.get('num_metrics', 0)}, "
+                                    f"sec_docs={rag_metadata.get('num_sec_docs', 0)}, "
+                                    f"uploaded_docs={rag_metadata.get('num_uploaded_docs', 0)}"
+                                )
+                        except Exception as e:
+                            LOGGER.warning(f"RAG Orchestrator failed, falling back to legacy context building: {e}", exc_info=True)
+                            use_rag_orchestrator = False
+                    
+                    # Fallback to legacy context building if RAG Orchestrator not available or failed
+                    if not use_rag_orchestrator:
+                        # Use build_financial_context for all queries (including forecasting)
+                        context = build_financial_context(
+                            query=user_input,
+                            analytics_engine=self.analytics_engine,
+                            database_path=str(self.settings.database_path),
+                            max_tickers=3,
+                            include_macro_context=True
+                        )
 
-                if doc_context:
-                    context = f"{context}\n\n{doc_context}" if context else doc_context
-                    context_detail = (
-                        f"{context_detail} + uploaded documents"
-                        if context_detail and context_detail != "Context not required"
-                        else "Uploaded document context attached"
-                    )
+                        if is_forecasting and not context:
+                            LOGGER.warning("Forecasting query detected but context is empty - will still call LLM")
+                            context = f"\n{'='*80}\n📊 FORECASTING QUERY DETECTED\n{'='*80}\n"
+                            context += f"**Query:** {user_input}\n"
+                            context += "**Note:** This is a forecasting query. Please provide a forecast based on available data.\n"
+                            context += f"{'='*80}\n"
+
+                        context_detail = "Context compiled" if context else "Context not required"
+                        
+                        # ENHANCED: Ensure LLM always has context, even if empty
+                        # This prevents the LLM from being called with no context at all
+                        if not context:
+                            # Provide minimal helpful context for the LLM
+                            context = f"\n{'='*80}\n"
+                            context += f"📊 USER QUERY\n"
+                            context += f"{'='*80}\n\n"
+                            context += f"**Query:** {user_input}\n\n"
+                            context += f"**Note:** No specific financial data was extracted from this query. "
+                            context += f"Please provide a helpful response based on your knowledge. "
+                            context += f"If the query is unclear, ask for clarification in a friendly way. "
+                            context += f"Never say 'I don't understand' - always try to help!\n"
+                            context += f"{'='*80}\n"
+                            context_detail = "Minimal context provided for LLM"
+                        
+                        # Add uploaded document context (only if not using RAG Orchestrator, which already includes it)
+                        if doc_context:
+                            context = f"{context}\n\n{doc_context}" if context else doc_context
+                            context_detail = (
+                                f"{context_detail} + uploaded documents"
+                                if context_detail and context_detail != "Context not required"
+                                else "Uploaded document context attached"
+                            )
 
                 emit(
                     "context_build_ready",
@@ -4794,6 +4875,7 @@ class FinanlyzeOSChatbot:
                             pass
                 
                 # If no preformatted reply, prepare LLM messages
+                # Note: reply might be set by grounded decision layer, in which case we skip LLM
                 if not reply:
                     # CRITICAL: Ensure context is never None - LLM needs something to work with
                     if not context:
