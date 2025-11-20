@@ -85,6 +85,12 @@ sentence-transformers>=2.2.0
 langchain>=0.1.0
 openai-whisper>=20231117
 
+# RAG (Retrieval-Augmented Generation) Dependencies
+chromadb>=0.4.0  # Vector database for semantic search (SEC narratives, uploaded docs)
+# sentence-transformers>=2.2.0  # Already listed above - used for embeddings and cross-encoder reranking
+# transformers>=4.35.0  # Already listed above - used by sentence-transformers
+# torch>=2.1.0  # Already listed above - backend for sentence-transformers
+
 # Real-time & WebSocket
 websockets>=12.0
 python-socketio>=5.10.0
@@ -105,6 +111,7 @@ prophet>=1.1.0
 # ML Forecasting (Phase 2: Deep Learning - Optional)
 tensorflow>=2.13.0
 keras>=2.13.0
+tf-keras>=2.13.0  # Required for sentence-transformers compatibility with Keras 3
 # torch>=2.1.0  # Already in requirements.txt
 # transformers>=4.35.0  # Already in requirements.txt
 
