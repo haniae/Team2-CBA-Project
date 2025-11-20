@@ -246,8 +246,7 @@ class RAGRetriever:
     
     Implements the "Retriever" from Lecture 2's RAG framework:
     - SQL deterministic retrieval (metric_snapshots, financial_facts)
-    - Vector store search over SEC narratives (semantic search)
-    - Uploaded-document retrieval (semantic search)
+    - Hybrid sparse+dense retrieval (BM25 + embeddings) for SEC narratives and uploaded docs
     - Macro data, portfolio data, ML forecast results
     """
     
@@ -255,12 +254,21 @@ class RAGRetriever:
         self,
         database_path: Path,
         analytics_engine: Any,  # AnalyticsEngine
+        use_hybrid_retrieval: bool = True,
     ):
-        """Initialize RAG Retriever."""
+        """
+        Initialize RAG Retriever.
+        
+        Args:
+            database_path: Path to database
+            analytics_engine: AnalyticsEngine instance
+            use_hybrid_retrieval: Enable hybrid sparse+dense retrieval (default True)
+        """
         self.database_path = database_path
         self.analytics_engine = analytics_engine
+        self.use_hybrid_retrieval = use_hybrid_retrieval
         
-        # Initialize vector store for semantic search
+        # Initialize vector store for dense retrieval
         try:
             self.vector_store = VectorStore(database_path)
             if not self.vector_store._available:
@@ -268,6 +276,29 @@ class RAGRetriever:
         except Exception as e:
             LOGGER.warning(f"Vector store initialization failed: {e}")
             self.vector_store = None
+        
+        # Initialize hybrid retriever (sparse + dense)
+        self.hybrid_retriever = None
+        self.sparse_retriever = None
+        if use_hybrid_retrieval:
+            try:
+                from .rag_hybrid_retriever import HybridRetriever, HybridRetrievalConfig
+                from .rag_sparse_retriever import SparseRetriever
+                from .rag_fusion import SourceFusion
+                
+                # Initialize sparse retriever (index will be built lazily)
+                self.sparse_retriever = SparseRetriever(vector_store=self.vector_store)
+                
+                self.hybrid_retriever = HybridRetriever(
+                    vector_store=self.vector_store,
+                    sparse_retriever=self.sparse_retriever,
+                    fusion=SourceFusion(),
+                    config=HybridRetrievalConfig(use_hybrid=use_hybrid_retrieval),
+                )
+                LOGGER.info("Hybrid retriever initialized (sparse + dense)")
+            except ImportError as e:
+                LOGGER.warning(f"Hybrid retriever not available: {e}. Using dense-only retrieval.")
+                self.use_hybrid_retrieval = False
     
     def retrieve(
         self,
@@ -305,27 +336,74 @@ class RAGRetriever:
         # 1. Deterministic SQL retrieval
         metrics, facts = self._retrieve_sql_data(tickers)
         
-        # 2. Semantic search over SEC narratives
+        # 2. Hybrid retrieval (sparse + dense) over SEC narratives
         sec_narratives = []
-        if use_semantic_search and self.vector_store and tickers:
+        if use_semantic_search and tickers:
             for ticker in tickers:
-                results = self.vector_store.search_sec_narratives(
-                    query=query,
-                    n_results=max_sec_results * 2,  # Retrieve more for reranking
-                    filter_metadata={"ticker": ticker.upper()},
-                )
-                sec_narratives.extend(results)
+                filter_metadata = {"ticker": ticker.upper()}
+                
+                if self.use_hybrid_retrieval and self.hybrid_retriever:
+                    # Use hybrid retrieval (sparse + dense)
+                    try:
+                        results = self.hybrid_retriever.retrieve_sec_narratives(
+                            query=query,
+                            n_results=max_sec_results * 2,  # Retrieve more for reranking
+                            filter_metadata=filter_metadata,
+                        )
+                        sec_narratives.extend(results)
+                        LOGGER.debug(f"Hybrid retrieval: {len(results)} SEC documents for {ticker}")
+                    except Exception as e:
+                        LOGGER.warning(f"Hybrid retrieval failed, falling back to dense-only: {e}")
+                        # Fallback to dense-only
+                        if self.vector_store and self.vector_store._available:
+                            results = self.vector_store.search_sec_narratives(
+                                query=query,
+                                n_results=max_sec_results * 2,
+                                filter_metadata=filter_metadata,
+                            )
+                            sec_narratives.extend(results)
+                elif self.vector_store and self.vector_store._available:
+                    # Dense-only retrieval (fallback)
+                    results = self.vector_store.search_sec_narratives(
+                        query=query,
+                        n_results=max_sec_results * 2,
+                        filter_metadata=filter_metadata,
+                    )
+                    sec_narratives.extend(results)
         
-        # 3. Semantic search over uploaded documents (with conversation filter)
+        # 3. Hybrid retrieval (sparse + dense) over uploaded documents
         uploaded_docs = []
-        if use_semantic_search and self.vector_store:
+        if use_semantic_search:
             filter_metadata = {"conversation_id": conversation_id} if conversation_id else None
-            results = self.vector_store.search_uploaded_docs(
-                query=query,
-                n_results=max_uploaded_results * 2,  # Retrieve more for reranking
-                filter_metadata=filter_metadata,
-            )
-            uploaded_docs.extend(results)
+            
+            if self.use_hybrid_retrieval and self.hybrid_retriever:
+                # Use hybrid retrieval (sparse + dense)
+                try:
+                    results = self.hybrid_retriever.retrieve_uploaded_docs(
+                        query=query,
+                        n_results=max_uploaded_results * 2,  # Retrieve more for reranking
+                        filter_metadata=filter_metadata,
+                    )
+                    uploaded_docs.extend(results)
+                    LOGGER.debug(f"Hybrid retrieval: {len(results)} uploaded documents")
+                except Exception as e:
+                    LOGGER.warning(f"Hybrid retrieval failed, falling back to dense-only: {e}")
+                    # Fallback to dense-only
+                    if self.vector_store and self.vector_store._available:
+                        results = self.vector_store.search_uploaded_docs(
+                            query=query,
+                            n_results=max_uploaded_results * 2,
+                            filter_metadata=filter_metadata,
+                        )
+                        uploaded_docs.extend(results)
+            elif self.vector_store and self.vector_store._available:
+                # Dense-only retrieval (fallback)
+                results = self.vector_store.search_uploaded_docs(
+                    query=query,
+                    n_results=max_uploaded_results * 2,
+                    filter_metadata=filter_metadata,
+                )
+                uploaded_docs.extend(results)
         
         retrieval_time_ms = (time.time() - start_time) * 1000
         

@@ -161,6 +161,103 @@ class SourceFusion:
         
         return all_fused, overall_confidence
     
+    def fuse_sparse_dense(
+        self,
+        dense_hits: List[RetrievedDocument],
+        sparse_hits: List[RetrievedDocument],
+        dense_weight: float = 0.6,
+        sparse_weight: float = 0.4,
+    ) -> List[RetrievedDocument]:
+        """
+        Fuse sparse (BM25) and dense (embedding) retrieval results.
+        
+        Args:
+            dense_hits: Documents from dense (embedding) retrieval
+            sparse_hits: Documents from sparse (BM25) retrieval
+            dense_weight: Weight for dense scores (default 0.6)
+            sparse_weight: Weight for sparse scores (default 0.4)
+        
+        Returns:
+            Fused list of documents sorted by combined score
+        """
+        # Create document ID -> document mapping
+        # Use text + metadata as unique identifier
+        doc_map: Dict[str, RetrievedDocument] = {}
+        
+        # Add dense hits
+        for doc in dense_hits:
+            doc_id = self._get_doc_id(doc)
+            if doc_id not in doc_map:
+                doc_map[doc_id] = doc
+                # Normalize dense score (assume it's similarity 0-1 or distance)
+                if doc.score is not None:
+                    # If score > 1, it's likely a distance - convert to similarity
+                    if doc.score > 1.0:
+                        dense_score = 1.0 / (1.0 + doc.score)
+                    else:
+                        dense_score = doc.score
+                else:
+                    dense_score = 0.0
+                doc_map[doc_id].metadata["_dense_score"] = dense_score
+                doc_map[doc_id].metadata["_sparse_score"] = 0.0
+        
+        # Add sparse hits
+        for doc in sparse_hits:
+            doc_id = self._get_doc_id(doc)
+            if doc_id not in doc_map:
+                doc_map[doc_id] = doc
+                doc_map[doc_id].metadata["_dense_score"] = 0.0
+                doc_map[doc_id].metadata["_sparse_score"] = 0.0
+            
+            # Normalize sparse score (BM25 scores can be any positive number)
+            if doc.score is not None:
+                # Normalize BM25 score (use sigmoid-like normalization)
+                # BM25 scores are typically 0-20, normalize to 0-1
+                sparse_score = min(1.0, doc.score / 10.0)  # Rough normalization
+            else:
+                sparse_score = 0.0
+            
+            doc_map[doc_id].metadata["_sparse_score"] = max(
+                doc_map[doc_id].metadata.get("_sparse_score", 0.0),
+                sparse_score
+            )
+        
+        # Compute fused scores
+        fused_docs = []
+        for doc_id, doc in doc_map.items():
+            dense_score = doc.metadata.get("_dense_score", 0.0)
+            sparse_score = doc.metadata.get("_sparse_score", 0.0)
+            
+            # Fuse scores
+            fused_score = (dense_score * dense_weight) + (sparse_score * sparse_weight)
+            
+            # Update document with fused score
+            doc.score = fused_score
+            doc.metadata["_fused_score"] = fused_score
+            doc.metadata["_dense_contrib"] = dense_score * dense_weight
+            doc.metadata["_sparse_contrib"] = sparse_score * sparse_weight
+            
+            fused_docs.append(doc)
+        
+        # Sort by fused score (descending)
+        fused_docs.sort(key=lambda x: x.score or 0.0, reverse=True)
+        
+        LOGGER.debug(
+            f"Sparse-dense fusion: {len(dense_hits)} dense + {len(sparse_hits)} sparse "
+            f"→ {len(fused_docs)} unique, {len([d for d in fused_docs if d.metadata.get('_dense_score', 0) > 0])} with dense, "
+            f"{len([d for d in fused_docs if d.metadata.get('_sparse_score', 0) > 0])} with sparse"
+        )
+        
+        return fused_docs
+    
+    def _get_doc_id(self, doc: RetrievedDocument) -> str:
+        """Generate unique document ID from text and metadata."""
+        # Use text hash + source type + key metadata as ID
+        text_hash = hash(doc.text[:100])  # First 100 chars
+        metadata_str = str(sorted(doc.metadata.items())) if doc.metadata else ""
+        return f"{doc.source_type}_{text_hash}_{hash(metadata_str)}"
+
+    
     def get_confidence_instruction(self, confidence: float) -> str:
         """
         Get instruction for LLM based on retrieval confidence.

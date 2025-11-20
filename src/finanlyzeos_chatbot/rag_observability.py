@@ -37,6 +37,14 @@ class RetrievalMetrics:
     sec_scores: List[float] = field(default_factory=list)
     uploaded_scores: List[float] = field(default_factory=list)
     
+    # Hybrid retrieval stats (sparse vs dense)
+    dense_sec_count: int = 0  # Number of SEC docs from dense retrieval
+    sparse_sec_count: int = 0  # Number of SEC docs from sparse retrieval
+    dense_uploaded_count: int = 0  # Number of uploaded docs from dense retrieval
+    sparse_uploaded_count: int = 0  # Number of uploaded docs from sparse retrieval
+    dense_contributions: List[float] = field(default_factory=list)  # Dense score contributions
+    sparse_contributions: List[float] = field(default_factory=list)  # Sparse score contributions
+    
     # Timing
     retrieval_time_ms: float = 0.0
     reranking_time_ms: float = 0.0
@@ -93,14 +101,36 @@ class RAGObserver:
         metrics.sec_scores = [doc.score for doc in result.sec_narratives if doc.score is not None]
         metrics.uploaded_scores = [doc.score for doc in result.uploaded_docs if doc.score is not None]
         
-        # Extract document IDs
+        # Extract hybrid retrieval stats (sparse vs dense)
         for doc in result.sec_narratives:
             doc_id = doc.metadata.get("document_id") or doc.metadata.get("filing_id", "unknown")
             metrics.retrieved_doc_ids.append(f"sec:{doc_id}")
+            
+            # Check if document has sparse/dense contribution metadata
+            dense_contrib = doc.metadata.get("_dense_contrib", 0.0)
+            sparse_contrib = doc.metadata.get("_sparse_contrib", 0.0)
+            
+            if dense_contrib > 0:
+                metrics.dense_sec_count += 1
+                metrics.dense_contributions.append(dense_contrib)
+            if sparse_contrib > 0:
+                metrics.sparse_sec_count += 1
+                metrics.sparse_contributions.append(sparse_contrib)
         
         for doc in result.uploaded_docs:
             doc_id = doc.metadata.get("document_id") or doc.metadata.get("filename", "unknown")
             metrics.retrieved_doc_ids.append(f"uploaded:{doc_id}")
+            
+            # Check if document has sparse/dense contribution metadata
+            dense_contrib = doc.metadata.get("_dense_contrib", 0.0)
+            sparse_contrib = doc.metadata.get("_sparse_contrib", 0.0)
+            
+            if dense_contrib > 0:
+                metrics.dense_uploaded_count += 1
+                metrics.dense_contributions.append(dense_contrib)
+            if sparse_contrib > 0:
+                metrics.sparse_uploaded_count += 1
+                metrics.sparse_contributions.append(sparse_contrib)
         
         # Check for anomalies
         all_scores = metrics.sec_scores + metrics.uploaded_scores
@@ -121,10 +151,20 @@ class RAGObserver:
         # Store metrics
         self.metrics.append(metrics)
         
-        # Log summary
+        # Log summary with hybrid retrieval stats
+        hybrid_info = ""
+        if metrics.dense_sec_count > 0 or metrics.sparse_sec_count > 0:
+            avg_dense = sum(metrics.dense_contributions) / len(metrics.dense_contributions) if metrics.dense_contributions else 0.0
+            avg_sparse = sum(metrics.sparse_contributions) / len(metrics.sparse_contributions) if metrics.sparse_contributions else 0.0
+            hybrid_info = (
+                f" | Hybrid: {metrics.dense_sec_count + metrics.dense_uploaded_count} dense, "
+                f"{metrics.sparse_sec_count + metrics.sparse_uploaded_count} sparse "
+                f"(dense_contrib={avg_dense:.2f}, sparse_contrib={avg_sparse:.2f})"
+            )
+        
         LOGGER.info(
             f"Retrieval: {metrics.num_sec_docs} SEC docs, {metrics.num_uploaded_docs} uploaded docs, "
-            f"{metrics.num_metrics} metrics, {retrieval_time_ms:.1f}ms"
+            f"{metrics.num_metrics} metrics, {retrieval_time_ms:.1f}ms{hybrid_info}"
         )
         
         return metrics

@@ -10,7 +10,7 @@ instruct the LLM to use only the retrieved documents.
 
 from __future__ import annotations
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from .rag_retriever import RetrievalResult, RetrievedDocument
 
 
@@ -75,9 +75,19 @@ def build_rag_prompt(
     
     # Section 3: Uploaded Documents (semantic search)
     if retrieval_result.uploaded_docs:
-        sections.append("📎 **UPLOADED DOCUMENTS** (semantic search results):\n")
-        sections.append(_format_uploaded_docs(retrieval_result.uploaded_docs))
-        sections.append("\n")
+        # Separate table data from regular documents
+        table_docs = [d for d in retrieval_result.uploaded_docs if d.source_type == "table"]
+        regular_docs = [d for d in retrieval_result.uploaded_docs if d.source_type != "table"]
+        
+        if regular_docs:
+            sections.append("📎 **UPLOADED DOCUMENTS** (semantic search results):\n")
+            sections.append(_format_uploaded_docs(regular_docs))
+            sections.append("\n")
+        
+        if table_docs:
+            sections.append("📊 **TABLE DATA** (structure-aware retrieval):\n")
+            sections.append(_format_table_data(table_docs))
+            sections.append("\n")
     
     # Section 4: Additional context
     if retrieval_result.macro_data:
@@ -206,6 +216,15 @@ def _format_uploaded_docs(docs: List[RetrievedDocument]) -> str:
         lines.append(f"\n{doc.text[:1000]}...")
         lines.append("─" * 80)
     
+    return "\n".join(lines)
+
+
+def _format_table_data(table_docs: List[RetrievedDocument]) -> str:
+    """Format table data for RAG prompt."""
+    lines = []
+    for i, doc in enumerate(table_docs, 1):
+        lines.append(f"\n**Table {i}**:")
+        lines.append(doc.text)
     return "\n".join(lines)
 
 

@@ -2012,8 +2012,16 @@ class FinanlyzeOSChatbot:
                     use_fusion=True,
                     use_grounded_decision=True,
                     use_memory=True,
+                    use_hybrid_retrieval=True,  # Hybrid sparse+dense
+                    use_intent_policies=True,  # Intent-specific policies
+                    use_temporal=True,  # Time-aware retrieval
+                    use_claim_verification=True,  # Claim-level verification
+                    use_structure_aware=True,  # Table-aware retrieval
+                    use_feedback=True,  # Online feedback
+                    use_knowledge_graph=False,  # KG+RAG (optional, disabled by default)
+                    llm_client=self.llm_client,  # For claim verification
                 )
-                LOGGER.info("RAG Orchestrator initialized with all advanced features")
+                LOGGER.info("RAG Orchestrator initialized with all advanced features (including 7 new features)")
             except Exception as e:
                 LOGGER.warning(f"Failed to initialize RAG Orchestrator: {e}. Falling back to legacy context building.", exc_info=True)
                 return None
@@ -4935,6 +4943,21 @@ class FinanlyzeOSChatbot:
                 
                 emit("llm_query_complete", "Explanation drafted")
                 LOGGER.info(f"Generated reply length: {len(reply) if reply else 0} characters")
+                
+                # Post-generation: Claim-level verification (if enabled)
+                if reply and use_rag_orchestrator and rag_orchestrator:
+                    try:
+                        verification = rag_orchestrator.verify_answer_claims(reply, rag_result)
+                        if verification and verification.should_regenerate:
+                            LOGGER.warning(
+                                f"Claim verification: {verification.num_contradicted} contradicted, "
+                                f"{verification.num_not_found} not found. Consider regenerating."
+                            )
+                            # Optionally regenerate or add warning to answer
+                            if verification.suggested_response:
+                                reply = f"{reply}\n\n⚠️ {verification.suggested_response}"
+                    except Exception as e:
+                        LOGGER.debug(f"Claim verification failed: {e}")
                 
                 # CRITICAL: Fix astronomical percentages BEFORE verification
                 if reply:

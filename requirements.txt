@@ -87,6 +87,8 @@ openai-whisper>=20231117
 
 # RAG (Retrieval-Augmented Generation) Dependencies
 chromadb>=0.4.0  # Vector database for semantic search (SEC narratives, uploaded docs)
+rank-bm25>=0.2.2  # BM25 sparse retrieval for hybrid retrieval
+networkx>=3.0  # Knowledge graph support (optional)
 # sentence-transformers>=2.2.0  # Already listed above - used for embeddings and cross-encoder reranking
 # transformers>=4.35.0  # Already listed above - used by sentence-transformers
 # torch>=2.1.0  # Already listed above - backend for sentence-transformers
