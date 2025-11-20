@@ -1,5 +1,54 @@
 # RAG System: Complete Guide
 
+## Table of Contents
+
+- [What is RAG?](#what-is-rag)
+- [Architecture Overview](#architecture-overview)
+- [Core Components](#core-components)
+  - [1. Retriever](#1-retriever)
+  - [2. Document Store / Vector Index](#2-document-store--vector-index)
+  - [3. Generator (LLM)](#3-generator-llm)
+- [Advanced Features (Production-Grade)](#advanced-features-production-grade)
+  - [1. Cross-Encoder Reranking ⭐ MOST IMPORTANT](#1-cross-encoder-reranking--most-important)
+  - [2. Source Fusion (Score Normalization & Confidence Fusion)](#2-source-fusion-score-normalization--confidence-fusion)
+  - [3. Grounded Decision Layer](#3-grounded-decision-layer)
+  - [4. Retrieval Confidence Score](#4-retrieval-confidence-score)
+  - [5. Memory-Augmented RAG](#5-memory-augmented-rag)
+  - [6. Unified RAGRetriever Path](#6-unified-ragretriever-path)
+  - [7. Multi-Hop RAG Controller](#7-multi-hop-rag-controller)
+  - [8. Enhanced Uploaded-Doc RAG](#8-enhanced-uploaded-doc-rag)
+  - [9. Evaluation Harness](#9-evaluation-harness)
+  - [10. Observability & Guardrails](#10-observability--guardrails)
+- [Data Sources: Semantic Search vs SQL Retrieval](#data-sources-semantic-search-vs-sql-retrieval)
+  - [Should Use Semantic Search (Narrative Text)](#-should-use-semantic-search-narrative-text)
+  - [Should Use SQL Retrieval (Structured Data)](#-should-use-sql-retrieval-structured-data)
+  - [Current Multi-Source Integration](#-current-multi-source-integration)
+- [Technical Details](#technical-details)
+  - [Embedding Model](#embedding-model)
+  - [Reranking Model](#reranking-model)
+  - [Vector Store](#vector-store)
+  - [Chunking Strategy](#chunking-strategy)
+- [How to Use RAG](#how-to-use-rag)
+  - [Current Usage (What's Running Now)](#current-usage-whats-running-now)
+  - [Unified RAG Flow (Recommended)](#unified-rag-flow-recommended)
+- [Indexing Documents](#indexing-documents)
+  - [Automatic Indexing](#automatic-indexing)
+  - [Manual Indexing](#manual-indexing)
+- [Testing & Evaluation](#testing--evaluation)
+  - [Test Suite](#test-suite)
+  - [Evaluation Script](#evaluation-script)
+- [Quick Start](#quick-start)
+  - [1. Install Dependencies](#1-install-dependencies)
+  - [2. Index Documents](#2-index-documents)
+  - [3. Use the System](#3-use-the-system)
+  - [4. Enable Advanced Features](#4-enable-advanced-features)
+- [Performance Considerations](#performance-considerations)
+  - [Reranking Trade-offs](#reranking-trade-offs)
+  - [Multi-Hop Trade-offs](#multi-hop-trade-offs)
+- [Summary](#summary)
+
+---
+
 ## What is RAG?
 
 **RAG (Retrieval-Augmented Generation)** combines:
