@@ -5148,7 +5148,7 @@ class FinanlyzeOSChatbot:
                             LOGGER.warning(f"Response confidence {confidence.score*100:.1f}% below threshold {self.settings.min_confidence_threshold*100:.1f}%")
                             if self.settings.verification_strict_mode:
                                 # In strict mode, reject low-confidence responses
-                                reply = "I don't have enough reliable information to answer this question accurately. Please try asking about a different company or topic."
+                                reply = "Unable to provide a reliable response based on available data. Please try asking about a different company or topic."
                                 emit("verification_reject", "Response rejected due to low confidence")
                             else:
                                 # Log warning but don't modify response

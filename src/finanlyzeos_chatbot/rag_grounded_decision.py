@@ -86,10 +86,7 @@ class GroundedDecisionLayer:
                 f"Retrieval confidence ({overall_confidence:.2f}) below threshold "
                 f"({self.min_confidence_threshold:.2f})"
             )
-            suggested = (
-                "I don't have enough relevant information in my knowledge base to answer "
-                "this question accurately. Could you provide more context or rephrase the question?"
-            )
+            suggested = None  # Let the system handle low confidence naturally
             return GroundedDecision(
                 should_answer=False,
                 confidence=overall_confidence,
@@ -102,10 +99,7 @@ class GroundedDecisionLayer:
         if total_docs < self.require_min_docs:
             should_answer = False
             reasons.append(f"Insufficient documents retrieved ({total_docs} < {self.require_min_docs})")
-            suggested = (
-                "I couldn't find enough relevant documents to answer this question. "
-                "Please try rephrasing or providing more specific details."
-            )
+            suggested = None  # Let the system handle insufficient documents naturally
             return GroundedDecision(
                 should_answer=False,
                 confidence=overall_confidence,
@@ -133,12 +127,7 @@ class GroundedDecisionLayer:
             # Don't block answer, but flag it
         
         # Determine suggested response if issues found
-        suggested = None
-        if contradictions:
-            contradiction_msg = "Sources disagree on some facts. "
-            for i, contr in enumerate(contradictions[:2], 1):  # Show first 2
-                contradiction_msg += f"{i}. {contr} "
-            suggested = contradiction_msg + "Please verify with original sources."
+        suggested = None  # Let the system handle contradictions naturally without generic messages
         
         return GroundedDecision(
             should_answer=should_answer,

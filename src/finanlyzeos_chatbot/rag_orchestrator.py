@@ -262,7 +262,7 @@ class RAGOrchestrator:
             # If decision says don't answer, return early
             if not grounded_decision.should_answer:
                 return (
-                    grounded_decision.suggested_response or "I don't have enough information to answer this question.",
+                    grounded_decision.suggested_response or "Unable to provide a response based on available information.",
                     result,
                     {
                         "grounded_decision": grounded_decision,
