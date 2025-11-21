@@ -5143,20 +5143,18 @@ class FinanlyzeOSChatbot:
                             reply = correct_response(reply, verification_result.results)
                             emit("verification_correct", f"Applied {len([r for r in verification_result.results if not r.is_correct])} corrections")
                         
-                        # Add confidence footer
+                        # Log confidence internally without adding footers
                         if confidence.score < self.settings.min_confidence_threshold:
                             LOGGER.warning(f"Response confidence {confidence.score*100:.1f}% below threshold {self.settings.min_confidence_threshold*100:.1f}%")
                             if self.settings.verification_strict_mode:
                                 # In strict mode, reject low-confidence responses
-                                reply = f"I apologize, but I cannot provide a response with sufficient confidence ({confidence.score*100:.1f}%). Please try rephrasing your query or asking about a different company."
+                                reply = "I don't have enough reliable information to answer this question accurately. Please try asking about a different company or topic."
                                 emit("verification_reject", "Response rejected due to low confidence")
                             else:
-                                # Add warning footer
-                                reply = add_confidence_footer(reply, confidence, include_details=True)
+                                # Log warning but don't modify response
                                 emit("verification_warning", f"Low confidence: {confidence.score*100:.1f}%")
                         else:
-                            # Add confidence footer
-                            reply = add_confidence_footer(reply, confidence, include_details=False)
+                            # Log completion without adding footer
                             emit("verification_complete", f"Verified: {verification_result.correct_facts}/{verification_result.total_facts} facts verified, {confidence.score*100:.1f}% confidence")
                         
                         # NEW: Add hallucination warning if detected
@@ -5164,7 +5162,7 @@ class FinanlyzeOSChatbot:
                             reply = add_hallucination_warning(reply, hallucination_report)
                             # In strict mode, reject responses with critical hallucinations
                             if self.settings.verification_strict_mode and hallucination_report.critical_warnings > 0:
-                                reply = f"I apologize, but I detected critical data verification issues in my response. Please verify the information against source documents or try rephrasing your query."
+                                reply = "I detected data verification issues with this response. Please verify the information against source documents or try rephrasing your query."
                                 emit("hallucination_reject", "Response rejected due to critical hallucinations")
                         
                         # Log verification results
@@ -5186,7 +5184,7 @@ class FinanlyzeOSChatbot:
                         # Forecasting query should have already been handled by LLM with forecast context
                         # If we're here, something went wrong - log it but don't generate a snapshot
                         LOGGER.warning(f"Forecasting query reached fallback handler - this should not happen: {user_input}")
-                        reply = "I apologize, but I encountered an issue generating the forecast. Please try rephrasing your query or specifying the company name more clearly."
+                        reply = "I encountered an issue generating the forecast. Please try rephrasing your query or specifying the company name more clearly."
                         emit("forecasting_fallback", "Forecasting query reached fallback - using error message instead of snapshot")
                     else:
                         emit("fallback", "Using enhanced fallback reply")
