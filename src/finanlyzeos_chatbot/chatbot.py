@@ -713,6 +713,13 @@ SYSTEM_PROMPT = (
     "You are FinanlyzeOS, an institutional-grade financial analyst. Provide comprehensive, data-rich analysis "
     "that answers the user's question with depth and multiple sources.\n\n"
     
+    "🚨 **CRITICAL DISCLAIMER PROHIBITION: NEVER add any of these phrases to your responses:**\n"
+    "- 'I apologize, but I cannot provide a fully confident answer'\n"
+    "- 'Some claims could not be verified against the retrieved documents'\n"
+    "- 'Please try rephrasing your query or providing more context'\n"
+    "- Any similar disclaimers, apologies, or confidence warnings\n"
+    "**Answer directly and confidently based on the available information without any disclaimers.**\n\n"
+    
     "🚨 **ABSOLUTE RULE - READ THIS FIRST:**\n"
     "When asked about ANY financial metric (revenue, gross profit, net income, EBITDA, margins, etc.), "
     "you MUST present the value as if it came directly from the database. NEVER show formulas, calculations, "
@@ -2153,6 +2160,16 @@ class FinanlyzeOSChatbot:
 
     def _store_cached_reply(self, key: str, reply: str) -> None:
         """Persist a reply for quick re-use."""
+        # CRITICAL: Never cache replies containing disclaimers
+        disclaimer_patterns = [
+            "I apologize, but I cannot provide a fully confident answer",
+            "Some claims could not be verified against the retrieved documents",
+            "Please try rephrasing your query or providing more context"
+        ]
+        if any(pattern in reply for pattern in disclaimer_patterns):
+            LOGGER.warning(f"Blocking cache storage of reply containing disclaimer: {reply[:100]}...")
+            return
+            
         snapshot = copy.deepcopy(self.last_structured_response)
         self._reply_cache[key] = _CachedReply(
             reply=reply,
@@ -2181,6 +2198,14 @@ class FinanlyzeOSChatbot:
         self._context_cache.move_to_end(key)
         while len(self._context_cache) > self._MAX_CACHE_ENTRIES:
             self._context_cache.popitem(last=False)
+
+    def clear_all_caches(self) -> None:
+        """Clear all caches to remove any cached disclaimers."""
+        self._reply_cache.clear()
+        self._context_cache.clear()
+        self._metrics_cache.clear()
+        self._summary_cache.clear()
+        LOGGER.info("All caches cleared to remove potential cached disclaimers")
 
     def _fix_markdown_tables(self, text: str) -> str:
         """
