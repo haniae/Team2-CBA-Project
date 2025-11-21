@@ -794,23 +794,52 @@ function stopPlaceholderRotation() {
   }
 }
 
-// Textarea auto-grow: up to 4 lines, cap at 6 lines then scroll
+// Enhanced textarea auto-expansion with better control
 function autoResizeTextarea() {
   if (!chatInput) return;
-  const style = window.getComputedStyle(chatInput);
-  const lineHeight = parseFloat(style.lineHeight) || 22;
-  const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
-  const minHeight = 48;
-  const maxAutoLines = 4;
-  const maxLines = 6;
-  chatInput.style.height = "auto";
-  const content = chatInput.scrollHeight;
-  const maxAuto = maxAutoLines * lineHeight + paddingY;
-  const hardMax = maxLines * lineHeight + paddingY;
-  const next = Math.min(Math.max(content, minHeight), hardMax);
-  chatInput.style.height = `${next}px`;
-  chatInput.style.overflowY = next >= hardMax ? "auto" : "hidden";
+  
+  // Store scroll position
+  const scrollPos = chatInput.scrollTop;
+  
+  // Reset height to calculate proper scrollHeight
+  chatInput.style.height = '52px'; // Reset to min height
+  
+  // Calculate new height (with min and max constraints)
+  const minHeight = 52; // Min height in pixels
+  const maxHeight = 160; // Max height in pixels (reduced for better UX)
+  const scrollHeight = chatInput.scrollHeight;
+  const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
+  
+  // Set the new height
+  chatInput.style.height = newHeight + 'px';
+  
+  // Handle scrollbar visibility
+  if (scrollHeight > maxHeight) {
+    chatInput.style.overflowY = 'auto';
+    // Restore scroll position if we're at max height
+    chatInput.scrollTop = scrollPos;
+  } else {
+    chatInput.style.overflowY = 'hidden';
+  }
+  
+  // Adjust chat-actions position to stay centered vertically
+  const chatActions = document.querySelector('.chat-actions');
+  if (chatActions && newHeight > minHeight) {
+    // Keep actions centered when textarea grows
+    chatActions.style.top = '50%';
+    chatActions.style.transform = 'translateY(-50%)';
+  }
 }
+
+// Global function to clear chat input and reset height
+window.clearChatInput = function() {
+  if (chatInput) {
+    chatInput.value = '';
+    chatInput.style.height = '52px';
+    chatInput.style.overflowY = 'hidden';
+  }
+};
+
 const COMPLETE_STAGE_HINTS = [
   "_complete",
   "_ready",
@@ -8329,6 +8358,13 @@ function startNewConversation({ focusInput = true } = {}) {
   }
   showIntroPanel();
   chatInput.value = "";
+  
+  // Reset textarea height when clearing
+  if (chatInput) {
+    chatInput.style.height = '52px';
+    chatInput.style.overflowY = 'hidden';
+  }
+  
   if (focusInput) {
     chatInput.focus();
   }
@@ -9006,6 +9042,12 @@ if (chatForm) {
   updatePromptSuggestionsFromPrompt(prompt);
   appendMessage("user", prompt, { forceScroll: true });
   chatInput.value = "";
+  
+  // Reset textarea height after sending message
+  if (chatInput) {
+    chatInput.style.height = '52px';
+    chatInput.style.overflowY = 'hidden';
+  }
 
   if (prompt.toLowerCase() === "help") {
     recordMessage("assistant", HELP_TEXT);
@@ -9114,6 +9156,13 @@ if (chatInput && sendButton) {
   };
   chatInput.addEventListener("input", updateSendDisabled);
   chatInput.addEventListener("input", autoResizeTextarea);
+  
+  // Enhanced paste handling for auto-expansion
+  chatInput.addEventListener("paste", function() {
+    // Delay to allow paste to complete
+    setTimeout(autoResizeTextarea, 10);
+  });
+  
   window.addEventListener("load", autoResizeTextarea);
   updateSendDisabled();
 }
@@ -9133,6 +9182,12 @@ if (chatInput && chatForm) {
       } else {
         chatForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       }
+    }
+    
+    // Handle Shift+Enter for new lines with auto-expansion
+    if (event.key === "Enter" && event.shiftKey) {
+      // Allow expansion on new line
+      setTimeout(autoResizeTextarea, 0);
     }
   });
 }
