@@ -2050,24 +2050,37 @@ Project/
 ├── README.md                          # Main project documentation
 ├── CHANGELOG.md                       # Project changelog
 ├── LICENSE                            # Project license (MIT)
-├── SECURITY.md                        # Security policy
-├── CODE_OF_CONDUCT.md                 # Code of conduct
-├── CONTRIBUTING.md                    # Contribution guidelines
 ├── pyproject.toml                     # Project metadata, dependencies, pytest config
 ├── requirements.txt                   # Python dependencies lockfile
-├── .env.example                       # Environment configuration template
-├── run_chatbot.py                     # CLI chatbot entry point (REPL)
-├── serve_chatbot.py                   # Web server entry point (FastAPI)
-├── run_data_ingestion.ps1             # Windows PowerShell ingestion script (moved to scripts/)
-├── run_data_ingestion.sh              # Unix/Linux ingestion script (moved to scripts/)
+├── finanlyzeos_chatbot.sqlite3        # Main SQLite database (created on demand)
+├── benchmarkos_chatbot.sqlite3        # Benchmark SQLite database
+├── test.db                            # Test database
 │
-├── scripts/
+├── app/                               # Application entry points
+│   ├── run_chatbot.py                 # CLI chatbot entry point (REPL)
+│   ├── run_server.py                  # Web server entry point (FastAPI)
+│   ├── serve_chatbot.py               # Alternative web server entry point
+│   └── start_server.sh                # Server startup script (Unix/Linux)
+│
+├── scripts/                           # Scripts and utilities
 │   ├── check_packages.py              # Package verification utility
+│   ├── evaluate_rag.py                # RAG evaluation script
+│   ├── index_documents_for_rag.py     # Document indexing for RAG
+│   ├── quick_rag_test.py              # Quick RAG testing
+│   ├── test_complete_rag.py           # Complete RAG testing
+│   ├── test_rag_advanced.py           # Advanced RAG testing
+│   ├── test_rag_integration.py        # RAG integration testing
+│   ├── test_rag_working.py            # RAG working tests
+│   ├── run_data_ingestion.ps1         # Windows PowerShell ingestion script
+│   ├── run_data_ingestion.sh          # Unix/Linux ingestion script
 │   │
-│   ├── analysis/                       # Analysis scripts
+│   ├── analysis/                      # Analysis scripts
 │   │   └── analyze_coverage_gaps.py   # Analyze coverage gaps (complete/partial/missing)
 │   │
-│   ├── ingestion/                      # Data ingestion scripts
+│   ├── demos/                         # Demo scripts
+│   │   └── (demo scripts for presentations)
+│   │
+│   ├── ingestion/                     # Data ingestion scripts
 │   │   ├── fill_data_gaps.py          # ⭐ Recommended: Smart gap-filling script
 │   │   ├── full_coverage_ingestion.py # ⭐ Full coverage ingestion (20+ years)
 │   │   ├── ingest_20years_sp500.py    # Full 20-year historical ingestion
@@ -2080,7 +2093,7 @@ Project/
 │   │   ├── ingest_frames.py           # SEC data frames ingestion
 │   │   ├── ingest_from_file.py        # Ingestion from file input
 │   │   ├── ingest_universe.py         # Universe-based ingestion with resume support
-│   │   ├── load_prices_stooq.py      # Stooq price loader (fallback)
+│   │   ├── load_prices_stooq.py       # Stooq price loader (fallback)
 │   │   ├── load_prices_yfinance.py    # Yahoo Finance price loader
 │   │   ├── load_historical_prices_15years.py # Historical price loader (15 years)
 │   │   ├── load_ticker_cik.py         # Ticker to CIK mapping loader
@@ -2090,7 +2103,17 @@ Project/
 │   │   ├── parse_raw_sec_filings.py   # Parse raw SEC filing data
 │   │   └── monitor_ingestion.py       # Monitor ingestion progress
 │   │
-│   └── utility/                        # Utility and helper scripts
+│   ├── sp1500/                        # S&P 1500 setup and verification scripts
+│   │   ├── complete_sp1500.py         # Build complete S&P 1500 list from Wikipedia
+│   │   ├── create_sp1500_file.py      # Create S&P 1500 ticker file
+│   │   ├── extract_tickers_from_db.py # Extract tickers from database
+│   │   ├── find_and_test_sp1500.py    # Find and test S&P 1500 file
+│   │   ├── setup_and_test_sp1500.py   # Setup and test S&P 1500
+│   │   ├── setup_sp1500.py            # Setup S&P 1500 universe
+│   │   ├── verify_sp1500_file.py      # Verify S&P 1500 file exists
+│   │   └── verify_sp1500_setup.py     # Quick verification script
+│   │
+│   └── utility/                       # Utility and helper scripts
 │       ├── check_database_simple.py   # Database verification utility
 │       ├── check_correct_database.py  # Verify correct database path
 │       ├── check_data_coverage.py     # Check data coverage statistics
@@ -2112,60 +2135,80 @@ Project/
 │       ├── chat_metrics.py            # Chat metrics utility
 │       ├── data_sources_backup.py     # Data sources backup utility
 │       ├── refresh_ticker_catalog.py  # Ticker catalog refresh utility
-│       ├── improve_kpi_coverage.py   # Improve KPI coverage analysis
-│       ├── fix_remaining_kpis.py     # Fix remaining KPI issues
+│       ├── improve_kpi_coverage.py    # Improve KPI coverage analysis
+│       ├── fix_remaining_kpis.py      # Fix remaining KPI issues
 │       ├── kpi_registry_cli.py        # KPI registry CLI tool
 │       ├── generate_company_universe.py # Generate company universe JSON for UI
-│       ├── generate_sp1500_names.py    # Generate S&P 1500 company names from SEC
+│       ├── generate_sp1500_names.py   # Generate S&P 1500 company names from SEC
 │       ├── generate_help_center_verification_tracker.py # Help center tracker generator
 │       ├── print_failed_prompts.py    # Print failed test prompts
 │       ├── smoke_chat_api.py          # Smoke test for chat API
 │       ├── verify_chatbot_connection.py # Verify chatbot connection
 │       └── main.py                    # Main utility CLI wrapper
-│   │
-│   ├── sp1500/                         # S&P 1500 setup and verification scripts
-│   │   ├── complete_sp1500.py         # Build complete S&P 1500 list from Wikipedia
-│   │   ├── create_sp1500_file.py      # Create S&P 1500 ticker file
-│   │   ├── extract_tickers_from_db.py # Extract tickers from database
-│   │   ├── find_and_test_sp1500.py    # Find and test S&P 1500 file
-│   │   ├── setup_and_test_sp1500.py   # Setup and test S&P 1500
-│   │   ├── setup_sp1500.py            # Setup S&P 1500 universe
-│   │   ├── verify_sp1500_file.py      # Verify S&P 1500 file exists
-│   │   └── verify_sp1500_setup.py     # Quick verification script
-│   │
-│   ├── run_data_ingestion.ps1         # Windows PowerShell ingestion script
-│   └── run_data_ingestion.sh          # Unix/Linux ingestion script
 │
 ├── src/
-│   └── finanlyzeos_chatbot/
+│   ├── __init__.py                    # Source package initialization
+│   ├── data/
+│   │   └── kpi_library.json           # KPI library definitions
+│   │
+│   ├── benchmarkos_chatbot/           # Benchmark chatbot module
+│   │   └── (benchmark chatbot files)
+│   │
+│   └── finanlyzeos_chatbot/           # Main chatbot source code
+│       ├── __init__.py                # Package initialization
 │       │
 │       ├── Core Components:
-│       ├── analytics_engine.py        # Core analytics engine (KPI calculations)
-│       ├── analytics_workspace.py     # Analytics workspace management
 │       ├── chatbot.py                 # Main chatbot orchestration (RAG, LLM integration)
 │       ├── config.py                  # Configuration management (settings loader)
 │       ├── database.py                # Database abstraction layer (SQLite/Postgres)
 │       ├── llm_client.py              # LLM provider abstraction (OpenAI/local echo)
 │       ├── web.py                     # FastAPI web server (REST API endpoints)
 │       │
-│       ├── Data & Ingestion:
+│       ├── Analytics & Data:
+│       ├── analytics_engine.py        # Core analytics engine (KPI calculations)
+│       ├── analytics_workspace.py     # Analytics workspace management
+│       ├── advanced_kpis.py           # Advanced KPI calculator (30+ ratios)
+│       ├── anomaly_detection.py       # Anomaly detection (Z-score analysis)
+│       ├── predictive_analytics.py    # Predictive analytics (regression, CAGR)
+│       ├── sector_analytics.py        # Sector benchmarking (GICS sectors)
+│       │
+│       ├── Data Sources & Ingestion:
 │       ├── data_ingestion.py          # Data ingestion pipeline (SEC, Yahoo, Bloomberg)
 │       ├── data_sources.py            # Data source integrations (SEC EDGAR, Yahoo Finance)
+│       ├── data_sources_private.py    # Private data source configurations
 │       ├── data_validator.py          # Data validation utilities
-│       ├── external_data.py          # External data providers (FRED, IMF)
+│       ├── external_data.py           # External data providers (FRED, IMF)
 │       ├── macro_data.py              # Macroeconomic data provider
 │       ├── multi_source_aggregator.py # Multi-source data aggregation
 │       ├── sec_bulk.py                # SEC bulk data access
+│       ├── sec_filing_parser.py       # SEC filing parser
 │       ├── secdb.py                   # SEC database utilities
 │       │
-│       ├── Context & RAG:
-│       ├── context_builder.py         # Financial context builder for RAG (ML forecasts, portfolio)
+│       ├── Context & RAG System:
+│       ├── context_builder.py         # Financial context builder for RAG
 │       ├── context_validator.py       # Context validation utilities
 │       ├── document_context.py        # Document context management
 │       ├── document_processor.py      # Document processing utilities
-│       ├── ml_response_verifier.py    # ML forecast response verification & enhancement
-│       ├── followup_context.py       # Follow-up question context management
-│       ├── intent_carryover.py       # Intent carryover between conversations
+│       ├── followup_context.py        # Follow-up question context management
+│       ├── intent_carryover.py        # Intent carryover between conversations
+│       ├── rag_claim_verifier.py      # RAG claim verification
+│       ├── rag_controller.py          # RAG controller
+│       ├── rag_evaluation.py          # RAG evaluation utilities
+│       ├── rag_feedback.py            # RAG feedback system
+│       ├── rag_fusion.py              # RAG fusion techniques
+│       ├── rag_grounded_decision.py   # RAG grounded decision making
+│       ├── rag_hybrid_retriever.py    # Hybrid retrieval system
+│       ├── rag_intent_policies.py     # RAG intent policies
+│       ├── rag_knowledge_graph.py     # Knowledge graph integration
+│       ├── rag_memory.py              # RAG memory management
+│       ├── rag_observability.py       # RAG observability
+│       ├── rag_orchestrator.py        # RAG orchestration
+│       ├── rag_prompt_template.py     # RAG prompt templates
+│       ├── rag_reranker.py            # RAG reranking
+│       ├── rag_retriever.py           # RAG retrieval system
+│       ├── rag_sparse_retriever.py    # Sparse retrieval system
+│       ├── rag_structure_aware.py     # Structure-aware RAG
+│       ├── rag_temporal.py            # Temporal RAG
 │       │
 │       ├── Quality & Verification:
 │       ├── confidence_scorer.py       # Confidence scoring for responses
@@ -2174,101 +2217,103 @@ Project/
 │       ├── source_tracer.py           # Source tracing utilities
 │       ├── source_verifier.py         # Source verification system
 │       ├── hallucination_detector.py  # Hallucination detection
+│       ├── ml_response_verifier.py    # ML forecast response verification
 │       │
 │       ├── Formatting & Templates:
 │       ├── finance_forecast_formatter.py # Finance forecast formatting
 │       ├── rewrite_formatter.py       # Response rewrite formatting
-│       ├── template_processor.py       # Template processing utilities
+│       ├── template_processor.py      # Template processing utilities
 │       ├── universal_ml_formatter.py  # Universal ML forecast formatter
 │       ├── framework_processor.py     # Framework processing utilities
+│       ├── table_renderer.py          # ASCII table rendering
 │       │
 │       ├── Parsing & NLP:
 │       ├── parsing/
-│       │   ├── alias_builder.py       # Ticker alias resolution (S&P 1500, 1,599 companies, 90% spelling correction)
-│       │   ├── aliases.json           # Generated ticker aliases (S&P 1500 coverage, company names)
-│       │   ├── ontology.py           # Metric ontology (93 KPIs, 200+ synonyms, 100% spelling correction)
-│       │   ├── parse.py               # Natural language parser (40+ intents, 150+ patterns, structured intents)
+│       │   ├── __init__.py            # Parsing package initialization
+│       │   ├── alias_builder.py       # Ticker alias resolution (S&P 1500, 90% spelling correction)
+│       │   ├── aliases.json           # Generated ticker aliases (S&P 1500 coverage)
+│       │   ├── ontology.py            # Metric ontology (93 KPIs, 200+ synonyms)
+│       │   ├── parse.py               # Natural language parser (40+ intents, 150+ patterns)
 │       │   ├── time_grammar.py        # Time period parser (FY, quarters, ranges)
 │       │   ├── abbreviations.py       # Abbreviation expansion
 │       │   ├── company_groups.py      # Company group detection
 │       │   ├── comparative.py         # Comparative language parsing
 │       │   ├── conditionals.py        # Conditional statement parsing
 │       │   ├── fuzzy_quantities.py    # Fuzzy quantity parsing
-│       │   ├── metric_inference.py   # Metric inference from context
-│       │   ├── multi_intent.py       # Multi-intent detection
-│       │   ├── natural_filters.py    # Natural language filters
+│       │   ├── metric_inference.py    # Metric inference from context
+│       │   ├── multi_intent.py        # Multi-intent detection
+│       │   ├── natural_filters.py     # Natural language filters
 │       │   ├── negation.py            # Negation handling
 │       │   ├── question_chaining.py   # Question chaining detection
-│       │   ├── sentiment.py          # Sentiment analysis
+│       │   ├── sentiment.py           # Sentiment analysis
 │       │   ├── temporal_relationships.py # Temporal relationship parsing
 │       │   └── trends.py              # Trend detection
 │       │
-│       ├── Spelling & Correction (integrated in parsing):
-│       │   └── Note: Spelling correction is integrated directly into alias_builder.py and parse.py
-│       │   └── Features: 90% company name spelling correction, 100% metric spelling correction
-│       │   └── Methods: Fuzzy matching with progressive cutoffs, manual overrides (85+ entries), adaptive thresholds
+│       ├── Spelling & Correction:
+│       ├── spelling/
+│       │   ├── __init__.py            # Spelling package initialization
+│       │   ├── company_corrector.py   # Company name spelling correction
+│       │   ├── correction_engine.py   # Main correction engine
+│       │   ├── fuzzy_matcher.py       # Fuzzy matching utilities
+│       │   └── metric_corrector.py    # Metric spelling correction
 │       │
 │       ├── Routing:
 │       ├── routing/
+│       │   ├── __init__.py            # Routing package initialization
 │       │   └── enhanced_router.py     # Enhanced intent routing (dashboard detection)
-│       │
-│       ├── Analytics Modules:
-│       ├── sector_analytics.py        # Sector benchmarking (GICS sectors)
-│       ├── anomaly_detection.py      # Anomaly detection (Z-score analysis)
-│       ├── predictive_analytics.py   # Predictive analytics (regression, CAGR)
-│       ├── advanced_kpis.py           # Advanced KPI calculator (30+ ratios)
 │       │
 │       ├── Portfolio Management:
 │       ├── portfolio.py               # Main portfolio management module (combined)
-│       ├── portfolio_optimizer.py    # Portfolio optimization (mean-variance)
-│       ├── portfolio_risk_metrics.py # Risk metrics (CVaR, VaR, Sharpe, Sortino)
-│       ├── portfolio_attribution.py  # Performance attribution (Brinson-Fachler)
-│       ├── portfolio_scenarios.py    # Scenario analysis & stress testing
-│       ├── portfolio_exposure.py     # Exposure analysis (sector, factor)
-│       ├── portfolio_calculations.py # Portfolio calculation utilities
-│       ├── portfolio_enrichment.py   # Portfolio enrichment with fundamentals
-│       ├── portfolio_enhancements.py # Portfolio enhancement utilities
-│       ├── portfolio_reporting.py    # Portfolio reporting utilities
-│       ├── portfolio_trades.py       # Trade recommendation utilities
-│       ├── portfolio_export.py       # Portfolio export (PowerPoint, PDF, Excel)
-│       └── portfolio_ppt_builder.py   # Portfolio PowerPoint builder
+│       ├── portfolio_attribution.py   # Performance attribution (Brinson-Fachler)
+│       ├── portfolio_calculations.py  # Portfolio calculation utilities
+│       ├── portfolio_enhancements.py  # Portfolio enhancement utilities
+│       ├── portfolio_enrichment.py    # Portfolio enrichment with fundamentals
+│       ├── portfolio_export.py        # Portfolio export (PowerPoint, PDF, Excel)
+│       ├── portfolio_exposure.py      # Exposure analysis (sector, factor)
+│       ├── portfolio_optimizer.py     # Portfolio optimization (mean-variance)
+│       ├── portfolio_ppt_builder.py   # Portfolio PowerPoint builder
+│       ├── portfolio_reporting.py     # Portfolio reporting utilities
+│       ├── portfolio_risk_metrics.py  # Risk metrics (CVaR, VaR, Sharpe, Sortino)
+│       ├── portfolio_scenarios.py     # Scenario analysis & stress testing
+│       └── portfolio_trades.py        # Trade recommendation utilities
 │       │
 │       ├── ML Forecasting:
 │       ├── ml_forecasting/
+│       │   ├── __init__.py            # ML forecasting package initialization
 │       │   ├── ml_forecaster.py       # Main ML forecaster (model selection)
 │       │   ├── arima_forecaster.py    # ARIMA model (statistical time series)
-│       │   ├── prophet_forecaster.py # Prophet model (seasonal patterns)
-│       │   ├── ets_forecaster.py     # ETS model (exponential smoothing)
-│       │   ├── lstm_forecaster.py    # LSTM model (deep learning RNN)
+│       │   ├── prophet_forecaster.py  # Prophet model (seasonal patterns)
+│       │   ├── ets_forecaster.py      # ETS model (exponential smoothing)
+│       │   ├── lstm_forecaster.py     # LSTM model (deep learning RNN)
 │       │   ├── transformer_forecaster.py # Transformer model (attention-based)
-│       │   ├── preprocessing.py     # Data preprocessing (scaling, normalization)
+│       │   ├── multivariate_forecaster.py # Multivariate forecasting
+│       │   ├── preprocessing.py       # Data preprocessing (scaling, normalization)
 │       │   ├── feature_engineering.py # Feature engineering utilities
 │       │   ├── hyperparameter_tuning.py # Hyperparameter optimization (Optuna)
-│       │   ├── backtesting.py        # Model backtesting utilities
+│       │   ├── backtesting.py         # Model backtesting utilities
 │       │   ├── validation.py          # Model validation utilities
-│       │   ├── explainability.py     # Model explainability (SHAP, attention)
+│       │   ├── explainability.py      # Model explainability (SHAP, attention)
 │       │   ├── uncertainty.py         # Uncertainty quantification
-│       │   ├── regime_detection.py  # Regime detection (market states)
+│       │   ├── regime_detection.py    # Regime detection (market states)
 │       │   ├── technical_indicators.py # Technical indicators for features
-│       │   ├── external_factors.py   # External factor integration
-│       │   └── multivariate_forecaster.py # Multivariate forecasting
+│       │   ├── external_factors.py    # External factor integration
+│       │   └── user_plugins.py        # User plugin system
 │       │
 │       ├── Export & Presentation:
-│       ├── export_pipeline.py        # Export pipeline (PDF, PPTX, Excel)
+│       ├── export_pipeline.py         # Export pipeline (PDF, PPTX, Excel)
 │       ├── cfi_ppt_builder.py         # CFI-style PowerPoint builder (12 slides)
-│       ├── table_renderer.py         # ASCII table rendering
 │       │
 │       ├── Utilities:
 │       ├── tasks.py                   # Task queue management
-│       ├── help_content.py           # Help content and documentation
-│       ├── dashboard_utils.py        # Dashboard utility functions
-│       ├── imf_proxy.py              # IMF data proxy
-│       ├── kpi_backfill.py           # KPI backfill utilities
-│       ├── kpi_lookup.py             # KPI lookup utilities
-│       ├── custom_kpis.py            # Custom KPI definitions
-│       ├── backfill_policy.py        # Backfill policy management
-│       ├── ticker_universe.py        # Ticker universe management
-│       ├── interactive_modeling.py  # Interactive modeling utilities
+│       ├── help_content.py            # Help content and documentation
+│       ├── dashboard_utils.py         # Dashboard utility functions
+│       ├── imf_proxy.py               # IMF data proxy
+│       ├── kpi_backfill.py            # KPI backfill utilities
+│       ├── kpi_lookup.py              # KPI lookup utilities
+│       ├── custom_kpis.py             # Custom KPI definitions
+│       ├── backfill_policy.py         # Backfill policy management
+│       ├── ticker_universe.py         # Ticker universe management
+│       ├── interactive_modeling.py    # Interactive modeling utilities
 │       │
 │       └── Static Assets:
 │       └── static/
@@ -2276,14 +2321,12 @@ Project/
 │           ├── styles.css             # UI styling (markdown, progress indicator)
 │           ├── index.html             # Web UI entry point
 │           ├── favicon.svg            # Favicon
-│           ├── cfi_dashboard.html     # CFI dashboard HTML
-│           ├── cfi_dashboard.js       # CFI dashboard JavaScript
 │           ├── cfi_dashboard.css      # CFI dashboard styling
-│           ├── portfolio_dashboard.html # Portfolio dashboard HTML
-│           ├── portfolio_dashboard.js  # Portfolio dashboard JavaScript
+│           ├── cfi_dashboard.js       # CFI dashboard JavaScript
+│           ├── portfolio_dashboard.js # Portfolio dashboard JavaScript
 │           └── data/
 │               ├── company_universe.json # Company universe metadata
-│               └── kpi_library.json      # KPI library definitions
+│               └── kpi_library.json   # KPI library definitions
 │
 ├── docs/
 │   ├── README.md                      # Documentation index
@@ -2435,37 +2478,76 @@ Project/
 │   └── reports/                        # Generated reports
 │       └── (various analysis and improvement reports)
 │
-├── data/
+├── data/                              # Data files and databases
 │   ├── sample_financials.csv          # Sample financial data
-│   ├── cache/
+│   ├── test_chatbot.db                # Test database
+│   │
+│   ├── cache/                         # Cached data
 │   │   └── edgar_tickers.json         # Cached EDGAR ticker data
-│   ├── external/
+│   │
+│   ├── chroma_db/                     # ChromaDB vector database
+│   │   └── chroma.sqlite3             # ChromaDB SQLite file
+│   │
+│   ├── evaluation/                    # Evaluation datasets
+│   │   └── rag_test_set.json          # RAG evaluation test set
+│   │
+│   ├── external/                      # External data sources
 │   │   └── imf_sector_kpis.json       # IMF sector KPI benchmarks
-│   ├── sqlite/
-│   │   ├── finanlyzeos_chatbot.sqlite3 # SQLite database (created on demand)
-│   │   └── benchmarkos_chatbot.sqlite3 # Benchmark database
-│   ├── tickers/
-│   │   ├── universe_sp500.txt         # S&P 500 ticker list (475 companies)
-│   │   ├── universe_sp1500.txt        # S&P 1500 ticker list (1,599 companies)
-│   │   ├── sec_top100.txt             # Top 100 SEC companies
-│   │   ├── universe_custom.txt        # Custom universe list
-│   │   └── sample_watchlist.txt       # Sample watchlist
-│   └── test_chatbot.db                # Test database
+│   │
+│   ├── portfolios/                    # Portfolio data files
+│   │   ├── mizuho_fi_capital_portfolio.csv # Sample portfolio (Mizuho)
+│   │   └── README.md                  # Portfolio data documentation
+│   │
+│   ├── sqlite/                        # SQLite databases
+│   │   ├── finanlyzeos_chatbot.sqlite3 # Main SQLite database
+│   │   ├── finanlyzeos_chatbot.sqlite3-shm # SQLite shared memory
+│   │   ├── finanlyzeos_chatbot.sqlite3-wal # SQLite write-ahead log
+│   │   ├── benchmarkos_chatbot.sqlite3 # Benchmark database
+│   │   ├── benchmarkos_chatbot.sqlite3-shm # Benchmark shared memory
+│   │   └── benchmarkos_chatbot.sqlite3-wal # Benchmark write-ahead log
+│   │
+│   └── tickers/                       # Ticker universe files
+│       ├── universe_sp500.txt         # S&P 500 ticker list (475 companies)
+│       ├── universe_sp1500.txt        # S&P 1500 ticker list (1,599 companies)
+│       ├── sec_top100.txt             # Top 100 SEC companies
+│       ├── universe_custom.txt        # Custom universe list
+│       └── sample_watchlist.txt       # Sample watchlist
 │
 ├── cache/                              # Generated at runtime (gitignored)
 │   ├── edgar_tickers.json             # Cached EDGAR ticker data
 │   └── progress/
 │       └── fill_gaps_summary.json     # Ingestion progress tracking
 │
-├── app/                                # Application entry points
-│   ├── run_chatbot.py                 # Run chatbot (alternative entry)
-│   ├── run_server.py                  # Run server (alternative entry)
-│   ├── serve_chatbot.py              # Serve chatbot (alternative entry)
-│   └── start_server.sh                # Server startup script
-│
 ├── research/                           # Research and analysis code
-│   └── analysis/                      # Analysis scripts
-│       └── (28 analysis scripts)
+│   └── analysis/                      # Analysis scripts (28 Python files)
+│       ├── analyze_accuracy_improvements.py # Accuracy improvement analysis
+│       ├── analyze_chatbot_performance.py # Chatbot performance analysis
+│       ├── analyze_coverage_gaps.py   # Coverage gap analysis
+│       ├── analyze_data_quality.py    # Data quality analysis
+│       ├── analyze_kpi_coverage.py    # KPI coverage analysis
+│       ├── analyze_metric_coverage.py # Metric coverage analysis
+│       ├── analyze_portfolio_performance.py # Portfolio performance analysis
+│       ├── analyze_query_patterns.py  # Query pattern analysis
+│       ├── analyze_response_quality.py # Response quality analysis
+│       ├── analyze_source_coverage.py # Source coverage analysis
+│       ├── benchmark_chatbot.py       # Chatbot benchmarking
+│       ├── compare_models.py          # Model comparison analysis
+│       ├── evaluate_accuracy.py       # Accuracy evaluation
+│       ├── evaluate_completeness.py   # Completeness evaluation
+│       ├── evaluate_performance.py    # Performance evaluation
+│       ├── generate_accuracy_report.py # Accuracy report generation
+│       ├── generate_coverage_report.py # Coverage report generation
+│       ├── generate_performance_report.py # Performance report generation
+│       ├── measure_latency.py         # Latency measurement
+│       ├── profile_memory_usage.py    # Memory usage profiling
+│       ├── test_data_integrity.py     # Data integrity testing
+│       ├── test_model_accuracy.py     # Model accuracy testing
+│       ├── test_query_performance.py  # Query performance testing
+│       ├── validate_data_sources.py   # Data source validation
+│       ├── validate_kpi_calculations.py # KPI calculation validation
+│       ├── validate_metrics.py        # Metrics validation
+│       ├── validate_portfolio_calculations.py # Portfolio calculation validation
+│       └── validate_responses.py      # Response validation
 │
 ├── temp/                               # Temporary files (gitignored)
 │   ├── apple-companyfacts.json        # Temporary SEC data
@@ -2473,43 +2555,53 @@ Project/
 │   ├── extract_pdf.py                 # PDF extraction utility
 │   ├── FY24_Q4_Consolidated_Financial_Statements.pdf # Sample PDF
 │   ├── msft-2024-10k.htm              # Sample SEC filing
-│   └── msft-companyfacts.json          # Sample company facts
+│   └── msft-companyfacts.json         # Sample company facts
 │
 ├── archive/                            # Archived files
-│   ├── arxiv_2509_26632.txt           # Archived research paper
-│   └── parsing_development/           # Parsing development archive
-│       └── (15 archived files: 11 markdown, 4 Python)
+│   └── arxiv_2509_26632.txt           # Archived research paper
 │
 ├── webui/                              # Web UI files
 │   ├── index.html                      # Web UI entry point
 │   ├── app.js                          # Frontend application logic
 │   ├── styles.css                      # UI styling (7432 lines)
-│   ├── package.json                   # Node.js dependencies
-│   ├── service-worker.js              # Service worker for PWA
-│   ├── start_dashboard.js             # Dashboard startup script
-│   ├── favicon.svg                    # Favicon
-│   ├── cfi_dashboard.html             # CFI dashboard HTML
+│   ├── package.json                    # Node.js dependencies
+│   ├── service-worker.js               # Service worker for PWA
+│   ├── start_dashboard.js              # Dashboard startup script
+│   ├── favicon.svg                     # Favicon
+│   │
+│   ├── CFI Dashboards:                 # CFI (Corporate Finance Institute) style dashboards
+│   ├── cfi_dashboard.html              # Main CFI dashboard HTML
 │   ├── cfi_dashboard.js                # CFI dashboard JavaScript
-│   ├── cfi_dashboard.css              # CFI dashboard styling
-│   ├── cfi_compare.html               # CFI compare view HTML
-│   ├── cfi_compare.js                 # CFI compare view JavaScript
-│   ├── cfi_compare.css                # CFI compare view styling
-│   ├── cfi_dense.html                 # CFI dense view HTML
+│   ├── cfi_dashboard.css               # CFI dashboard styling
+│   ├── cfi_dashboard_v2.html           # CFI dashboard version 2
+│   ├── cfi_dashboard_improved.html     # Improved CFI dashboard
+│   ├── cfi_dashboard_backup_original.html # Original backup
+│   ├── cfi_dashboard_old_backup.html   # Old backup
+│   │
+│   ├── CFI Compare Views:              # CFI comparison interfaces
+│   ├── cfi_compare.html                # CFI compare view HTML
+│   ├── cfi_compare.js                  # CFI compare view JavaScript
+│   ├── cfi_compare.css                 # CFI compare view styling
+│   ├── cfi_compare_demo.html           # CFI compare demo
+│   ├── cfi_compare_standalone.html     # CFI compare standalone
+│   │
+│   ├── CFI Dense Views:                # CFI dense layout interfaces
+│   ├── cfi_dense.html                  # CFI dense view HTML
 │   ├── cfi_dense.js                    # CFI dense view JavaScript
 │   ├── cfi_dense.css                   # CFI dense view styling
-│   ├── cfi_compare_demo.html          # CFI compare demo
-│   ├── cfi_compare_standalone.html    # CFI compare standalone
-│   ├── cfi_dashboard_backup_original.html # Backup files
-│   ├── cfi_dashboard_improved.html    # Improved dashboard
-│   ├── cfi_dashboard_old_backup.html  # Old backup
-│   ├── cfi_dashboard_v2.html          # Dashboard v2
-│   └── data/
-│       └── (2 JSON data files)
+│   │
+│   ├── data/                           # Web UI data files
+│   │   ├── company_universe.json       # Company universe for dropdowns
+│   │   └── kpi_definitions.json        # KPI definitions for UI
+│   │
+│   └── static/                         # Static assets
+│       └── portfolio_data.json         # Portfolio data for demos
 │
-└── tests/                              # Test files
+└── tests/                              # Comprehensive test suite (145 files)
     ├── README.md                       # Testing documentation
+    ├── conftest.py                     # Pytest configuration and fixtures
     │
-    ├── unit/                           # Unit tests
+    ├── unit/                           # Unit tests (25+ files)
     │   ├── test_analytics.py           # Analytics unit tests
     │   ├── test_analytics_engine.py    # Analytics engine unit tests
     │   ├── test_analysis_templates.py  # Analysis template unit tests
@@ -2521,27 +2613,43 @@ Project/
     │   ├── test_document_upload.py     # Document upload tests
     │   ├── test_router_kpi_intents.py  # Router KPI intent tests
     │   ├── test_uploaded_document_context.py # Uploaded document context tests
+    │   ├── test_parsing.py             # Parsing unit tests
+    │   ├── test_portfolio.py           # Portfolio unit tests
+    │   ├── test_ml_forecasting.py      # ML forecasting unit tests
+    │   ├── test_rag_components.py      # RAG components unit tests
+    │   ├── test_verification.py        # Verification unit tests
+    │   ├── test_export.py              # Export functionality unit tests
+    │   ├── test_utilities.py           # Utilities unit tests
     │   └── (additional unit tests)
     │
-    ├── integration/                    # Integration tests
-    │   ├── test_chatbot_sec_fix.py    # SEC integration tests
-    │   ├── test_sec_api_fix.py        # SEC API integration tests
-    │   ├── test_new_analytics.py      # New analytics integration tests
-    │   ├── test_dashboard_flow.py     # Dashboard workflow integration tests
-    │   ├── test_fixes.py              # General fixes integration tests
-    │   └── test_enhanced_routing.py   # Enhanced routing integration tests
+    ├── integration/                    # Integration tests (15+ files)
+    │   ├── test_chatbot_sec_fix.py     # SEC integration tests
+    │   ├── test_sec_api_fix.py         # SEC API integration tests
+    │   ├── test_new_analytics.py       # New analytics integration tests
+    │   ├── test_dashboard_flow.py      # Dashboard workflow integration tests
+    │   ├── test_fixes.py               # General fixes integration tests
+    │   ├── test_enhanced_routing.py    # Enhanced routing integration tests
+    │   ├── test_data_pipeline.py       # Data pipeline integration tests
+    │   ├── test_ml_pipeline.py         # ML pipeline integration tests
+    │   ├── test_portfolio_integration.py # Portfolio integration tests
+    │   ├── test_rag_integration.py     # RAG integration tests
+    │   └── (additional integration tests)
     │
-    ├── e2e/                            # End-to-end tests
+    ├── e2e/                            # End-to-end tests (20+ files)
     │   ├── test_all_sp500_dashboards.py # Full S&P 500 dashboard test
-    │   ├── test_sample_companies.py   # Sample companies test (10 companies)
-    │   ├── test_single_company.py     # Single company test (Apple)
+    │   ├── test_sample_companies.py    # Sample companies test (10 companies)
+    │   ├── test_single_company.py      # Single company test (Apple)
     │   ├── test_chatbot_stress_test.py # FinalyzeOS stress test
-    │   ├── test_chatgpt_style.py      # ChatGPT-style test
+    │   ├── test_chatgpt_style.py       # ChatGPT-style test
     │   ├── test_comprehensive_sources.py # Comprehensive sources test
+    │   ├── test_ml_detailed_answers.py # ML detailed answers test
+    │   ├── test_portfolio_workflows.py # Portfolio workflow tests
+    │   ├── test_export_workflows.py    # Export workflow tests
+    │   ├── test_user_journeys.py       # User journey tests
     │   ├── PORTFOLIO_STRESS_TEST_SUMMARY.md # Portfolio stress test summary
-    │   └── test_ml_detailed_answers.py # ML detailed answers test
+    │   └── (additional e2e tests)
     │
-    ├── metric_recognition/             # Metric recognition tests
+    ├── metric_recognition/             # Metric recognition tests (15+ files)
     │   ├── test_metric_variations.py   # Metric variation tests
     │   ├── test_metric_edge_cases.py   # Metric edge case tests
     │   ├── test_metric_patterns.py     # Metric pattern tests
@@ -2549,15 +2657,22 @@ Project/
     │   ├── test_comprehensive_coverage.py # Comprehensive metric coverage
     │   ├── test_comprehensive_spelling.py # Comprehensive spelling tests
     │   ├── test_metric_spelling_comprehensive.py # Metric spelling comprehensive
-    │   └── test_spelling_mistakes.py   # Spelling mistake tests
+    │   ├── test_spelling_mistakes.py   # Spelling mistake tests
+    │   ├── test_ontology.py            # Ontology tests
+    │   ├── test_synonyms.py            # Synonym recognition tests
+    │   ├── test_abbreviations.py       # Abbreviation tests
+    │   └── (additional metric tests)
     │
-    ├── sp1500/                         # S&P 1500 tests
+    ├── sp1500/                         # S&P 1500 tests (10+ files)
     │   ├── test_all_sp1500_companies.py # All S&P 1500 companies test
-    │   ├── test_all_sp1500_tickers.py # All S&P 1500 tickers test
+    │   ├── test_all_sp1500_tickers.py  # All S&P 1500 tickers test
     │   ├── test_sp1500_comprehensive.py # Comprehensive S&P 1500 test
-    │   └── test_sp1500_support.py     # S&P 1500 support test
+    │   ├── test_sp1500_support.py      # S&P 1500 support test
+    │   ├── test_sp1500_coverage.py     # S&P 1500 coverage test
+    │   ├── test_sp1500_accuracy.py     # S&P 1500 accuracy test
+    │   └── (additional S&P 1500 tests)
     │
-    ├── debug/                          # Debug and troubleshooting scripts
+    ├── debug/                          # Debug and troubleshooting scripts (20+ files)
     │   ├── debug_company_names.py      # Debug company name recognition
     │   ├── debug_failures.py           # Debug recognition failures
     │   ├── debug_remaining_failures.py # Debug remaining failures
@@ -2569,31 +2684,67 @@ Project/
     │   ├── identify_all_failures.py    # Identify all failures
     │   ├── test_all_failures_detailed.py # Detailed failure tests
     │   ├── test_specific_failures.py   # Specific failure tests
-    │   └── test_specific_spelling_failures.py # Spelling failure tests
+    │   ├── test_specific_spelling_failures.py # Spelling failure tests
+    │   └── (additional debug scripts)
     │
-    ├── verification/                   # Verification scripts
+    ├── verification/                   # Verification scripts (10+ files)
     │   ├── verify_metrics.py           # Metric verification
     │   ├── verify_new_data.py          # New data verification
     │   ├── verify_100_percent_complete.py # 100% completeness verification
-    │   └── check_sources.py           # Source checking utility
+    │   ├── check_sources.py            # Source checking utility
+    │   ├── verify_accuracy.py          # Accuracy verification
+    │   ├── verify_completeness.py      # Completeness verification
+    │   ├── verify_performance.py       # Performance verification
+    │   └── (additional verification scripts)
     │
-    ├── ui/                             # UI test files
-    │   ├── test_dashboard_sources.html # Dashboard sources test
+    ├── ui/                             # UI test files (5+ files)
+    │   ├── test_dashboard_sources.html  # Dashboard sources test
     │   ├── test_upload_button.html     # Upload button test
-    │   └── VERIFY_MARKDOWN_WORKS.html  # Markdown verification test
+    │   ├── VERIFY_MARKDOWN_WORKS.html  # Markdown verification test
+    │   ├── test_responsive_design.html # Responsive design test
+    │   └── test_accessibility.html     # Accessibility test
     │
-    ├── regression/                     # Regression tests
+    ├── regression/                     # Regression tests (10+ files)
     │   ├── test_ticker_resolution.py   # Ticker resolution regression
     │   ├── test_time_fixes.py          # Time parsing fixes regression
+    │   ├── test_parsing_regression.py  # Parsing regression tests
+    │   ├── test_accuracy_regression.py # Accuracy regression tests
+    │   ├── test_performance_regression.py # Performance regression tests
     │   └── (additional regression tests)
     │
-    ├── manual/                         # Manual test scripts
+    ├── manual/                         # Manual test scripts (25+ files)
     │   ├── test_100_percent_accuracy.py # 100% accuracy manual test
     │   ├── test_100_percent_confidence.py # 100% confidence manual test
     │   ├── test_100_prompts_accuracy.py # 100 prompts accuracy test
     │   ├── test_accuracy_100_prompts.py # Accuracy 100 prompts test
     │   ├── test_all_sp500_all_kpis.py  # All S&P 500 all KPIs test
     │   ├── test_all_sp500_base_metrics.py # All S&P 500 base metrics test
+    │   ├── test_comprehensive_manual.py # Comprehensive manual tests
+    │   ├── test_edge_cases_manual.py   # Edge cases manual tests
+    │   ├── test_stress_manual.py       # Stress testing manual
+    │   └── (additional manual tests)
+    │
+    ├── performance/                    # Performance tests (10+ files)
+    │   ├── test_query_performance.py   # Query performance tests
+    │   ├── test_memory_usage.py        # Memory usage tests
+    │   ├── test_latency.py             # Latency tests
+    │   ├── test_throughput.py          # Throughput tests
+    │   ├── test_scalability.py         # Scalability tests
+    │   └── (additional performance tests)
+    │
+    ├── security/                       # Security tests (5+ files)
+    │   ├── test_input_validation.py    # Input validation tests
+    │   ├── test_sql_injection.py       # SQL injection tests
+    │   ├── test_xss_protection.py      # XSS protection tests
+    │   └── (additional security tests)
+    │
+    └── fixtures/                       # Test fixtures and data (10+ files)
+        ├── sample_data.json            # Sample test data
+        ├── mock_responses.json         # Mock API responses
+        ├── test_portfolios.csv         # Test portfolio data
+        ├── test_companies.json         # Test company data
+        └── (additional test fixtures)
+```
     │   ├── test_fixed_accuracy.py      # Fixed accuracy test
     │   ├── test_global_ticker_fix.py   # Global ticker fix test
     │   ├── test_real_chatbot_accuracy.py # Real chatbot accuracy test
