@@ -4954,7 +4954,7 @@ class FinanlyzeOSChatbot:
                                 f"{verification.num_not_found} not found. Consider regenerating."
                             )
                             # Note: Removed automatic disclaimer appending
-                            # Low confidence will be handled contextually within the response
+                            # Low confidence is logged but no disclaimer is added
                     except Exception as e:
                         LOGGER.debug(f"Claim verification failed: {e}")
                 
