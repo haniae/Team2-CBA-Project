@@ -4953,9 +4953,8 @@ class FinanlyzeOSChatbot:
                                 f"Claim verification: {verification.num_contradicted} contradicted, "
                                 f"{verification.num_not_found} not found. Consider regenerating."
                             )
-                            # Optionally regenerate or add warning to answer
-                            if verification.suggested_response:
-                                reply = f"{reply}\n\n⚠️ {verification.suggested_response}"
+                            # Note: Removed automatic disclaimer appending
+                            # Low confidence will be handled contextually within the response
                     except Exception as e:
                         LOGGER.debug(f"Claim verification failed: {e}")
                 

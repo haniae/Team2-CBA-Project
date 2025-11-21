@@ -111,12 +111,8 @@ class ClaimVerifier:
         )
         
         suggested_response = None
-        if should_regenerate:
-            suggested_response = (
-                "I apologize, but I cannot provide a fully confident answer based on the available information. "
-                "Some claims could not be verified against the retrieved documents. "
-                "Please try rephrasing your query or providing more context."
-            )
+        # Note: Removed automatic disclaimer generation
+        # If confidence is low, the system will handle it contextually
         
         return ClaimVerificationResult(
             claims=verified_claims,
