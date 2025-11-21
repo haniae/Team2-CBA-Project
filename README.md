@@ -1497,7 +1497,7 @@ Project/
 ├── pyproject.toml                     # Project metadata, dependencies, pytest config
 ├── requirements.txt                   # Python dependencies lockfile
 ├── finanlyzeos_chatbot.sqlite3        # Main SQLite database (created on demand)
-├── benchmarkos_chatbot.sqlite3        # Benchmark SQLite database
+├── finalyzeos_chatbot.sqlite3         # Main SQLite database (backup)
 ├── test.db                            # Test database
 │
 ├── app/                               # Application entry points
@@ -1595,7 +1595,7 @@ Project/
 │   ├── data/
 │   │   └── kpi_library.json           # KPI library definitions
 │   │
-│   ├── benchmarkos_chatbot/           # Benchmark chatbot module
+│   ├── finalyzeos_chatbot/            # Alternative chatbot module
 │   │   └── (benchmark chatbot files)
 │   │
 │   └── finanlyzeos_chatbot/           # Main chatbot source code
@@ -1946,7 +1946,7 @@ Project/
 │   │   ├── finanlyzeos_chatbot.sqlite3 # Main SQLite database
 │   │   ├── finanlyzeos_chatbot.sqlite3-shm # SQLite shared memory
 │   │   ├── finanlyzeos_chatbot.sqlite3-wal # SQLite write-ahead log
-│   │   ├── benchmarkos_chatbot.sqlite3 # Benchmark database
+│   │   ├── finalyzeos_chatbot.sqlite3  # Alternative database
 │   │   ├── benchmarkos_chatbot.sqlite3-shm # Benchmark shared memory
 │   │   └── benchmarkos_chatbot.sqlite3-wal # Benchmark write-ahead log
 │   │

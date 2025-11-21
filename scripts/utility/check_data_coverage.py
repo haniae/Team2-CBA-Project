@@ -39,9 +39,9 @@ def get_database_path():
     
     # Try common database locations
     possible_paths = [
-        Path("benchmarkos_chatbot.sqlite3"),
+        Path("finalyzeos_chatbot.sqlite3"),
         Path("finanlyzeos_chatbot.sqlite3"),
-        Path.cwd() / "benchmarkos_chatbot.sqlite3",
+        Path.cwd() / "finalyzeos_chatbot.sqlite3",
     ]
     
     for path in possible_paths:
@@ -306,7 +306,7 @@ def main():
     if not db_path:
         print("❌ Database not found!")
         print("\nTried locations:")
-        print("  - benchmarkos_chatbot.sqlite3")
+        print("  - finalyzeos_chatbot.sqlite3")
         print("  - finanlyzeos_chatbot.sqlite3")
         print("  - Current directory")
         print("\nPlease ensure the database exists or update the path in settings.")

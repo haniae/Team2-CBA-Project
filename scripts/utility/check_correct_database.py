@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 
 # The actual database path from settings
-db_path = Path(r'C:\Users\Hania\Documents\GitHub\Project\benchmarkos_chatbot.sqlite3')
+db_path = Path(r'C:\Users\Hania\Documents\GitHub\Project\finalyzeos_chatbot.sqlite3')
 
 if not db_path.exists():
     print(f"❌ Database not found at: {db_path}")
