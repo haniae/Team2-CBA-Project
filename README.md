@@ -27,7 +27,7 @@ Contributors
 
 **Acknowledgments** Special thanks to Professor Patrick Hall (The George Washington University) for his outstanding mentorship and tireless support. His guidance and encouragement made this project possible.
 
-[Setup Guide](#️-complete-setup-guide) • [Documentation](docs/) • [Features](#core-capabilities) • [Example Queries](#-example-queries) • [Contributing](CONTRIBUTING.md)
+[Setup Guide](#️-complete-setup-guide) • [Documentation](docs/) • [Features](#core-capabilities) • [Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -69,7 +69,6 @@ python run_chatbot.py
 ### Getting Started
 - [⚡ Quick Start](#-quick-start)
 - [🛠️ Complete Setup Guide](#️-complete-setup-guide)
-- [💡 Example Queries](#-example-queries)
 - [📊 Current Data Coverage](#-current-data-coverage)
 
 ### Core Features
@@ -451,179 +450,6 @@ python scripts/ingestion/ingest_universe.py --universe-file your_tickers.txt --y
 
 ---
 
-## 💡 Example Queries
-
-After setup, try these example queries to explore FinalyzeOS capabilities:
-
-### 📊 Single Metric Queries
-```bash
-# In CLI or Web UI
-"What is Apple's revenue?"
-"Show me Microsoft's EBITDA margin"
-"What's Tesla's free cash flow?"
-"What is Google's net income?"
-"Tell me Amazon's market cap"
-"What's Apple's P/E ratio?"
-"Show NVDA's gross margin"
-"What is META's return on equity?"
-
-# Spelling mistake handling (automatically corrected)
-"What is Appel's revenue?"        # Company name typo → "Apple"
-"Show me revenu for Tesla"         # Metric typo → "revenue"
-"What's Microsft's P/E ratio?"    # Company name typo → "Microsoft"
-"Tell me about earnngs per share" # Metric typo → "earnings per share"
-
-# Natural language variations
-"Apple revenue"                    # Minimal query
-"Revenue for Apple"                # Reversed order
-"Tell me Apple's top line"         # Synonym for revenue
-"Show me how much Apple makes"     # Natural phrasing
-```
-
-**What You Get:**
-- ✅ Direct answer in first paragraph
-- ✅ Year-over-year growth context
-- ✅ 3-year and 5-year CAGR trends
-- ✅ Business drivers explanation
-- ✅ Clickable SEC filing links
-- ✅ 150-300 words with analysis
-- ✅ Automatic spelling correction for company names and metrics
-
----
-
-### 🔍 "Why" Questions (Multi-Factor Analysis)
-```bash
-"Why is Tesla's margin declining?"
-"Why is Apple's revenue growing?"
-"Why is Microsoft more profitable?"
-"Why did NVDA's stock price increase?"
-"Why is Amazon investing more in CapEx?"
-"Why is Google's margin expanding?"
-```
-
-**What You Get:**
-- ✅ Multi-factor explanation (3-5 key reasons)
-- ✅ Quantified impact (basis points, percentages)
-- ✅ Business context and industry dynamics
-- ✅ Historical comparison
-- ✅ Forward outlook
-- ✅ 400-600 words with deep analysis
-
----
-
-### 📈 Comparison Queries
-```bash
-"Compare Apple vs Microsoft"
-"Show me Tesla and Ford's financial metrics"
-"Compare tech companies: AAPL, MSFT, GOOGL"
-"How do Apple and Microsoft stack up on profitability?"
-"Compare the big 5 tech companies"
-```
-
-**What You Get:**
-- ✅ Side-by-side metrics table
-- ✅ Sector percentile rankings
-- ✅ Visual comparison charts
-- ✅ Highlighted differences
-- ✅ S&P 500 average benchmarks
-
----
-
-### 📅 Time-Based Queries
-```bash
-"Show me Apple's revenue over the last 5 years"
-"What was Microsoft's profit margin in 2022?"
-"Compare Tesla's revenue in 2021 vs 2023"
-"Show me Amazon's growth trend"
-"What happened to Meta's revenue in 2023?"
-```
-
-**What You Get:**
-- ✅ Historical trend charts
-- ✅ Period-specific analysis
-- ✅ Year-over-year comparisons
-- ✅ Growth rate calculations
-
----
-
-### 🎯 Dashboard Requests
-```bash
-"Show me Apple's dashboard"
-"Display Microsoft financial dashboard"
-"Give me Tesla's full financial overview"
-```
-
-**What You Get:**
-- ✅ Interactive dashboard with KPI cards
-- ✅ Revenue, EBITDA, FCF charts
-- ✅ Valuation multiples over time
-- ✅ Share price performance
-- ✅ Risk indicators
-- ✅ Export options (PowerPoint, PDF, Excel)
-
----
-
-### 🔮 Forecasting Queries
-```bash
-"Forecast Microsoft's revenue for 2026"
-"Predict Apple's earnings growth"
-"What's Tesla's revenue outlook?"
-"Show me Amazon's 5-year forecast"
-```
-
-**What You Get:**
-- ✅ ML-powered forecasts (ARIMA, Prophet, LSTM, Transformer)
-- ✅ Confidence intervals
-- ✅ Trend classification (increasing/decreasing/stable)
-- ✅ Multiple model ensemble
-- ✅ Historical accuracy metrics
-
----
-
-### 💼 Portfolio Queries
-```bash
-"Show me my portfolio performance"
-"What's my portfolio's sector exposure?"
-"Analyze my portfolio risk"
-"Compare my portfolio to S&P 500"
-```
-
-**What You Get:**
-- ✅ Portfolio analytics dashboard
-- ✅ Sector diversification analysis
-- ✅ Risk metrics (Sharpe ratio, volatility)
-- ✅ Performance attribution
-- ✅ Benchmark comparisons
-
----
-
-### 🎨 Advanced Analytics
-```bash
-"Which tech company has the best margins?"
-"Rank companies by revenue growth"
-"Find companies with declining profitability"
-"Show me sector benchmarks for technology"
-```
-
-**What You Get:**
-- ✅ Sector benchmarking and percentile rankings
-- ✅ Anomaly detection with severity classification
-- ✅ Top/bottom performers identification
-- ✅ Statistical analysis with Z-scores
-
----
-
-**💡 Pro Tip:** All queries support natural language - no need to memorize commands! The system understands variations like "What is", "Show me", "Tell me", "Compare", etc.
-
-**🎯 Advanced Natural Language Features:**
-- ✅ **100% Query Pattern Detection** - Supports 150+ question patterns (what, how, why, when, where, who, which)
-- ✅ **90% Company Name Spelling Mistake Handling** - Automatically corrects misspellings (e.g., "Appel" → "Apple", "Microsft" → "Microsoft")
-- ✅ **100% Metric Spelling Mistake Handling** - Handles metric typos (e.g., "revenu" → "revenue", "earnngs" → "earnings")
-- ✅ **40+ Intent Types** - Recognizes compare, trend, rank, explain, forecast, scenario, relationship, benchmark, and more
-- ✅ **93 Financial Metrics** - All metrics support 200+ natural language synonyms and variations
-- ✅ **1,599 S&P 1500 Companies** - Full support for all S&P 500, S&P 400, and S&P 600 companies via ticker or company name
-
----
 
 ## 📊 Current Data Coverage
 
@@ -834,13 +660,6 @@ FinalyzeOS includes comprehensive **portfolio management capabilities** that ena
 - **Sector Breakdown**: GICS sector classification for all holdings
 - **Concentration Metrics**: HHI (Herfindahl-Hirschman Index), top 10 concentration, max weights
 
-**Example Queries:**
-```
-✅ "Show my portfolio holdings"
-✅ "What are the holdings for port_abc123?"
-✅ "Show holdings for port_abc123"
-✅ "Use portfolio port_abc123"
-```
 
 #### 3. **Portfolio Exposure Analysis**
 - **Sector Exposure**: Weight breakdown across 11 GICS sectors (Technology, Financials, Healthcare, etc.)
@@ -848,13 +667,6 @@ FinalyzeOS includes comprehensive **portfolio management capabilities** that ena
 - **Concentration Analysis**: HHI, top 10 concentration ratio, maximum position weights
 - **Geographic Exposure**: Regional allocation (if available in data)
 
-**Example Queries:**
-```
-✅ "What's my portfolio exposure?"
-✅ "Show portfolio sector exposure"
-✅ "Analyze exposure for port_abc123"
-✅ "What's my factor exposure?"
-```
 
 #### 4. **Portfolio Optimization**
 - **Mean-Variance Optimization**: Optimize for maximum Sharpe ratio, minimum variance, or target return
@@ -862,12 +674,6 @@ FinalyzeOS includes comprehensive **portfolio management capabilities** that ena
 - **Rebalancing Recommendations**: Specific buy/sell recommendations with expected impact
 - **Performance Projections**: Expected return, variance, and Sharpe ratio for optimized portfolio
 
-**Example Queries:**
-```
-✅ "Optimize my portfolio"
-✅ "Rebalance portfolio port_abc123"
-✅ "Optimize for maximum Sharpe ratio"
-```
 
 #### 5. **Performance Attribution (Brinson-Fachler)**
 - **Active Return Decomposition**: Total active return broken down into allocation, selection, and interaction effects
@@ -875,12 +681,6 @@ FinalyzeOS includes comprehensive **portfolio management capabilities** that ena
 - **Top Detractors**: Worst performing positions and their impact
 - **Sector-Level Analysis**: Which sectors drove portfolio performance
 
-**Example Queries:**
-```
-✅ "Show portfolio attribution"
-✅ "What's driving my portfolio performance?"
-✅ "Attribution analysis for port_abc123"
-```
 
 #### 6. **Risk Metrics & Stress Testing**
 - **CVaR (Conditional Value at Risk)**: Expected shortfall at 95% confidence level
@@ -891,13 +691,6 @@ FinalyzeOS includes comprehensive **portfolio management capabilities** that ena
 - **Tracking Error**: Active risk vs. benchmark (S&P 500)
 - **Beta**: Portfolio beta vs. market
 
-**Example Queries:**
-```
-✅ "What's my portfolio CVaR?"
-✅ "Calculate CVaR for port_abc123"
-✅ "Portfolio expected shortfall"
-✅ "What's my portfolio tracking error?"
-```
 
 #### 7. **Scenario Analysis & Stress Testing**
 - **Equity Drawdown Scenarios**: Test portfolio performance under market crashes (e.g., -20%, -30%)
@@ -905,13 +698,6 @@ FinalyzeOS includes comprehensive **portfolio management capabilities** that ena
 - **Custom Scenarios**: Define custom market scenarios with position-specific impacts
 - **Monte Carlo Simulation**: Probabilistic scenario analysis with thousands of simulations
 
-**Example Queries:**
-```
-✅ "What if the market crashes 20%?"
-✅ "Stress test my portfolio"
-✅ "What happens if tech sector drops 30%?"
-✅ "Monte Carlo simulation for port_abc123"
-```
 
 #### 8. **ESG & Sustainability Analysis**
 - **ESG Scores**: Overall portfolio ESG score and component scores (Environmental, Social, Governance)
@@ -919,12 +705,6 @@ FinalyzeOS includes comprehensive **portfolio management capabilities** that ena
 - **Sector ESG**: Average ESG scores by sector
 - **Controversy Detection**: Portfolio controversy level and flagging of controversial holdings
 
-**Example Queries:**
-```
-✅ "What's my portfolio ESG score?"
-✅ "Show ESG exposure for port_abc123"
-✅ "Analyze portfolio ESG"
-```
 
 #### 9. **Tax Analysis**
 - **Tax Liability Estimation**: Estimated taxes if positions were sold
@@ -933,12 +713,6 @@ FinalyzeOS includes comprehensive **portfolio management capabilities** that ena
 - **Holding Period Classification**: Short-term vs. long-term capital gains
 - **Wash Sale Detection**: Identification of potential wash sale issues
 
-**Example Queries:**
-```
-✅ "Tax analysis for my portfolio"
-✅ "What's my tax-adjusted return?"
-✅ "Tax-aware analysis for port_abc123"
-```
 
 #### 10. **Diversification Analysis**
 - **Diversification Ratio**: Measure of diversification benefit
@@ -946,24 +720,12 @@ FinalyzeOS includes comprehensive **portfolio management capabilities** that ena
 - **Risk Contribution Analysis**: Which positions drive portfolio risk
 - **Diversification Recommendations**: Specific suggestions to improve diversification
 
-**Example Queries:**
-```
-✅ "How diversified is my portfolio?"
-✅ "Diversification score for port_abc123"
-✅ "Show portfolio concentration"
-```
 
 #### 11. **Portfolio Export & Reporting**
 - **PowerPoint Export**: 12-slide professional presentation with portfolio summary, holdings, exposure charts, performance attribution, risk metrics, and recommendations
 - **PDF Export**: Multi-page PDF report with executive summary, holdings table, charts, and risk analysis
 - **Excel Export**: Multi-tab workbook with holdings sheet, exposure breakdowns, performance attribution table, and risk metrics
 
-**Example Queries:**
-```
-✅ "Export portfolio as PowerPoint"
-✅ "Generate PDF report for port_abc123"
-✅ "Export to Excel"
-```
 
 ### 📋 Portfolio Data Structure
 
@@ -1108,51 +870,6 @@ The chatbot system prompt includes explicit instructions for ML forecasts:
 - **Technical Depth**: Minimum 500-1000 words for forecast responses
 - **Professional Formatting**: Markdown formatting guidelines for professional presentation
 
-### 📋 Example Forecast Queries
-
-#### **Basic Forecasts:**
-```
-✅ "Forecast Apple's revenue"
-✅ "Predict Microsoft's revenue for the next 3 years"
-✅ "What's the revenue forecast for Tesla?"
-✅ "Estimate Amazon's earnings"
-✅ "Project Google's free cash flow"
-```
-
-#### **Method-Specific:**
-```
-✅ "Forecast Apple's revenue using ARIMA"
-✅ "Predict Tesla's earnings with Prophet"
-✅ "LSTM forecast for Microsoft's revenue"
-✅ "Transformer forecast for Google's revenue"
-✅ "Ensemble forecast for NVIDIA's earnings"
-✅ "Auto forecast for Amazon's revenue"
-```
-
-#### **Metric-Specific:**
-```
-✅ "Forecast Apple's revenue"
-✅ "Predict Tesla's net income"
-✅ "Estimate Microsoft's free cash flow"
-✅ "Project Google's EBITDA"
-✅ "Forecast NVIDIA's earnings"
-```
-
-#### **Time Period-Specific:**
-```
-✅ "Forecast Apple's revenue for the next 2 years"
-✅ "Predict Tesla's earnings for the next 3 years"
-✅ "What's the revenue outlook for Microsoft over the next 5 years?"
-✅ "Estimate Amazon's revenue for upcoming years"
-```
-
-#### **Combined Queries:**
-```
-✅ "Forecast Apple's revenue using ARIMA for the next 3 years"
-✅ "Predict Tesla's earnings with Prophet for the next 5 years"
-✅ "What's the LSTM forecast for Google's revenue over the next 3 years?"
-✅ "Estimate Microsoft's free cash flow using Transformer for the next 2 years"
-```
 
 ### 📚 Documentation
 
