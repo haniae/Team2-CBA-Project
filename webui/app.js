@@ -884,17 +884,444 @@ const PROGRESS_BLUEPRINT = [
   },
 ];
 
-// Status messages for progress indicator
-const STATUS_MESSAGES = [
-  "Analyzing prompt phrasing...",
-  "Retrieving financial data...",
-  "Running LSTM forecast...",
-  "Generating insights...",
-  "Finalizing analysis..."
-];
+ // Status messages for progress indicator
+ const STATUS_MESSAGES = [
+   "Analyzing prompt phrasing...",
+   "Retrieving financial data...",
+   "Running LSTM forecast...",
+   "Generating insights...",
+   "Finalizing analysis..."
+ ];
 
-// Stage-specific status messages for contextual feedback
-const STAGE_STATUS_MAP = {
+ // Enhanced analysis type detection
+ function detectAnalysisType(query) {
+   if (!query) return 'general_query';
+   
+   const queryLower = query.toLowerCase();
+   
+   // Multiple companies comparison
+   if (queryLower.match(/compar(e|ison)|vs|versus|competitor|against|benchmark/i)) {
+     return 'competitive_analysis';
+   }
+   
+   // Margins specifically
+   if (queryLower.match(/margin|profitability|gross profit|operating income|ebitda/i)) {
+     return 'margin_analysis';
+   }
+   
+   // Revenue/Financial Forecasting
+   if (queryLower.match(/forecast|predict|project|future revenue|next quarter|lstm|arima|time series/i)) {
+     return 'revenue_forecast';
+   }
+   
+   // Valuation
+   if (queryLower.match(/valuation|worth|value|dcf|multiples|fair value|price target/i)) {
+     return 'valuation';
+   }
+   
+   // Risk Assessment
+   if (queryLower.match(/risk|volatility|var|stress test|downside|monte carlo/i)) {
+     return 'risk_assessment';
+   }
+   
+   // Market Analysis
+   if (queryLower.match(/market (size|share|analysis)|industry|sector|tam|addressable market/i)) {
+     return 'market_analysis';
+   }
+   
+   // Financial Health
+   if (queryLower.match(/financial health|ratios|liquidity|solvency|profitability|debt|leverage/i)) {
+     return 'financial_health';
+   }
+   
+   // Cash flow analysis
+   if (queryLower.match(/cash flow|fcf|operating cash|free cash/i)) {
+     return 'cash_flow_analysis';
+   }
+   
+   // Growth analysis
+   if (queryLower.match(/growth|cagr|yoy|year over year/i)) {
+     return 'growth_analysis';
+   }
+   
+   // Default
+   return 'general_query';
+ }
+
+ // Expanded message queues for each analysis type
+ function buildMessageQueue(analysisType, query) {
+   switch (analysisType) {
+     case 'margin_analysis':
+       return buildMarginMessages(query);
+     case 'competitive_analysis':
+       return buildCompetitiveMessages(query);
+     case 'revenue_forecast':
+       return buildForecastMessages(query);
+     case 'valuation':
+       return buildValuationMessages(query);
+     case 'risk_assessment':
+       return buildRiskMessages(query);
+     case 'market_analysis':
+       return buildMarketMessages(query);
+     case 'financial_health':
+       return buildHealthMessages(query);
+     case 'cash_flow_analysis':
+       return buildCashFlowMessages(query);
+     case 'growth_analysis':
+       return buildGrowthMessages(query);
+     default:
+       return buildGeneralMessages(query);
+   }
+ }
+
+ // Margin Analysis Messages (for your current query)
+ function buildMarginMessages(query) {
+   return [
+     "Understanding margin analysis request...",
+     "Identifying target company...",
+     "Connecting to financial databases...",
+     "Retrieving income statements...",
+     "Downloading quarterly reports...",
+     "Fetching revenue data...",
+     "Collecting cost of goods sold...",
+     "Gathering operating expenses...",
+     "Retrieving EBITDA figures...",
+     "Calculating gross margin...",
+     "Computing operating margin...",
+     "Analyzing net profit margin...",
+     "Examining EBITDA margin trends...",
+     "Comparing to historical averages...",
+     "Benchmarking against industry peers...",
+     "Identifying margin drivers...",
+     "Analyzing cost structure...",
+     "Evaluating pricing power...",
+     "Assessing operating leverage...",
+     "Computing margin expansion...",
+     "Analyzing mix effects...",
+     "Evaluating efficiency improvements...",
+     "Reviewing margin sustainability...",
+     "Preparing margin breakdown...",
+     "Creating trend visualizations...",
+     "Writing margin analysis...",
+     "Adding context and insights...",
+     "Formatting financial tables...",
+     "Finalizing margin report..."
+   ];
+ }
+
+ // Competitive Analysis Messages
+ function buildCompetitiveMessages(query) {
+   return [
+     "Understanding comparison request...",
+     "Identifying companies to analyze...",
+     "Setting up competitive framework...",
+     "Gathering financial data for all companies...",
+     "Retrieving market share information...",
+     "Downloading performance metrics...",
+     "Collecting industry benchmarks...",
+     "Fetching analyst ratings...",
+     "Normalizing financial metrics...",
+     "Calculating relative performance...",
+     "Comparing revenue growth rates...",
+     "Analyzing profit margins...",
+     "Evaluating market positioning...",
+     "Comparing valuation multiples...",
+     "Assessing operational efficiency...",
+     "Analyzing competitive advantages...",
+     "Evaluating moat strength...",
+     "Comparing innovation metrics...",
+     "Reviewing market share trends...",
+     "Analyzing pricing strategies...",
+     "Evaluating cost structures...",
+     "Comparing customer acquisition...",
+     "Ranking companies by performance...",
+     "Building comparison matrix...",
+     "Creating side-by-side charts...",
+     "Writing competitive insights...",
+     "Highlighting key differentiators...",
+     "Finalizing comparison report..."
+   ];
+ }
+
+ // Revenue Forecast Messages
+ function buildForecastMessages(query) {
+   return [
+     "Reading forecast parameters...",
+     "Identifying target metrics and timeframe...",
+     "Detecting model type (LSTM/ARIMA)...",
+     "Connecting to financial databases...",
+     "Downloading historical revenue data...",
+     "Retrieving quarterly earnings reports...",
+     "Collecting market indicators...",
+     "Gathering economic data...",
+     "Preprocessing time series data...",
+     "Cleaning historical data...",
+     "Identifying seasonal patterns...",
+     "Building neural network architecture...",
+     "Configuring LSTM layers...",
+     "Training model on historical patterns...",
+     "Epoch 5/20: Learning revenue trends...",
+     "Epoch 10/20: Refining predictions...",
+     "Epoch 15/20: Optimizing accuracy...",
+     "Validating model performance...",
+     "Testing forecast accuracy...",
+     "Generating forecast for next periods...",
+     "Calculating confidence intervals...",
+     "Running sensitivity analysis...",
+     "Comparing to analyst consensus...",
+     "Evaluating forecast reliability...",
+     "Creating forecast visualization...",
+     "Preparing scenario analysis...",
+     "Writing forecast summary...",
+     "Adding confidence metrics...",
+     "Finalizing revenue projections..."
+   ];
+ }
+
+ // Cash Flow Analysis Messages
+ function buildCashFlowMessages(query) {
+   return [
+     "Understanding cash flow request...",
+     "Identifying cash flow components...",
+     "Connecting to financial databases...",
+     "Retrieving cash flow statements...",
+     "Downloading operating activities...",
+     "Fetching investing activities...",
+     "Collecting financing activities...",
+     "Gathering working capital data...",
+     "Analyzing cash generation...",
+     "Computing free cash flow...",
+     "Evaluating cash conversion...",
+     "Examining working capital efficiency...",
+     "Analyzing capex trends...",
+     "Reviewing cash burn rate...",
+     "Assessing liquidity position...",
+     "Evaluating cash adequacy...",
+     "Comparing to net income...",
+     "Analyzing quality of earnings...",
+     "Reviewing dividend coverage...",
+     "Assessing reinvestment needs...",
+     "Creating cash flow waterfall...",
+     "Preparing trend analysis...",
+     "Writing cash flow insights...",
+     "Finalizing analysis..."
+   ];
+ }
+
+ // Growth Analysis Messages
+ function buildGrowthMessages(query) {
+   return [
+     "Understanding growth analysis request...",
+     "Identifying growth metrics...",
+     "Setting analysis timeframe...",
+     "Gathering historical data...",
+     "Downloading financial statements...",
+     "Retrieving quarterly results...",
+     "Collecting segment data...",
+     "Calculating revenue CAGR...",
+     "Computing earnings growth...",
+     "Analyzing organic growth...",
+     "Evaluating inorganic growth...",
+     "Assessing market expansion...",
+     "Reviewing product adoption...",
+     "Analyzing customer growth...",
+     "Evaluating pricing impact...",
+     "Comparing to industry growth...",
+     "Identifying growth drivers...",
+     "Assessing growth sustainability...",
+     "Projecting future growth...",
+     "Creating growth charts...",
+     "Writing growth analysis...",
+     "Finalizing report..."
+   ];
+ }
+
+ // Valuation Messages
+ function buildValuationMessages(query) {
+   return [
+     "Understanding valuation request...",
+     "Identifying target company...",
+     "Selecting valuation methodology...",
+     "Fetching financial statements...",
+     "Downloading cash flow data...",
+     "Retrieving balance sheet details...",
+     "Gathering market data and beta...",
+     "Collecting comparable companies...",
+     "Getting risk-free rate data...",
+     "Building DCF model...",
+     "Projecting future cash flows...",
+     "Estimating revenue growth...",
+     "Forecasting margins...",
+     "Calculating WACC...",
+     "Determining cost of equity...",
+     "Computing cost of debt...",
+     "Calculating terminal value...",
+     "Applying perpetuity growth...",
+     "Discounting cash flows...",
+     "Calculating enterprise value...",
+     "Deriving equity value...",
+     "Computing price per share...",
+     "Running sensitivity analysis...",
+     "Comparing to market multiples...",
+     "Evaluating trading comps...",
+     "Formatting valuation report...",
+     "Finalizing fair value estimate..."
+   ];
+ }
+
+ // Risk Assessment Messages
+ function buildRiskMessages(query) {
+   return [
+     "Understanding risk assessment scope...",
+     "Identifying risk factors...",
+     "Setting up risk framework...",
+     "Gathering historical price data...",
+     "Fetching volatility metrics...",
+     "Retrieving market correlations...",
+     "Downloading economic indicators...",
+     "Collecting stress test scenarios...",
+     "Calculating Value at Risk (VaR)...",
+     "Computing historical volatility...",
+     "Analyzing drawdown scenarios...",
+     "Measuring correlation risks...",
+     "Setting up Monte Carlo engine...",
+     "Running Monte Carlo simulations...",
+     "Simulation: 1,000 iterations...",
+     "Simulation: 5,000 iterations...",
+     "Simulation: 10,000 iterations...",
+     "Calculating expected shortfall...",
+     "Computing tail risk metrics...",
+     "Assessing liquidity risk...",
+     "Evaluating credit risk...",
+     "Analyzing operational risks...",
+     "Reviewing market risks...",
+     "Preparing risk dashboard...",
+     "Creating risk distribution...",
+     "Writing risk summary...",
+     "Finalizing risk report..."
+   ];
+ }
+
+ // Market Analysis Messages  
+ function buildMarketMessages(query) {
+   return [
+     "Understanding market analysis request...",
+     "Identifying target market/sector...",
+     "Defining market boundaries...",
+     "Gathering market size data...",
+     "Fetching growth rate statistics...",
+     "Retrieving market share data...",
+     "Downloading industry reports...",
+     "Collecting competitive landscape data...",
+     "Gathering customer demographics...",
+     "Analyzing total addressable market...",
+     "Calculating market size and TAM...",
+     "Evaluating serviceable market...",
+     "Computing market growth rates...",
+     "Segmenting market by category...",
+     "Identifying key players...",
+     "Analyzing competitive intensity...",
+     "Evaluating barriers to entry...",
+     "Assessing market maturity...",
+     "Identifying growth drivers...",
+     "Analyzing customer behavior...",
+     "Reviewing pricing dynamics...",
+     "Evaluating distribution channels...",
+     "Creating market overview...",
+     "Building strategic recommendations...",
+     "Finalizing market analysis..."
+   ];
+ }
+
+ // Financial Health Messages
+ function buildHealthMessages(query) {
+   return [
+     "Understanding financial health request...",
+     "Identifying key health metrics...",
+     "Fetching financial statements...",
+     "Downloading balance sheet data...",
+     "Retrieving income statements...",
+     "Collecting cash flow statements...",
+     "Calculating liquidity ratios...",
+     "Computing current ratio...",
+     "Evaluating quick ratio...",
+     "Computing solvency ratios...",
+     "Analyzing profitability metrics...",
+     "Calculating ROE and ROA...",
+     "Evaluating efficiency ratios...",
+     "Assessing leverage ratios...",
+     "Computing debt-to-equity...",
+     "Analyzing interest coverage...",
+     "Comparing to industry averages...",
+     "Identifying financial strengths...",
+     "Detecting potential weaknesses...",
+     "Analyzing trend patterns...",
+     "Evaluating credit worthiness...",
+     "Assessing bankruptcy risk...",
+     "Creating health scorecard...",
+     "Writing health summary...",
+     "Providing recommendations...",
+     "Finalizing health report..."
+   ];
+ }
+
+ // General Query Messages (Fallback)
+ function buildGeneralMessages(query) {
+   return [
+     "Reading your question...",
+     "Understanding your request...",
+     "Identifying key information needed...",
+     "Planning analysis approach...",
+     "Searching for relevant data...",
+     "Gathering financial information...",
+     "Retrieving market data...",
+     "Collecting supporting evidence...",
+     "Downloading company filings...",
+     "Fetching historical data...",
+     "Validating data sources...",
+     "Processing financial metrics...",
+     "Analyzing the data...",
+     "Computing key ratios...",
+     "Identifying patterns...",
+     "Drawing insights...",
+     "Cross-referencing information...",
+     "Validating conclusions...",
+     "Preparing visualizations...",
+     "Structuring response...",
+     "Writing explanation...",
+     "Adding supporting details...",
+     "Formatting answer...",
+     "Reviewing for accuracy...",
+     "Finalizing response..."
+   ];
+ }
+
+ // Extract query text from request for dynamic message generation
+ function extractQueryFromRequest(requestId) {
+   try {
+     // Try to get the query from the chat input or recent messages
+     const chatInput = document.querySelector('#chat-input');
+     if (chatInput && chatInput.value.trim()) {
+       return chatInput.value.trim();
+     }
+     
+     // Try to get from the most recent user message
+     const messages = document.querySelectorAll('.message.user .message-content');
+     if (messages.length > 0) {
+       const lastMessage = messages[messages.length - 1];
+       return lastMessage.textContent.trim();
+     }
+     
+     // Fallback - return empty string which will use default messages
+     return '';
+   } catch (error) {
+     console.warn('Could not extract query for dynamic messages:', error);
+     return '';
+   }
+ }
+
+ // Stage-specific status messages for contextual feedback
+ const STAGE_STATUS_MAP = {
   "intent": "Analyzing prompt phrasing...",
   "help_lookup": "Searching knowledge base...",
   "cache": "Checking recent answers...",
@@ -5906,9 +6333,9 @@ function startProgressTracking(requestId, wrapper) {
     updateStatus(message) {
       updateProgressStatus(this, message);
     },
-    startStatusRotation() {
-      startStatusMessageRotation(this);
-    },
+     startStatusRotation(query) {
+       startStatusMessageRotation(this, query);
+     },
     stopStatusRotation() {
       stopStatusMessageRotation(this);
     },
@@ -5955,9 +6382,12 @@ function startProgressTracking(requestId, wrapper) {
 
   tracker.poll = poll;
   progressTrackers.set(requestId, tracker);
-  tracker.render();
-  tracker.showThinking(); // Show ChatGPT-style thinking dots
-  tracker.startStatusRotation(); // Start rotating status messages
+   tracker.render();
+   tracker.showThinking(); // Show ChatGPT-style thinking dots
+   
+   // Extract query from the request for dynamic message generation
+   const queryText = extractQueryFromRequest(requestId);
+   tracker.startStatusRotation(queryText); // Start rotating status messages
   tracker.poll().catch(() => {});
   tracker.timer = window.setInterval(() => {
     tracker.poll().catch(() => {});
@@ -9274,34 +9704,93 @@ function updateProgressStatus(tracker, message) {
   }
 }
 
-function startStatusMessageRotation(tracker) {
-  if (!tracker?.title) {
-    return;
-  }
-  
-  // Don't rotate if we have a specific stage message
-  if (tracker.lastStageMessage) {
-    return;
-  }
-  
-  tracker.statusRotationTimer = setInterval(() => {
-    // Don't rotate if we have a specific stage message or if complete
-    if (tracker.lastStageMessage || tracker.complete) {
-      return;
-    }
-    
-    tracker.currentStatusIndex = (tracker.currentStatusIndex + 1) % STATUS_MESSAGES.length;
-    const nextMessage = STATUS_MESSAGES[tracker.currentStatusIndex];
-    updateProgressStatus(tracker, nextMessage);
-  }, 2500); // Rotate every 2.5 seconds
-}
+ function startStatusMessageRotation(tracker, query = null) {
+   if (!tracker?.title) {
+     return;
+   }
+   
+   // Don't rotate if we have a specific stage message
+   if (tracker.lastStageMessage) {
+     return;
+   }
+   
+   // Detect analysis type and build appropriate message queue
+   let messageQueue = STATUS_MESSAGES; // Default fallback
+   
+   if (query && query.trim()) {
+     const analysisType = detectAnalysisType(query);
+     messageQueue = buildMessageQueue(analysisType, query);
+     
+     // Store for reference
+     tracker.analysisType = analysisType;
+     tracker.dynamicMessages = messageQueue;
+     
+     console.log(`Detected analysis type: ${analysisType} with ${messageQueue.length} messages`);
+   }
+   
+   // Use dynamic messages if available
+   const messages = tracker.dynamicMessages || STATUS_MESSAGES;
+   tracker.currentStatusIndex = 0;
+   
+   // Start sequential message display
+   startSequentialMessageDisplay(tracker, messages);
+ }
 
-function stopStatusMessageRotation(tracker) {
-  if (tracker?.statusRotationTimer) {
-    clearInterval(tracker.statusRotationTimer);
-    tracker.statusRotationTimer = null;
-  }
-}
+ async function startSequentialMessageDisplay(tracker, messages) {
+   let index = 0;
+   
+   // Clear any existing timer
+   if (tracker.statusRotationTimer) {
+     clearInterval(tracker.statusRotationTimer);
+   }
+   
+   const displayNextMessage = async () => {
+     // Stop if we have a specific stage message or if complete
+     if (tracker.lastStageMessage || tracker.complete) {
+       return;
+     }
+     
+     if (index < messages.length) {
+       const message = messages[index];
+       tracker.currentStatusIndex = index;
+       
+       // Simple text update without animation
+       if (tracker.title) {
+         tracker.title.textContent = message;
+       }
+       
+       index++;
+       
+       // Vary timing based on message - keep it moving
+       const baseDuration = 1800; // Faster base duration
+       const variability = Math.random() * 800; // Add some natural variation
+       const duration = baseDuration + variability;
+       
+       // Schedule next message
+       tracker.statusRotationTimer = setTimeout(() => {
+         displayNextMessage();
+       }, duration);
+     } else {
+       // All messages shown, loop back to start if still not complete
+       if (!tracker.complete && !tracker.lastStageMessage) {
+         index = Math.floor(messages.length * 0.7); // Start from 70% through
+         displayNextMessage();
+       }
+     }
+   };
+   
+   // Start the sequence
+   displayNextMessage();
+ }
+
+ function stopStatusMessageRotation(tracker) {
+   if (tracker?.statusRotationTimer) {
+     // Handle both interval and timeout timers
+     clearInterval(tracker.statusRotationTimer);
+     clearTimeout(tracker.statusRotationTimer);
+     tracker.statusRotationTimer = null;
+   }
+ }
 
 function getStatusMessageForStage(stage) {
   if (!stage) {
