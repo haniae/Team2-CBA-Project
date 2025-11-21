@@ -14,6 +14,7 @@ psycopg2-binary>=2.9.9
 # HTTP & API
 requests>=2.32.0
 httpx>=0.25.0
+beautifulsoup4>=4.12.0
 
 # Financial Data Sources
 yfinance>=0.2.40
