@@ -88,7 +88,6 @@ python run_chatbot.py
 
 ### Project Structure
 - [📁 Project Layout](#-project-layout)
-- [📝 File Reference](#-file-reference)
 
 ### Support
 - [✅ Quality and Testing](#-quality-and-testing)
@@ -2275,39 +2274,6 @@ Project/
     ├── data/                           # Test data fixtures
     └── outputs/                        # Test outputs (gitignored)
 ```
-
-## 📝 Key Files Reference
-
-### 🚀 Quick Start Files
-
-| File | Purpose |
-|------|---------|
-| **[`app/run_chatbot.py`](app/run_chatbot.py)** | CLI chatbot interface (REPL mode) |
-| **[`app/run_server.py`](app/run_server.py)** | Web server (FastAPI) |
-| **[`scripts/ingestion/fill_data_gaps.py`](scripts/ingestion/fill_data_gaps.py)** | ⭐ Recommended data setup script |
-| **[`webui/index.html`](webui/index.html)** | Web UI entry point |
-
-### 📋 Configuration & Setup
-
-| File | Purpose |
-|------|---------|
-| **[`requirements.txt`](requirements.txt)** | Python dependencies (70+ packages) |
-| **[`pyproject.toml`](pyproject.toml)** | Project metadata and configuration |
-| **[`.env.example`](.env.example)** | Environment variables template |
-
-### 🧠 Core Components
-
-| Component | Key Files |
-|-----------|-----------|
-| **Analytics Engine** | [`src/finanlyzeos_chatbot/analytics_engine.py`](src/finanlyzeos_chatbot/analytics_engine.py) |
-| **Chatbot Core** | [`src/finanlyzeos_chatbot/chatbot.py`](src/finanlyzeos_chatbot/chatbot.py) |
-| **Natural Language Parser** | [`src/finanlyzeos_chatbot/parsing/parse.py`](src/finanlyzeos_chatbot/parsing/parse.py) |
-| **RAG System** | [`src/finanlyzeos_chatbot/rag_orchestrator.py`](src/finanlyzeos_chatbot/rag_orchestrator.py) |
-| **ML Forecasting** | [`src/finanlyzeos_chatbot/ml_forecasting/`](src/finanlyzeos_chatbot/ml_forecasting/) |
-| **Portfolio Management** | [`src/finanlyzeos_chatbot/portfolio.py`](src/finanlyzeos_chatbot/portfolio.py) |
-| **Web API** | [`src/finanlyzeos_chatbot/web.py`](src/finanlyzeos_chatbot/web.py) |
-
-> **📖 Complete File Reference**: See the [Detailed Project Structure](#appendix-detailed-project-structure) in the appendix for comprehensive file listings and descriptions.
 
 ## ✅ Quality and Testing
 
