@@ -2805,59 +2805,6 @@ python run_chatbot.py
 - 💻 **Inline Module Documentation** - Comprehensive docs across `src/finanlyzeos_chatbot/` describe invariants, data contracts, and extension hooks
 - 🔧 **Versioning Best Practices** - Consider versioning your `.env` templates and deployment runbooks alongside these docs as the project evolves
 
-## 🎓 System Overview (Professor Summary)
-
-### Core Components
-| Layer | Function | Key files |
-|-------|----------|-----------|
-| Experiences | Web dashboard, CLI, REST API | webui/, 
-un_chatbot.py, serve_chatbot.py |
-| Parsing | Ticker/period normalisation | src/finanlyzeos_chatbot/parsing/alias_builder.py, 	ime_grammar.py |
-| Retrieval & Analytics | KPI calculations, scenarios | src/finanlyzeos_chatbot/analytics_engine.py, database.py, data_ingestion.py |
-| RAG Orchestration | Prompt assembly, LLM calls | src/finanlyzeos_chatbot/chatbot.py, llm_client.py |
-| Data Acquisition | SEC ingests, quotes, macro baselines | scripts/ingestion/*.py, xternal_data.py |
-
-### Processing Workflow
-| Step | Example module | Responsibilities |
-|------|----------------|------------------|
-| 1. Normalise Input | lias_builder.resolve_tickers_freeform | Clean ticker names, fuzzy match alerts |
-| 2. Parse Periods | 	ime_grammar.parse_periods | Interpret FY-24, calender 2020, ranges |
-| 3. Retrieve Facts | nalytics_engine.fetch_metrics | Read metric_snapshots, recompute derived KPIs |
-| 4. Assemble Prompt | chatbot.build_prompt | Comparison tables, highlights, trend snippets |
-| 5. Generate Response | llm_client | Provide natural-language answer, citations |
-| 6. Display & Export | webui/, /api/export/cfi | Dashboard, PDF/PPTX/Excel exports |
-
-### Database (SQLite default)
-| Table | Purpose |
-|-------|---------|
-| inancial_facts | Raw SEC CompanyFacts metrics |
-| company_filings | Filing metadata (CIK, accession, period) |
-| metric_snapshots | Precomputed KPIs, scenarios |
-| market_quotes | Price/share-count snapshots |
-| udit_events | Ingestion lineage (source system, timestamps) |
-| kpi_values | Optional macro baselines |
-| 	icker_aliases | Alias dictionary for parsing |
-
-### Key Features
-- Deterministic analytics + explainable responses
-- Full citation trail (filings, quote timestamps)
-- Dashboard + export parity (chat answers = PDF/PPTX)
-- Optional macro context (IMF baselines)
-- Modular ingestion scripts (resume-safe)
-- Deployment: local FastAPI/Plotly; Postgres supported
-
-### Maintenance Toolkit
-| Script | Frequency | Notes |
-|--------|-----------|-------|
-| ingest_extended_universe.py | Monthly/quarterly | Deep SEC ingest, custom universes |
-| ackfill_metrics.py | After ingests | Recompute KPIs, refresh scenarios |
-| 
-efresh_quotes.py | Daily | Price/ratio refresh |
-| etch_imf_sector_kpis.py | As needed | Macro baselines |
-
-
----
-
 <div align="center">
 
 ## 🎉 Happy Building!
