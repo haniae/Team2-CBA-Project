@@ -1,0 +1,23 @@
+{
+  "model_name": "all-MiniLM-L6-v2",
+  "model_version": "v1.0",
+  "description": "Team-shared embedding model for consistent behavior",
+  "created_by": "unknown",
+  "instructions": {
+    "setup": "Run: python -m finanlyzeos_chatbot.shared_embeddings setup",
+    "verify": "Run: python -m finanlyzeos_chatbot.shared_embeddings verify"
+  },
+  "files": [
+    "model\\config.json",
+    "model\\config_sentence_transformers.json",
+    "model\\model.safetensors",
+    "model\\modules.json",
+    "model\\README.md",
+    "model\\sentence_bert_config.json",
+    "model\\special_tokens_map.json",
+    "model\\tokenizer.json",
+    "model\\tokenizer_config.json",
+    "model\\vocab.txt",
+    "model\\1_Pooling\\config.json"
+  ]
+}

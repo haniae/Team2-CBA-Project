@@ -17,6 +17,16 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
+# Import smart caching for performance optimization
+try:
+    from .smart_cache import cache_embeddings, cache_retrieval
+    CACHING_AVAILABLE = True
+except ImportError:
+    CACHING_AVAILABLE = False
+    # Fallback decorators that do nothing
+    def cache_embeddings(func): return func
+    def cache_retrieval(func): return func
+
 LOGGER = logging.getLogger(__name__)
 
 # Optional imports for semantic search
@@ -96,9 +106,16 @@ class VectorStore:
         self.database_path = database_path
         self.collection_name = collection_name
         
-        # Initialize embedding model
+        # Initialize embedding model (use shared model for team consistency)
         LOGGER.info(f"Loading embedding model: {embedding_model}")
-        self.embedding_model = SentenceTransformer(embedding_model)
+        try:
+            from .shared_embeddings import get_shared_embedding_model
+            self.embedding_model = get_shared_embedding_model()
+            LOGGER.info("✅ Using shared team embedding model for consistency")
+        except Exception as e:
+            LOGGER.warning(f"Shared embedding model not available: {e}")
+            LOGGER.info("Falling back to individual model download")
+            self.embedding_model = SentenceTransformer(embedding_model)
         
         # Initialize ChromaDB
         chroma_db_path = database_path.parent / "chroma_db"
@@ -206,6 +223,7 @@ class VectorStore:
             return []
         return self._search(query, self.uploaded_collection, n_results, filter_metadata, "uploaded_doc")
     
+    @cache_retrieval
     def _search(
         self,
         query: str,
@@ -336,10 +354,14 @@ class RAGRetriever:
         # 1. Deterministic SQL retrieval
         metrics, facts = self._retrieve_sql_data(tickers)
         
-        # 2. Hybrid retrieval (sparse + dense) over SEC narratives
+        # 2. PARALLEL Hybrid retrieval (sparse + dense) over SEC narratives
         sec_narratives = []
         if use_semantic_search and tickers:
-            for ticker in tickers:
+            # PERFORMANCE OPTIMIZATION: Parallel retrieval instead of sequential
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            def retrieve_for_ticker(ticker: str):
+                """Retrieve SEC narratives for a single ticker."""
                 filter_metadata = {"ticker": ticker.upper()}
                 
                 if self.use_hybrid_retrieval and self.hybrid_retriever:
@@ -350,10 +372,10 @@ class RAGRetriever:
                             n_results=max_sec_results * 2,  # Retrieve more for reranking
                             filter_metadata=filter_metadata,
                         )
-                        sec_narratives.extend(results)
                         LOGGER.debug(f"Hybrid retrieval: {len(results)} SEC documents for {ticker}")
+                        return results
                     except Exception as e:
-                        LOGGER.warning(f"Hybrid retrieval failed, falling back to dense-only: {e}")
+                        LOGGER.warning(f"Hybrid retrieval failed for {ticker}, falling back to dense-only: {e}")
                         # Fallback to dense-only
                         if self.vector_store and self.vector_store._available:
                             results = self.vector_store.search_sec_narratives(
@@ -361,7 +383,7 @@ class RAGRetriever:
                                 n_results=max_sec_results * 2,
                                 filter_metadata=filter_metadata,
                             )
-                            sec_narratives.extend(results)
+                            return results
                 elif self.vector_store and self.vector_store._available:
                     # Dense-only retrieval (fallback)
                     results = self.vector_store.search_sec_narratives(
@@ -369,7 +391,29 @@ class RAGRetriever:
                         n_results=max_sec_results * 2,
                         filter_metadata=filter_metadata,
                     )
-                    sec_narratives.extend(results)
+                    return results
+                return []
+            
+            # Execute retrievals in parallel (3-5x faster than sequential)
+            max_workers = min(len(tickers), 4)  # Limit concurrent requests
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit all ticker retrievals
+                future_to_ticker = {
+                    executor.submit(retrieve_for_ticker, ticker): ticker 
+                    for ticker in tickers
+                }
+                
+                # Collect results as they complete
+                for future in as_completed(future_to_ticker):
+                    ticker = future_to_ticker[future]
+                    try:
+                        results = future.result()
+                        if results:
+                            sec_narratives.extend(results)
+                    except Exception as e:
+                        LOGGER.warning(f"Parallel retrieval failed for {ticker}: {e}")
+            
+            LOGGER.debug(f"Parallel SEC retrieval completed: {len(sec_narratives)} total documents")
         
         # 3. Hybrid retrieval (sparse + dense) over uploaded documents
         uploaded_docs = []

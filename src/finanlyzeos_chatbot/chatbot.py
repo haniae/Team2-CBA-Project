@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import os
 import re
 import time
 import uuid
@@ -56,6 +57,7 @@ from .ml_forecasting.user_plugins import (
     ForecastingPlugin,
 )
 from .source_tracer import SourceTracer
+from .query_classifier import classify_query, QueryComplexity, QueryType, get_fast_path_config
 from .framework_processor import FrameworkProcessor
 from .template_processor import TemplateProcessor
 from .document_context import build_uploaded_document_context
@@ -2568,30 +2570,48 @@ class FinanlyzeOSChatbot:
 
         database.initialise(settings.database_path)
 
+        # PERFORMANCE FIX: Skip startup ingestion to avoid 1-2 minute delays
+        # Data ingestion should be done separately, not during chatbot startup
         ingestion_report: Optional[IngestionReport] = None
-        try:
-            ingestion_report = ingest_financial_data(settings)
-        except Exception as exc:  # pragma: no cover - defensive guard
-            database.record_audit_event(
-                settings.database_path,
-                AuditEvent(
-                    ticker="__system__",
-                    event_type="ingestion_error",
-                    entity_id="startup",
-                    details={"error": str(exc)},
-                    created_at=datetime.utcnow(),
-                    created_by="chatbot",
-                ),
-            )
+        
+        # Only run ingestion if explicitly enabled via environment variable
+        if os.getenv("ENABLE_STARTUP_INGESTION", "false").lower() == "true":
+            try:
+                LOGGER.info("Running startup ingestion (ENABLE_STARTUP_INGESTION=true)")
+                ingestion_report = ingest_financial_data(settings)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                database.record_audit_event(
+                    settings.database_path,
+                    AuditEvent(
+                        ticker="__system__",
+                        event_type="ingestion_error",
+                        entity_id="startup",
+                        details={"error": str(exc)},
+                        created_at=datetime.utcnow(),
+                        created_by="chatbot",
+                    ),
+                )
+        else:
+            LOGGER.info("Skipping startup ingestion for faster startup (set ENABLE_STARTUP_INGESTION=true to enable)")
 
         analytics_engine = AnalyticsEngine(settings)
-        analytics_engine.refresh_metrics(force=True)
+        
+        # PERFORMANCE FIX: Skip expensive metrics refresh during startup
+        # Only refresh if explicitly enabled or if database is empty
+        if os.getenv("ENABLE_STARTUP_METRICS_REFRESH", "false").lower() == "true":
+            LOGGER.info("Running startup metrics refresh (ENABLE_STARTUP_METRICS_REFRESH=true)")
+            analytics_engine.refresh_metrics(force=True)
+        else:
+            LOGGER.info("Skipping startup metrics refresh for faster startup")
 
         # Build the SEC-backed name index once; always attempt local alias fallback
         index = _CompanyNameIndex()
+        
+        # PERFORMANCE FIX: Skip SEC API calls during startup, use database instead
         base = getattr(settings, "edgar_base_url", None) or "https://www.sec.gov"
         ua = getattr(settings, "sec_api_user_agent", None) or "FinanlyzeOSBot/1.0 (support@finanlyzeos.com)"
         try:
+            # This method already uses database instead of SEC API to avoid 404 errors
             index.build_from_sec(base, ua)
             LOGGER.info("SEC company index built with %d names", len(index.by_exact))
         except Exception as e:
@@ -3960,6 +3980,11 @@ class FinanlyzeOSChatbot:
             reply: Optional[str] = None
             lowered_input = user_input.strip().lower()
             emit("intent_analysis_start", "Analyzing prompt phrasing")
+            
+            # PERFORMANCE OPTIMIZATION: Query classification for fast path routing
+            complexity, query_type, query_metadata = classify_query(user_input)
+            emit("query_classification", f"Query classified as {complexity.value} {query_type.value}")
+            
             doc_context = build_uploaded_document_context(
                 user_input,
                 getattr(self.conversation, "conversation_id", None),
@@ -6469,6 +6494,62 @@ class FinanlyzeOSChatbot:
             ):
                 selected[record.metric] = record
         return selected
+    
+    def _handle_simple_factual_query(self, user_input: str, query_metadata: Dict[str, any]) -> Optional[str]:
+        """Handle simple factual queries with direct database lookup (fast path)."""
+        try:
+            tickers = query_metadata.get("tickers", [])
+            if not tickers:
+                return None
+            
+            # Extract the main ticker and metric from the query
+            ticker = tickers[0]  # Use first ticker found
+            query_lower = user_input.lower()
+            
+            # Simple metric extraction
+            if any(word in query_lower for word in ['revenue', 'sales']):
+                metric = 'revenue'
+            elif any(word in query_lower for word in ['price', 'stock price']):
+                metric = 'current_price'
+            elif any(word in query_lower for word in ['market cap', 'market capitalization']):
+                metric = 'market_cap'
+            elif any(word in query_lower for word in ['pe ratio', 'p/e']):
+                metric = 'pe_ratio'
+            elif any(word in query_lower for word in ['earnings', 'net income']):
+                metric = 'net_income'
+            else:
+                return None  # Can't determine metric, fall back to full pipeline
+            
+            # Get the metric directly from analytics engine
+            try:
+                records = self.analytics_engine.get_metrics(ticker, [metric])
+                if records and records[0].value is not None:
+                    value = records[0].value
+                    period = records[0].period or "latest"
+                    
+                    # Format the response
+                    if metric == 'revenue':
+                        formatted_value = f"${value/1e9:.1f}B" if value >= 1e9 else f"${value/1e6:.1f}M"
+                        return f"{ticker}'s revenue for {period} is {formatted_value}."
+                    elif metric == 'current_price':
+                        return f"{ticker} is currently trading at ${value:.2f}."
+                    elif metric == 'market_cap':
+                        formatted_value = f"${value/1e9:.1f}B" if value >= 1e9 else f"${value/1e6:.1f}M"
+                        return f"{ticker}'s market cap is {formatted_value}."
+                    elif metric == 'pe_ratio':
+                        return f"{ticker}'s P/E ratio is {value:.1f}."
+                    elif metric == 'net_income':
+                        formatted_value = f"${value/1e9:.1f}B" if value >= 1e9 else f"${value/1e6:.1f}M"
+                        return f"{ticker}'s net income for {period} is {formatted_value}."
+            except Exception as e:
+                LOGGER.debug(f"Fast path query failed for {ticker} {metric}: {e}")
+                return None
+                
+        except Exception as e:
+            LOGGER.debug(f"Simple factual query handler failed: {e}")
+            return None
+        
+        return None  # Fall back to full pipeline
 
     def _build_rag_context(self, user_input: str) -> Optional[str]:
         """Assemble finance facts to ground the LLM response."""

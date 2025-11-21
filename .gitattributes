@@ -1,94 +1,12 @@
-# Git attributes for BenchmarkOS repository
-
-# Auto detect text files and perform LF normalization
-* text=auto
-
-# Source code
-*.py text eol=lf diff=python
-*.js text eol=lf
-*.jsx text eol=lf
-*.ts text eol=lf
-*.tsx text eol=lf
-*.css text eol=lf
-*.html text eol=lf
-*.json text eol=lf
-*.yml text eol=lf
-*.yaml text eol=lf
-*.md text eol=lf diff=markdown
-*.txt text eol=lf
-
-# Shell scripts
-*.sh text eol=lf
-*.bash text eol=lf
-*.ps1 text eol=crlf
-
-# SQL
-*.sql text eol=lf
-
-# Configuration files
-.gitignore text eol=lf
-.gitattributes text eol=lf
-.editorconfig text eol=lf
-requirements*.txt text eol=lf
-pyproject.toml text eol=lf
-setup.py text eol=lf
-setup.cfg text eol=lf
-Makefile text eol=lf
-*.toml text eol=lf
-*.ini text eol=lf
-*.cfg text eol=lf
-*.conf text eol=lf
-
-# Documentation
-*.md text eol=lf linguist-documentation
-LICENSE text eol=lf
-AUTHORS text eol=lf
-CHANGELOG* text eol=lf
-CONTRIBUTING* text eol=lf
-README* text eol=lf
-
-# Binary files
-*.db binary
-*.sqlite binary
-*.sqlite3 binary
-*.jpg binary
-*.jpeg binary
-*.png binary
-*.gif binary
-*.ico binary
-*.pdf binary
-*.zip binary
-*.gz binary
-*.tar binary
-*.7z binary
-*.pptx binary
-*.xlsx binary
-*.docx binary
-
-# Exclude from exports
-.gitattributes export-ignore
-.gitignore export-ignore
-.github/ export-ignore
-tests/ export-ignore
-.editorconfig export-ignore
-*.md export-ignore
-docs/ export-ignore
-
-# Diff settings for specific files
-*.ipynb diff=jupyternotebook
-*.svg diff=image
-*.lock linguist-generated=true
-package-lock.json linguist-generated=true
-poetry.lock linguist-generated=true
-
-# Language detection
-*.py linguist-language=Python
-*.js linguist-language=JavaScript
-*.ts linguist-language=TypeScript
-*.css linguist-language=CSS
-*.html linguist-language=HTML
-*.md linguist-documentation
-
-# Merge strategies
-CHANGELOG.md merge=union
-
+# Git LFS tracking for large embedding model files
+team_embeddings_package/model/**/* filter=lfs diff=lfs merge=lfs -text
+*.bin filter=lfs diff=lfs merge=lfs -text
+*.safetensors filter=lfs diff=lfs merge=lfs -text
+*.pt filter=lfs diff=lfs merge=lfs -text
+*.pth filter=lfs diff=lfs merge=lfs -text
+# Other large files that should use LFS
+*.pkl filter=lfs diff=lfs merge=lfs -text
+*.joblib filter=lfs diff=lfs merge=lfs -text
+*.h5 filter=lfs diff=lfs merge=lfs -text
+*.hdf5 filter=lfs diff=lfs merge=lfs -text
+.embeddings_cache/**/* filter=lfs diff=lfs merge=lfs -text

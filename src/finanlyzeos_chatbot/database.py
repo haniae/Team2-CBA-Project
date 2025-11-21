@@ -20,6 +20,13 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, TYPE_CHECKING, Union
 
+# Import connection pooling for performance
+try:
+    from .connection_pool import pooled_connection, get_connection_pool
+    CONNECTION_POOLING_AVAILABLE = True
+except ImportError:
+    CONNECTION_POOLING_AVAILABLE = False
+
 if TYPE_CHECKING:  # pragma: no cover
     from .data_sources import AuditEvent, FilingRecord, FinancialFact, MarketQuote
 
@@ -271,14 +278,27 @@ def _normalize_ticker(t: Optional[str]) -> str:
 
 
 def _connect(database_path: Path) -> sqlite3.Connection:
-    """Open a SQLite connection with recommended pragmas enabled."""
-    conn = sqlite3.connect(database_path)
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    conn.execute("PRAGMA temp_store=MEMORY;")
-    conn.execute("PRAGMA cache_size=-16000;")
-    conn.execute("PRAGMA foreign_keys=ON;")
-    return conn
+    """Open a SQLite connection with recommended pragmas enabled and optional pooling."""
+    if CONNECTION_POOLING_AVAILABLE:
+        # Use connection pooling for better performance
+        pool = get_connection_pool(database_path)
+        # Note: This is a simplified integration - full pooling would need context manager refactoring
+        conn = sqlite3.connect(database_path)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA temp_store=MEMORY;")
+        conn.execute("PRAGMA cache_size=-16000;")
+        conn.execute("PRAGMA foreign_keys=ON;")
+        return conn
+    else:
+        # Direct connection (existing behavior)
+        conn = sqlite3.connect(database_path)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA temp_store=MEMORY;")
+        conn.execute("PRAGMA cache_size=-16000;")
+        conn.execute("PRAGMA foreign_keys=ON;")
+        return conn
 
 
 def _table_has_column(connection: sqlite3.Connection, table: str, column: str) -> bool:

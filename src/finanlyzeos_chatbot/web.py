@@ -1167,6 +1167,72 @@ def chat(request: ChatRequest) -> ChatResponse:
     )
 
 
+@app.get("/chat/stream")
+async def stream_chat(
+    prompt: str = Query(..., description="The user's query"),
+    conversation_id: str = Query(None, description="Optional conversation ID")
+) -> StreamingResponse:
+    """Stream chatbot response in real-time for immediate feedback."""
+    import asyncio
+    import json
+    import time
+    
+    if not prompt.strip():
+        raise HTTPException(status_code=400, detail="Prompt cannot be empty.")
+    
+    async def generate_stream():
+        """Generate streaming response chunks."""
+        try:
+            # Send immediate acknowledgment
+            yield f"data: {json.dumps({'type': 'status', 'content': '🔍 Analyzing your query...', 'timestamp': time.time()})}\n\n"
+            
+            # Build bot
+            bot = build_bot(conversation_id)
+            request_id = str(uuid.uuid4())
+            _start_progress_tracking(request_id, bot.conversation.conversation_id)
+            
+            # Send processing status
+            yield f"data: {json.dumps({'type': 'progress', 'content': '📊 Processing your request...', 'timestamp': time.time()})}\n\n"
+            
+            # Get response (this is still synchronous, but we provide immediate feedback)
+            def stream_progress_hook(stage: str, detail: str) -> None:
+                # Progress updates are handled by the existing progress tracking
+                _record_progress_event(request_id, stage, detail)
+            
+            reply = bot.ask(prompt.strip(), progress_callback=stream_progress_hook)
+            
+            # Stream response in chunks for better perceived performance
+            if reply:
+                words = reply.split()
+                chunk_size = 25  # words per chunk
+                
+                for i in range(0, len(words), chunk_size):
+                    chunk = " ".join(words[i:i + chunk_size])
+                    if chunk.strip():  # Only send non-empty chunks
+                        yield f"data: {json.dumps({'type': 'content', 'content': chunk, 'timestamp': time.time()})}\n\n"
+                        await asyncio.sleep(0.03)  # Small delay for streaming effect
+                
+                # Send completion
+                yield f"data: {json.dumps({'type': 'complete', 'content': '✅ Response complete', 'timestamp': time.time()})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'error', 'content': '❌ No response generated', 'timestamp': time.time()})}\n\n"
+                
+            _complete_progress_tracking(request_id)
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'content': f'❌ Error: {str(e)}', 'timestamp': time.time()})}\n\n"
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
+
 # Optional: compatibility endpoint for clients calling /api/chat
 @app.post("/api/chat", response_model=ChatResponse)
 def api_chat(request: ChatRequest) -> ChatResponse:
