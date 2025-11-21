@@ -193,20 +193,9 @@ class GroundedDecisionLayer:
         instructions = []
         
         # Confidence-based tone
-        if overall_confidence >= 0.7:
-            instructions.append("HIGH CONFIDENCE: You have highly relevant information. Provide a confident, detailed answer.")
-        elif overall_confidence >= 0.4:
-            instructions.append("MEDIUM CONFIDENCE: You have moderately relevant information. Provide a helpful answer but acknowledge any uncertainties.")
-        else:
-            instructions.append("LOW CONFIDENCE: You have limited relevant information. Be cautious and explicit about information gaps.")
+        # Note: Removed confidence-based tone instructions - let model respond naturally
         
-        # Contradictions
-        if decision.contradictions:
-            instructions.append(f"⚠️ SOURCE CONTRADICTIONS DETECTED: {len(decision.contradictions)} potential contradictions found. Acknowledge disagreements in your response.")
-        
-        # Missing info
-        if decision.missing_info:
-            instructions.append(f"⚠️ MISSING INFORMATION: {len(decision.missing_info)} information gaps detected. Mention what information is unavailable.")
+        # Note: Removed contradiction and missing information warnings - let model handle naturally
         
         return "\n".join(instructions)
 

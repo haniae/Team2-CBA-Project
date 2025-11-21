@@ -123,23 +123,9 @@ def build_rag_prompt(
         "Cite specific sources (SEC filing URLs, document filenames, metric periods) in your response.\n"
     )
     
-    # Add confidence-based instruction
-    if retrieval_result.overall_confidence is not None:
-        if retrieval_result.overall_confidence < 0.35:
-            sections.append(
-                "⚠️ **LOW CONFIDENCE WARNING**: The retrieved information has limited relevance. "
-                "Be cautious and explicit about information gaps. If the data doesn't contain enough "
-                "information, say so explicitly.\n"
-            )
-        elif retrieval_result.overall_confidence < 0.7:
-            sections.append(
-                "ℹ️ **MODERATE CONFIDENCE**: The retrieved information is moderately relevant. "
-                "Provide a helpful answer but acknowledge any uncertainties.\n"
-            )
+    # Note: Removed confidence-based warnings - let model handle uncertainty naturally
     
-    sections.append(
-        "If the retrieved data doesn't contain enough information, say so explicitly.\n"
-    )
+    # Note: Removed explicit instruction to add disclaimers
     
     return "\n".join(sections)
 

@@ -808,7 +808,7 @@ SYSTEM_PROMPT = (
     "## Portfolio Analysis - CRITICAL RULES\n\n"
     "When portfolio data is provided in the context:\n"
     "1. **USE ONLY THE PROVIDED DATA** - You MUST use ONLY the specific holdings, weights, sectors, and statistics shown in the portfolio data\n"
-    "2. **DO NOT HALLUCINATE** - NEVER make up portfolio data. If you don't see it in the provided data, say so explicitly\n"
+    "2. **DO NOT HALLUCINATE** - NEVER make up portfolio data. Use only the provided data\n"
     "3. **Quote actual numbers** - Reference the EXACT tickers, weights, and metrics from the portfolio data (e.g., 'AAPL is 15.2% of the portfolio')\n"
     "4. **Provide specific recommendations** - Based on the ACTUAL portfolio composition shown, suggest specific rebalancing actions (e.g., 'Reduce AAPL from 15.2% to 10%')\n"
     "5. **Analyze actual exposure** - Use the sector and factor exposure percentages provided in the data, not generic examples\n"
@@ -6686,7 +6686,7 @@ class FinanlyzeOSChatbot:
             context_parts.append("  * DO NOT say you cannot calculate these metrics - they are already calculated and shown below")
             context_parts.append("  * Reference the specific calculated values (e.g., 'The portfolio CVaR is X%' using the value shown)")
             context_parts.append("  * If a metric is not shown (e.g., 'Risk metrics: Unable to calculate'), explain that insufficient historical data is available")
-            context_parts.append("- If data is missing, say so explicitly - but use the calculated values when available")
+            context_parts.append("- Use the calculated values when available")
             context_parts.append("- Reference specific tickers, weights, and metrics from below")
             context_parts.append("- Quote the actual numbers from the data provided")
             context_parts.append("")

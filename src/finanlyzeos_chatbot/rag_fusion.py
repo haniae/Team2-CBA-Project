@@ -269,19 +269,9 @@ class SourceFusion:
             Instruction string for LLM
         """
         if confidence >= 0.7:
-            return (
-                "High confidence: The retrieved documents are highly relevant. "
-                "You can provide a confident, detailed answer."
-            )
+            return None  # Let model handle high confidence naturally
         elif confidence >= 0.4:
-            return (
-                "Medium confidence: The retrieved documents are moderately relevant. "
-                "Provide a helpful answer but acknowledge any uncertainties."
-            )
+            return None  # Let model handle medium confidence naturally
         else:
-            return (
-                "Low confidence: The retrieved documents have limited relevance. "
-                "Be cautious and explicit about information gaps. "
-                "If the retrieved data doesn't contain enough information, say so explicitly."
-            )
+            return None  # Let model handle low confidence naturally
 
