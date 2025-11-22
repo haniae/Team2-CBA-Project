@@ -79,15 +79,15 @@ class ChatGPTVoiceRecorder {
       }
 
       .voice-btn.listening {
-        background: #ef4444;
-        border-color: #ef4444;
+        background: #6366f1;
+        border-color: #6366f1;
         color: white;
         animation: pulse 1.5s infinite;
       }
 
       .voice-btn.processing {
-        background: #f59e0b;
-        border-color: #f59e0b;
+        background: #8b5cf6;
+        border-color: #8b5cf6;
         color: white;
         cursor: not-allowed;
       }

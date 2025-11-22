@@ -156,12 +156,12 @@ class PremiumVoiceRecorder {
         height: 44px;
         border: none;
         border-radius: 12px;
-        background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
         color: white;
         cursor: pointer;
         overflow: hidden;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -169,8 +169,8 @@ class PremiumVoiceRecorder {
 
       .premium-voice-btn:hover {
         transform: translateY(-2px) scale(1.05);
-        box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
-        background: linear-gradient(135deg, #ff5252 0%, #ff9500 100%);
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
       }
 
       .premium-voice-btn:active {
@@ -190,7 +190,7 @@ class PremiumVoiceRecorder {
       }
 
       .premium-voice-btn.processing {
-        background: linear-gradient(135deg, #ffa726 0%, #ff9800 100%);
+        background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
         animation: processingRotate 1s linear infinite;
       }
 
