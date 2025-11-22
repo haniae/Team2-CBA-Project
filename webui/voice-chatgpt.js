@@ -59,37 +59,39 @@ class ChatGPTVoiceRecorder {
     style.id = 'voice-styles';
     style.textContent = `
       .voice-btn {
-        background: transparent;
-        border: 1px solid var(--color-border, #e5e7eb);
-        border-radius: 8px;
-        color: var(--color-text-secondary, #6b7280);
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        border: none;
+        border-radius: 12px;
+        color: white;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 40px;
-        width: 40px;
-        transition: all 0.2s ease;
+        height: 44px;
+        width: 44px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
       }
 
       .voice-btn:hover {
-        background: var(--color-bg-hover, #f3f4f6);
-        color: var(--color-text-primary, #111827);
-        border-color: var(--color-border-hover, #d1d5db);
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: white;
       }
 
       .voice-btn.listening {
-        background: #6366f1;
-        border-color: #6366f1;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
         color: white;
         animation: pulse 1.5s infinite;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
       }
 
       .voice-btn.processing {
-        background: #8b5cf6;
-        border-color: #8b5cf6;
+        background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
         color: white;
         cursor: not-allowed;
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
       }
 
       @keyframes pulse {
