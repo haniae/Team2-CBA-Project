@@ -3954,6 +3954,7 @@ class FinanlyzeOSChatbot:
         user_input: str,
         *,
         progress_callback: Optional[Callable[[str, str], None]] = None,
+        file_ids: Optional[List[str]] = None,  # Explicit file IDs to include in context
     ) -> str:
         """Generate a reply and persist both sides of the exchange."""
 
@@ -3985,11 +3986,120 @@ class FinanlyzeOSChatbot:
             complexity, query_type, query_metadata = classify_query(user_input)
             emit("query_classification", f"Query classified as {complexity.value} {query_type.value}")
             
+            LOGGER.info("\n" + "="*80)
+            LOGGER.info("DOCUMENT CONTEXT BUILDING")
+            LOGGER.info("="*80)
+            LOGGER.info(f"🔍 Requested file_ids: {file_ids}")
+            LOGGER.info(f"🔍 Conversation ID: {getattr(self.conversation, 'conversation_id', None)}")
+            LOGGER.info(f"🔍 Database path: {self.settings.database_path}")
+            
+            database_path = Path(self.settings.database_path)
+            LOGGER.info(f"📁 Chatbot using database path: {database_path}")
+            LOGGER.info(f"📁 Database exists: {database_path.exists()}")
+            
+            # Build document context
+            # If file_ids provided, use them explicitly; otherwise, auto-fetch from conversation
+            # If file_ids is empty list, pass None to trigger automatic conversation-based fetching
+            # This matches ChatGPT behavior: files uploaded to conversation are automatically available
+            conv_id = getattr(self.conversation, "conversation_id", None)
+            LOGGER.info(f"🔍 Building document context with conversation_id: {conv_id}")
+            LOGGER.info(f"🔍 file_ids provided: {file_ids}")
+            LOGGER.info(f"🔍 database_path: {database_path}")
+            
             doc_context = build_uploaded_document_context(
                 user_input,
-                getattr(self.conversation, "conversation_id", None),
-                Path(self.settings.database_path),
+                conv_id,
+                database_path,
+                file_ids=file_ids if file_ids else None,  # None triggers auto-fetch from conversation
             )
+            
+            # CRITICAL: If doc_context is None but we have a conversation_id, something is wrong
+            # NUCLEAR FALLBACK: Directly query database and build context ourselves
+            if not doc_context and conv_id:
+                LOGGER.error(f"❌ CRITICAL: doc_context is None but conversation_id exists: {conv_id}")
+                LOGGER.error(f"   Attempting NUCLEAR FALLBACK: Direct database query and manual context building")
+                
+                # Direct database check and manual context building
+                try:
+                    import sqlite3
+                    with sqlite3.connect(database_path) as conn:
+                        cursor = conn.execute(
+                            "SELECT document_id, filename, file_type, content, LENGTH(content) as content_len FROM uploaded_documents WHERE conversation_id = ? AND content IS NOT NULL AND content != '' ORDER BY created_at DESC LIMIT 5",
+                            (conv_id,)
+                        )
+                        rows = cursor.fetchall()
+                        db_file_count = len(rows)
+                        LOGGER.error(f"   Database shows {db_file_count} files with content for this conversation_id")
+                        
+                        if db_file_count > 0:
+                            LOGGER.error(f"   ⚠️ FILES EXIST but context building returned None!")
+                            LOGGER.error(f"   Building context manually as NUCLEAR FALLBACK...")
+                            
+                            # Manually build context
+                            sections = []
+                            for doc_id, filename, file_type, content, content_len in rows:
+                                if content and content_len > 0:
+                                    # Include first 20k chars per file
+                                    snippet = content[:20000] if len(content) > 20000 else content
+                                    if len(content) > 20000:
+                                        snippet += f"\n\n[... {len(content) - 20000:,} more characters ...]"
+                                    
+                                    section = f"""Filename: {filename}
+Type: {file_type or 'unknown'}
+Content Length: {content_len} characters
+
+Content:
+{snippet}"""
+                                    sections.append(section)
+                            
+                            if sections:
+                                banner = "=" * 80
+                                header = [
+                                    banner,
+                                    "UPLOADED FILES (NUCLEAR FALLBACK - Direct Database Query)",
+                                    "",
+                                    "⚠️ IMPORTANT: The user has uploaded these files and is asking you to analyze them.",
+                                    "You MUST use the content from these files to answer the user's question.",
+                                    "DO NOT say 'I don't have access to external documents' - you have the file content below.",
+                                    "Reference specific parts of the files (filenames, sections, data points) in your response.",
+                                    "",
+                                    banner,
+                                ]
+                                body = f"\n\n{banner}\n".join(sections)
+                                doc_context = "\n".join(header) + "\n\n" + body
+                                
+                                LOGGER.error(f"   ✅ NUCLEAR FALLBACK SUCCESS: Built {len(doc_context)} chars of context manually")
+                                LOGGER.error(f"   This context will be forced into the LLM messages")
+                        else:
+                            LOGGER.error(f"   No files with content found in database")
+                except Exception as db_e:
+                    LOGGER.error(f"   Error in nuclear fallback: {db_e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            if file_ids:
+                LOGGER.info(f"📎 Explicit file_ids provided: {len(file_ids)} files")
+                if doc_context:
+                    LOGGER.info(f"✅ Document context built from explicit file_ids: {len(doc_context)} characters")
+                    LOGGER.info(f"📝 Context preview (first 500 chars):\n{doc_context[:500]}")
+                    # Check for key markers
+                    if "UPLOADED FILES" in doc_context or "UPLOADED FINANCIAL DOCUMENTS" in doc_context:
+                        LOGGER.info("✅ Context contains file content markers")
+                    else:
+                        LOGGER.warning("⚠️ Context missing file content markers")
+                else:
+                    LOGGER.warning(f"❌ No document context built for file_ids: {file_ids}")
+                    LOGGER.warning(f"   Possible reasons:")
+                    LOGGER.warning(f"   - Files not found in database")
+                    LOGGER.warning(f"   - Files have no content")
+                    LOGGER.warning(f"   - Database query failed")
+            elif doc_context:
+                LOGGER.info(f"📄 Document context auto-fetched from conversation: {len(doc_context)} characters")
+                LOGGER.info(f"   All files uploaded to this conversation are now available for analysis")
+                LOGGER.info(f"📝 Context preview (first 500 chars):\n{doc_context[:500]}")
+            else:
+                LOGGER.info("ℹ️ No document context (no file_ids and no files in conversation)")
+            LOGGER.info("="*80)
             is_document_followup = bool(doc_context) and self._is_document_followup(user_input)
             normalized_command = self._normalize_nl_to_command(user_input)
             canonical_prompt = self._canonical_prompt(user_input, normalized_command)
@@ -4786,12 +4896,39 @@ class FinanlyzeOSChatbot:
                         
                         # Add uploaded document context (only if not using RAG Orchestrator, which already includes it)
                         if doc_context:
+                            LOGGER.info("\n" + "="*80)
+                            LOGGER.info("ADDING DOCUMENT CONTEXT TO LLM PROMPT")
+                            LOGGER.info("="*80)
+                            LOGGER.info(f"📎 Document context length: {len(doc_context)} characters")
+                            LOGGER.info(f"📝 Context preview (first 300 chars):\n{doc_context[:300]}")
+                            
                             context = f"{context}\n\n{doc_context}" if context else doc_context
                             context_detail = (
                                 f"{context_detail} + uploaded documents"
                                 if context_detail and context_detail != "Context not required"
                                 else "Uploaded document context attached"
                             )
+                            
+                            # Verify context includes file content
+                            if "UPLOADED FILES" in doc_context or "UPLOADED FINANCIAL DOCUMENTS" in doc_context:
+                                LOGGER.info("✅ Document context contains file content markers")
+                            else:
+                                LOGGER.warning("⚠️ Document context missing file content markers")
+                            
+                            LOGGER.info(f"📊 Final context length: {len(context)} characters")
+                            LOGGER.info("="*80)
+                        else:
+                            if file_ids:
+                                LOGGER.warning("\n" + "="*80)
+                                LOGGER.warning("⚠️ CRITICAL: file_ids provided but doc_context is None!")
+                                LOGGER.warning("="*80)
+                                LOGGER.warning(f"📎 File IDs: {file_ids}")
+                                LOGGER.warning(f"🔍 This means files were not found in database or had no content")
+                                LOGGER.warning(f"💡 Check:")
+                                LOGGER.warning(f"   1. Are files stored in uploaded_documents table?")
+                                LOGGER.warning(f"   2. Do document_ids match?")
+                                LOGGER.warning(f"   3. Do files have content column populated?")
+                                LOGGER.warning("="*80)
 
                 emit(
                     "context_build_ready",
@@ -4947,8 +5084,79 @@ class FinanlyzeOSChatbot:
                         LOGGER.info("Created fallback context for LLM")
                     
                     # Pass is_forecasting flag and user_query to message preparation
+                    LOGGER.info("\n" + "="*80)
+                    LOGGER.info("PREPARING LLM MESSAGES")
+                    LOGGER.info("="*80)
+                    LOGGER.info(f"📊 Context length: {len(context) if context else 0} characters")
+                    if context:
+                        # Check if document context is in the context
+                        if "UPLOADED FILES" in context or "UPLOADED FINANCIAL DOCUMENTS" in context:
+                            LOGGER.info("✅ Context contains document/file markers")
+                            # Find where document context starts
+                            doc_start = context.find("UPLOADED FILES") or context.find("UPLOADED FINANCIAL DOCUMENTS")
+                            if doc_start >= 0:
+                                doc_preview = context[doc_start:doc_start+500]
+                                LOGGER.info(f"📝 Document context preview:\n{doc_preview}")
+                        else:
+                            LOGGER.warning("⚠️ Context does NOT contain document/file markers")
+                            LOGGER.warning("   This means document context was not added to the context variable")
+                    LOGGER.info("="*80)
+                    
                     messages = self._prepare_llm_messages(context, is_forecasting=is_forecasting, user_query=user_input)
-                    LOGGER.debug(f"Prepared {len(messages)} messages for LLM")
+                    LOGGER.info(f"📨 Prepared {len(messages)} messages for LLM")
+                    
+                    # CRITICAL: Verify document context is in messages
+                    # Check if doc_context was built (either from file_ids or auto-fetched from conversation)
+                    if doc_context:
+                        system_messages = [msg for msg in messages if msg.get("role") == "system"]
+                        has_doc_context = False
+                        for sys_msg in system_messages:
+                            content = sys_msg.get("content", "")
+                            if "UPLOADED FILES" in content or "UPLOADED FINANCIAL DOCUMENTS" in content:
+                                has_doc_context = True
+                                LOGGER.info(f"✅ Document context found in system message ({len(content)} chars)")
+                                LOGGER.info(f"   Context preview (first 500 chars): {content[:500]}")
+                                break
+                        
+                        # EMERGENCY FIX: If doc_context was built but not in messages, force it in
+                        if not has_doc_context:
+                            LOGGER.error(f"❌ CRITICAL: doc_context was built ({len(doc_context)} chars) but NOT in LLM messages!")
+                            LOGGER.error(f"   Context variable length: {len(context) if context else 0}")
+                            LOGGER.error(f"   System messages count: {len(system_messages)}")
+                            for i, sys_msg in enumerate(system_messages):
+                                content_preview = sys_msg.get('content', '')[:200]
+                                LOGGER.error(f"   System message {i} preview: {content_preview}")
+                            
+                            # EMERGENCY FIX: Force document context into the last system message
+                            LOGGER.warning("🔧 EMERGENCY FIX: Forcing document context into system message")
+                            if system_messages:
+                                # Append to last system message
+                                last_sys_msg = system_messages[-1]
+                                last_sys_msg["content"] = f"{last_sys_msg.get('content', '')}\n\n{doc_context}"
+                                LOGGER.info(f"✅ Document context forced into system message (new length: {len(last_sys_msg['content'])} chars)")
+                            else:
+                                # Add as new system message
+                                messages.insert(0, {"role": "system", "content": doc_context})
+                                LOGGER.info(f"✅ Document context added as new system message")
+                            
+                            # Re-verify
+                            system_messages = [msg for msg in messages if msg.get("role") == "system"]
+                            for sys_msg in system_messages:
+                                content = sys_msg.get("content", "")
+                                if "UPLOADED FILES" in content or "UPLOADED FINANCIAL DOCUMENTS" in content:
+                                    LOGGER.info(f"✅ VERIFIED: Document context now in system message")
+                                    break
+                    elif file_ids:
+                        # file_ids provided but doc_context is None - this is a problem
+                        LOGGER.warning(f"⚠️ file_ids provided ({file_ids}) but doc_context is None")
+                        LOGGER.warning(f"   Files may not exist in database or have no content")
+                    else:
+                        LOGGER.info("ℹ️ No document context (no file_ids and no files in conversation)")
+                    # Log message contents
+                    for i, msg in enumerate(messages):
+                        role = msg.get("role", "unknown")
+                        content_preview = msg.get("content", "")[:200] if msg.get("content") else ""
+                        LOGGER.info(f"   Message {i+1}: role={role}, content_length={len(msg.get('content', ''))}, preview={content_preview}")
                 
                 # Log context details for debugging
                 if context:
@@ -4990,6 +5198,41 @@ class FinanlyzeOSChatbot:
                         )
                     else:
                         reply = self.llm_client.generate_reply(messages)
+                
+                # FINAL SAFETY CHECK: Verify document context was sent to LLM
+                if doc_context:
+                    # Check all messages one more time before sending
+                    all_content = " ".join([msg.get("content", "") for msg in messages if msg.get("content")])
+                    has_file_markers = "UPLOADED FILES" in all_content or "UPLOADED FINANCIAL DOCUMENTS" in all_content
+                    
+                    if not has_file_markers:
+                        LOGGER.error("🚨 EMERGENCY: Document context built but NOT in final messages sent to LLM!")
+                        LOGGER.error(f"   doc_context length: {len(doc_context)} chars")
+                        LOGGER.error(f"   Total messages content length: {len(all_content)} chars")
+                        LOGGER.error("   This should never happen - the emergency fix should have caught this")
+                        
+                        # Last resort: Prepend to first user message
+                        for msg in messages:
+                            if msg.get("role") == "user":
+                                original_content = msg.get("content", "")
+                                msg["content"] = f"""[UPLOADED FILES CONTENT - USER HAS UPLOADED THESE FILES FOR ANALYSIS]
+
+{doc_context}
+
+[USER QUESTION]
+{original_content}"""
+                                LOGGER.warning("🔧 LAST RESORT: Prepend document context to user message")
+                                LOGGER.warning(f"   New user message length: {len(msg['content'])} chars")
+                                break
+                    else:
+                        LOGGER.info("✅ FINAL CHECK PASSED: Document context confirmed in messages sent to LLM")
+                        # Log a sample to verify
+                        for msg in messages:
+                            content = msg.get("content", "")
+                            if "UPLOADED FILES" in content or "UPLOADED FINANCIAL DOCUMENTS" in content:
+                                LOGGER.info(f"   Found in {msg.get('role')} message: {len(content)} chars")
+                                LOGGER.info(f"   Preview: {content[:300]}...")
+                                break
                 
                 emit("llm_query_complete", "Explanation drafted")
                 LOGGER.info(f"Generated reply length: {len(reply) if reply else 0} characters")

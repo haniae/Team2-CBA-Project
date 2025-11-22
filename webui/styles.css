@@ -2794,9 +2794,9 @@ body::-webkit-scrollbar {
   border-radius: 24px;
   padding: 16px 20px;
   display: flex;
-  flex-direction: row; /* Changed from column to row */
-  align-items: center; /* Center items vertically */
-  gap: 0;
+  flex-direction: column; /* Column layout to accommodate file chips */
+  align-items: stretch;
+  gap: 8px;
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
@@ -2869,11 +2869,91 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+/* File chips container */
+.file-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(0, 102, 255, 0.08);
+  border: 1px solid rgba(0, 102, 255, 0.2);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.file-chip:hover {
+  background: rgba(0, 102, 255, 0.12);
+  border-color: rgba(0, 102, 255, 0.3);
+}
+
+.file-chip-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.file-chip-name {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.file-chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  margin-left: 4px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.file-chip-remove:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+[data-theme="dark"] .file-chip {
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+[data-theme="dark"] .file-chip:hover {
+  background: rgba(96, 165, 250, 0.18);
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+[data-theme="dark"] .file-chips-container {
+  border-bottom-color: rgba(148, 163, 184, 0.2);
+}
+
 /* Textarea container wrapper */
 .chat-form .chat-input-wrapper {
   position: relative;
   width: 100%;
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 0;
 }

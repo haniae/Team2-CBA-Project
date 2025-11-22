@@ -138,3 +138,5 @@ pypdf>=3.0.0  # Alternative PDF library (optional, used in document_processor.py
 
 # Document Processing (Optional - has fallback if missing)
 python-docx>=1.1.0  # Word document processing (optional, used in document_processor.py for .docx files)
+python-pptx>=0.6.23  # PowerPoint document processing (optional, used in document_processor.py for .pptx files)
+pytesseract>=0.3.10  # OCR for image text extraction (optional, used in document_processor.py for image files)

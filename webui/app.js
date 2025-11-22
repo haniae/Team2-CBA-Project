@@ -153,7 +153,7 @@ async function onChatFileSelected(event) {
     saveConversations();
   }
 
-  const uploadingMsgWrapper = appendMessage("user", `📎 Uploading ${file.name}...`, { forceScroll: true });
+  // Show visual feedback (no chat message)
   setSending(true);
 
   try {
@@ -183,37 +183,53 @@ async function onChatFileSelected(event) {
       saveConversations();
     }
 
-    if (uploadingMsgWrapper) {
-      const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
-      if (bodyEl) {
-        bodyEl.textContent = `📎 Uploaded ${file.name} successfully`;
-        uploadingMsgWrapper.classList.add("upload-success");
+    // Add file to uploaded files list (this shows the file chip)
+    if (payload.document_id) {
+      uploadedFiles.push({
+        id: payload.document_id,
+        name: file.name,
+        type: payload.file_type || 'unknown',
+        size: file.size,
+      });
+      renderFileChips();
+      
+      // Show subtle toast notification (not a chat message)
+      if (typeof showToast === 'function') {
+        showToast(`✓ ${file.name}`, "success", 2000);
       }
     }
 
-    const assistantMsg =
-      payload.message ||
-      `✅ File "${file.name}" uploaded successfully. The document has been processed and is ready for analysis. Ask about it directly in your next prompt.`;
-    recordMessage("assistant", assistantMsg, { upload: { documentId: payload.document_id, filename: file.name } });
-    appendMessage("assistant", assistantMsg, { forceScroll: true });
-
+    // Only show warnings in chat if they're critical
     if (Array.isArray(payload.warnings) && payload.warnings.length) {
-      const warningText = `⚠️ Upload warnings for "${file.name}": ${payload.warnings.join(" ")}`;
-      recordMessage("system", warningText);
-      appendMessage("system", warningText, { forceScroll: true });
+      // Check if warnings are critical (e.g., extraction failed)
+      const criticalWarnings = payload.warnings.filter(w => 
+        w.toLowerCase().includes('failed') || 
+        w.toLowerCase().includes('error') ||
+        w.toLowerCase().includes('could not')
+      );
+      
+      if (criticalWarnings.length > 0) {
+        const warningText = `⚠️ Upload issue with "${file.name}": ${criticalWarnings.join(" ")}`;
+        recordMessage("system", warningText);
+        appendMessage("system", warningText, { forceScroll: true });
+      } else {
+        // Non-critical warnings just in toast
+        if (typeof showToast === 'function') {
+          showToast(`⚠️ ${payload.warnings[0]}`, "info", 3000);
+        }
+      }
     }
   } catch (error) {
     console.error("Upload failed", error);
-    if (uploadingMsgWrapper) {
-      const bodyEl = uploadingMsgWrapper.querySelector(".message-body");
-      if (bodyEl) {
-        bodyEl.textContent = `❌ Upload failed: ${error.message}`;
-        uploadingMsgWrapper.classList.add("upload-error");
-      }
-    }
+    // Only show errors in chat (not success messages)
     const errorMsg = `❌ Failed to upload ${file.name}: ${error.message}`;
     recordMessage("system", errorMsg);
     appendMessage("system", errorMsg, { forceScroll: true });
+    
+    // Also show toast for errors
+    if (typeof showToast === 'function') {
+      showToast(`Upload failed: ${error.message}`, "error", 4000);
+    }
   } finally {
     setSending(false);
     if (input) {
@@ -4456,6 +4472,84 @@ let conversations = loadStoredConversations();
 let activeConversation = null;
 let conversationSearch = "";
 let currentUtilityKey = null;
+let uploadedFiles = []; // Track uploaded files for current conversation
+
+// File chips rendering
+function renderFileChips() {
+  const container = document.getElementById('file-chips-container');
+  if (!container) return;
+  
+  if (uploadedFiles.length === 0) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+  
+  container.style.display = 'flex';
+  container.className = 'file-chips-container';
+  container.innerHTML = uploadedFiles.map(file => {
+    const icon = getFileIcon(file.type);
+    // Ensure data-file-id attribute is set for DOM fallback
+    return `
+      <div class="file-chip" data-file-id="${file.id}" data-filename="${file.name}">
+        <span class="file-chip-icon">${icon}</span>
+        <span class="file-chip-name" title="${file.name}">${file.name}</span>
+        <button type="button" class="file-chip-remove" aria-label="Remove ${file.name}" data-file-id="${file.id}">×</button>
+      </div>
+    `;
+  }).join('');
+  
+  // Bind remove handlers
+  container.querySelectorAll('.file-chip-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const fileId = e.target.dataset.fileId;
+      removeFile(fileId);
+    });
+  });
+}
+
+function getFileIcon(fileType) {
+  const icons = {
+    'pdf': '📄',
+    'docx': '📝',
+    'doc': '📝',
+    'pptx': '📽️',
+    'ppt': '📽️',
+    'xlsx': '📊',
+    'xls': '📊',
+    'csv': '📈',
+    'txt': '📃',
+    'json': '📋',
+    'image': '🖼️',
+    'jpg': '🖼️',
+    'jpeg': '🖼️',
+    'png': '🖼️',
+    'gif': '🖼️',
+  };
+  return icons[fileType?.toLowerCase()] || '📎';
+}
+
+async function removeFile(fileId) {
+  // Remove from local state
+  uploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
+  renderFileChips();
+  
+  // Optionally delete from server
+  try {
+    await fetch(`${API_BASE}/api/documents/${fileId}`, {
+      method: 'DELETE',
+    });
+  } catch (error) {
+    console.warn('Failed to delete file from server:', error);
+    // Non-critical - file is removed from UI anyway
+  }
+}
+
+// Clear files when starting new conversation
+function clearUploadedFiles() {
+  uploadedFiles = [];
+  renderFileChips();
+}
 
 const UTILITY_SECTIONS = {
   help: {
@@ -8352,6 +8446,7 @@ function loadConversation(conversationId) {
 }
 
 function startNewConversation({ focusInput = true } = {}) {
+  clearUploadedFiles(); // Clear uploaded files when starting new conversation
   activeConversation = null;
   saveActiveConversationId(null);
   if (currentUtilityKey) {
@@ -8999,6 +9094,19 @@ async function sendPrompt(prompt, requestId) {
   if (activeConversation && activeConversation.remoteId) {
     payload.conversation_id = activeConversation.remoteId;
   }
+  
+  // AUTOMATIC FILE INCLUSION: Don't send file_ids - let backend automatically use all files from conversation
+  // The backend will automatically fetch all files associated with the conversation_id
+  // This matches ChatGPT's behavior where files uploaded to a conversation are automatically available
+  console.log('\n' + '='.repeat(80));
+  console.log('FRONTEND: Sending chat message');
+  console.log('='.repeat(80));
+  console.log('💬 Message:', prompt.substring(0, 200));
+  console.log('🆔 Conversation ID:', activeConversation?.remoteId);
+  console.log('📎 Uploaded files in conversation:', uploadedFiles.length);
+  console.log('ℹ️  NOT sending file_ids - backend will automatically use all files from conversation');
+  console.log('📦 Full payload:', JSON.stringify(payload, null, 2));
+  console.log('='.repeat(80) + '\n');
 
   try {
     const response = await fetch(`${API_BASE}/chat`, {
@@ -9044,10 +9152,18 @@ if (chatForm) {
   }
   const canonicalPrompt = canonicalisePrompt(prompt);
 
-  recordMessage("user", prompt);
-  updatePromptSuggestionsFromPrompt(prompt);
-  appendMessage("user", prompt, { forceScroll: true });
-  chatInput.value = "";
+    recordMessage("user", prompt);
+    updatePromptSuggestionsFromPrompt(prompt);
+    appendMessage("user", prompt, { forceScroll: true });
+    chatInput.value = "";
+    
+    // Clear uploaded files immediately after sending message
+    // Files are already associated with conversation_id, so backend will auto-fetch them
+    // This matches ChatGPT behavior: files disappear from UI but remain available for analysis
+    if (uploadedFiles.length > 0) {
+      console.log(`📎 Clearing ${uploadedFiles.length} file chip(s) from UI (files remain in conversation for analysis)`);
+      clearUploadedFiles();
+    }
   
   // Reset textarea height after sending message
   if (chatInput) {
@@ -9091,6 +9207,11 @@ if (chatForm) {
     startProgressTracking(requestId, pendingMessage);
   }
 
+  // CRITICAL: Capture uploadedFiles snapshot BEFORE calling sendPrompt
+  // This ensures files are included even if they get cleared during async operations
+  const filesSnapshot = [...uploadedFiles];
+  console.log('📸 Captured files snapshot before sendPrompt:', filesSnapshot.map(f => ({ id: f.id, name: f.name })));
+  
   try {
     const response = await sendPrompt(prompt, requestId);
     const cleanReply = typeof response?.reply === "string" ? response.reply.trim() : "";
@@ -9122,6 +9243,8 @@ if (chatForm) {
       }
     }
     setCachedPrompt(canonicalPrompt, messageText, artifacts);
+    
+    // Files already cleared when message was sent - no need to clear again
   } catch (error) {
     // Don't show error for cancelled requests
     if (error.message !== 'Request cancelled') {

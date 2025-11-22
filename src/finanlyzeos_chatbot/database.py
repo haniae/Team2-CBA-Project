@@ -1392,6 +1392,119 @@ def fetch_uploaded_documents(
     return records
 
 
+def fetch_uploaded_documents_by_ids(
+    database_path: Path,
+    document_ids: List[str],
+) -> List[UploadedDocumentRecord]:
+    """
+    Fetch uploaded documents by their document IDs.
+
+    Args:
+        database_path: Path to the SQLite database.
+        document_ids: List of document IDs to fetch.
+    """
+    if not document_ids:
+        return []
+
+    def _rows_to_records(rows: Iterable[sqlite3.Row]) -> List[UploadedDocumentRecord]:
+        records: List[UploadedDocumentRecord] = []
+        for row in rows:
+            raw_metadata = row[6] if len(row) > 6 else "{}"
+            try:
+                metadata: Dict[str, Any] = json.loads(raw_metadata) if raw_metadata else {}
+            except json.JSONDecodeError:
+                metadata = {}
+            records.append(
+                UploadedDocumentRecord(
+                    document_id=row[0],
+                    conversation_id=row[1],
+                    filename=row[2],
+                    file_type=row[3],
+                    file_size=row[4],
+                    content=row[5] or "",
+                    metadata=metadata,
+                    uploaded_at=_parse_dt(row[7]) or datetime(1970, 1, 1, tzinfo=timezone.utc),
+                    updated_at=_parse_dt(row[8]) or datetime(1970, 1, 1, tzinfo=timezone.utc),
+                )
+            )
+        return records
+
+    import logging
+    db_logger = logging.getLogger(__name__)
+    
+    with _connect(database_path) as connection:
+        connection.row_factory = sqlite3.Row
+        
+        # Debug: Check if table exists and what documents are in it
+        try:
+            all_docs = connection.execute(
+                "SELECT document_id, filename, conversation_id FROM uploaded_documents ORDER BY created_at DESC LIMIT 20"
+            ).fetchall()
+            db_logger.info(f"📋 All documents in database ({len(all_docs)} total):")
+            for row in all_docs:
+                db_logger.info(f"   - ID: {row[0]}, Filename: {row[1]}, Conv: {row[2]}")
+            
+            # Check if requested IDs exist
+            requested_set = set(document_ids)
+            existing_set = {row[0] for row in all_docs}
+            missing = requested_set - existing_set
+            if missing:
+                db_logger.warning(f"❌ Requested document IDs NOT found in database: {list(missing)}")
+            found = requested_set & existing_set
+            if found:
+                db_logger.info(f"✅ Requested document IDs found in database: {list(found)}")
+        except Exception as e:
+            db_logger.error(f"❌ Could not query uploaded_documents table: {e}", exc_info=True)
+        
+        # Use IN clause to fetch all documents at once
+        placeholders = ",".join("?" * len(document_ids))
+        query = f"""
+            SELECT document_id, conversation_id, filename, file_type, file_size,
+                   content, metadata, created_at, updated_at
+            FROM uploaded_documents
+            WHERE document_id IN ({placeholders})
+            ORDER BY created_at DESC
+        """
+        db_logger.info(f"🔍 Executing query for document_ids: {document_ids}")
+        db_logger.debug(f"Query: {query}")
+        db_logger.debug(f"Parameters: {tuple(document_ids)}")
+        
+        rows = connection.execute(query, tuple(document_ids)).fetchall()
+        
+        db_logger.info(f"📊 Query returned {len(rows)} rows")
+        if rows:
+            for row in rows:
+                content_len = len(row[5]) if row[5] else 0
+                db_logger.info(f"   ✅ Found: {row[0]} ({row[2]}) - {content_len} chars of content")
+        else:
+            db_logger.warning(f"❌ Query returned 0 rows - documents not found!")
+            db_logger.warning(f"   Requested IDs: {document_ids}")
+        
+        db_logger.info(f"📊 Query returned {len(rows)} rows")
+        if rows:
+            for row in rows:
+                content_len = len(row[5]) if row[5] else 0
+                db_logger.info(f"   ✅ Found: ID='{row[0]}', filename='{row[2]}', content_len={content_len} chars")
+                if content_len == 0:
+                    db_logger.warning(f"   ⚠️ WARNING: Document has NO CONTENT (empty content column)")
+        else:
+            db_logger.warning(f"❌ Query returned 0 rows - documents not found!")
+            db_logger.warning(f"   Requested IDs: {document_ids}")
+            db_logger.warning(f"No documents found matching IDs: {document_ids}")
+            # Try to find similar IDs
+            try:
+                similar = connection.execute(
+                    "SELECT document_id FROM uploaded_documents WHERE document_id LIKE ?",
+                    (f"%{document_ids[0][-8:]}%",)
+                ).fetchall()
+                if similar:
+                    db_logger.info(f"Found similar document IDs: {[row[0] for row in similar]}")
+            except Exception:
+                pass
+        
+        return _rows_to_records(rows)
+
+
 @contextmanager
 def temporary_connection(database_path: Path) -> Iterator[sqlite3.Connection]:
     """Provide a context-managed SQLite connection for bulk work."""

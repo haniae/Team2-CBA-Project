@@ -289,6 +289,27 @@ async def serve_styles_css():
     
     with open(css_path, 'r', encoding='utf-8') as f:
         content = f.read()
+
+
+@app.get("/static/file-preview.css")
+async def serve_file_preview_css():
+    """Serve file-preview.css with no-cache headers."""
+    css_path = FRONTEND_DIR / "file-preview.css"
+    if not css_path.exists():
+        raise HTTPException(status_code=404, detail="file-preview.css not found")
+    
+    with open(css_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    return Response(
+        content=content,
+        media_type="text/css",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
     
     return Response(
         content=content,
@@ -383,6 +404,7 @@ class ChatRequest(BaseModel):
     prompt: str
     conversation_id: Optional[str] = None
     request_id: Optional[str] = None
+    file_ids: Optional[List[str]] = None  # List of uploaded document IDs to include in context
 
 
 class TrendPoint(BaseModel):
@@ -697,10 +719,12 @@ def build_bot(conversation_id: Optional[str] = None) -> FinanlyzeOSChatbot:
     settings = get_settings()
     bot = FinanlyzeOSChatbot.create(settings)
     if conversation_id:
+        LOGGER.info(f"🔍 build_bot: Received conversation_id: {conversation_id}")
         history = list(
             database.fetch_conversation(settings.database_path, conversation_id)
         )
         if history:
+            LOGGER.info(f"✅ build_bot: Found {len(history)} messages in history")
             bot.conversation.conversation_id = conversation_id
             bot.conversation.messages = [
                 {"role": msg.role, "content": msg.content} for msg in history
@@ -708,6 +732,7 @@ def build_bot(conversation_id: Optional[str] = None) -> FinanlyzeOSChatbot:
         else:
             # Even when no prior messages exist, lock the conversation id so uploads and
             # subsequent prompts share the same identifier.
+            LOGGER.info(f"ℹ️ build_bot: No message history, but locking conversation_id: {conversation_id}")
             bot.conversation.conversation_id = conversation_id
     
     # CRITICAL: Ensure fresh bot starts with no dashboard AND no cached summaries
@@ -1069,15 +1094,102 @@ def chat(request: ChatRequest) -> ChatResponse:
             progress_events=progress_snapshot.events,
         )
 
+    LOGGER.info("\n" + "="*80)
+    LOGGER.info("CHAT REQUEST - BUILDING BOT")
+    LOGGER.info("="*80)
+    LOGGER.info(f"📥 Received conversation_id from request: {request.conversation_id}")
+    
     bot = build_bot(request.conversation_id)
     conversation_id = bot.conversation.conversation_id
+    
+    LOGGER.info(f"✅ Bot built with conversation_id: {conversation_id}")
+    LOGGER.info(f"🔍 Checking for files in this conversation...")
+    
+    # CRITICAL: Check ALL possible conversation IDs to find files
+    try:
+        import sqlite3
+        with sqlite3.connect(settings.database_path) as conn:
+            # Check exact match
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM uploaded_documents WHERE conversation_id = ?",
+                (conversation_id,)
+            )
+            file_count = cursor.fetchone()[0]
+            LOGGER.info(f"📎 Found {file_count} files in database for conversation_id: {conversation_id}")
+            
+            if file_count == 0:
+                # Check if request had a different conversation_id
+                if request.conversation_id and request.conversation_id != conversation_id:
+                    LOGGER.warning(f"⚠️ conversation_id mismatch!")
+                    LOGGER.warning(f"   Request had: {request.conversation_id}")
+                    LOGGER.warning(f"   Bot using: {conversation_id}")
+                    # Check with request conversation_id
+                    cursor = conn.execute(
+                        "SELECT COUNT(*) FROM uploaded_documents WHERE conversation_id = ?",
+                        (request.conversation_id,)
+                    )
+                    req_file_count = cursor.fetchone()[0]
+                    LOGGER.warning(f"   Files with request conversation_id: {req_file_count}")
+                    if req_file_count > 0:
+                        LOGGER.warning(f"   ⚠️ FOUND FILES with request conversation_id but not bot conversation_id!")
+                        LOGGER.warning(f"   This is a conversation_id mismatch issue!")
+                        # List all recent conversations with files
+                        cursor = conn.execute("""
+                            SELECT DISTINCT conversation_id, COUNT(*) as cnt
+                            FROM uploaded_documents
+                            WHERE conversation_id IS NOT NULL
+                            GROUP BY conversation_id
+                            ORDER BY cnt DESC
+                            LIMIT 5
+                        """)
+                        recent_convos = cursor.fetchall()
+                        LOGGER.warning(f"   Recent conversations with files:")
+                        for conv_id, cnt in recent_convos:
+                            LOGGER.warning(f"      - {conv_id}: {cnt} files")
+            
+            if file_count > 0:
+                cursor = conn.execute(
+                    "SELECT document_id, filename, LENGTH(content) as content_len FROM uploaded_documents WHERE conversation_id = ? LIMIT 5",
+                    (conversation_id,)
+                )
+                files = cursor.fetchall()
+                for doc_id, filename, content_len in files:
+                    LOGGER.info(f"   - {doc_id}: {filename} ({content_len} chars)")
+                    if content_len == 0:
+                        LOGGER.warning(f"      ⚠️ WARNING: This file has NO CONTENT!")
+    except Exception as e:
+        LOGGER.warning(f"⚠️ Could not check files in database: {e}")
+        import traceback
+        traceback.print_exc()
+    
     _start_progress_tracking(request_id, conversation_id)
+
+    # Handle file_ids: If provided, use them; otherwise, let chatbot auto-fetch from conversation
+    file_ids = request.file_ids or []
+    
+    LOGGER.info("\n" + "="*80)
+    LOGGER.info("CHAT REQUEST DEBUG")
+    LOGGER.info("="*80)
+    LOGGER.info(f"💬 Message: {request.prompt[:200]}")
+    LOGGER.info(f"🆔 Final Conversation ID: {conversation_id}")
+    if file_ids:
+        LOGGER.info(f"📎 Explicit file_ids provided: {file_ids}")
+        LOGGER.info(f"   Will use these specific files")
+    else:
+        LOGGER.info(f"📎 No explicit file_ids - will automatically use all files from conversation")
+        LOGGER.info(f"   This matches ChatGPT behavior: files uploaded to conversation are auto-available")
+    LOGGER.info("="*80)
 
     def _progress_hook(stage: str, detail: str) -> None:
         _record_progress_event(request_id, stage, detail)
 
     try:
-        reply = bot.ask(request.prompt, progress_callback=_progress_hook)
+        # Pass file_ids to the chatbot if provided
+        reply = bot.ask(
+            request.prompt, 
+            progress_callback=_progress_hook,
+            file_ids=file_ids,
+        )
     except Exception as exc:  # pragma: no cover - defensive relay
         _complete_progress_tracking(request_id, error=str(exc))
         _progress_snapshot(request_id)  # ensure cleanup scheduling
@@ -2050,7 +2162,12 @@ async def document_upload(
     
     try:
         # Log file info for debugging
-        LOGGER.info(f"Processing uploaded file: {file.filename}, size: {file_size} bytes")
+        LOGGER.info("\n" + "="*80)
+        LOGGER.info("FILE UPLOAD DEBUG")
+        LOGGER.info("="*80)
+        LOGGER.info(f"📁 Filename: {file.filename}")
+        LOGGER.info(f"💬 Conversation ID: {conversation_id}")
+        LOGGER.info(f"📦 File size: {file_size} bytes")
         
         warnings: List[str] = []
         success_message: Optional[str] = None
@@ -2059,7 +2176,13 @@ async def document_upload(
         # Extract text from file
         try:
             extracted_text, file_type = extract_text_from_file(tmp_path, file.filename)
-            LOGGER.info(f"File type detected: {file_type}, extracted text length: {len(extracted_text) if extracted_text else 0}")
+            content_length = len(extracted_text) if extracted_text else 0
+            LOGGER.info(f"📄 File type detected: {file_type}")
+            LOGGER.info(f"📝 Content extracted: {content_length} characters")
+            if extracted_text:
+                LOGGER.info(f"📝 First 200 chars: {extracted_text[:200]}")
+            else:
+                LOGGER.warning(f"⚠️ No content extracted from file")
         except Exception as extract_error:
             LOGGER.error(f"Error during text extraction: {extract_error}", exc_info=True)
             extracted_text = None
@@ -2133,6 +2256,7 @@ async def document_upload(
         
         # Generate document ID
         document_id = f"doc_{uuid.uuid4().hex[:8]}"
+        LOGGER.info(f"🆔 Generated document ID: {document_id}")
         
         # Truncate content if too long (keep first 500k chars for preview, full content stored)
         content_preview = extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text
@@ -2153,28 +2277,78 @@ async def document_upload(
 
         metadata = json.dumps(metadata_payload)
         
-        with sqlite3.connect(db_path) as conn:
-            conn.execute(
-                """
-                INSERT INTO uploaded_documents 
-                (document_id, conversation_id, filename, file_type, file_size, content, metadata, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    document_id,
-                    conversation_id,
-                    file.filename,
-                    file_type,
-                    file_size,
-                    extracted_text,
-                    metadata,
-                    created_at,
-                    created_at
-                )
-            )
-            conn.commit()
+        LOGGER.info(f"💾 Saving to database: {db_path}")
+        LOGGER.info(f"   Document ID: {document_id}")
+        LOGGER.info(f"   Content length: {len(extracted_text)} chars")
         
-        LOGGER.info(f"Document uploaded: {document_id} ({file.filename}, {file_type}, {len(extracted_text)} chars)")
+        with sqlite3.connect(db_path) as conn:
+            # Ensure table exists
+            try:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS uploaded_documents (
+                        document_id TEXT PRIMARY KEY,
+                        conversation_id TEXT,
+                        filename TEXT NOT NULL,
+                        file_type TEXT NOT NULL,
+                        file_size INTEGER NOT NULL,
+                        content TEXT NOT NULL,
+                        metadata TEXT NOT NULL DEFAULT '{}',
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                conn.commit()
+                LOGGER.info("✅ uploaded_documents table verified/created")
+            except Exception as e:
+                LOGGER.warning(f"⚠️ Error creating table (may already exist): {e}")
+            
+            # Insert document
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO uploaded_documents 
+                    (document_id, conversation_id, filename, file_type, file_size, content, metadata, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        document_id,
+                        conversation_id,
+                        file.filename,
+                        file_type,
+                        file_size,
+                        extracted_text,
+                        metadata,
+                        created_at,
+                        created_at
+                    )
+                )
+                conn.commit()
+                LOGGER.info(f"✅ Document saved to database successfully")
+                
+                # Verify it was saved
+                verify_cursor = conn.execute(
+                    "SELECT document_id, LENGTH(content) as content_len FROM uploaded_documents WHERE document_id = ?",
+                    (document_id,)
+                )
+                verify_row = verify_cursor.fetchone()
+                if verify_row:
+                    LOGGER.info(f"✅ Verification: Document {verify_row[0]} exists with {verify_row[1]} chars")
+                else:
+                    LOGGER.error(f"❌ CRITICAL: Document was not saved! Verification query returned no rows")
+            except sqlite3.IntegrityError as e:
+                LOGGER.error(f"❌ Database integrity error: {e}")
+                LOGGER.error(f"   Document may already exist or there's a constraint violation")
+            except Exception as e:
+                LOGGER.error(f"❌ Error saving document to database: {e}", exc_info=True)
+                raise
+        
+        LOGGER.info(f"✅ Document uploaded successfully:")
+        LOGGER.info(f"   - Document ID: {document_id}")
+        LOGGER.info(f"   - Filename: {file.filename}")
+        LOGGER.info(f"   - Type: {file_type}")
+        LOGGER.info(f"   - Content length: {len(extracted_text)} chars")
+        LOGGER.info(f"   - Conversation ID: {conversation_id}")
+        LOGGER.info("="*80)
         
         # Automatically index the document for semantic search (non-blocking)
         try:
@@ -2262,6 +2436,115 @@ async def document_upload(
     finally:
         if tmp_path.exists():
             tmp_path.unlink()
+
+
+@app.get("/api/documents/{document_id}")
+async def get_document(document_id: str) -> Dict[str, Any]:
+    """
+    Get an uploaded document by its ID.
+    Returns document metadata and content.
+    """
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        import sqlite3
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT document_id, conversation_id, filename, file_type, file_size, 
+                       content, metadata, created_at, updated_at
+                FROM uploaded_documents
+                WHERE document_id = ?
+                """,
+                (document_id,)
+            )
+            row = cursor.fetchone()
+            
+            if not row:
+                raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
+            
+            # Parse metadata
+            import json
+            try:
+                metadata = json.loads(row[6]) if row[6] else {}
+            except:
+                metadata = {}
+            
+            return {
+                "success": True,
+                "document_id": row[0],
+                "conversation_id": row[1],
+                "filename": row[2],
+                "file_type": row[3],
+                "file_size": row[4],
+                "content_length": len(row[5]) if row[5] else 0,
+                "content_preview": (row[5][:500] + "...") if row[5] and len(row[5]) > 500 else (row[5] or ""),
+                "metadata": metadata,
+                "created_at": row[7],
+                "updated_at": row[8],
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        LOGGER.error(f"Error fetching document {document_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error fetching document: {str(e)}")
+
+
+@app.delete("/api/documents/{document_id}")
+async def delete_document(document_id: str) -> Dict[str, Any]:
+    """
+    Delete an uploaded document by its ID.
+    """
+    settings = get_settings()
+    db_path = settings.database_path
+    
+    try:
+        import sqlite3
+        
+        with sqlite3.connect(db_path) as conn:
+            # Check if document exists
+            cursor = conn.execute(
+                "SELECT document_id, filename FROM uploaded_documents WHERE document_id = ?",
+                (document_id,)
+            )
+            row = cursor.fetchone()
+            
+            if not row:
+                raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
+            
+            # Delete from database
+            conn.execute(
+                "DELETE FROM uploaded_documents WHERE document_id = ?",
+                (document_id,)
+            )
+            conn.commit()
+            
+            # Try to remove from vector store (non-critical)
+            try:
+                from .rag_retriever import VectorStore
+                vector_store = VectorStore(db_path)
+                if vector_store._available:
+                    # Note: ChromaDB doesn't have a direct delete by metadata filter
+                    # This would require querying first, then deleting by IDs
+                    # For now, we'll just log that the document was deleted from DB
+                    LOGGER.info(f"Document {document_id} deleted from database. Vector store cleanup may be needed.")
+            except Exception as e:
+                LOGGER.debug(f"Vector store cleanup failed (non-critical): {e}")
+            
+            LOGGER.info(f"Document deleted: {document_id}")
+            
+            return {
+                "success": True,
+                "message": f"Document {document_id} deleted successfully",
+                "document_id": document_id
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        LOGGER.error(f"Error deleting document {document_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error deleting document: {str(e)}")
 
 
 @app.post("/api/portfolio/policy/upload")

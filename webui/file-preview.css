@@ -1,0 +1,115 @@
+/* ChatGPT-style file preview bubbles in chat */
+.file-preview-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--message-user-bg, #f0f0f0);
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  max-width: 400px;
+}
+
+.file-preview-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-preview-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.file-preview-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-preview-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-primary, #333);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-preview-size {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  margin-top: 2px;
+}
+
+.file-preview-remove {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #666);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.file-preview-remove:hover {
+  background: var(--hover-bg, rgba(0, 0, 0, 0.1));
+  color: var(--text-primary, #333);
+}
+
+.file-preview-status {
+  font-size: 11px;
+  color: var(--text-secondary, #666);
+  padding-top: 4px;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.file-preview-status.uploading {
+  color: var(--accent-color, #0066cc);
+}
+
+.file-preview-status.uploaded {
+  color: var(--success-color, #28a745);
+}
+
+.file-preview-status.error {
+  color: var(--error-color, #dc3545);
+}
+
+/* Finalized attachment style (after upload) */
+.file-attachment-finalized {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--message-user-bg, #f0f0f0);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e0e0e0);
+}
+
+.file-attachment-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.file-attachment-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-attachment-name {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-primary, #333);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-attachment-size {
+  font-size: 11px;
+  color: var(--text-secondary, #666);
+  margin-top: 2px;
+}
+

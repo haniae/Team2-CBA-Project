@@ -37,6 +37,8 @@ def extract_text_from_file(file_path: Path, filename: Optional[str] = None) -> T
             return extract_text_from_pdf(file_path), 'pdf'
         elif file_ext in ['.docx', '.doc']:
             return extract_text_from_docx(file_path), 'docx'
+        elif file_ext in ['.pptx', '.ppt']:
+            return extract_text_from_pptx(file_path), 'pptx'
         elif file_ext == '.txt':
             return extract_text_from_txt(file_path), 'text'
         elif file_ext == '.csv':
@@ -45,6 +47,8 @@ def extract_text_from_file(file_path: Path, filename: Optional[str] = None) -> T
             return extract_text_from_excel(file_path), 'excel'
         elif file_ext == '.json':
             return extract_text_from_json(file_path), 'json'
+        elif file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
+            return extract_text_from_image(file_path), 'image'
         elif file_ext in ['.py', '.js', '.ts', '.java', '.cpp', '.c', '.h', '.rb', '.go', '.rs', '.php', '.html', '.css', '.xml', '.yaml', '.yml']:
             return extract_text_from_txt(file_path), 'code'
         else:
@@ -203,4 +207,66 @@ def extract_text_from_json(file_path: Path) -> Optional[str]:
         LOGGER.error(f"Error extracting text from JSON {file_path}: {e}", exc_info=True)
         # Fallback to plain text extraction
         return extract_text_from_txt(file_path)
+
+
+def extract_text_from_pptx(file_path: Path) -> Optional[str]:
+    """Extract text from PowerPoint file (.pptx)."""
+    try:
+        try:
+            from pptx import Presentation
+            prs = Presentation(file_path)
+            text_content = []
+            
+            # Extract text from slides
+            for slide_num, slide in enumerate(prs.slides, 1):
+                text_content.append(f"\n--- Slide {slide_num} ---\n")
+                
+                # Extract from shapes (text boxes, etc.)
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text:
+                        text_content.append(shape.text)
+                
+                # Extract from tables
+                for shape in slide.shapes:
+                    if shape.has_table:
+                        table = shape.table
+                        for row in table.rows:
+                            row_data = [cell.text for cell in row.cells]
+                            text_content.append(" | ".join(row_data))
+            
+            text = "\n".join(text_content)
+            return text.strip() if text.strip() else None
+        except ImportError:
+            LOGGER.warning("python-pptx not available. Install with: pip install python-pptx")
+            return None
+    except Exception as e:
+        LOGGER.error(f"Error extracting text from PPTX {file_path}: {e}", exc_info=True)
+        return None
+
+
+def extract_text_from_image(file_path: Path) -> Optional[str]:
+    """Extract text from image file using OCR."""
+    try:
+        # Try Tesseract OCR first
+        try:
+            import pytesseract
+            from PIL import Image
+            
+            image = Image.open(file_path)
+            text = pytesseract.image_to_string(image)
+            
+            if text and text.strip():
+                return f"[IMAGE CONTENT EXTRACTED VIA OCR]\n{text.strip()}\n[/IMAGE CONTENT]"
+            else:
+                return "[IMAGE FILE] - No text detected via OCR. The image has been stored for reference."
+        except ImportError:
+            LOGGER.warning("pytesseract or PIL not available. Install with: pip install pytesseract pillow")
+            # Fallback: return placeholder
+            return "[IMAGE FILE] - OCR not available. The image has been stored for reference. Install pytesseract for text extraction."
+        except Exception as e:
+            LOGGER.error(f"Error during OCR extraction: {e}", exc_info=True)
+            return "[IMAGE FILE] - OCR extraction failed. The image has been stored for reference."
+    except Exception as e:
+        LOGGER.error(f"Error extracting text from image {file_path}: {e}", exc_info=True)
+        return "[IMAGE FILE] - Error processing image. The file has been stored for reference."
 

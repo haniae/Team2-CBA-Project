@@ -23,247 +23,292 @@ def build_uploaded_document_context(
     conversation_id: Optional[str],
     database_path: Path,
     *,
+    file_ids: Optional[List[str]] = None,  # Explicit file IDs to include
     max_documents: int = 3,
-    max_chars: int = 6000,
-    max_snippet_per_doc: int = 2000,
+    max_chars: int = 100000,  # ChatGPT-style: ~110k tokens = ~440k chars, but we use 100k for safety
+    max_snippet_per_doc: int = 50000,  # ChatGPT-style: Include substantial chunks directly
     chunk_overlap: int = 200,
     use_semantic_search: bool = True,
 ) -> Optional[str]:
     """
-    Build context from uploaded documents.
+    Build context from uploaded documents using ChatGPT-style hybrid approach:
+    1. Direct injection: First ~100k chars directly in prompt (like ChatGPT's 110k tokens)
+    2. Vector search: For remaining content, retrieve relevant chunks dynamically
     
     Args:
+        file_ids: Explicit list of document IDs to include. If provided, only these documents will be used.
         use_semantic_search: If True, use vector search when available; 
                             falls back to token overlap if vector store unavailable.
     """
-    if not conversation_id:
+    if not conversation_id and not file_ids:
         return None
 
-    # Try semantic search first if enabled
-    if use_semantic_search:
+    # If explicit file_ids provided, fetch those documents directly
+    if file_ids:
+        LOGGER.info("\n" + "="*80)
+        LOGGER.info("BUILDING DOCUMENT CONTEXT FROM EXPLICIT FILE IDs")
+        LOGGER.info("="*80)
+        LOGGER.info(f"📎 Requested file_ids: {file_ids}")
+        LOGGER.info(f"📁 Database path: {database_path}")
+        
         try:
-            from .rag_retriever import VectorStore
+            documents = database.fetch_uploaded_documents_by_ids(
+                database_path,
+                file_ids,
+            )
             
-            vector_store = VectorStore(database_path)
-            if vector_store._available:
-                # Use semantic search
-                results = vector_store.search_uploaded_docs(
-                    query=user_input,
-                    n_results=max_documents,
-                    filter_metadata={"conversation_id": conversation_id} if conversation_id else None,
-                )
+            LOGGER.info(f"🔍 Database query returned {len(documents) if documents else 0} documents")
+            
+            if not documents:
+                LOGGER.warning(f"❌ No documents found for file_ids: {file_ids}")
+                LOGGER.warning(f"💡 Possible issues:")
+                LOGGER.warning(f"   - Document IDs don't exist in database")
+                LOGGER.warning(f"   - Document IDs format mismatch")
+                LOGGER.warning(f"   - Database connection issue")
+                LOGGER.warning("="*80)
+                return None
+            
+            LOGGER.info(f"✅ Found {len(documents)} documents:")
+            for i, doc in enumerate(documents, 1):
+                content_len = len(doc.content) if doc.content else 0
+                LOGGER.info(f"   {i}. {doc.filename} (ID: {doc.document_id}, Content: {content_len} chars)")
+            # ChatGPT-style direct injection: Include first ~100k chars directly
+            # This matches ChatGPT's approach of injecting first 110k tokens directly
+            banner = "=" * 80
+            sections: List[str] = []
+            remaining_chars = max(max_chars, 0)
+            
+            # Calculate chars per document (ChatGPT distributes 110k tokens across multiple docs)
+            if len(documents) > 1:
+                chars_per_doc = max(remaining_chars // len(documents), 10000)  # At least 10k per doc
+            else:
+                chars_per_doc = remaining_chars
+            
+            for record in documents:
+                metadata = record.metadata or {}
+                text = (record.content or "").strip()
                 
-                if results:
-                    return _format_semantic_search_results(results, max_chars)
-        except (ImportError, Exception) as e:
-            # Fall back to token overlap if semantic search fails
-            LOGGER.debug(f"Semantic search unavailable, using token overlap: {e}")
-
-    # Fallback: Token overlap matching (original implementation)
-    try:
-        documents = database.fetch_uploaded_documents(
-            database_path,
-            conversation_id,
-            limit=max_documents,
-            include_unscoped=False,
-        )
-    except Exception:
-        return None
-
-    if not documents:
-        return None
-
-    banner = "=" * 80
-    sections: List[str] = []
-    remaining_chars = max(max_chars, 0)
-
-    stopwords = {
-        "the",
-        "a",
-        "an",
-        "and",
-        "or",
-        "to",
-        "of",
-        "in",
-        "on",
-        "with",
-        "for",
-        "by",
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "been",
-        "it",
-        "this",
-        "that",
-        "these",
-        "those",
-        "about",
-        "into",
-        "from",
-        "at",
-        "as",
-        "their",
-        "its",
-    }
-
-    query_tokens = set(_tokenize(user_input, stopwords))
-    if not query_tokens:
-        query_tokens = set(re.findall(r"[a-z0-9]+", (user_input or "").lower()))
-
-    def iter_chunks(text: str) -> Iterable[str]:
-        snippet_limit = max(200, min(max_snippet_per_doc, 5000))
-        overlap = max(0, min(chunk_overlap, snippet_limit - 50))
-        normalized = (text or "").strip()
-        if not normalized:
-            return
-        if len(normalized) <= snippet_limit:
-            yield normalized
-            return
-        step = max(1, snippet_limit - overlap)
-        start = 0
-        text_length = len(normalized)
-        while start < text_length:
-            end = min(text_length, start + snippet_limit)
-            chunk = normalized[start:end]
-            boundary = chunk.rfind("\n\n")
-            if boundary > snippet_limit * 0.4:
-                chunk = chunk[:boundary]
-                end = start + boundary
-            yield chunk.strip()
-            if end >= text_length:
-                break
-            start += step
-
-    def focus_chunk(chunk: str, terms: Set[str]) -> str:
-        if not chunk or not terms:
-            return chunk
-        lowered = chunk.lower()
-        spans: List[Tuple[int, int]] = []
-        for term in terms:
-            term_lower = term.lower()
-            idx = lowered.find(term_lower)
-            if idx != -1:
-                spans.append((idx, idx + len(term_lower)))
-        if not spans:
-            return chunk
-        start_idx = min(span[0] for span in spans)
-        end_idx = max(span[1] for span in spans)
-        window_before = 150
-        window_after = 250
-        start = max(0, start_idx - window_before)
-        end = min(len(chunk), end_idx + window_after)
-        snippet = chunk[start:end].strip()
-        prefix = "… " if start > 0 else ""
-        suffix = " …" if end < len(chunk) else ""
-        return f"{prefix}{snippet}{suffix}".strip()
-
-    for record in documents:
-        metadata = record.metadata or {}
-        text = (record.content or "").strip()
-
-        fallback_snippet = text[:max_snippet_per_doc].strip()
-        best_chunk = ""
-        best_score = -1.0
-        matched_terms: Set[str] = set()
-
-        for chunk in iter_chunks(text):
-            if not chunk:
-                continue
-            chunk_tokens = set(_tokenize(chunk, stopwords))
-            if not chunk_tokens:
-                continue
-            overlap = query_tokens & chunk_tokens
-            overlap_count = len(overlap)
-            coverage = overlap_count / max(len(query_tokens), 1)
-            density = overlap_count / max(len(chunk_tokens), 1)
-            score = overlap_count + 0.7 * coverage + 0.5 * density
-            if score > best_score:
-                best_score = score
-                best_chunk = chunk
-                matched_terms = overlap
-
-        if not best_chunk:
-            best_chunk = fallback_snippet or text[:200].strip()
-            matched_terms = set()
-
-        if matched_terms:
-            sentences = re.split(r"(?<=[.!?])\s+", text)
-            selected: List[str] = []
-            for sentence in sentences:
-                lowered_sentence = sentence.lower()
-                if any(term in lowered_sentence for term in matched_terms):
-                    cleaned = sentence.strip()
-                    if cleaned and cleaned not in selected:
-                        selected.append(cleaned)
-            if selected:
-                best_chunk = " ".join(selected)
-            else:
-                best_chunk = focus_chunk(best_chunk, matched_terms)
-        else:
-            best_chunk = focus_chunk(best_chunk, matched_terms)
-
-        snippet_len = len(best_chunk)
-        if remaining_chars and snippet_len:
-            if snippet_len > remaining_chars:
-                best_chunk = best_chunk[:remaining_chars].rstrip() + "\n[…]"
-                snippet_len = len(best_chunk)
-            remaining_chars = max(remaining_chars - snippet_len, 0)
-
-        section_lines = [
-            f"Filename: {record.filename}",
-            f"Type: {record.file_type or 'unknown'}",
-        ]
-
-        uploaded_at = None
+                if not text:
+                    continue
+                
+                # ChatGPT-style: Include first N chars directly (like 110k tokens)
+                # For multiple files, distribute the budget
+                doc_budget = min(chars_per_doc, remaining_chars) if remaining_chars > 0 else chars_per_doc
+                snippet_len = min(len(text), doc_budget)
+                file_snippet = text[:snippet_len]
+                
+                # If there's more content, note it (ChatGPT uses vector search for the rest)
+                if len(text) > snippet_len:
+                    remaining_content_len = len(text) - snippet_len
+                    file_snippet += f"\n\n[... {remaining_content_len:,} more characters available via search if needed ...]"
+                
+                if snippet_len:
+                    remaining_chars = max(remaining_chars - snippet_len, 0) if remaining_chars > 0 else 0
+                
+                section_lines = [
+                    f"Filename: {record.filename}",
+                    f"Type: {record.file_type or 'unknown'}",
+                ]
+                
+                uploaded_at = None
+                try:
+                    if record.uploaded_at:
+                        uploaded_at = record.uploaded_at.isoformat()
+                except Exception:
+                    uploaded_at = None
+                if uploaded_at:
+                    section_lines.append(f"Uploaded: {uploaded_at}")
+                
+                file_size = metadata.get("file_size")
+                if file_size:
+                    section_lines.append(f"Size: {file_size} bytes")
+                
+                section_lines.append("Content:")
+                section_lines.append(file_snippet.strip() or "[No readable text extracted]")
+                
+                sections.append("\n".join(section_lines))
+                
+                if remaining_chars == 0:
+                    break
+            
+            if not sections:
+                return None
+            
+            header = [
+                banner,
+                "UPLOADED FILES (Explicitly Selected)",
+                "",
+                "⚠️ IMPORTANT: The user has uploaded these files and is asking you to analyze them.",
+                "You MUST use the content from these files to answer the user's question.",
+                "DO NOT say 'I don't have access to external documents' - you have the file content below.",
+                "Reference specific parts of the files (page numbers, sections, data points) in your response.",
+                "",
+                banner,
+            ]
+            body = f"\n\n{banner}\n".join(sections)
+            result = "\n".join(header) + "\n\n" + body
+            
+            LOGGER.info(f"✅ Built document context from {len(sections)} files, total length: {len(result)} chars")
+            LOGGER.info(f"📝 Final context preview (first 300 chars):\n{result[:300]}")
+            LOGGER.info("="*80)
+            return result
+            
+        except Exception as e:
+            LOGGER.error(f"❌ Error fetching documents by IDs: {e}", exc_info=True)
+            LOGGER.error(f"   Database path: {database_path}")
+            LOGGER.error(f"   Database exists: {database_path.exists()}")
+            LOGGER.error(f"   File IDs requested: {file_ids}")
+            return None
+    else:
+        # No explicit file_ids provided - automatically fetch all files from conversation
+        # ChatGPT-style hybrid approach: Direct injection + Vector search
+        LOGGER.info("\n" + "="*80)
+        LOGGER.info("AUTO-FETCHING DOCUMENTS FROM CONVERSATION (ChatGPT-style)")
+        LOGGER.info("="*80)
+        LOGGER.info(f"📎 No explicit file_ids - using all files from conversation_id: {conversation_id}")
+        LOGGER.info(f"📁 Database path: {database_path}")
+        
+        # ChatGPT-style Step 1: Direct injection - fetch all documents and inject first ~100k chars
+        # This matches ChatGPT's approach: first 110k tokens directly injected
         try:
-            if record.uploaded_at:
-                uploaded_at = record.uploaded_at.isoformat()
-        except Exception:
-            uploaded_at = None
-        if uploaded_at:
-            section_lines.append(f"Uploaded: {uploaded_at}")
-
-        file_size = metadata.get("file_size")
-        if file_size:
-            section_lines.append(f"Size: {file_size} bytes")
-
-        if matched_terms:
-            section_lines.append(f"Matched Terms: {', '.join(sorted(matched_terms))}")
-        elif best_score > 0:
-            section_lines.append(f"Match Score: {best_score:.2f}")
-
-        warning_entries = metadata.get("warnings")
-        if warning_entries:
-            if isinstance(warning_entries, str):
-                warning_text = warning_entries
+            LOGGER.info(f"🔍 Step 1: Fetching documents for direct injection (conversation_id: {conversation_id})")
+            documents = database.fetch_uploaded_documents(
+                database_path,
+                conversation_id,
+                limit=max_documents * 2,  # Get more documents for direct injection
+                include_unscoped=False,
+            )
+            
+            if documents:
+                LOGGER.info(f"✅ Found {len(documents)} documents for direct injection")
+                for i, doc in enumerate(documents, 1):
+                    content_len = len(doc.content) if doc.content else 0
+                    LOGGER.info(f"   {i}. {doc.filename} (ID: {doc.document_id}, Content: {content_len} chars)")
+                
+                # ChatGPT-style: Build context with direct injection
+                banner = "=" * 80
+                sections: List[str] = []
+                remaining_chars = max(max_chars, 0)
+                
+                # Calculate chars per document (ChatGPT distributes 110k tokens across multiple docs)
+                if len(documents) > 1:
+                    chars_per_doc = max(remaining_chars // len(documents), 20000)  # At least 20k per doc
+                else:
+                    chars_per_doc = remaining_chars
+                
+                for record in documents:
+                    metadata = record.metadata or {}
+                    text = (record.content or "").strip()
+                    
+                    if not text:
+                        continue
+                    
+                    # ChatGPT-style: Include first N chars directly (like 110k tokens)
+                    doc_budget = min(chars_per_doc, remaining_chars) if remaining_chars > 0 else chars_per_doc
+                    snippet_len = min(len(text), doc_budget)
+                    file_snippet = text[:snippet_len]
+                    
+                    # If there's more content, note it (ChatGPT uses vector search for the rest)
+                    if len(text) > snippet_len:
+                        remaining_content_len = len(text) - snippet_len
+                        file_snippet += f"\n\n[... {remaining_content_len:,} more characters in this document ...]"
+                    
+                    if snippet_len:
+                        remaining_chars = max(remaining_chars - snippet_len, 0) if remaining_chars > 0 else 0
+                    
+                    section_lines = [
+                        f"Filename: {record.filename}",
+                        f"Type: {record.file_type or 'unknown'}",
+                    ]
+                    
+                    uploaded_at = None
+                    try:
+                        if record.uploaded_at:
+                            uploaded_at = record.uploaded_at.isoformat()
+                    except Exception:
+                        uploaded_at = None
+                    if uploaded_at:
+                        section_lines.append(f"Uploaded: {uploaded_at}")
+                    
+                    file_size = metadata.get("file_size")
+                    if file_size:
+                        section_lines.append(f"Size: {file_size} bytes")
+                    
+                    section_lines.append("Content:")
+                    section_lines.append(file_snippet.strip() or "[No readable text extracted]")
+                    
+                    sections.append("\n".join(section_lines))
+                    
+                    if remaining_chars == 0:
+                        break
+                
+                if sections:
+                    header = [
+                        banner,
+                        "UPLOADED FILES (Available in this conversation)",
+                        "",
+                        "⚠️ IMPORTANT: The user has uploaded these files and is asking you to analyze them.",
+                        "You MUST use the content from these files to answer the user's question.",
+                        "DO NOT say 'I don't have access to external documents' - you have the file content below.",
+                        "Reference specific parts of the files (filenames, sections, data points) in your response.",
+                        "",
+                        banner,
+                    ]
+                    body = f"\n\n{banner}\n".join(sections)
+                    result = "\n".join(header) + "\n\n" + body
+                    
+                    LOGGER.info(f"✅ Built document context using ChatGPT-style direct injection: {len(result)} chars from {len(sections)} files")
+                    LOGGER.info(f"📝 Final context preview (first 300 chars):\n{result[:300]}")
+                    LOGGER.info("="*80)
+                    return result
             else:
-                warning_text = " ".join(str(item) for item in warning_entries if item)
-            if warning_text:
-                section_lines.append(f"Warnings: {warning_text}")
-
-        section_lines.append("Content Preview:")
-        section_lines.append(best_chunk.strip() or "[No readable text extracted]")
-
-        sections.append("\n".join(section_lines))
-
-        if remaining_chars == 0:
-            break
-
-    if not sections:
+                LOGGER.warning(f"⚠️ No documents found in conversation {conversation_id}")
+                # Debug: Check database directly
+                import sqlite3
+                try:
+                    with sqlite3.connect(database_path) as conn:
+                        cursor = conn.execute(
+                            "SELECT document_id, filename, conversation_id, LENGTH(content) as content_len FROM uploaded_documents WHERE conversation_id = ? LIMIT 10",
+                            (conversation_id,)
+                        )
+                        rows = cursor.fetchall()
+                        if rows:
+                            LOGGER.warning(f"   ⚠️ Found {len(rows)} documents with matching conversation_id in database:")
+                            for row in rows:
+                                LOGGER.warning(f"      - ID: {row[0]}, Filename: {row[1]}, Conv: {row[2]}, Content: {row[3]} chars")
+                        else:
+                            LOGGER.warning(f"   ❌ No documents found with conversation_id: {conversation_id}")
+                except Exception as db_e:
+                    LOGGER.error(f"   Error checking database directly: {db_e}")
+        except Exception as e:
+            LOGGER.error(f"❌ Error fetching documents from conversation: {e}", exc_info=True)
+        
+        # Step 2: Fallback to vector search if direct injection didn't work
+        if use_semantic_search:
+            try:
+                from .rag_retriever import VectorStore
+                
+                vector_store = VectorStore(database_path)
+                if vector_store._available:
+                    LOGGER.info(f"🔍 Step 2: Trying vector search as fallback")
+                    filter_metadata = {}
+                    if conversation_id:
+                        filter_metadata["conversation_id"] = conversation_id
+                    
+                    results = vector_store.search_uploaded_docs(
+                        query=user_input,
+                        n_results=max_documents,
+                        filter_metadata=filter_metadata if filter_metadata else None,
+                    )
+                    
+                    if results:
+                        LOGGER.info(f"✅ Vector search found {len(results)} relevant chunks")
+                        return _format_semantic_search_results(results, max_chars)
+            except (ImportError, Exception) as e:
+                LOGGER.debug(f"Vector search unavailable: {e}")
+        
+        # No documents found
         return None
-
-    header = [
-        banner,
-        "UPLOADED FINANCIAL DOCUMENTS",
-        "Use these excerpts when answering the user's question. Cite filenames in your response.",
-        banner,
-    ]
-    body = f"\n\n{banner}\n".join(sections)
-    return "\n".join(header) + "\n\n" + body
 
 
 def _format_semantic_search_results(
@@ -314,7 +359,12 @@ def _format_semantic_search_results(
     header = [
         banner,
         "UPLOADED FINANCIAL DOCUMENTS (Semantic Search)",
-        "Use these excerpts when answering the user's question. Cite filenames in your response.",
+        "",
+        "⚠️ IMPORTANT: The user has uploaded these documents and is asking you to analyze them.",
+        "You MUST use the content from these documents to answer the user's question.",
+        "DO NOT say 'I don't have access to external documents' - you have the document content below.",
+        "Reference specific parts of the documents (filenames, sections, data points) in your response.",
+        "",
         banner,
     ]
     body = f"\n\n{banner}\n".join(sections)
