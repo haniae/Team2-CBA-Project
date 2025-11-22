@@ -3013,6 +3013,16 @@ body::-webkit-scrollbar {
   box-shadow: 0 4px 12px rgba(0, 163, 255, 0.25);
 }
 
+#send-button:disabled {
+  background: linear-gradient(135deg, 
+    rgba(0, 163, 255, 0.6) 0%, 
+    rgba(15, 118, 110, 0.55) 100%);
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
 /* Stop Button - Red */
 #stop-button {
   background: linear-gradient(135deg, 
@@ -3062,10 +3072,9 @@ body::-webkit-scrollbar {
 
 /* Disabled state */
 .chat-actions button:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none !important;
-  background: rgba(148, 163, 184, 0.4) !important;
   transform: none !important;
 }
 
@@ -8235,10 +8244,13 @@ img {
 }
 
 #stop-button:disabled {
-  opacity: 0.5;
+  background: linear-gradient(135deg, 
+    rgba(239, 68, 68, 0.6) 0%, 
+    rgba(220, 38, 38, 0.55) 100%);
+  opacity: 0.6;
   cursor: not-allowed;
-  background: rgba(148, 163, 184, 0.45);
   box-shadow: none;
+  transform: none;
 }
 
 #stop-button svg {
