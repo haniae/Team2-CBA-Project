@@ -7,9 +7,10 @@ retrieval augmentation) without rewriting the core chatbot logic.
 
 from __future__ import annotations
 
+import logging
 import os
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Mapping, Protocol
 
 # Language-model integrations live here. Implement the LLMClient protocol and register new
@@ -19,6 +20,9 @@ try:  # pragma: no cover - optional dependency
     import keyring  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency
     keyring = None
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class LLMClient(Protocol):
@@ -152,6 +156,13 @@ def build_llm_client(
         return LocalEchoLLM()
 
     if provider == "openai":
-        return OpenAILLMClient(model=model)
+        try:
+            return OpenAILLMClient(model=model)
+        except RuntimeError as exc:
+            LOGGER.warning(
+                "OpenAI provider unavailable (%s). Falling back to local echo LLM.",
+                exc,
+            )
+            return LocalEchoLLM()
 
     raise ValueError(f"Unsupported provider: {provider}")
