@@ -6285,7 +6285,13 @@ function pushProgressEventsInternal(tracker, events) {
       contentText.indexOf("### 2. Forecast Table") !== -1;
     if (hasUniversalFormatterEvent || looksLikeInstitutionalReport) {
       container.classList.remove("active", "pending");
-      container.style.display = "none";
+      
+      // Smooth fade-out transition
+      container.classList.add("hiding");
+      setTimeout(() => {
+        container.style.display = "none";
+      }, 300);
+      
       return;
     }
   } catch (err) {
@@ -9593,6 +9599,9 @@ function updateProgressTrackerWithEvent(tracker, event) {
     tracker.stopStatusRotation();
     tracker.isStreaming = true;
     
+    // Smooth transition from progress to response
+    smoothTransitionToResponse(tracker);
+    
     // Add streaming cursor to message body
     const messageBody = tracker.wrapper?.querySelector('.message-content');
     if (messageBody) {
@@ -9883,9 +9892,58 @@ function hideThinkingDots(tracker) {
     return;
   }
   
-  // Hide thinking dots instantly when streaming starts
-  tracker.indicator.style.display = 'none';
+  // Smooth fade out transition
+  tracker.indicator.style.opacity = '0';
+  tracker.indicator.style.transform = 'translateY(-8px)';
+  
+  // Hide after transition completes
+  setTimeout(() => {
+    if (tracker.indicator) {
+      tracker.indicator.style.display = 'none';
+    }
+  }, 400);
+  
   tracker.isThinking = false;
+}
+
+function smoothTransitionToResponse(tracker) {
+  if (!tracker?.wrapper) return;
+  
+  const messageElement = tracker.wrapper;
+  const progressElement = messageElement.querySelector('.message-progress');
+  const contentElement = messageElement.querySelector('.message-content');
+  
+  // Add transitioning class for coordinated animation
+  messageElement.classList.add('transitioning');
+  
+  // Fade out progress indicator
+  if (progressElement) {
+    progressElement.classList.add('hiding');
+  }
+  
+  // Prepare content for smooth entrance
+  if (contentElement) {
+    contentElement.classList.add('loading');
+    
+    // Remove loading state and add entrance animation after brief delay
+    setTimeout(() => {
+      contentElement.classList.remove('loading');
+      contentElement.classList.add('streaming-in');
+      
+      // Clean up animation classes
+      setTimeout(() => {
+        contentElement.classList.remove('streaming-in');
+        messageElement.classList.remove('transitioning');
+      }, 500);
+    }, 200);
+  }
+  
+  // Hide progress element after fade out completes
+  setTimeout(() => {
+    if (progressElement) {
+      progressElement.style.display = 'none';
+    }
+  }, 300);
 }
 
 function addStreamingCursor(messageBody) {

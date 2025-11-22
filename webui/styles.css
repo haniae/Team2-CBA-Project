@@ -1700,6 +1700,64 @@ body::-webkit-scrollbar {
   color: #ffffff !important;
 }
 
+/* Smooth transition for response content */
+.message-content {
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+
+.message-content.loading {
+  opacity: 0.7;
+  transform: translateY(4px);
+}
+
+.message-content.streaming-in {
+  animation: streamInContent 0.5s ease-out;
+}
+
+@keyframes streamInContent {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth transition between progress and response */
+.message.transitioning .message-progress {
+  animation: fadeOutProgress 0.3s ease-in forwards;
+}
+
+.message.transitioning .message-content {
+  animation: streamInContent 0.5s ease-out 0.2s both;
+}
+
+/* Subtle pulse during transition */
+.message-content.loading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--indigo), transparent);
+  animation: loadingPulse 1.5s ease-in-out infinite;
+  border-radius: 1px;
+}
+
+@keyframes loadingPulse {
+  0%, 100% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateX(100%);
+  }
+}
+
 .message-content pre {
   background: #1e293b;
   color: #e2e8f0;
@@ -3326,6 +3384,7 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
   gap: 12px;
   padding: 12px 0;
   opacity: 0;
@@ -3430,6 +3489,21 @@ body::-webkit-scrollbar {
 .message-progress.active {
   display: flex;
   animation: fadeInProgress 0.4s ease-out;
+}
+
+.message-progress.hiding {
+  animation: fadeOutProgress 0.3s ease-in forwards;
+}
+
+@keyframes fadeOutProgress {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
 }
 
 @keyframes fadeInProgress {
