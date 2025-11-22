@@ -5,6 +5,7 @@ python-dotenv>=1.0.1
 
 # AI/ML
 openai>=1.35.0
+python-multipart>=0.0.6
 
 # Database
 SQLAlchemy>=2.0

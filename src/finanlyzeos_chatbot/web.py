@@ -5305,3 +5305,131 @@ def load_user_preferences_endpoint(
         LOGGER.error(f"Preferences load failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"message": f"Preferences load failed: {str(e)}"})
 
+
+@app.post("/api/voice-to-text-only")
+async def voice_to_text_only(audio: UploadFile = File(...)) -> JSONResponse:
+    """Convert voice recording to text only (no chatbot response)."""
+    import tempfile
+    import os
+    from openai import OpenAI
+    
+    if not audio.content_type or not audio.content_type.startswith('audio/'):
+        raise HTTPException(status_code=400, detail="Invalid audio file format")
+    
+    # Create temporary file for audio processing
+    temp_audio_path = None
+    try:
+        # Save uploaded audio to temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as temp_file:
+            temp_audio_path = temp_file.name
+            content = await audio.read()
+            temp_file.write(content)
+        
+        # Initialize OpenAI client
+        settings = load_settings()
+        openai_client = OpenAI(api_key=settings.openai_api_key)
+        
+        # Transcribe audio using Whisper
+        with open(temp_audio_path, 'rb') as audio_file:
+            transcription = openai_client.audio.transcriptions.create(
+                file=audio_file,
+                model="whisper-1",
+                language="en"
+            )
+        
+        transcript = transcription.text.strip()
+        
+        if not transcript:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No speech detected in audio"}
+            )
+        
+        return JSONResponse(content={
+            "transcript": transcript
+        })
+        
+    except Exception as e:
+        LOGGER.error(f"Voice transcription failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Voice transcription failed: {str(e)}")
+    
+    finally:
+        # Clean up temporary file
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            try:
+                os.unlink(temp_audio_path)
+            except Exception as cleanup_error:
+                LOGGER.warning(f"Failed to cleanup temp file {temp_audio_path}: {cleanup_error}")
+
+
+@app.post("/api/voice-to-text")
+async def voice_to_text(audio: UploadFile = File(...)) -> JSONResponse:
+    """Convert voice recording to text and generate chatbot response."""
+    import tempfile
+    import os
+    from openai import OpenAI
+    
+    if not audio.content_type or not audio.content_type.startswith('audio/'):
+        raise HTTPException(status_code=400, detail="Invalid audio file format")
+    
+    # Create temporary file for audio processing
+    temp_audio_path = None
+    try:
+        # Save uploaded audio to temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as temp_file:
+            temp_audio_path = temp_file.name
+            content = await audio.read()
+            temp_file.write(content)
+        
+        # Initialize OpenAI client
+        settings = load_settings()
+        openai_client = OpenAI(api_key=settings.openai_api_key)
+        
+        # Transcribe audio using Whisper
+        with open(temp_audio_path, 'rb') as audio_file:
+            transcription = openai_client.audio.transcriptions.create(
+                file=audio_file,
+                model="whisper-1",
+                language="en"
+            )
+        
+        transcript = transcription.text.strip()
+        
+        if not transcript:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No speech detected in audio"}
+            )
+        
+        # Generate chatbot response using existing chat logic
+        request_id = str(uuid.uuid4())
+        bot = build_bot(None)  # New conversation
+        conversation_id = bot.conversation.conversation_id
+        
+        def progress_hook(stage: str, detail: str) -> None:
+            # Progress tracking for voice requests
+            pass
+        
+        try:
+            reply = bot.ask(transcript, progress_callback=progress_hook)
+        except Exception as exc:
+            LOGGER.error(f"Voice chat processing failed: {exc}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Chat processing failed: {str(exc)}")
+        
+        return JSONResponse(content={
+            "transcript": transcript,
+            "response": reply,
+            "conversation_id": conversation_id
+        })
+        
+    except Exception as e:
+        LOGGER.error(f"Voice processing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Voice processing failed: {str(e)}")
+    
+    finally:
+        # Clean up temporary file
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            try:
+                os.unlink(temp_audio_path)
+            except Exception as cleanup_error:
+                LOGGER.warning(f"Failed to cleanup temp file {temp_audio_path}: {cleanup_error}")
