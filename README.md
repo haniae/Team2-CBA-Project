@@ -14,7 +14,7 @@
 [![Intents](https://img.shields.io/badge/intents-40%2B%20types-orange)](https://github.com/haniae/Team2-CBA-Project)
 [![Spelling](https://img.shields.io/badge/spelling-90%25%20company%20%7C%20100%25%20metric-green)](https://github.com/haniae/Team2-CBA-Project)
 
-**FinalyzeOS** is an institutional-grade copilot for finance teams. It pairs deterministic market analytics with a conversational interface so analysts can ask natural-language questions, inspect lineage, and keep data pipelines auditable. This repository underpins our Fall 2025 DNSC 6317 practicum 🎓at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing FinalyzeOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
+**FinalyzeOS** is an institutional-grade copilot for finance teams. It pairs deterministic market analytics with a conversational interface so analysts can ask natural-language questions, inspect lineage, and keep data pipelines auditable. This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing FinalyzeOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
 
 Contributors  
 **Hania A.** haniaa@gwmail.gwu.edu
