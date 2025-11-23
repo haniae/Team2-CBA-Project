@@ -44,6 +44,11 @@ python -m venv .venv
 # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt && pip install -e .
 
+# 1.5. Add API key to .env for faster results (optional but recommended)
+# Create .env file and add: OPENAI_API_KEY=sk-your-key-here
+# Windows: Copy-Item .env.example .env  (if .env.example exists)
+# macOS/Linux: cp .env.example .env  (if .env.example exists)
+
 # 2. Quick test (100 companies, ~15-30 min)
 python scripts/ingestion/ingest_universe.py --universe-file data/tickers/test_100.txt --years 5
 
