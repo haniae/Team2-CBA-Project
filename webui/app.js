@@ -4670,6 +4670,24 @@ function appendMessage(
   label.textContent = role === "user" ? "You" : role === "assistant" ? "Finalyze" : "System";
 
   header.append(avatar, label);
+
+  // Add read button for assistant messages
+  if (role === "assistant" && !isPlaceholder) {
+    const readButton = document.createElement("button");
+    readButton.type = "button";
+    readButton.className = "message-read-button";
+    readButton.setAttribute("aria-label", "Read message aloud");
+    readButton.title = "Read message aloud";
+    readButton.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+      </svg>
+    `;
+    readButton.addEventListener("click", () => readMessage(wrapper));
+    header.append(readButton);
+  }
+
   wrapper.append(header);
 
   const body = document.createElement("div");
@@ -4718,6 +4736,328 @@ function createTypingIndicator() {
   }
 
   return container;
+}
+
+let currentSpeechSynthesis = null;
+let preferredVoice = null;
+
+// Initialize preferred voice on first use
+function getPreferredVoice() {
+  if (preferredVoice) {
+    return preferredVoice;
+  }
+
+  if (!window.speechSynthesis) {
+    return null;
+  }
+
+  // Get available voices
+  const voices = window.speechSynthesis.getVoices();
+  
+  // Preferred natural-sounding British English voices (in order of preference)
+  // Prioritize neural/premium voices and avoid robotic-sounding ones
+  const preferredVoiceNames = [
+    "Daniel",             // macOS - premium natural British male voice
+    "Kate",               // macOS - natural British female voice
+    "Oliver",             // macOS - natural British male voice
+    "Serena",             // macOS - natural British female voice
+    "Microsoft Hazel",    // Windows - natural British female voice
+    "Microsoft George",   // Windows - natural British male voice
+    "Microsoft Susan",    // Windows - natural British female voice
+    "Google UK English",  // Chrome - British voice
+    "en-GB Neural",       // Neural voices
+    "en-GB Premium",      // Premium voices
+    "en-GB",              // Generic British English
+  ];
+  
+  // Words that indicate robotic/low-quality voices (avoid these)
+  const roboticIndicators = [
+    "robotic", "compact", "basic", "sapi", "espeak", "festival",
+    "pico", "flite", "dectalk", "eloquence", "vocalizer"
+  ];
+  
+  // Words that indicate high-quality/natural voices (prefer these)
+  const naturalIndicators = [
+    "neural", "premium", "enhanced", "natural", "expressive", "pro",
+    "hq", "high quality", "voice", "daniel", "kate", "oliver", "serena",
+    "hazel", "george", "susan"
+  ];
+
+  // Score voices based on how natural they sound
+  const scoreVoice = (voice) => {
+    let score = 0;
+    const nameLower = voice.name.toLowerCase();
+    
+    // High scores for natural indicators
+    naturalIndicators.forEach(indicator => {
+      if (nameLower.includes(indicator)) {
+        score += 10;
+      }
+    });
+    
+    // Penalize robotic indicators
+    roboticIndicators.forEach(indicator => {
+      if (nameLower.includes(indicator)) {
+        score -= 20; // Heavy penalty
+      }
+    });
+    
+    // Bonus for local voices (usually better quality)
+    if (voice.localService) {
+      score += 5;
+    }
+    
+    // Bonus for default voice (often best quality)
+    if (voice.default) {
+      score += 15;
+    }
+    
+    // Bonus for neural/premium/enhanced
+    if (nameLower.includes("neural") || nameLower.includes("premium") || nameLower.includes("enhanced")) {
+      score += 20;
+    }
+    
+    // Bonus for known good voices
+    if (nameLower.includes("daniel") || nameLower.includes("kate") || 
+        nameLower.includes("oliver") || nameLower.includes("serena") ||
+        nameLower.includes("hazel") || nameLower.includes("george") ||
+        nameLower.includes("susan")) {
+      score += 25;
+    }
+    
+    return score;
+  };
+  
+  // Get all British voices
+  const allBritishVoices = voices.filter(v => 
+    v.lang.startsWith("en-GB") || v.lang === "en-GB"
+  );
+  
+  // Log all available British voices for debugging
+  console.log("Available British voices:", allBritishVoices
+    .map(v => `${v.name} (${v.lang}, local: ${v.localService}, default: ${v.default}, score: ${scoreVoice(v)})`)
+  );
+  
+  // First, prioritize local voices (usually higher quality than remote)
+  const localVoices = allBritishVoices.filter(v => v.localService === true);
+
+  // Score and sort local voices (best first)
+  if (localVoices.length > 0) {
+    const scoredLocal = localVoices.map(v => ({ voice: v, score: scoreVoice(v) }));
+    scoredLocal.sort((a, b) => b.score - a.score); // Highest score first
+    
+    // Filter out voices with negative scores (too robotic)
+    const goodLocalVoices = scoredLocal.filter(item => item.score > 0);
+    
+    if (goodLocalVoices.length > 0) {
+      preferredVoice = goodLocalVoices[0].voice;
+      console.log("Selected local voice:", preferredVoice.name, "with score:", goodLocalVoices[0].score);
+      return preferredVoice;
+    }
+    
+    // If all have negative scores, still pick the best one
+    if (scoredLocal.length > 0) {
+      preferredVoice = scoredLocal[0].voice;
+      console.log("Selected best available local voice:", preferredVoice.name, "with score:", scoredLocal[0].score);
+      return preferredVoice;
+    }
+  }
+
+  // Score and sort all British voices (best first)
+  const scoredAll = allBritishVoices.map(v => ({ voice: v, score: scoreVoice(v) }));
+  scoredAll.sort((a, b) => b.score - a.score); // Highest score first
+  
+  // Filter out voices with negative scores (too robotic)
+  const goodVoices = scoredAll.filter(item => item.score > 0);
+  
+  if (goodVoices.length > 0) {
+    preferredVoice = goodVoices[0].voice;
+    console.log("Selected best voice:", preferredVoice.name, "with score:", goodVoices[0].score);
+    return preferredVoice;
+  }
+  
+  // If all have negative scores, still pick the best one (least robotic)
+  if (scoredAll.length > 0) {
+    preferredVoice = scoredAll[0].voice;
+    console.log("Selected least robotic voice:", preferredVoice.name, "with score:", scoredAll[0].score);
+    return preferredVoice;
+  }
+
+  return null;
+}
+
+function readMessage(messageWrapper) {
+  if (!messageWrapper) {
+    return;
+  }
+
+  // Stop any currently playing speech
+  if (currentSpeechSynthesis) {
+    window.speechSynthesis.cancel();
+    currentSpeechSynthesis = null;
+    // Reset all read buttons
+    document.querySelectorAll(".message-read-button").forEach(btn => {
+      btn.classList.remove("reading");
+    });
+    return;
+  }
+
+  // Check if Web Speech API is available
+  if (!window.speechSynthesis) {
+    showToast("Text-to-speech is not supported in your browser.", "error");
+    return;
+  }
+
+  // Extract text content from message
+  const messageBody = messageWrapper.querySelector(".message-body");
+  if (!messageBody) {
+    return;
+  }
+
+  // Get text content, excluding code blocks and tables
+  const content = messageBody.cloneNode(true);
+  // Remove code blocks, tables, and other non-text elements
+  content.querySelectorAll("code, pre, table, .message-table, .message-dashboard, .message-artifacts").forEach(el => el.remove());
+  
+  let text = content.textContent || content.innerText || "";
+  text = text.trim();
+
+  if (!text) {
+    showToast("No text to read.", "info");
+    return;
+  }
+
+  // Get or wait for voices to load
+  const loadVoice = () => {
+    let voices = window.speechSynthesis.getVoices();
+    
+    // If voices aren't loaded yet, wait for them to load
+    if (voices.length === 0) {
+      // Set up one-time listener for voices
+      const voicesHandler = () => {
+        window.speechSynthesis.onvoiceschanged = null; // Remove listener after first call
+        voices = window.speechSynthesis.getVoices();
+        preferredVoice = null; // Reset to find voice again
+        const voice = getPreferredVoice();
+        if (voice) {
+          speakText(text, voice, messageWrapper);
+        } else {
+          speakText(text, null, messageWrapper);
+        }
+      };
+      
+      window.speechSynthesis.onvoiceschanged = voicesHandler;
+      
+      // Also try again after a short delay in case onvoiceschanged doesn't fire
+      setTimeout(() => {
+        voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          window.speechSynthesis.onvoiceschanged = null;
+          preferredVoice = null;
+          const voice = getPreferredVoice();
+          if (voice) {
+            speakText(text, voice, messageWrapper);
+          } else {
+            speakText(text, null, messageWrapper);
+          }
+        }
+      }, 500);
+      return;
+    }
+
+    const voice = getPreferredVoice();
+    speakText(text, voice, messageWrapper);
+  };
+
+  // Start loading voice
+  loadVoice();
+}
+
+function speakText(text, voice, messageWrapper) {
+  // Clean and prepare text for more natural speech
+  // Process text to sound more natural when spoken with better pacing
+  let processedText = text
+    // Remove markdown formatting that doesn't need to be spoken
+    .replace(/#{1,6}\s+/g, '')  // Remove markdown headers
+    .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold
+    .replace(/\*(.*?)\*/g, '$1')  // Remove italic
+    .replace(/`(.*?)`/g, '$1')  // Remove inline code
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')  // Convert links to just text
+    // Normalize whitespace and line breaks with natural pauses
+    .replace(/\n\n+/g, '... ')  // Multiple newlines become longer pause
+    .replace(/\n/g, ' ')      // Single newlines become space
+    .replace(/\s+/g, ' ')    // Normalize all whitespace
+    // Add natural pauses and breathing
+    .replace(/\. /g, '. ')   // Keep period pauses
+    .replace(/\./g, '. ')     // Ensure periods have space
+    .replace(/, /g, ', ')    // Keep comma pauses
+    .replace(/:/g, ',')      // Colons become commas (shorter pause)
+    .replace(/;/g, ',')      // Semicolons become commas
+    .replace(/\?/g, '? ')    // Questions get pause
+    .replace(/!/g, '! ')     // Exclamations get pause
+    // Clean up any remaining artifacts
+    .replace(/\s+/g, ' ')    // Final whitespace normalization
+    .trim();
+
+  // Create speech synthesis utterance
+  const utterance = new SpeechSynthesisUtterance(processedText);
+  
+  // Set natural-sounding parameters for human-like speech
+  // These values are optimized for less robotic, more human-like speech
+  // Slower rate and varied pitch help reduce robotic sound
+  utterance.rate = 0.8;     // Even slower rate (0.8) for more natural, less rushed speech
+  utterance.pitch = 0.88;   // Lower pitch (0.88) for warmer, more human-like tone
+  utterance.volume = 1.0;   // Full volume
+  
+  // Set language and voice to British English
+  utterance.lang = "en-GB";
+  if (voice) {
+    utterance.voice = voice;
+    // Log which voice is being used for debugging
+    console.log("Using British voice:", voice.name, voice.lang, "| Local:", voice.localService, "| Default:", voice.default);
+    
+    // If we have a voice, try to use its natural properties
+    // Some voices have better default settings
+  } else {
+    console.warn("No preferred British voice found, using default system voice");
+    // Still set to British English even if no specific voice found
+    utterance.lang = "en-GB";
+  }
+  
+  // Add event listeners to help with natural pacing
+  utterance.onboundary = (event) => {
+    // This fires at word boundaries - can be used for future enhancements
+  };
+
+  // Get the read button for this message
+  const readButton = messageWrapper.querySelector(".message-read-button");
+  
+  // Update button state
+  if (readButton) {
+    readButton.classList.add("reading");
+  }
+
+  // Handle speech end
+  utterance.onend = () => {
+    currentSpeechSynthesis = null;
+    if (readButton) {
+      readButton.classList.remove("reading");
+    }
+  };
+
+  // Handle speech error
+  utterance.onerror = (event) => {
+    console.error("Speech synthesis error:", event);
+    currentSpeechSynthesis = null;
+    if (readButton) {
+      readButton.classList.remove("reading");
+    }
+    showToast("Error reading message.", "error");
+  };
+
+  // Store current synthesis and start speaking
+  currentSpeechSynthesis = utterance;
+  window.speechSynthesis.speak(utterance);
 }
 
 function updateMessageRole(wrapper, role) {
@@ -6693,6 +7033,27 @@ function resolvePendingMessage(
   }
   updateMessageRole(wrapper, role);
   wrapper.classList.remove("typing");
+  
+  // Add read button if it doesn't exist and this is an assistant message
+  if (role === "assistant" && text && text.trim()) {
+    const header = wrapper.querySelector(".message-header");
+    if (header && !header.querySelector(".message-read-button")) {
+      const readButton = document.createElement("button");
+      readButton.type = "button";
+      readButton.className = "message-read-button";
+      readButton.setAttribute("aria-label", "Read message aloud");
+      readButton.title = "Read message aloud";
+      readButton.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+      `;
+      readButton.addEventListener("click", () => readMessage(wrapper));
+      header.append(readButton);
+    }
+  }
+  
   if (role === "assistant" && stream && shouldStreamText(text)) {
     streamMessageBody(wrapper, text, artifacts, { forceScroll });
     return wrapper;
