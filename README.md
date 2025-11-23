@@ -52,6 +52,11 @@ pip install -r requirements.txt && pip install -e .
 # 2. Quick test (100 companies, ~15-30 min)
 python scripts/ingestion/ingest_universe.py --universe-file data/tickers/test_100.txt --years 5
 
+# 2.5. Index into ChromaDB for RAG (optional but recommended)
+# This enables semantic search over SEC filings for better answers
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text --limit 10  # Test first
+# Then index all: python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text
+
 # 3. Run the chatbot
 python run_chatbot.py
 # Or web UI: python serve_chatbot.py --port 8000
@@ -332,6 +337,227 @@ python scripts/utility/check_ingestion_status.py
 - ~1.7M+ price records
 - Database size: ~850 MB
 - **Coverage**: 1,500 companies, 18 years of data
+
+---
+
+### **Step 2.5: Complete Ingestion Scripts Reference & ChromaDB Indexing**
+
+This section provides a comprehensive guide to all available ingestion scripts and how to index data into ChromaDB for RAG (Retrieval-Augmented Generation).
+
+#### **📊 All Available Ingestion Scripts**
+
+**Primary Ingestion Scripts (Choose One):**
+
+```bash
+# Option 1: S&P 500, 15 Years (RECOMMENDED for first run)
+# Best for: Quick setup, good coverage, reasonable time
+# Time: 15-30 minutes | Coverage: ~500 companies, 15 years
+python scripts/ingestion/ingest_sp500_15years.py
+
+# Option 2: S&P 500, 20 Years
+# Best for: More historical data
+# Time: 20-40 minutes | Coverage: ~500 companies, 20 years
+python scripts/ingestion/ingest_20years_sp500.py
+
+# Option 3: Full Coverage Ingestion
+# Best for: Maximum coverage across multiple indices
+# Time: 1-2 hours | Coverage: Comprehensive (S&P 500, S&P 1500, custom universes)
+python scripts/ingestion/full_coverage_ingestion.py
+
+# Option 4: Batch Ingestion
+# Best for: Custom ticker lists or specific companies
+# Time: Varies | Coverage: Configurable
+python scripts/ingestion/batch_ingest.py
+
+# Option 5: Extended Universe
+# Best for: Beyond S&P 500 (mid-cap and small-cap companies)
+# Time: Varies | Coverage: Extended market
+python scripts/ingestion/ingest_extended_universe.py
+
+# Option 6: Company Facts API (Alternative Method)
+# Best for: Using SEC Company Facts API directly
+# Time: Varies | Coverage: API-based
+python scripts/ingestion/ingest_companyfacts.py
+# Or batch version:
+python scripts/ingestion/ingest_companyfacts_batch.py
+```
+
+**Additional Data Ingestion Scripts:**
+
+```bash
+# Historical Price Data (run after SEC filing ingestion)
+# Yahoo Finance - 15 years of historical prices
+python scripts/ingestion/load_historical_prices_15years.py
+
+# Current prices from Yahoo Finance
+python scripts/ingestion/load_prices_yfinance.py
+
+# Current prices from Stooq
+python scripts/ingestion/load_prices_stooq.py
+
+# Ticker-CIK Mapping (maps stock tickers to SEC CIK numbers)
+python scripts/ingestion/load_ticker_cik.py
+
+# Private Companies (if applicable)
+python scripts/ingestion/ingest_private_companies.py
+```
+
+**Verify Ingestion Completed:**
+
+```bash
+# Check database status (shows SQLite and ChromaDB status)
+python scripts/check_database_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+
+# Expected output:
+# - ✅ company_filings table exists
+# - ✅ Filings in database: > 0 (e.g., "10,000" or more)
+# - ✅ Sample filings shown
+```
+
+---
+
+#### **🔍 ChromaDB Indexing for RAG (Retrieval-Augmented Generation)**
+
+After populating your SQLite database with SEC filing metadata, you need to index it into ChromaDB for semantic search capabilities. ChromaDB stores vector embeddings that enable the chatbot to find relevant document sections when answering questions.
+
+**Prerequisites:**
+
+```bash
+# Install ChromaDB dependencies (if not already installed)
+pip install chromadb sentence-transformers
+```
+
+**Step 1: Test Indexing (RECOMMENDED - Start Here!)**
+
+```bash
+# Test with 10 filings first to verify everything works
+# This downloads filing text, extracts sections, creates embeddings, and indexes
+# Time: ~2 minutes
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text --limit 10
+```
+
+**Step 2: Index All SEC Filings**
+
+```bash
+# Index all SEC filings from your database into ChromaDB
+# This will:
+# - Fetch all filings from company_filings table
+# - Download full filing text from SEC EDGAR
+# - Extract narrative sections (MD&A, Risk Factors, Business Overview)
+# - Create embeddings using all-MiniLM-L6-v2 model
+# - Index into ChromaDB for semantic search
+# Time: Varies based on number of filings
+#   - 1,000 filings: ~3-4 minutes
+#   - 10,000 filings: ~30-40 minutes
+#   - 80,000 filings: ~4-5 hours
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text
+```
+
+**Indexing Options:**
+
+```bash
+# Index specific ticker only
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --ticker AAPL --download-text
+
+# Index only 10-K filings (annual reports)
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --filing-type 10-K --download-text
+
+# Index only 10-Q filings (quarterly reports)
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --filing-type 10-Q --download-text
+
+# Index uploaded documents (user-uploaded PDFs, CSVs, etc.)
+# Note: Doesn't require --download-text since documents are already in database
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type uploaded
+
+# Index everything (SEC filings + uploaded documents)
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type all --download-text
+
+# Custom batch size (for large databases, default is 100)
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text --batch-size 200
+```
+
+**Step 3: Verify ChromaDB Indexing**
+
+```bash
+# Check ChromaDB status
+python scripts/check_chromadb_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+
+# Or use combined status check (shows both SQLite and ChromaDB)
+python scripts/check_database_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+
+# Expected output:
+# - ✅ SEC narratives indexed: > 0
+# - ✅ Uploaded docs indexed: 0 or > 0
+# - ✅ Total in ChromaDB: > 0
+```
+
+**What Gets Indexed:**
+
+- **SEC Filings:**
+  - **MD&A** (Management's Discussion and Analysis)
+  - **Risk Factors**
+  - **Business Overview**
+  - Each section is chunked into ~1500 character pieces
+  - Embedded using `all-MiniLM-L6-v2` model (384 dimensions)
+  - Stored with metadata (ticker, filing type, fiscal year, section, etc.)
+
+- **Uploaded Documents:**
+  - Full text content from user-uploaded files
+  - Chunked similarly for vectorization
+  - Metadata includes filename, file type, conversation ID
+
+**Complete Workflow Example:**
+
+```bash
+# 1. Check current status
+python scripts/check_database_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+
+# 2. Ingest S&P 500 data (15 years) - CHOOSE ONE from options above
+python scripts/ingestion/ingest_sp500_15years.py
+
+# 3. Verify ingestion completed
+python scripts/check_database_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+
+# 4. Test ChromaDB indexing (10 filings)
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text --limit 10
+
+# 5. Index all SEC filings into ChromaDB
+python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text
+
+# 6. Verify ChromaDB has data
+python scripts/check_chromadb_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+```
+
+**Troubleshooting ChromaDB Indexing:**
+
+```bash
+# Issue: Database table doesn't exist
+# Solution: Initialize database schema
+python -c "from finanlyzeos_chatbot.database import initialise; from pathlib import Path; initialise(Path('data/sqlite/finanlyzeos_chatbot.sqlite3'))"
+
+# Issue: ChromaDB not available
+# Solution: Install dependencies
+pip install chromadb sentence-transformers
+
+# Issue: SEC download fails
+# Causes: Network issues, SEC rate limiting (script handles this automatically)
+# Solution: Script continues with other filings. Check logs for specific errors.
+
+# Issue: No sections extracted from filings
+# Causes: Filing text doesn't match expected patterns, unusual format
+# Solution: This is normal for some filings. Script skips them and continues.
+
+# Issue: Ingestion script stops/fails
+# Solution: Most ingestion scripts create progress files. Re-run the same script to resume.
+```
+
+**Performance Tips:**
+
+- **Start Small**: Test with `--limit 10` before full indexing
+- **Use Filing Type Filter**: Index 10-K first (most important), then 10-Q
+- **Batch Processing**: The script processes in batches automatically (default: 100 documents)
+- **Resume Capability**: Ingestion scripts can be resumed if interrupted
+- **Monitor Progress**: Watch the progress indicators in the output
 
 ---
 
