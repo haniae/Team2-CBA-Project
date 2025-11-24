@@ -50,11 +50,24 @@ def fetch_seeking_alpha_transcript(ticker: str, quarter: Optional[str] = None) -
         # Seeking Alpha earnings transcript URL pattern
         url = f"https://seekingalpha.com/symbol/{ticker}/earnings/transcript"
         
+        # More realistic browser headers to avoid 403 errors
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1"
         }
         
-        response = requests.get(url, headers=headers, timeout=30)
+        response = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
+        
+        # Check for 403 or other blocking
+        if response.status_code == 403:
+            print(f"⚠️  Seeking Alpha blocked access for {ticker} (403 Forbidden). This is common - they have anti-scraping measures.")
+            return None
+        
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
