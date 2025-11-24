@@ -448,9 +448,49 @@ The vector database enables **semantic search** over multiple document types, al
 5. Embeddings are stored in ChromaDB for fast semantic search
 
 **Check Vector Database Status:**
-```bash
-# Quick status check
+
+This is the **easiest way** to see how much data you have indexed:
+
+**Windows PowerShell/CMD:**
+```cmd
+REM Quick status check - shows all collections and document counts
 python scripts/utility/check_vector_db.py
+
+REM Check specific database
+python scripts/utility/check_vector_db.py --database data/financial.db
+
+REM Check without showing sample documents
+python scripts/utility/check_vector_db.py --no-samples
+```
+
+**What it shows:**
+- ✅ Document counts for all 7 collections (SEC, earnings, news, analyst, press, industry, uploaded)
+- ✅ Total document count across all collections
+- ✅ Storage size in MB
+- ✅ Sample documents from each collection
+
+**Example Output:**
+```
+================================================================================
+VECTOR DATABASE STATUS CHECK
+================================================================================
+Database: data/financial.db
+
+📊 Document Counts by Collection:
+--------------------------------------------------------------------------------
+  ✅ SEC narratives:             13,800 documents
+  ✅ Uploaded documents:              5 documents
+  ✅ Earnings transcripts:            0 documents
+  ✅ Financial news:                  0 documents
+  ✅ Analyst reports:                 0 documents
+  ✅ Press releases:                  0 documents
+  ✅ Industry research:               0 documents
+  ✅ Portfolio spreadsheets:          0 documents
+--------------------------------------------------------------------------------
+  📈 TOTAL:                      13,805 documents
+
+  💾 Storage Size:                 45.23 MB
+================================================================================
 ```
 
 **Prerequisites:**
