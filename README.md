@@ -61,9 +61,9 @@ python scripts/index_documents_for_rag.py --database data/financial.db --type se
 # Index additional sources (NEW!):
 python scripts/index_documents_for_rag.py --database data/financial.db --type earnings --ticker AAPL
 python scripts/index_documents_for_rag.py --database data/financial.db --type news --ticker AAPL
-# Check status: python check_vector_db.py
+# Check status: python scripts/utility/check_vector_db.py
 # Then process all: python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 5
-# See full guide: VECTOR_DB_INGESTION_GUIDE.md or README section "Vector Database Indexing"
+# See full guide: docs/guides/VECTOR_DB_INGESTION_GUIDE.md or README section "Vector Database Indexing"
 
 # 3. Run the chatbot
 python run_chatbot.py
@@ -101,7 +101,7 @@ python run_chatbot.py
 - [🧠 Retrieval & ML Internals](#-retrieval--ml-internals)
 - [💬 Running FinalyzeOS](#-running-finalyzeos)
 - [📥 Data Ingestion Guide](#-data-ingestion-guide)
-- [🔍 Vector Database Guide](VECTOR_DB_INGESTION_GUIDE.md) - Complete guide for vector DB indexing
+- [🔍 Vector Database Guide](docs/guides/VECTOR_DB_INGESTION_GUIDE.md) - Complete guide for vector DB indexing
 - [⚙️ Configuration Reference](#️-configuration-reference)
 - [🗄️ Database Schema](#️-database-schema)
 
@@ -450,7 +450,7 @@ The vector database enables **semantic search** over multiple document types, al
 **Check Vector Database Status:**
 ```bash
 # Quick status check
-python check_vector_db.py
+python scripts/utility/check_vector_db.py
 ```
 
 **Prerequisites:**
@@ -545,10 +545,10 @@ python scripts/index_documents_for_rag.py --database data/financial.db --type se
 **Windows PowerShell/CMD:**
 ```cmd
 REM Quick status check
-python check_vector_db.py
+python scripts/utility/check_vector_db.py
 
 REM Detailed check
-python check_vector_db.py
+python scripts/utility/check_vector_db.py
 
 REM Expected output:
 REM - ✅ SEC narratives: X,XXX documents
@@ -612,19 +612,19 @@ REM - 💾 Storage Size: XX.XX MB
 **Windows PowerShell/CMD:**
 ```cmd
 REM 1. Check current vector DB status
-python check_vector_db.py
+python scripts/utility/check_vector_db.py
 
 REM 2. Test indexing with one ticker
 python scripts/index_documents_for_rag.py --database data/financial.db --type sec --ticker AAPL --fetch-from-sec --limit 3
 
 REM 3. Verify indexing worked
-python check_vector_db.py
+python scripts/utility/check_vector_db.py
 
 REM 4. Process all S&P 500 tickers (or use sp1500 for all 1,599 tickers)
 python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 5
 
 REM 5. Check final status
-python check_vector_db.py
+python scripts/utility/check_vector_db.py
 ```
 
 **Time Estimates:**
@@ -707,11 +707,11 @@ REM Solution: Try different ticker, check internet connection, wait a few minute
 - **Run Overnight**: Full S&P 500/1500 processing takes many hours
 - **Resume Support**: Use `--start-from TICKER` if interrupted
 - **Monitor Progress**: Script shows progress for each ticker
-- **Check Status**: Run `python check_vector_db.py` anytime to see current counts
+- **Check Status**: Run `python scripts/utility/check_vector_db.py` anytime to see current counts
 
 **Check Vector Database Anytime:**
 ```cmd
-python check_vector_db.py
+python scripts/utility/check_vector_db.py
 ```
 
 ---

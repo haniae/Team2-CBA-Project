@@ -6,7 +6,7 @@ This guide explains how to populate the vector database (ChromaDB) with SEC fili
 
 **Quick Status Check:**
 ```cmd
-python check_vector_db.py
+python scripts/utility/check_vector_db.py
 ```
 
 ## Database Location
@@ -23,7 +23,7 @@ The script works with any SQLite database. Common locations:
 **Windows PowerShell/CMD:**
 ```cmd
 REM Quick status check
-python check_vector_db.py
+python scripts/utility/check_vector_db.py
 ```
 
 This shows:
@@ -175,7 +175,7 @@ After indexing, verify data is in vector DB:
 **Windows PowerShell/CMD:**
 ```cmd
 REM Quick status check
-python check_vector_db.py
+python scripts/utility/check_vector_db.py
 ```
 
 **Python Code:**
