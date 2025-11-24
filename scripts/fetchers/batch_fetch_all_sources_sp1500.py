@@ -208,7 +208,7 @@ def batch_fetch_all_sources(
         if not skip_analyst and ANALYST_AVAILABLE:
             try:
                 print(f"  📊 Fetching analyst reports...")
-                result = index_analyst_reports(database_path, ticker=ticker, source="seeking_alpha", limit=analyst_limit)
+                result = index_analyst_reports(database_path, ticker=ticker, source="all", limit=analyst_limit)
                 if result == 0:
                     stats["analyst"]["success"] += 1
                     print(f"  ✓ Analyst reports indexed (may be 0 if Seeking Alpha blocks access)")
