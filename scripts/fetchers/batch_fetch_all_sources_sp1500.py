@@ -11,13 +11,22 @@ Industry research is handled separately by sector.
 """
 
 import sys
+import io
 import argparse
 import time
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+# Fix Windows console encoding issues
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+# Add project root and src to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root / "src"))
+sys.path.insert(0, str(project_root))
 
 try:
     from finanlyzeos_chatbot.ticker_universe import load_ticker_universe
@@ -25,34 +34,53 @@ except ImportError:
     print("❌ Error: Could not import load_ticker_universe")
     sys.exit(1)
 
-# Import all fetchers
+# Import all fetchers - import directly from the fetchers directory
 try:
-    from scripts.fetchers.fetch_earnings_transcripts import index_earnings_transcripts
+    # Import using importlib to handle the module path correctly
+    import importlib.util
+    
+    earnings_path = Path(__file__).parent / "fetch_earnings_transcripts.py"
+    spec = importlib.util.spec_from_file_location("fetch_earnings_transcripts", earnings_path)
+    earnings_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(earnings_module)
+    index_earnings_transcripts = earnings_module.index_earnings_transcripts
     EARNINGS_AVAILABLE = True
-except ImportError:
+except Exception as e:
     EARNINGS_AVAILABLE = False
-    print("⚠️  Warning: Earnings transcripts fetcher not available")
+    print(f"⚠️  Warning: Earnings transcripts fetcher not available: {e}")
 
 try:
-    from scripts.fetchers.fetch_financial_news import index_financial_news
+    news_path = Path(__file__).parent / "fetch_financial_news.py"
+    spec = importlib.util.spec_from_file_location("fetch_financial_news", news_path)
+    news_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(news_module)
+    index_financial_news = news_module.index_financial_news
     NEWS_AVAILABLE = True
-except ImportError:
+except Exception as e:
     NEWS_AVAILABLE = False
-    print("⚠️  Warning: Financial news fetcher not available")
+    print(f"⚠️  Warning: Financial news fetcher not available: {e}")
 
 try:
-    from scripts.fetchers.fetch_analyst_reports import index_analyst_reports
+    analyst_path = Path(__file__).parent / "fetch_analyst_reports.py"
+    spec = importlib.util.spec_from_file_location("fetch_analyst_reports", analyst_path)
+    analyst_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(analyst_module)
+    index_analyst_reports = analyst_module.index_analyst_reports
     ANALYST_AVAILABLE = True
-except ImportError:
+except Exception as e:
     ANALYST_AVAILABLE = False
-    print("⚠️  Warning: Analyst reports fetcher not available")
+    print(f"⚠️  Warning: Analyst reports fetcher not available: {e}")
 
 try:
-    from scripts.fetchers.fetch_press_releases import index_press_releases
+    press_path = Path(__file__).parent / "fetch_press_releases.py"
+    spec = importlib.util.spec_from_file_location("fetch_press_releases", press_path)
+    press_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(press_module)
+    index_press_releases = press_module.index_press_releases
     PRESS_AVAILABLE = True
-except ImportError:
+except Exception as e:
     PRESS_AVAILABLE = False
-    print("⚠️  Warning: Press releases fetcher not available")
+    print(f"⚠️  Warning: Press releases fetcher not available: {e}")
 
 
 def batch_fetch_all_sources(

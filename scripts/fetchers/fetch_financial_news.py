@@ -8,13 +8,22 @@ Sources:
 """
 
 import sys
+import io
 import argparse
 import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+# Fix Windows console encoding issues
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root / "src"))
+sys.path.insert(0, str(project_root))
 
 from finanlyzeos_chatbot.rag_retriever import VectorStore
 from scripts.utils.chunking import create_document_chunks

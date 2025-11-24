@@ -49,9 +49,9 @@ def chunk_text(
                 chunk = chunk[:sentence_end + 1]
                 end = start + sentence_end + 1
         
-        chunk_text = chunk.strip()
-        if chunk_text:
-            chunks.append(chunk_text)
+        chunk_stripped = chunk.strip()
+        if chunk_stripped:
+            chunks.append(chunk_stripped)
         
         start = end - chunk_overlap
         if start >= text_length or start < 0:
@@ -83,13 +83,13 @@ def create_document_chunks(
     chunks = chunk_text(text, chunk_size, chunk_overlap, max_chunks)
     
     documents = []
-    for chunk_idx, chunk_text in enumerate(chunks):
+    for chunk_idx, chunk_content in enumerate(chunks):
         chunk_metadata = metadata.copy()
         chunk_metadata["chunk_index"] = chunk_idx
         chunk_metadata["total_chunks"] = len(chunks)
         
         documents.append({
-            "text": chunk_text,
+            "text": chunk_content,
             "metadata": chunk_metadata
         })
     

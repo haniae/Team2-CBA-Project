@@ -15,7 +15,10 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root / "src"))
+sys.path.insert(0, str(project_root))
 
 from finanlyzeos_chatbot.rag_retriever import VectorStore
 from scripts.utils.chunking import create_document_chunks
