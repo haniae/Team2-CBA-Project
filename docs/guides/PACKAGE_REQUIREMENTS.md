@@ -66,7 +66,7 @@ These packages enhance functionality but have fallbacks:
 - **sentence-transformers>=2.2.0** - Sentence embeddings
 
 ### NLP (Optional)
-- **langchain>=0.1.0** - LLM application framework
+- **langchain>=0.1.0** - LLM application framework (not currently used - custom RAG implementation)
 - **nltk>=3.8.0** - Natural language processing
 - **spacy>=3.7.0** - Advanced NLP
 - **textblob>=0.17.0** - Text processing

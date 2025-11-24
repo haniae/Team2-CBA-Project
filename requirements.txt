@@ -84,7 +84,7 @@ spacy>=3.7.0
 transformers>=4.35.0
 torch>=2.1.0
 sentence-transformers>=2.2.0
-langchain>=0.1.0
+# langchain>=0.1.0  # Not used - custom RAG implementation with ChromaDB + sentence-transformers
 openai-whisper>=20231117
 
 # RAG (Retrieval-Augmented Generation) Dependencies

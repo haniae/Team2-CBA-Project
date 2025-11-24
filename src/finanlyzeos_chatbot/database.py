@@ -1622,6 +1622,71 @@ def bulk_upsert_company_filings(
             connection.close()
 
 
+def fetch_company_filings(
+    database_path: Path,
+    *,
+    ticker: Optional[str] = None,
+    form_type: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Fetch company filings from the database.
+    
+    Args:
+        database_path: Path to the database
+        ticker: Optional ticker filter
+        form_type: Optional form type filter (e.g., "10-K", "10-Q")
+        limit: Optional limit on number of results
+        
+    Returns:
+        List of filing records as dictionaries
+    """
+    connection = _connect(database_path)
+    try:
+        connection.row_factory = sqlite3.Row
+        query = "SELECT cik, ticker, accession_number, form_type, filed_at, period_of_report, data FROM company_filings WHERE 1=1"
+        params = []
+        
+        if ticker:
+            query += " AND ticker = ?"
+            params.append(_normalize_ticker(ticker))
+        
+        if form_type:
+            query += " AND form_type = ?"
+            params.append(form_type)
+        
+        query += " ORDER BY filed_at DESC"
+        
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+        
+        rows = connection.execute(query, params).fetchall()
+        
+        filings = []
+        for row in rows:
+            data_dict = {}
+            try:
+                if row["data"]:
+                    data_dict = json.loads(row["data"])
+            except:
+                pass
+            
+            filings.append({
+                "cik": row["cik"],
+                "ticker": row["ticker"],
+                "accession_number": row["accession_number"],
+                "form_type": row["form_type"],
+                "filed_at": row["filed_at"],
+                "period_of_report": row["period_of_report"],
+                "data": data_dict,
+            })
+        
+        return filings
+    finally:
+        connection.close()
+
+
 # -----------------------------
 # Financial Facts
 # -----------------------------

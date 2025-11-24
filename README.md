@@ -52,10 +52,12 @@ pip install -r requirements.txt && pip install -e .
 # 2. Quick test (100 companies, ~15-30 min)
 python scripts/ingestion/ingest_universe.py --universe-file data/tickers/test_100.txt --years 5
 
-# 2.5. Index into ChromaDB for RAG (optional but recommended)
+# 2.5. Index into Vector DB for RAG (optional but recommended)
 # This enables semantic search over SEC filings for better answers
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text --limit 10  # Test first
-# Then index all: python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text
+# Test with one ticker first:
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --ticker AAPL --fetch-from-sec --limit 3
+# Check status: python check_vector_db.py
+# Then process all: python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 5
 
 # 3. Run the chatbot
 python run_chatbot.py
@@ -416,9 +418,27 @@ python scripts/check_database_status.py --database data/sqlite/finanlyzeos_chatb
 
 ---
 
-#### **🔍 ChromaDB Indexing for RAG (Retrieval-Augmented Generation)**
+#### **🔍 Vector Database (ChromaDB) Indexing for RAG**
 
-After populating your SQLite database with SEC filing metadata, you need to index it into ChromaDB for semantic search capabilities. ChromaDB stores vector embeddings that enable the chatbot to find relevant document sections when answering questions.
+The vector database enables **semantic search** over SEC filing narratives, allowing the chatbot to answer questions using context from Management's Discussion & Analysis (MD&A), Risk Factors, and Business Overview sections.
+
+**What Gets Indexed:**
+- **SEC Filing Narratives**: MD&A, Risk Factors, Business Overview sections from 10-K and 10-Q filings
+- **User-Uploaded Documents**: PDFs, CSVs, and other documents you upload through the web interface
+- **Chunking Strategy**: Documents are split into 1500-character chunks with 200-character overlap for optimal retrieval
+
+**How It Works:**
+1. Documents are downloaded from SEC or loaded from your database
+2. Narrative sections are extracted (MD&A, Risk Factors, Business Overview)
+3. Text is chunked into smaller segments
+4. Each chunk is embedded using `all-MiniLM-L6-v2` model (384 dimensions)
+5. Embeddings are stored in ChromaDB for fast semantic search
+
+**Check Vector Database Status:**
+```bash
+# Quick status check
+python check_vector_db.py
+```
 
 **Prerequisites:**
 
@@ -429,66 +449,74 @@ pip install chromadb sentence-transformers
 
 **Step 1: Test Indexing (RECOMMENDED - Start Here!)**
 
-```bash
-# Test with 10 filings first to verify everything works
-# This downloads filing text, extracts sections, creates embeddings, and indexes
-# Time: ~2 minutes
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text --limit 10
+**Windows PowerShell/CMD:**
+```cmd
+REM Test with a single ticker first
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --ticker AAPL --fetch-from-sec --limit 3
 ```
 
-**Step 2: Index All SEC Filings**
+**Step 2: Index All Tickers (S&P 500 or S&P 1500)**
+
+**Windows PowerShell/CMD:**
+```cmd
+REM Process all S&P 500 tickers (482 companies)
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 5
+
+REM Process all S&P 1500 tickers (1,599 companies) - takes longer!
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp1500 --fetch-from-sec --limit 5
+
+REM Test with first 10 tickers only
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 3 --max-tickers 10
+
+REM List available universes
+python scripts/index_documents_for_rag.py --list-universes
+```
+
+**Step 3: Index from Existing Database (if you already have filings)**
 
 ```bash
-# Index all SEC filings from your database into ChromaDB
-# This will:
-# - Fetch all filings from company_filings table
-# - Download full filing text from SEC EDGAR
-# - Extract narrative sections (MD&A, Risk Factors, Business Overview)
-# - Create embeddings using all-MiniLM-L6-v2 model
-# - Index into ChromaDB for semantic search
-# Time: Varies based on number of filings
-#   - 1,000 filings: ~3-4 minutes
-#   - 10,000 filings: ~30-40 minutes
-#   - 80,000 filings: ~4-5 hours
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text
+# If your database already has company_filings table populated
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec
 ```
 
 **Indexing Options:**
 
-```bash
-# Index specific ticker only
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --ticker AAPL --download-text
+**Windows PowerShell/CMD:**
+```cmd
+REM Index specific ticker only
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --ticker AAPL --fetch-from-sec --limit 5
 
-# Index only 10-K filings (annual reports)
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --filing-type 10-K --download-text
+REM Index only 10-K filings (annual reports)
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --ticker AAPL --filing-type 10-K --fetch-from-sec --limit 5
 
-# Index only 10-Q filings (quarterly reports)
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --filing-type 10-Q --download-text
+REM Index only 10-Q filings (quarterly reports)
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --ticker AAPL --filing-type 10-Q --fetch-from-sec --limit 5
 
-# Index uploaded documents (user-uploaded PDFs, CSVs, etc.)
-# Note: Doesn't require --download-text since documents are already in database
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type uploaded
+REM Index uploaded documents (user-uploaded PDFs, CSVs, etc.)
+python scripts/index_documents_for_rag.py --database data/financial.db --type uploaded
 
-# Index everything (SEC filings + uploaded documents)
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type all --download-text
+REM Index everything (SEC filings + uploaded documents)
+python scripts/index_documents_for_rag.py --database data/financial.db --type all --fetch-from-sec
 
-# Custom batch size (for large databases, default is 100)
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text --batch-size 200
+REM Resume from a specific ticker (if interrupted)
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 5 --start-from MSFT
 ```
 
-**Step 3: Verify ChromaDB Indexing**
+**Step 4: Verify Vector Database Status**
 
-```bash
-# Check ChromaDB status
-python scripts/check_chromadb_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+**Windows PowerShell/CMD:**
+```cmd
+REM Quick status check
+python check_vector_db.py
 
-# Or use combined status check (shows both SQLite and ChromaDB)
-python scripts/check_database_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+REM Detailed check
+python check_vector_db.py
 
-# Expected output:
-# - ✅ SEC narratives indexed: > 0
-# - ✅ Uploaded docs indexed: 0 or > 0
-# - ✅ Total in ChromaDB: > 0
+REM Expected output:
+REM - ✅ SEC narratives: X,XXX documents
+REM - ✅ Uploaded documents: X documents  
+REM - ✅ Total: X,XXX documents
+REM - 💾 Storage Size: XX.XX MB
 ```
 
 **What Gets Indexed:**
@@ -508,56 +536,73 @@ python scripts/check_database_status.py --database data/sqlite/finanlyzeos_chatb
 
 **Complete Workflow Example:**
 
-```bash
-# 1. Check current status
-python scripts/check_database_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+**Windows PowerShell/CMD:**
+```cmd
+REM 1. Check current vector DB status
+python check_vector_db.py
 
-# 2. Ingest S&P 500 data (15 years) - CHOOSE ONE from options above
-python scripts/ingestion/ingest_sp500_15years.py
+REM 2. Test indexing with one ticker
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --ticker AAPL --fetch-from-sec --limit 3
 
-# 3. Verify ingestion completed
-python scripts/check_database_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+REM 3. Verify indexing worked
+python check_vector_db.py
 
-# 4. Test ChromaDB indexing (10 filings)
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text --limit 10
+REM 4. Process all S&P 500 tickers (or use sp1500 for all 1,599 tickers)
+python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 5
 
-# 5. Index all SEC filings into ChromaDB
-python scripts/index_documents_for_rag.py --database data/sqlite/finanlyzeos_chatbot.sqlite3 --type sec --download-text
-
-# 6. Verify ChromaDB has data
-python scripts/check_chromadb_status.py --database data/sqlite/finanlyzeos_chatbot.sqlite3
+REM 5. Check final status
+python check_vector_db.py
 ```
 
-**Troubleshooting ChromaDB Indexing:**
+**Time Estimates:**
+- **S&P 500**: ~500 tickers × 2-5 min/ticker = **16-40 hours**
+- **S&P 1500**: ~1,599 tickers × 2-5 min/ticker = **50-125 hours**
 
-```bash
-# Issue: Database table doesn't exist
-# Solution: Initialize database schema
-python -c "from finanlyzeos_chatbot.database import initialise; from pathlib import Path; initialise(Path('data/sqlite/finanlyzeos_chatbot.sqlite3'))"
+**Tips:**
+- Start with `--max-tickers 10` to test
+- Use `--limit 5` to get 5 filings per ticker (enough for recent data)
+- Run overnight for full universe processing
+- Use `--start-from TICKER` to resume if interrupted
 
-# Issue: ChromaDB not available
-# Solution: Install dependencies
-pip install chromadb sentence-transformers
+**Troubleshooting Vector Database Indexing:**
 
-# Issue: SEC download fails
-# Causes: Network issues, SEC rate limiting (script handles this automatically)
-# Solution: Script continues with other filings. Check logs for specific errors.
+**Windows PowerShell/CMD:**
+```cmd
+REM Issue: "no such table: company_filings"
+REM Solution: Script auto-creates tables, but you can manually initialize:
+python -c "from finanlyzeos_chatbot.database import initialise; from pathlib import Path; initialise(Path('data/financial.db'))"
 
-# Issue: No sections extracted from filings
-# Causes: Filing text doesn't match expected patterns, unusual format
-# Solution: This is normal for some filings. Script skips them and continues.
+REM Issue: ChromaDB not available
+REM Solution: Install dependencies
+pip install chromadb sentence-transformers requests beautifulsoup4
 
-# Issue: Ingestion script stops/fails
-# Solution: Most ingestion scripts create progress files. Re-run the same script to resume.
+REM Issue: "Unknown ticker universe: sp1500"
+REM Solution: Check available universes
+python scripts/index_documents_for_rag.py --list-universes
+
+REM Issue: MemoryError during processing
+REM Solution: Already fixed! Script now limits section sizes and chunk counts
+
+REM Issue: No sections extracted
+REM Solution: Parser uses fallback extraction. Some filings may not have standard sections.
+
+REM Issue: SEC API returns 0 filings
+REM Solution: Try different ticker, check internet connection, wait a few minutes (rate limiting)
 ```
 
 **Performance Tips:**
 
-- **Start Small**: Test with `--limit 10` before full indexing
-- **Use Filing Type Filter**: Index 10-K first (most important), then 10-Q
-- **Batch Processing**: The script processes in batches automatically (default: 100 documents)
-- **Resume Capability**: Ingestion scripts can be resumed if interrupted
-- **Monitor Progress**: Watch the progress indicators in the output
+- **Start Small**: Test with `--max-tickers 10` before processing full universe
+- **Use Limits**: `--limit 5` gets 5 filings per ticker (sufficient for recent data)
+- **Run Overnight**: Full S&P 500/1500 processing takes many hours
+- **Resume Support**: Use `--start-from TICKER` if interrupted
+- **Monitor Progress**: Script shows progress for each ticker
+- **Check Status**: Run `python check_vector_db.py` anytime to see current counts
+
+**Check Vector Database Anytime:**
+```cmd
+python check_vector_db.py
+```
 
 ---
 
@@ -1329,7 +1374,7 @@ All required packages are specified in **[`requirements.txt`](requirements.txt)*
 
 **Key Package Categories:**
 - **Core Framework**: FastAPI, Uvicorn, Python-dotenv
-- **AI/ML**: OpenAI, Transformers, PyTorch, Sentence-transformers, LangChain
+- **AI/ML**: OpenAI, Transformers, PyTorch, Sentence-transformers
 - **Database**: SQLAlchemy, PostgreSQL adapters
 - **Financial Data**: yfinance, FRED API, pandas-datareader
 - **Data Processing**: Pandas, NumPy, OpenPyXL

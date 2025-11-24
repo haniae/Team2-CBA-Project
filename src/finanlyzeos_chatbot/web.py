@@ -289,6 +289,16 @@ async def serve_styles_css():
     
     with open(css_path, 'r', encoding='utf-8') as f:
         content = f.read()
+    
+    return Response(
+        content=content,
+        media_type="text/css",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
 
 
 @app.get("/static/file-preview.css")

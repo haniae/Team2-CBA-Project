@@ -58,6 +58,9 @@ _SP500_TICKERS = [
     "ZBH", "ZION", "ZTS"
 ]
 
+# Path to ticker universe files
+_UNIVERSE_DIR = Path(__file__).parent.parent.parent / "data" / "tickers"
+
 _UNIVERSES = {
     "sp500": _SP500_TICKERS,
 }
@@ -65,18 +68,40 @@ _UNIVERSES = {
 
 def available_universes() -> List[str]:
     """Return the keys for available ticker universes."""
-
-    return sorted(_UNIVERSES.keys())
+    universes = list(_UNIVERSES.keys())
+    
+    # Also check for file-based universes
+    if _UNIVERSE_DIR.exists():
+        for file_path in _UNIVERSE_DIR.glob("universe_*.txt"):
+            universe_name = file_path.stem.replace("universe_", "")
+            if universe_name not in universes:
+                universes.append(universe_name)
+    
+    return sorted(universes)
 
 
 def load_ticker_universe(name: str = "sp500") -> List[str]:
     """Return a list of tickers for the requested universe."""
-
+    name_lower = name.lower()
+    
+    # First try built-in universes
     try:
-        tickers = _UNIVERSES[name.lower()]
-    except KeyError as exc:
-        raise ValueError(f"Unknown ticker universe: {name}") from exc
-    return sorted(set(tickers))
+        tickers = _UNIVERSES[name_lower]
+        return sorted(set(tickers))
+    except KeyError:
+        pass
+    
+    # Then try loading from file
+    universe_file = _UNIVERSE_DIR / f"universe_{name_lower}.txt"
+    if universe_file.exists():
+        return load_ticker_file(universe_file)
+    
+    # If neither works, raise error
+    available = available_universes()
+    raise ValueError(
+        f"Unknown ticker universe: {name}. "
+        f"Available universes: {', '.join(available)}"
+    )
 
 
 def load_ticker_file(path) -> List[str]:
