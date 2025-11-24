@@ -280,7 +280,7 @@ def _chunk_text(text: str, chunk_size: int = 1500, chunk_overlap: int = 200) -> 
     text_length = len(text)
     # Limit chunks per section to prevent memory issues
     # For very large sections, cap at reasonable number
-    max_chunks_per_section = 200  # Reduced from 1000 to get better quality chunks
+    max_chunks_per_section = 1000  # Restored to 1000 as requested
     
     while start < text_length and len(chunks) < max_chunks_per_section:
         end = min(start + chunk_size, text_length)
