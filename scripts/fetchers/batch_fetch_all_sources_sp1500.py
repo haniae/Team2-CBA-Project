@@ -145,7 +145,7 @@ def batch_fetch_all_sources(
         if not skip_earnings and EARNINGS_AVAILABLE:
             try:
                 print(f"  📞 Fetching earnings transcripts...")
-                result = index_earnings_transcripts(database_path, ticker, source="all")
+                result = index_earnings_transcripts(database_path, ticker, source="all", limit=None)
                 if result == 0:
                     stats["earnings"]["success"] += 1
                     print(f"  ✓ Earnings transcripts indexed")
@@ -160,7 +160,7 @@ def batch_fetch_all_sources(
         if not skip_news and NEWS_AVAILABLE:
             try:
                 print(f"  📰 Fetching financial news...")
-                result = index_financial_news(database_path, ticker, source="yahoo", limit=news_limit)
+                result = index_financial_news(database_path, ticker=ticker, source="yahoo", limit=news_limit)
                 if result == 0:
                     stats["news"]["success"] += 1
                     print(f"  ✓ Financial news indexed")
@@ -175,7 +175,7 @@ def batch_fetch_all_sources(
         if not skip_analyst and ANALYST_AVAILABLE:
             try:
                 print(f"  📊 Fetching analyst reports...")
-                result = index_analyst_reports(database_path, ticker, source="seeking_alpha", limit=analyst_limit)
+                result = index_analyst_reports(database_path, ticker=ticker, source="seeking_alpha", limit=analyst_limit)
                 if result == 0:
                     stats["analyst"]["success"] += 1
                     print(f"  ✓ Analyst reports indexed")
@@ -190,7 +190,7 @@ def batch_fetch_all_sources(
         if not skip_press and PRESS_AVAILABLE:
             try:
                 print(f"  📢 Fetching press releases...")
-                result = index_press_releases(database_path, ticker, limit=press_limit)
+                result = index_press_releases(database_path, ticker=ticker, limit=press_limit)
                 if result == 0:
                     stats["press"]["success"] += 1
                     print(f"  ✓ Press releases indexed")
