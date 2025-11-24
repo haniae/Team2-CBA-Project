@@ -4,8 +4,13 @@ Index documents for RAG Pipeline
 This script indexes:
 1. SEC filings (narratives) into vector store
 2. Uploaded documents into vector store
+3. Earnings call transcripts
+4. Financial news articles
+5. Analyst research reports
+6. Company press releases
+7. Industry research reports
 
-Run this after ingesting new SEC filings or when users upload documents.
+Run this after ingesting new documents or when users upload documents.
 """
 
 import sys
@@ -480,7 +485,7 @@ def index_uploaded_documents(database_path: Path, conversation_id: Optional[str]
 def main():
     parser = argparse.ArgumentParser(description="Index documents for RAG pipeline")
     parser.add_argument("--database", required=False, type=Path, help="Path to SQLite database (required unless using --list-universes)")
-    parser.add_argument("--type", choices=["sec", "uploaded", "all"], default="all", help="What to index")
+    parser.add_argument("--type", choices=["sec", "uploaded", "earnings", "news", "analyst", "press", "industry", "all"], default="all", help="What to index")
     parser.add_argument("--ticker", type=str, help="Filter SEC filings by ticker (or use --universe for all)")
     parser.add_argument("--universe", type=str, help="Process all tickers from universe (e.g., sp500, sp1500). Use --list-universes to see available options.")
     parser.add_argument("--list-universes", action="store_true", help="List available ticker universes and exit")
@@ -490,6 +495,7 @@ def main():
     parser.add_argument("--limit", type=int, help="Limit number of filings per ticker to process")
     parser.add_argument("--max-tickers", type=int, help="Limit number of tickers to process (when using --universe)")
     parser.add_argument("--start-from", type=str, help="Start from this ticker (useful for resuming)")
+    parser.add_argument("--sector", type=str, help="Industry sector (for industry research indexing)")
     
     args = parser.parse_args()
     
@@ -611,6 +617,63 @@ def main():
     
     if args.type in ["uploaded", "all"] and not args.universe:
         index_uploaded_documents(args.database, args.conversation_id)
+    
+    if args.type in ["earnings", "all"]:
+        if args.ticker:
+            try:
+                from scripts.fetchers.fetch_earnings_transcripts import index_earnings_transcripts
+                index_earnings_transcripts(args.database, args.ticker, source="all")
+            except ImportError as e:
+                print(f"⚠️  Earnings transcripts fetcher not available: {e}")
+                print("   Make sure scripts/fetchers/fetch_earnings_transcripts.py exists")
+        else:
+            print("ℹ️  Earnings transcripts indexing requires --ticker")
+    
+    if args.type in ["news", "all"]:
+        if args.ticker:
+            try:
+                from scripts.fetchers.fetch_financial_news import index_financial_news
+                index_financial_news(args.database, args.ticker, source="yahoo", limit=10)
+            except ImportError as e:
+                print(f"⚠️  Financial news fetcher not available: {e}")
+                print("   Make sure scripts/fetchers/fetch_financial_news.py exists")
+        else:
+            print("ℹ️  Financial news indexing requires --ticker")
+    
+    if args.type in ["analyst", "all"]:
+        if args.ticker:
+            try:
+                from scripts.fetchers.fetch_analyst_reports import index_analyst_reports
+                index_analyst_reports(args.database, args.ticker, source="seeking_alpha", limit=10)
+            except ImportError as e:
+                print(f"⚠️  Analyst reports fetcher not available: {e}")
+                print("   Make sure scripts/fetchers/fetch_analyst_reports.py exists")
+        else:
+            print("ℹ️  Analyst reports indexing requires --ticker")
+    
+    if args.type in ["press", "all"]:
+        if args.ticker:
+            try:
+                from scripts.fetchers.fetch_press_releases import index_press_releases
+                index_press_releases(args.database, args.ticker, limit=20)
+            except ImportError as e:
+                print(f"⚠️  Press releases fetcher not available: {e}")
+                print("   Make sure scripts/fetchers/fetch_press_releases.py exists")
+        else:
+            print("ℹ️  Press releases indexing requires --ticker")
+    
+    if args.type in ["industry", "all"]:
+        # Industry research requires --sector instead of --ticker
+        sector = getattr(args, 'sector', None)
+        if not sector:
+            print("ℹ️  Industry research indexing requires --sector (e.g., --sector Technology)")
+        else:
+            try:
+                from scripts.fetchers.fetch_industry_research import index_industry_research
+                index_industry_research(args.database, sector, source="ssrn", limit=10)
+            except ImportError as e:
+                print(f"⚠️  Industry research fetcher not available: {e}")
+                print("   Make sure scripts/fetchers/fetch_industry_research.py exists")
     
     return 0
 

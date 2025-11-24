@@ -53,11 +53,14 @@ pip install -r requirements.txt && pip install -e .
 python scripts/ingestion/ingest_universe.py --universe-file data/tickers/test_100.txt --years 5
 
 # 2.5. Index into Vector DB for RAG (optional but recommended)
-# This enables semantic search over SEC filings for better answers
+# This enables semantic search over SEC filings, earnings transcripts, news, and more
 # First, install vector DB dependencies:
-pip install chromadb sentence-transformers requests beautifulsoup4
-# Test with one ticker first:
+pip install chromadb sentence-transformers requests beautifulsoup4 yfinance
+# Test with one ticker first (SEC filings):
 python scripts/index_documents_for_rag.py --database data/financial.db --type sec --ticker AAPL --fetch-from-sec --limit 3
+# Index additional sources (NEW!):
+python scripts/index_documents_for_rag.py --database data/financial.db --type earnings --ticker AAPL
+python scripts/index_documents_for_rag.py --database data/financial.db --type news --ticker AAPL
 # Check status: python check_vector_db.py
 # Then process all: python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 5
 # See full guide: VECTOR_DB_INGESTION_GUIDE.md or README section "Vector Database Indexing"
@@ -424,12 +427,18 @@ python scripts/check_database_status.py --database data/sqlite/finanlyzeos_chatb
 
 #### **🔍 Vector Database (ChromaDB) Indexing for RAG**
 
-The vector database enables **semantic search** over SEC filing narratives, allowing the chatbot to answer questions using context from Management's Discussion & Analysis (MD&A), Risk Factors, and Business Overview sections.
+The vector database enables **semantic search** over multiple document types, allowing the chatbot to answer questions using comprehensive context from various financial sources.
 
-**What Gets Indexed:**
-- **SEC Filing Narratives**: MD&A, Risk Factors, Business Overview sections from 10-K and 10-Q filings
-- **User-Uploaded Documents**: PDFs, CSVs, and other documents you upload through the web interface
-- **Chunking Strategy**: Documents are split into 1500-character chunks with 200-character overlap for optimal retrieval
+**Available Collections:**
+1. ✅ **SEC Filing Narratives** - MD&A, Risk Factors, Business Overview sections from 10-K and 10-Q filings
+2. ✅ **User-Uploaded Documents** - PDFs, CSVs, and other documents uploaded through the web interface
+3. 🆕 **Earnings Transcripts** - Earnings call transcripts with management commentary and Q&A
+4. 🆕 **Financial News** - Recent news articles from Yahoo Finance and NewsAPI
+5. 🆕 **Analyst Reports** - Professional equity research reports and analysis
+6. 🆕 **Press Releases** - Company announcements and strategic updates
+7. 🆕 **Industry Research** - Sector analysis and market trend reports
+
+**Chunking Strategy**: All documents are split into 1500-character chunks with 200-character overlap for optimal retrieval
 
 **How It Works:**
 1. Documents are downloaded from SEC or loaded from your database
@@ -499,8 +508,33 @@ python scripts/index_documents_for_rag.py --database data/financial.db --type se
 REM Index uploaded documents (user-uploaded PDFs, CSVs, etc.)
 python scripts/index_documents_for_rag.py --database data/financial.db --type uploaded
 
-REM Index everything (SEC filings + uploaded documents)
-python scripts/index_documents_for_rag.py --database data/financial.db --type all --fetch-from-sec
+REM Index earnings transcripts (NEW!)
+python scripts/index_documents_for_rag.py --database data/financial.db --type earnings --ticker AAPL
+REM Or use individual fetcher:
+python scripts/fetchers/fetch_earnings_transcripts.py --database data/financial.db --ticker AAPL
+
+REM Index financial news (NEW!)
+python scripts/index_documents_for_rag.py --database data/financial.db --type news --ticker AAPL
+REM Or use individual fetcher:
+python scripts/fetchers/fetch_financial_news.py --database data/financial.db --ticker AAPL --limit 20
+
+REM Index analyst reports (NEW!)
+python scripts/index_documents_for_rag.py --database data/financial.db --type analyst --ticker AAPL
+REM Or use individual fetcher:
+python scripts/fetchers/fetch_analyst_reports.py --database data/financial.db --ticker AAPL --limit 10
+
+REM Index press releases (NEW!)
+python scripts/index_documents_for_rag.py --database data/financial.db --type press --ticker AAPL
+REM Or use individual fetcher:
+python scripts/fetchers/fetch_press_releases.py --database data/financial.db --ticker AAPL --limit 20
+
+REM Index industry research (NEW!)
+python scripts/index_documents_for_rag.py --database data/financial.db --type industry --sector Technology
+REM Or use individual fetcher:
+python scripts/fetchers/fetch_industry_research.py --database data/financial.db --sector Technology --limit 10
+
+REM Index everything (all document types)
+python scripts/index_documents_for_rag.py --database data/financial.db --type all --ticker AAPL --fetch-from-sec
 
 REM Resume from a specific ticker (if interrupted)
 python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 5 --start-from MSFT
@@ -518,7 +552,12 @@ python check_vector_db.py
 
 REM Expected output:
 REM - ✅ SEC narratives: X,XXX documents
-REM - ✅ Uploaded documents: X documents  
+REM - ✅ Uploaded documents: X documents
+REM - ✅ Earnings transcripts: X documents (NEW!)
+REM - ✅ Financial news: X documents (NEW!)
+REM - ✅ Analyst reports: X documents (NEW!)
+REM - ✅ Press releases: X documents (NEW!)
+REM - ✅ Industry research: X documents (NEW!)
 REM - ✅ Total: X,XXX documents
 REM - 💾 Storage Size: XX.XX MB
 ```
@@ -537,6 +576,36 @@ REM - 💾 Storage Size: XX.XX MB
   - Full text content from user-uploaded files
   - Chunked similarly for vectorization
   - Metadata includes filename, file type, conversation ID
+
+- **Earnings Transcripts** (NEW!):
+  - Management commentary and Q&A sessions
+  - Forward guidance and strategic discussions
+  - Sources: Seeking Alpha, Company IR pages
+  - Metadata: ticker, date, quarter, source URL
+
+- **Financial News** (NEW!):
+  - Recent news articles affecting stocks
+  - Market sentiment and breaking news
+  - Sources: Yahoo Finance, NewsAPI
+  - Metadata: ticker, date, publisher, title, source URL
+
+- **Analyst Reports** (NEW!):
+  - Professional equity research and analysis
+  - Price targets and investment theses
+  - Sources: Seeking Alpha
+  - Metadata: ticker, date, analyst, rating, target price
+
+- **Press Releases** (NEW!):
+  - Company announcements and strategic updates
+  - Product launches and M&A news
+  - Sources: Company IR pages
+  - Metadata: ticker, date, category, title
+
+- **Industry Research** (NEW!):
+  - Sector analysis and market trends
+  - Competitive landscape reports
+  - Sources: SSRN, Government sources
+  - Metadata: sector, industry, date, title
 
 **Complete Workflow Example:**
 
@@ -562,11 +631,48 @@ python check_vector_db.py
 - **S&P 500**: ~500 tickers × 2-5 min/ticker = **16-40 hours**
 - **S&P 1500**: ~1,599 tickers × 2-5 min/ticker = **50-125 hours**
 
+**New Document Types (Available Now!):**
+
+The system now supports indexing additional document types for richer financial analysis:
+
+- **Earnings Transcripts**: Management commentary and Q&A from earnings calls
+  ```cmd
+  python scripts/fetchers/fetch_earnings_transcripts.py --database data/financial.db --ticker AAPL
+  ```
+
+- **Financial News**: Recent news articles affecting stocks
+  ```cmd
+  python scripts/fetchers/fetch_financial_news.py --database data/financial.db --ticker AAPL --limit 20
+  ```
+
+- **Analyst Reports**: Professional equity research and analysis
+  ```cmd
+  python scripts/fetchers/fetch_analyst_reports.py --database data/financial.db --ticker AAPL --limit 10
+  ```
+
+- **Press Releases**: Company announcements and strategic updates
+  ```cmd
+  python scripts/fetchers/fetch_press_releases.py --database data/financial.db --ticker AAPL --limit 20
+  ```
+
+- **Industry Research**: Sector analysis and market trends
+  ```cmd
+  python scripts/fetchers/fetch_industry_research.py --database data/financial.db --sector Technology --limit 10
+  ```
+
+**Or use the main indexing script for all types:**
+```cmd
+python scripts/index_documents_for_rag.py --database data/financial.db --type all --ticker AAPL
+```
+
+See [Fetcher Scripts Usage Guide](docs/guides/FETCHER_SCRIPTS_USAGE.md) for detailed documentation.
+
 **Tips:**
 - Start with `--max-tickers 10` to test
 - Use `--limit 5` to get 5 filings per ticker (enough for recent data)
 - Run overnight for full universe processing
 - Use `--start-from TICKER` to resume if interrupted
+- **New**: Index additional document types for comprehensive analysis
 
 **Troubleshooting Vector Database Indexing:**
 
@@ -1380,7 +1486,9 @@ All required packages are specified in **[`requirements.txt`](requirements.txt)*
 - **Core Framework**: FastAPI, Uvicorn, Python-dotenv
 - **AI/ML**: OpenAI, Transformers, PyTorch, Sentence-transformers
 - **Database**: SQLAlchemy, PostgreSQL adapters
+- **Vector Database**: ChromaDB, Sentence-transformers (for RAG)
 - **Financial Data**: yfinance, FRED API, pandas-datareader
+- **Web Scraping**: requests, beautifulsoup4 (for document fetchers)
 - **Data Processing**: Pandas, NumPy, OpenPyXL
 - **Visualization**: Plotly, Dash, Matplotlib, Seaborn
 - **ML Forecasting**: Prophet, ARIMA, TensorFlow, Scikit-learn
@@ -1797,6 +1905,16 @@ Project/
 │   ├── test_rag_working.py            # RAG working tests
 │   ├── run_data_ingestion.ps1         # Windows PowerShell ingestion script
 │   ├── run_data_ingestion.sh          # Unix/Linux ingestion script
+│   │
+│   ├── fetchers/                      # Document fetcher scripts (NEW!)
+│   │   ├── fetch_earnings_transcripts.py  # Earnings call transcripts
+│   │   ├── fetch_financial_news.py        # Financial news articles
+│   │   ├── fetch_analyst_reports.py       # Analyst research reports
+│   │   ├── fetch_press_releases.py         # Company press releases
+│   │   └── fetch_industry_research.py      # Industry research reports
+│   │
+│   ├── utils/                          # Shared utilities (NEW!)
+│   │   └── chunking.py                 # Document chunking utility
 │   │
 │   ├── analysis/                      # Analysis scripts
 │   │   └── analyze_coverage_gaps.py   # Analyze coverage gaps (complete/partial/missing)

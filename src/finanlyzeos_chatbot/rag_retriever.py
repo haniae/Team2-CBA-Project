@@ -66,6 +66,11 @@ class RetrievalResult:
     # Semantic search results (embedded documents)
     sec_narratives: List[RetrievedDocument]  # MD&A, Risk Factors, etc.
     uploaded_docs: List[RetrievedDocument]   # User-uploaded documents
+    earnings_transcripts: Optional[List[RetrievedDocument]] = None  # Earnings call transcripts
+    financial_news: Optional[List[RetrievedDocument]] = None  # Financial news articles
+    analyst_reports: Optional[List[RetrievedDocument]] = None  # Analyst research reports
+    press_releases: Optional[List[RetrievedDocument]] = None  # Company press releases
+    industry_research: Optional[List[RetrievedDocument]] = None  # Industry research reports
     
     # Additional context
     macro_data: Optional[Dict[str, Any]] = None
@@ -130,7 +135,7 @@ class VectorStore:
         self._init_collections()
     
     def _init_collections(self):
-        """Initialize separate collections for SEC filings and uploaded docs."""
+        """Initialize separate collections for different document types."""
         # SEC narratives collection
         try:
             self.sec_collection = self.client.get_collection(name=f"{self.collection_name}_sec")
@@ -148,6 +153,51 @@ class VectorStore:
                 name=f"{self.collection_name}_uploaded",
                 metadata={"description": "User-uploaded documents (PDFs, CSVs, etc.)"}
             )
+        
+        # Earnings transcripts collection
+        try:
+            self.earnings_collection = self.client.get_collection(name=f"{self.collection_name}_earnings")
+        except Exception:
+            self.earnings_collection = self.client.create_collection(
+                name=f"{self.collection_name}_earnings",
+                metadata={"description": "Earnings call transcripts (management commentary, Q&A)"}
+            )
+        
+        # Financial news collection
+        try:
+            self.news_collection = self.client.get_collection(name=f"{self.collection_name}_news")
+        except Exception:
+            self.news_collection = self.client.create_collection(
+                name=f"{self.collection_name}_news",
+                metadata={"description": "Financial news articles (market sentiment, breaking news)"}
+            )
+        
+        # Analyst reports collection
+        try:
+            self.analyst_collection = self.client.get_collection(name=f"{self.collection_name}_analyst")
+        except Exception:
+            self.analyst_collection = self.client.create_collection(
+                name=f"{self.collection_name}_analyst",
+                metadata={"description": "Analyst research reports (equity research, price targets)"}
+            )
+        
+        # Press releases collection
+        try:
+            self.press_collection = self.client.get_collection(name=f"{self.collection_name}_press")
+        except Exception:
+            self.press_collection = self.client.create_collection(
+                name=f"{self.collection_name}_press",
+                metadata={"description": "Company press releases (announcements, strategic updates)"}
+            )
+        
+        # Industry research collection
+        try:
+            self.industry_collection = self.client.get_collection(name=f"{self.collection_name}_industry")
+        except Exception:
+            self.industry_collection = self.client.create_collection(
+                name=f"{self.collection_name}_industry",
+                metadata={"description": "Industry research reports (sector analysis, market trends)"}
+            )
     
     def add_sec_documents(self, documents: List[Dict[str, Any]], batch_size: int = 100) -> int:
         """Add SEC filing documents to vector store."""
@@ -160,6 +210,36 @@ class VectorStore:
         if not self._available:
             return 0
         return self._add_documents(documents, self.uploaded_collection, batch_size)
+    
+    def add_earnings_transcripts(self, documents: List[Dict[str, Any]], batch_size: int = 100) -> int:
+        """Add earnings call transcripts to vector store."""
+        if not self._available:
+            return 0
+        return self._add_documents(documents, self.earnings_collection, batch_size)
+    
+    def add_financial_news(self, documents: List[Dict[str, Any]], batch_size: int = 100) -> int:
+        """Add financial news articles to vector store."""
+        if not self._available:
+            return 0
+        return self._add_documents(documents, self.news_collection, batch_size)
+    
+    def add_analyst_reports(self, documents: List[Dict[str, Any]], batch_size: int = 100) -> int:
+        """Add analyst research reports to vector store."""
+        if not self._available:
+            return 0
+        return self._add_documents(documents, self.analyst_collection, batch_size)
+    
+    def add_press_releases(self, documents: List[Dict[str, Any]], batch_size: int = 100) -> int:
+        """Add company press releases to vector store."""
+        if not self._available:
+            return 0
+        return self._add_documents(documents, self.press_collection, batch_size)
+    
+    def add_industry_research(self, documents: List[Dict[str, Any]], batch_size: int = 100) -> int:
+        """Add industry research reports to vector store."""
+        if not self._available:
+            return 0
+        return self._add_documents(documents, self.industry_collection, batch_size)
     
     def _add_documents(
         self,
@@ -184,12 +264,28 @@ class VectorStore:
                 convert_to_numpy=True,
             ).tolist()
             
-            # Generate IDs
-            ids = [
-                f"{meta.get('ticker', 'unknown')}_{meta.get('filing_type', 'doc')}_"
-                f"{meta.get('fiscal_year', 'unknown')}_{meta.get('section', 'unknown')}_{i+j}"
-                for j, meta in enumerate(metadatas)
-            ]
+            # Generate IDs based on source type
+            ids = []
+            for j, meta in enumerate(metadatas):
+                source_type = meta.get('source_type', 'doc')
+                ticker = meta.get('ticker', 'unknown')
+                
+                if source_type == 'sec_filing':
+                    doc_id = f"{ticker}_{meta.get('filing_type', 'doc')}_{meta.get('fiscal_year', 'unknown')}_{meta.get('section', 'unknown')}_{i+j}"
+                elif source_type == 'earnings_transcript':
+                    doc_id = f"{ticker}_earnings_{meta.get('date', 'unknown')}_{meta.get('quarter', 'unknown')}_{i+j}"
+                elif source_type == 'news':
+                    doc_id = f"{ticker}_news_{meta.get('date', 'unknown')}_{meta.get('publisher', 'unknown')}_{i+j}"
+                elif source_type == 'analyst_report':
+                    doc_id = f"{ticker}_analyst_{meta.get('date', 'unknown')}_{meta.get('analyst', 'unknown')}_{i+j}"
+                elif source_type == 'press_release':
+                    doc_id = f"{ticker}_press_{meta.get('date', 'unknown')}_{i+j}"
+                elif source_type == 'industry_research':
+                    doc_id = f"industry_{meta.get('sector', 'unknown')}_{meta.get('date', 'unknown')}_{i+j}"
+                else:
+                    doc_id = f"{source_type}_{ticker}_{meta.get('date', 'unknown')}_{i+j}"
+                
+                ids.append(doc_id)
             
             collection.add(
                 embeddings=embeddings,
@@ -222,6 +318,83 @@ class VectorStore:
         if not self._available:
             return []
         return self._search(query, self.uploaded_collection, n_results, filter_metadata, "uploaded_doc")
+    
+    def search_earnings_transcripts(
+        self,
+        query: str,
+        n_results: int = 5,
+        filter_metadata: Optional[Dict[str, Any]] = None,
+    ) -> List[RetrievedDocument]:
+        """Semantic search over earnings call transcripts."""
+        if not self._available:
+            return []
+        return self._search(query, self.earnings_collection, n_results, filter_metadata, "earnings_transcript")
+    
+    def search_financial_news(
+        self,
+        query: str,
+        n_results: int = 5,
+        filter_metadata: Optional[Dict[str, Any]] = None,
+    ) -> List[RetrievedDocument]:
+        """Semantic search over financial news articles."""
+        if not self._available:
+            return []
+        return self._search(query, self.news_collection, n_results, filter_metadata, "news")
+    
+    def search_analyst_reports(
+        self,
+        query: str,
+        n_results: int = 5,
+        filter_metadata: Optional[Dict[str, Any]] = None,
+    ) -> List[RetrievedDocument]:
+        """Semantic search over analyst research reports."""
+        if not self._available:
+            return []
+        return self._search(query, self.analyst_collection, n_results, filter_metadata, "analyst_report")
+    
+    def search_press_releases(
+        self,
+        query: str,
+        n_results: int = 5,
+        filter_metadata: Optional[Dict[str, Any]] = None,
+    ) -> List[RetrievedDocument]:
+        """Semantic search over company press releases."""
+        if not self._available:
+            return []
+        return self._search(query, self.press_collection, n_results, filter_metadata, "press_release")
+    
+    def search_industry_research(
+        self,
+        query: str,
+        n_results: int = 5,
+        filter_metadata: Optional[Dict[str, Any]] = None,
+    ) -> List[RetrievedDocument]:
+        """Semantic search over industry research reports."""
+        if not self._available:
+            return []
+        return self._search(query, self.industry_collection, n_results, filter_metadata, "industry_research")
+    
+    def search_all_sources(
+        self,
+        query: str,
+        n_results_per_source: int = 3,
+        filter_metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, List[RetrievedDocument]]:
+        """Search across all document collections and return results by source."""
+        if not self._available:
+            return {}
+        
+        results = {
+            "sec_filings": self.search_sec_narratives(query, n_results_per_source, filter_metadata),
+            "uploaded_docs": self.search_uploaded_docs(query, n_results_per_source, filter_metadata),
+            "earnings_transcripts": self.search_earnings_transcripts(query, n_results_per_source, filter_metadata),
+            "financial_news": self.search_financial_news(query, n_results_per_source, filter_metadata),
+            "analyst_reports": self.search_analyst_reports(query, n_results_per_source, filter_metadata),
+            "press_releases": self.search_press_releases(query, n_results_per_source, filter_metadata),
+            "industry_research": self.search_industry_research(query, n_results_per_source, filter_metadata),
+        }
+        
+        return results
     
     @cache_retrieval
     def _search(
