@@ -39,6 +39,12 @@ venv.bak/
 *.sqlite
 *.sqlite3
 data/sqlite/
+# SQLite temporary files
+*.db-shm
+*.db-wal
+# ChromaDB vector database
+data/chroma_db/
+**/chroma_db/
 
 # Logs
 logs/
