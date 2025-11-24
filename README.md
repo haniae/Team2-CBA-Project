@@ -54,10 +54,13 @@ python scripts/ingestion/ingest_universe.py --universe-file data/tickers/test_10
 
 # 2.5. Index into Vector DB for RAG (optional but recommended)
 # This enables semantic search over SEC filings for better answers
+# First, install vector DB dependencies:
+pip install chromadb sentence-transformers requests beautifulsoup4
 # Test with one ticker first:
 python scripts/index_documents_for_rag.py --database data/financial.db --type sec --ticker AAPL --fetch-from-sec --limit 3
 # Check status: python check_vector_db.py
 # Then process all: python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 5
+# See full guide: VECTOR_DB_INGESTION_GUIDE.md or README section "Vector Database Indexing"
 
 # 3. Run the chatbot
 python run_chatbot.py
@@ -95,6 +98,7 @@ python run_chatbot.py
 - [🧠 Retrieval & ML Internals](#-retrieval--ml-internals)
 - [💬 Running FinalyzeOS](#-running-finalyzeos)
 - [📥 Data Ingestion Guide](#-data-ingestion-guide)
+- [🔍 Vector Database Guide](VECTOR_DB_INGESTION_GUIDE.md) - Complete guide for vector DB indexing
 - [⚙️ Configuration Reference](#️-configuration-reference)
 - [🗄️ Database Schema](#️-database-schema)
 
