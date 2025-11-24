@@ -580,6 +580,44 @@ REM Resume from a specific ticker (if interrupted)
 python scripts/index_documents_for_rag.py --database data/financial.db --type sec --universe sp500 --fetch-from-sec --limit 5 --start-from MSFT
 ```
 
+**Batch Process All Document Types for Ticker Universe:**
+
+**Windows PowerShell/CMD:**
+```cmd
+REM Process all S&P 1500 tickers with earnings, news, analyst, and press releases
+python scripts/fetchers/batch_fetch_all_sources_sp1500.py --database data/financial.db --universe sp1500
+
+REM Test with first 10 tickers
+python scripts/fetchers/batch_fetch_all_sources_sp1500.py --database data/financial.db --universe sp1500 --max-tickers 10
+
+REM Use S&P 500 instead
+python scripts/fetchers/batch_fetch_all_sources_sp1500.py --database data/financial.db --universe sp500
+
+REM Resume from a specific ticker
+python scripts/fetchers/batch_fetch_all_sources_sp1500.py --database data/financial.db --universe sp1500 --start-from MSFT
+
+REM Skip certain sources
+python scripts/fetchers/batch_fetch_all_sources_sp1500.py --database data/financial.db --universe sp1500 --skip-earnings
+
+REM Custom limits per source
+python scripts/fetchers/batch_fetch_all_sources_sp1500.py --database data/financial.db --universe sp1500 --news-limit 20 --analyst-limit 15
+```
+
+**What the batch fetcher does:**
+- Processes all tickers in the specified universe (sp500, sp1500, etc.)
+- For each ticker, fetches and indexes:
+  - Earnings transcripts (Yahoo Finance primary, Seeking Alpha fallback)
+  - Financial news (Yahoo Finance - reliable)
+  - Analyst reports (Yahoo Finance primary, Seeking Alpha fallback)
+  - Press releases (Company IR pages)
+- Shows progress, time estimates, and statistics
+- Handles errors gracefully and continues processing
+- Can be resumed from any ticker if interrupted
+
+**Time Estimates:**
+- S&P 500 (482 companies): ~8-16 hours
+- S&P 1500 (1,599 companies): ~25-50 hours
+
 **Step 4: Verify Vector Database Status**
 
 **Windows PowerShell/CMD:**
@@ -620,19 +658,21 @@ REM - 💾 Storage Size: XX.XX MB
 - **Earnings Transcripts** (NEW!):
   - Management commentary and Q&A sessions
   - Forward guidance and strategic discussions
-  - Sources: Seeking Alpha, Company IR pages
+  - Earnings history and quarterly data
+  - Sources: **Yahoo Finance (primary, reliable)**, Seeking Alpha (fallback, may be blocked), Company IR pages
   - Metadata: ticker, date, quarter, source URL
 
 - **Financial News** (NEW!):
   - Recent news articles affecting stocks
   - Market sentiment and breaking news
-  - Sources: Yahoo Finance, NewsAPI
+  - Sources: **Yahoo Finance (reliable)**, NewsAPI (optional, requires API key)
   - Metadata: ticker, date, publisher, title, source URL
 
 - **Analyst Reports** (NEW!):
   - Professional equity research and analysis
   - Price targets and investment theses
-  - Sources: Seeking Alpha
+  - Analyst recommendations and upgrades/downgrades
+  - Sources: **Yahoo Finance (primary, reliable)**, Seeking Alpha (fallback, may be blocked with 403)
   - Metadata: ticker, date, analyst, rating, target price
 
 - **Press Releases** (NEW!):

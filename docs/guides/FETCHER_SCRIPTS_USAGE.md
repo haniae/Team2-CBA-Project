@@ -53,25 +53,28 @@ python scripts/fetchers/fetch_industry_research.py --database data/financial.db 
 
 ### 1. Earnings Transcripts
 
-**Sources**: Seeking Alpha, Company IR pages
+**Sources**: Yahoo Finance (primary, reliable), Seeking Alpha (fallback, may be blocked), Company IR pages
 
 ```bash
-# Basic usage
+# Basic usage (tries all sources, Yahoo Finance first)
 python scripts/fetchers/fetch_earnings_transcripts.py --database data/financial.db --ticker AAPL
 
 # Specify source
+python scripts/fetchers/fetch_earnings_transcripts.py --database data/financial.db --ticker AAPL --source yahoo
 python scripts/fetchers/fetch_earnings_transcripts.py --database data/financial.db --ticker AAPL --source seeking_alpha
 python scripts/fetchers/fetch_earnings_transcripts.py --database data/financial.db --ticker AAPL --source company_ir
 python scripts/fetchers/fetch_earnings_transcripts.py --database data/financial.db --ticker AAPL --source all
 ```
 
 **What it does**:
-- Fetches earnings call transcripts from Seeking Alpha or company IR pages
-- Extracts Q&A sections and management commentary
+- Fetches earnings data and history from Yahoo Finance (most reliable)
+- Falls back to Seeking Alpha or company IR pages if Yahoo Finance doesn't have transcripts
+- Extracts earnings history, quarterly data, and management commentary
 - Chunks and indexes into `earnings_transcripts` collection
 
 **Requirements**:
-- `requests`, `beautifulsoup4`
+- `yfinance` (for Yahoo Finance)
+- `requests`, `beautifulsoup4` (for other sources)
 
 ---
 
