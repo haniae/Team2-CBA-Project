@@ -255,7 +255,13 @@ class VectorStore:
         for i in range(0, len(documents), batch_size):
             batch = documents[i:i + batch_size]
             texts = [doc["text"] for doc in batch]
-            metadatas = [doc.get("metadata", {}) for doc in batch]
+            metadatas_raw = [doc.get("metadata", {}) for doc in batch]
+            
+            # Clean metadata: Remove None values (ChromaDB doesn't accept None)
+            metadatas = []
+            for meta in metadatas_raw:
+                cleaned_meta = {k: v for k, v in meta.items() if v is not None}
+                metadatas.append(cleaned_meta)
             
             # Generate embeddings: "Text → Tokens → Embeddings"
             embeddings = self.embedding_model.encode(
@@ -266,7 +272,7 @@ class VectorStore:
             
             # Generate IDs based on source type
             ids = []
-            for j, meta in enumerate(metadatas):
+            for j, meta in enumerate(metadatas_raw):  # Use raw metadata for ID generation
                 source_type = meta.get('source_type', 'doc')
                 ticker = meta.get('ticker', 'unknown')
                 
@@ -290,7 +296,7 @@ class VectorStore:
             collection.add(
                 embeddings=embeddings,
                 documents=texts,
-                metadatas=metadatas,
+                metadatas=metadatas,  # Use cleaned metadata without None values
                 ids=ids,
             )
             total_added += len(texts)
