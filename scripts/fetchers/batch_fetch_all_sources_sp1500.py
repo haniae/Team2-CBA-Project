@@ -10,7 +10,13 @@ This script processes all tickers in the S&P 1500 universe and indexes:
 Industry research is handled separately by sector.
 """
 
+import os
 import sys
+
+# Set encoding environment variable FIRST (before any imports that might print)
+if sys.platform == 'win32':
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 import io
 import argparse
 import time
@@ -18,10 +24,20 @@ from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
 
-# Fix Windows console encoding issues
+# Fix Windows console encoding issues (safer approach - only if needed)
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    try:
+        # Only wrap if not already wrapped and buffer exists and is not closed
+        if (not isinstance(sys.stdout, io.TextIOWrapper) and 
+            hasattr(sys.stdout, 'buffer') and 
+            not sys.stdout.buffer.closed):
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+        if (not isinstance(sys.stderr, io.TextIOWrapper) and 
+            hasattr(sys.stderr, 'buffer') and 
+            not sys.stderr.buffer.closed):
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    except (AttributeError, ValueError, OSError):
+        pass  # Environment variable is already set, that's enough
 
 # Add project root and src to path
 project_root = Path(__file__).parent.parent.parent
@@ -31,7 +47,7 @@ sys.path.insert(0, str(project_root))
 try:
     from finanlyzeos_chatbot.ticker_universe import load_ticker_universe
 except ImportError:
-    print("❌ Error: Could not import load_ticker_universe")
+    print("[ERROR] Error: Could not import load_ticker_universe")
     sys.exit(1)
 
 # Import all fetchers - import directly from the fetchers directory
@@ -47,7 +63,7 @@ try:
     EARNINGS_AVAILABLE = True
 except Exception as e:
     EARNINGS_AVAILABLE = False
-    print(f"⚠️  Warning: Earnings transcripts fetcher not available: {e}")
+    print(f"[WARN] Warning: Earnings transcripts fetcher not available: {e}")
 
 try:
     news_path = Path(__file__).parent / "fetch_financial_news.py"
@@ -58,7 +74,7 @@ try:
     NEWS_AVAILABLE = True
 except Exception as e:
     NEWS_AVAILABLE = False
-    print(f"⚠️  Warning: Financial news fetcher not available: {e}")
+    print(f"[WARN] Warning: Financial news fetcher not available: {e}")
 
 try:
     analyst_path = Path(__file__).parent / "fetch_analyst_reports.py"
@@ -69,7 +85,7 @@ try:
     ANALYST_AVAILABLE = True
 except Exception as e:
     ANALYST_AVAILABLE = False
-    print(f"⚠️  Warning: Analyst reports fetcher not available: {e}")
+    print(f"[WARN] Warning: Analyst reports fetcher not available: {e}")
 
 try:
     press_path = Path(__file__).parent / "fetch_press_releases.py"
@@ -80,7 +96,7 @@ try:
     PRESS_AVAILABLE = True
 except Exception as e:
     PRESS_AVAILABLE = False
-    print(f"⚠️  Warning: Press releases fetcher not available: {e}")
+    print(f"[WARN] Warning: Press releases fetcher not available: {e}")
 
 
 def batch_fetch_all_sources(
@@ -127,9 +143,9 @@ def batch_fetch_all_sources(
     # Load ticker universe
     try:
         tickers = load_ticker_universe(universe)
-        print(f"✓ Loaded {len(tickers)} tickers from {universe}")
+        print(f"[OK] Loaded {len(tickers)} tickers from {universe}")
     except Exception as e:
-        print(f"❌ Error loading ticker universe: {e}")
+        print(f"[ERROR] Error loading ticker universe: {e}")
         return 1
     
     # Filter tickers if start_from is specified
@@ -137,16 +153,16 @@ def batch_fetch_all_sources(
         try:
             start_idx = tickers.index(start_from.upper())
             tickers = tickers[start_idx:]
-            print(f"✓ Starting from ticker {start_from.upper()} (skipped {start_idx} tickers)")
+            print(f"[OK] Starting from ticker {start_from.upper()} (skipped {start_idx} tickers)")
         except ValueError:
-            print(f"⚠️  Warning: Ticker {start_from.upper()} not found in universe, starting from beginning")
+            print(f"[WARN] Warning: Ticker {start_from.upper()} not found in universe, starting from beginning")
     
     # Limit tickers if max_tickers is specified
     if max_tickers:
         tickers = tickers[:max_tickers]
-        print(f"✓ Limited to {len(tickers)} tickers")
+        print(f"[OK] Limited to {len(tickers)} tickers")
     
-    print(f"\n📊 Processing {len(tickers)} tickers...")
+    print(f"\n[INFO] Processing {len(tickers)} tickers...")
     print("=" * 80)
     
     # Statistics
@@ -172,72 +188,72 @@ def batch_fetch_all_sources(
         # 1. Earnings Transcripts
         if not skip_earnings and EARNINGS_AVAILABLE:
             try:
-                print(f"  📞 Fetching earnings transcripts...")
+                print(f"  [EARNINGS] Fetching earnings transcripts...")
                 result = index_earnings_transcripts(database_path, ticker, source="all", limit=None)
                 if result == 0:
                     stats["earnings"]["success"] += 1
-                    print(f"  ✓ Earnings transcripts indexed (may be 0 if not available)")
+                    print(f"  [OK] Earnings transcripts indexed (may be 0 if not available)")
                 else:
                     stats["earnings"]["failed"] += 1
-                    print(f"  ⚠️  Earnings transcripts failed")
+                    print(f"  [WARN] Earnings transcripts failed")
             except Exception as e:
                 # 403 errors are expected from some sources
                 if "403" in str(e) or "Forbidden" in str(e):
                     stats["earnings"]["success"] += 1
-                    print(f"  ⚠️  Earnings transcripts: Access blocked (this is normal)")
+                    print(f"  [WARN] Earnings transcripts: Access blocked (this is normal)")
                 else:
                     stats["earnings"]["failed"] += 1
-                    print(f"  ❌ Earnings transcripts error: {e}")
+                    print(f"  [ERROR] Earnings transcripts error: {e}")
         
         # 2. Financial News
         if not skip_news and NEWS_AVAILABLE:
             try:
-                print(f"  📰 Fetching financial news...")
+                print(f"  [NEWS] Fetching financial news...")
                 result = index_financial_news(database_path, ticker=ticker, source="yahoo", limit=news_limit)
                 if result == 0:
                     stats["news"]["success"] += 1
-                    print(f"  ✓ Financial news indexed")
+                    print(f"  [OK] Financial news indexed")
                 else:
                     stats["news"]["failed"] += 1
-                    print(f"  ⚠️  Financial news failed")
+                    print(f"  [WARN] Financial news failed")
             except Exception as e:
                 stats["news"]["failed"] += 1
-                print(f"  ❌ Financial news error: {e}")
+                print(f"  [ERROR] Financial news error: {e}")
         
         # 3. Analyst Reports
         if not skip_analyst and ANALYST_AVAILABLE:
             try:
-                print(f"  📊 Fetching analyst reports...")
+                print(f"  [ANALYST] Fetching analyst reports...")
                 result = index_analyst_reports(database_path, ticker=ticker, source="all", limit=analyst_limit)
                 if result == 0:
                     stats["analyst"]["success"] += 1
-                    print(f"  ✓ Analyst reports indexed (may be 0 if Seeking Alpha blocks access)")
+                    print(f"  [OK] Analyst reports indexed (may be 0 if Seeking Alpha blocks access)")
                 else:
                     stats["analyst"]["failed"] += 1
-                    print(f"  ⚠️  Analyst reports failed")
+                    print(f"  [WARN] Analyst reports failed")
             except Exception as e:
                 # 403 errors from Seeking Alpha are expected - they have anti-scraping measures
                 if "403" in str(e) or "Forbidden" in str(e):
                     stats["analyst"]["success"] += 1  # Count as success since process completed
-                    print(f"  ⚠️  Analyst reports: Seeking Alpha blocked access (this is normal)")
+                    print(f"  [WARN] Analyst reports: Seeking Alpha blocked access (this is normal)")
                 else:
                     stats["analyst"]["failed"] += 1
-                    print(f"  ❌ Analyst reports error: {e}")
+                    print(f"  [ERROR] Analyst reports error: {e}")
         
         # 4. Press Releases
         if not skip_press and PRESS_AVAILABLE:
             try:
-                print(f"  📢 Fetching press releases...")
+                print(f"  [PRESS] Fetching press releases...")
                 result = index_press_releases(database_path, ticker=ticker, limit=press_limit)
                 if result == 0:
                     stats["press"]["success"] += 1
-                    print(f"  ✓ Press releases indexed")
+                    print(f"  [OK] Press releases indexed")
                 else:
                     stats["press"]["failed"] += 1
-                    print(f"  ⚠️  Press releases failed")
+                    print(f"  [WARN] Press releases failed")
             except Exception as e:
                 stats["press"]["failed"] += 1
-                print(f"  ❌ Press releases error: {e}")
+                print(f"  [ERROR] Press releases error: {e}")
         
         stats["processed"] += 1
         
@@ -246,12 +262,12 @@ def batch_fetch_all_sources(
         avg_time = elapsed / idx
         remaining = (len(tickers) - idx) * avg_time
         
-        print(f"\n  📈 Progress: {idx}/{len(tickers)} ({idx/len(tickers)*100:.1f}%)")
-        print(f"  ⏱️  Elapsed: {elapsed/60:.1f} min | Est. remaining: {remaining/60:.1f} min")
+        print(f"\n  [PROGRESS] {idx}/{len(tickers)} ({idx/len(tickers)*100:.1f}%)")
+        print(f"  [TIME] Elapsed: {elapsed/60:.1f} min | Est. remaining: {remaining/60:.1f} min")
         
         # Rate limiting - be nice to APIs
         if idx < len(tickers):
-            print(f"  ⏸️  Waiting 2 seconds before next ticker...")
+            print(f"  [WAIT] Waiting 2 seconds before next ticker...")
             time.sleep(2)
     
     # Final summary
@@ -312,7 +328,7 @@ Examples:
     args = parser.parse_args()
     
     if not args.database.exists():
-        print(f"❌ Error: Database not found: {args.database}")
+        print(f"[ERROR] Error: Database not found: {args.database}")
         sys.exit(1)
     
     sys.exit(batch_fetch_all_sources(

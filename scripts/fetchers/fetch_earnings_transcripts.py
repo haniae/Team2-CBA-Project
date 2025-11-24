@@ -2,18 +2,31 @@
 Fetch and index earnings call transcripts.
 
 Sources:
-- Seeking Alpha (free transcripts)
+- Yahoo Finance (earnings data and summaries - reliable)
+- Seeking Alpha (free transcripts - may be blocked)
 - Fintel.io (free transcripts)
 - Company investor relations pages
 """
 
 import sys
+import io
 import argparse
 import time
 import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+
+# Fix Windows console encoding issues (safer approach)
+if sys.platform == 'win32':
+    try:
+        if not isinstance(sys.stdout, io.TextIOWrapper) and hasattr(sys.stdout, 'buffer'):
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+        if not isinstance(sys.stderr, io.TextIOWrapper) and hasattr(sys.stderr, 'buffer'):
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    except (AttributeError, ValueError, OSError):
+        import os
+        os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -30,6 +43,93 @@ try:
 except ImportError:
     REQUESTS_AVAILABLE = False
     print("⚠️  Warning: requests/beautifulsoup4 not available. Install: pip install requests beautifulsoup4")
+
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+except ImportError:
+    YFINANCE_AVAILABLE = False
+    yf = None
+
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+except ImportError:
+    YFINANCE_AVAILABLE = False
+    yf = None
+
+
+def fetch_yahoo_earnings_data(ticker: str) -> Optional[Dict[str, Any]]:
+    """
+    Fetch earnings data and summaries from Yahoo Finance (reliable, no blocking).
+    
+    Args:
+        ticker: Company ticker symbol
+        
+    Returns:
+        Dict with earnings data or None
+    """
+    if not YFINANCE_AVAILABLE:
+        return None
+    
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Get earnings data
+        earnings_dates = stock.calendar
+        earnings_history = stock.earnings_history
+        
+        # Get earnings history
+        earnings_text = ""
+        
+        # Try to get earnings calendar
+        try:
+            earnings_dates = stock.calendar
+            if earnings_dates is not None and len(earnings_dates) > 0:
+                earnings_text += f"Upcoming Earnings Dates for {ticker}:\n"
+                for date in earnings_dates.index[:3]:
+                    earnings_text += f"- {date}\n"
+                earnings_text += "\n"
+        except:
+            pass
+        
+        # Get earnings history
+        try:
+            earnings_history = stock.earnings_history
+            if earnings_history is not None and len(earnings_history) > 0:
+                earnings_text += f"Earnings History for {ticker}:\n\n"
+                for idx, row in earnings_history.head(4).iterrows():
+                    eps_actual = row.get('epsActual', 'N/A')
+                    eps_estimate = row.get('epsEstimate', 'N/A')
+                    surprise = row.get('surprisePercent', 'N/A')
+                    date = idx.strftime('%Y-%m-%d') if hasattr(idx, 'strftime') else str(idx)
+                    earnings_text += f"Date: {date}\nEPS Actual: {eps_actual}\nEPS Estimate: {eps_estimate}\nSurprise: {surprise}%\n\n"
+        except Exception as e:
+            pass
+        
+        # Get quarterly earnings
+        try:
+            quarterly_earnings = stock.quarterly_earnings
+            if quarterly_earnings is not None and len(quarterly_earnings) > 0:
+                earnings_text += f"\nQuarterly Earnings:\n{quarterly_earnings.to_string()}\n"
+        except:
+            pass
+        
+        if not earnings_text:
+            return None
+        
+        return {
+            "text": earnings_text,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "quarter": None,  # Yahoo Finance doesn't provide quarter directly
+            "source_url": f"https://finance.yahoo.com/quote/{ticker}/analysis",
+            "source": "yahoo_finance"
+        }
+        
+    except Exception as e:
+        print(f"⚠️  Error fetching Yahoo Finance earnings data for {ticker}: {e}")
+        return None
 
 
 def fetch_seeking_alpha_transcript(ticker: str, quarter: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -213,9 +313,13 @@ def index_earnings_transcripts(
     
     all_documents = []
     
-    # Fetch transcript
+    # Fetch transcript - try Yahoo Finance first (reliable, no blocking)
     transcript_data = None
-    if source in ["seeking_alpha", "all"]:
+    if source in ["yahoo", "all"]:
+        print(f"🔍 Fetching earnings data from Yahoo Finance for {ticker}...")
+        transcript_data = fetch_yahoo_earnings_data(ticker)
+    
+    if not transcript_data and source in ["seeking_alpha", "all"]:
         print(f"🔍 Fetching transcript from Seeking Alpha for {ticker}...")
         transcript_data = fetch_seeking_alpha_transcript(ticker)
     
@@ -264,7 +368,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch and index earnings call transcripts")
     parser.add_argument("--database", required=True, type=Path, help="Path to SQLite database")
     parser.add_argument("--ticker", required=True, type=str, help="Company ticker symbol")
-    parser.add_argument("--source", choices=["seeking_alpha", "company_ir", "all"], default="all", help="Source to fetch from")
+    parser.add_argument("--source", choices=["yahoo", "seeking_alpha", "company_ir", "all"], default="all", help="Source to fetch from (yahoo is most reliable, all tries all sources)")
     parser.add_argument("--limit", type=int, help="Limit number of transcripts (not yet implemented)")
     
     args = parser.parse_args()

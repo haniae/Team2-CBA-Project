@@ -15,10 +15,16 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 
-# Fix Windows console encoding issues
+# Fix Windows console encoding issues (safer approach)
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    try:
+        if not isinstance(sys.stdout, io.TextIOWrapper) and hasattr(sys.stdout, 'buffer'):
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+        if not isinstance(sys.stderr, io.TextIOWrapper) and hasattr(sys.stderr, 'buffer'):
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    except (AttributeError, ValueError, OSError):
+        import os
+        os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -68,17 +74,46 @@ def fetch_yahoo_news(ticker: str, limit: int = 10) -> List[Dict[str, Any]]:
             return articles
         
         for item in news[:limit]:
+            # Yahoo Finance news structure has changed - data is nested
+            content = item.get("content", {})
+            title = content.get("title", item.get("title", ""))
+            summary = content.get("summary", item.get("summary", ""))
+            description = content.get("description", "")
+            
+            # Combine summary and description for text
+            text = summary or description or ""
+            
+            # Get URL
+            canonical_url = item.get("canonicalUrl", {})
+            source_url = canonical_url.get("url", "") if isinstance(canonical_url, dict) else canonical_url or item.get("link", "")
+            
+            # Get publisher
+            provider = item.get("provider", {})
+            publisher = provider.get("displayName", "Yahoo Finance") if isinstance(provider, dict) else str(provider) or "Yahoo Finance"
+            
+            # Get date
+            pub_date = content.get("pubDate", item.get("pubDate", ""))
+            if pub_date:
+                try:
+                    from dateutil import parser as date_parser
+                    date_obj = date_parser.parse(pub_date)
+                    date_str = date_obj.strftime("%Y-%m-%d")
+                except:
+                    date_str = datetime.now().strftime("%Y-%m-%d")
+            else:
+                date_str = datetime.now().strftime("%Y-%m-%d")
+            
             article = {
-                "title": item.get("title", ""),
-                "text": item.get("summary", ""),  # Yahoo Finance provides summary
-                "publisher": item.get("publisher", "Unknown"),
-                "date": datetime.fromtimestamp(item.get("providerPublishTime", 0)).strftime("%Y-%m-%d") if item.get("providerPublishTime") else datetime.now().strftime("%Y-%m-%d"),
-                "source_url": item.get("link", ""),
+                "title": title,
+                "text": text,
+                "publisher": publisher,
+                "date": date_str,
+                "source_url": source_url,
                 "source": "yahoo_finance"
             }
             
-            # If we have a link, try to fetch full article
-            if article["source_url"] and REQUESTS_AVAILABLE:
+            # If we have a link and text is short, try to fetch full article
+            if article["source_url"] and len(article["text"]) < 500 and REQUESTS_AVAILABLE:
                 try:
                     response = requests.get(article["source_url"], timeout=10, headers={
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -92,7 +127,9 @@ def fetch_yahoo_news(ticker: str, limit: int = 10) -> List[Dict[str, Any]]:
                 except:
                     pass  # Use summary if full article fetch fails
             
-            articles.append(article)
+            # Only add if we have some text
+            if article["text"]:
+                articles.append(article)
             
     except Exception as e:
         print(f"⚠️  Error fetching Yahoo Finance news for {ticker}: {e}")

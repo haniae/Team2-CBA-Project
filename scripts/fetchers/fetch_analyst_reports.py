@@ -16,10 +16,16 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-# Fix Windows console encoding issues
+# Fix Windows console encoding issues (safer approach)
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    try:
+        if not isinstance(sys.stdout, io.TextIOWrapper) and hasattr(sys.stdout, 'buffer'):
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+        if not isinstance(sys.stderr, io.TextIOWrapper) and hasattr(sys.stderr, 'buffer'):
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    except (AttributeError, ValueError, OSError):
+        import os
+        os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
