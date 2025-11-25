@@ -1,4 +1,4 @@
-l"""Source verification to ensure cited sources actually contain the data mentioned."""
+"""Source verification to ensure cited sources actually contain the data mentioned."""
 
 import re
 import logging

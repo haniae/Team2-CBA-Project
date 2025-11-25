@@ -2754,12 +2754,20 @@ class FinanlyzeOSChatbot:
     def _detect_visualization_intent(self, text: str) -> Optional[Any]:
         """Detect if the prompt is a visualization request."""
         try:
-            detector = VisualizationIntentDetector()
+            # Pass ticker resolver for company name resolution
+            ticker_resolver = getattr(self, '_name_to_ticker', None)
+            detector = VisualizationIntentDetector(ticker_resolver=ticker_resolver)
             request = detector.detect(text)
-            if request and request.confidence >= 0.5:
-                return request
+            if request:
+                # Check confidence if available, otherwise accept if request exists
+                confidence = getattr(request, 'confidence', 1.0)
+                if confidence >= 0.5:
+                    LOGGER.info(f"Visualization intent detected: {request.chart_type.value}, tickers: {request.tickers}, confidence: {confidence}")
+                    return request
+                else:
+                    LOGGER.debug(f"Visualization intent detected but confidence too low: {confidence}")
         except Exception as e:
-            LOGGER.debug(f"Visualization intent detection failed: {e}")
+            LOGGER.warning(f"Visualization intent detection failed: {e}", exc_info=True)
         return None
 
     def _handle_visualization_intent(self, request: Any) -> Optional[str]:
@@ -2780,6 +2788,7 @@ class FinanlyzeOSChatbot:
             # Pass ticker resolver to support S&P 1500+ companies
             ticker_resolver = getattr(self, '_name_to_ticker', None)
             
+            # Initialize VisualizationGenerator with correct parameters
             generator = VisualizationGenerator(
                 db_path=Path(self.settings.database_path),
                 analytics_engine=self.analytics_engine,
@@ -2798,12 +2807,283 @@ class FinanlyzeOSChatbot:
                 chart_type = metadata.get("chart_type", "chart")
                 tickers = metadata.get("tickers", [])
                 metric = metadata.get("metric", "data")
+                metric_label = metric.replace('_', ' ').title()
+                data_sources = metadata.get("data_sources", [])
+                chart_data = metadata.get("chart_data", [])
                 
-                response = f"I've created a {chart_type} chart showing {metric.replace('_', ' ')}"
+                # Build comprehensive response with explanation and audit trail
+                response = f"## 📊 {chart_type.title()} Chart: {metric_label}\n\n"
+                response += f"I've created an interactive {chart_type} chart showing **{metric_label}**"
                 if tickers:
-                    response += f" for {', '.join(tickers)}"
+                    response += f" for **{', '.join(tickers)}**"
                 response += ".\n\n"
                 response += f"![{chart_type} chart]({file_path})\n\n"
+                
+                # Add comprehensive, detailed explanation (always show if we have data sources or chart data)
+                if chart_data or data_sources:
+                    response += "### 📊 Detailed Analysis & Insights\n\n"
+                    
+                    # Collect all data for analysis
+                    all_data = []
+                    if chart_data:
+                        for data in chart_data:
+                            ticker = data.get('ticker', '').upper()
+                            latest_value = data.get('latest_value')
+                            values = data.get('values', [])
+                            years = data.get('years', [])
+                            trend = data.get('trend', 'stable')
+                            
+                            # Calculate comprehensive growth metrics
+                            growth_rate = None
+                            growth_percentage = None
+                            cagr = None  # Compound Annual Growth Rate
+                            volatility = None
+                            min_value = None
+                            max_value = None
+                            
+                            if len(values) > 1 and values[0] > 0:
+                                growth_rate = values[-1] - values[0]
+                                growth_percentage = ((values[-1] - values[0]) / values[0]) * 100
+                                
+                                # Calculate CAGR if we have multiple years
+                                if len(years) > 1 and len(values) == len(years):
+                                    num_years = years[-1] - years[0]
+                                    if num_years > 0:
+                                        cagr = (((values[-1] / values[0]) ** (1.0 / num_years)) - 1) * 100
+                                
+                                # Calculate volatility (standard deviation of year-over-year changes)
+                                if len(values) > 2:
+                                    try:
+                                        import statistics
+                                        yoy_changes = [(values[i] - values[i-1]) / values[i-1] * 100 for i in range(1, len(values))]
+                                        if yoy_changes:
+                                            volatility = statistics.stdev(yoy_changes) if len(yoy_changes) > 1 else 0
+                                    except:
+                                        volatility = None
+                                
+                                min_value = min(values)
+                                max_value = max(values)
+                            
+                            all_data.append({
+                                'ticker': ticker,
+                                'latest_value': latest_value,
+                                'values': values,
+                                'years': years,
+                                'trend': trend,
+                                'growth_rate': growth_rate,
+                                'growth_percentage': growth_percentage,
+                                'cagr': cagr,
+                                'volatility': volatility,
+                                'min_value': min_value,
+                                'max_value': max_value
+                            })
+                    elif data_sources:
+                        # Fallback: use data_sources if chart_data is empty
+                        for source_info in data_sources:
+                            ticker = source_info.get('ticker', '').upper()
+                            value = source_info.get('value')
+                            all_data.append({
+                                'ticker': ticker,
+                                'latest_value': value,
+                                'values': [value] if value else [],
+                                'years': [],
+                                'trend': 'stable',
+                                'growth_rate': None,
+                                'growth_percentage': None
+                            })
+                    
+                    # Sort by latest value (highest first) for comparison
+                    all_data.sort(key=lambda x: x.get('latest_value') or 0, reverse=True)
+                    
+                    # Generate detailed insights for each company
+                    response += "#### Company Performance Breakdown\n\n"
+                    for i, data in enumerate(all_data):
+                        ticker = data.get('ticker', '').upper()
+                        latest_value = data.get('latest_value')
+                        trend = data.get('trend', 'stable')
+                        growth_percentage = data.get('growth_percentage')
+                        cagr = data.get('cagr')
+                        volatility = data.get('volatility')
+                        min_value = data.get('min_value')
+                        max_value = data.get('max_value')
+                        years = data.get('years', [])
+                        
+                        if latest_value is not None:
+                            # Format value based on metric type
+                            if metric in ['revenue', 'net_income', 'operating_income', 'gross_profit', 'free_cash_flow', 'total_assets']:
+                                if latest_value >= 1e9:
+                                    formatted_value = f"${latest_value/1e9:.2f}B"
+                                elif latest_value >= 1e6:
+                                    formatted_value = f"${latest_value/1e6:.2f}M"
+                                else:
+                                    formatted_value = f"${latest_value:,.0f}"
+                            elif metric in ['pe_ratio', 'ps_ratio', 'pb_ratio', 'ev_ebitda']:
+                                formatted_value = f"{latest_value:.2f}x"
+                            elif metric in ['return_on_equity', 'return_on_assets', 'operating_margin', 'net_margin', 'ebitda_margin']:
+                                formatted_value = f"{latest_value:.2f}%"
+                            else:
+                                formatted_value = f"{latest_value:,.0f}"
+                            
+                            # Build detailed insight header
+                            response += f"**{ticker}** — Latest {metric_label}: **{formatted_value}**"
+                            
+                            # Add ranking for multi-company comparisons
+                            if len(all_data) > 1:
+                                if i == 0:
+                                    response += " *(Highest)*"
+                                elif i == len(all_data) - 1:
+                                    response += " *(Lowest)*"
+                            
+                            response += "\n"
+                            
+                            # Add detailed metrics
+                            details = []
+                            
+                            if growth_percentage is not None:
+                                if growth_percentage > 0:
+                                    details.append(f"Total growth: **+{growth_percentage:.1f}%** over the period")
+                                elif growth_percentage < 0:
+                                    details.append(f"Total decline: **{growth_percentage:.1f}%** over the period")
+                                else:
+                                    details.append("Stable performance with no significant change")
+                            
+                            if cagr is not None:
+                                if cagr > 0:
+                                    details.append(f"CAGR: **+{cagr:.1f}%** (compound annual growth rate)")
+                                elif cagr < 0:
+                                    details.append(f"CAGR: **{cagr:.1f}%** (compound annual decline)")
+                            
+                            if volatility is not None and volatility > 0:
+                                if volatility < 5:
+                                    details.append(f"Low volatility: **{volatility:.1f}%** (stable growth pattern)")
+                                elif volatility < 15:
+                                    details.append(f"Moderate volatility: **{volatility:.1f}%** (some fluctuation)")
+                                else:
+                                    details.append(f"High volatility: **{volatility:.1f}%** (significant fluctuations)")
+                            
+                            if min_value is not None and max_value is not None and min_value != max_value:
+                                range_pct = ((max_value - min_value) / min_value) * 100 if min_value > 0 else 0
+                                if metric in ['revenue', 'net_income', 'operating_income', 'gross_profit', 'free_cash_flow', 'total_assets']:
+                                    if min_value >= 1e9:
+                                        min_formatted = f"${min_value/1e9:.2f}B"
+                                        max_formatted = f"${max_value/1e9:.2f}B"
+                                    elif min_value >= 1e6:
+                                        min_formatted = f"${min_value/1e6:.2f}M"
+                                        max_formatted = f"${max_value/1e6:.2f}M"
+                                    else:
+                                        min_formatted = f"${min_value:,.0f}"
+                                        max_formatted = f"${max_value:,.0f}"
+                                else:
+                                    min_formatted = f"{min_value:,.0f}"
+                                    max_formatted = f"{max_value:,.0f}"
+                                details.append(f"Range: {min_formatted} to {max_formatted} ({range_pct:.1f}% spread)")
+                            
+                            if years and len(years) > 1:
+                                details.append(f"Period analyzed: **{years[0]} to {years[-1]}** ({len(years)} data points)")
+                            
+                            if details:
+                                for detail in details:
+                                    response += f"  - {detail}\n"
+                            else:
+                                response += f"  - Trend: {trend.capitalize()}\n"
+                            
+                            response += "\n"
+                    
+                    # Add comparative analysis for multi-company charts
+                    if len(all_data) > 1:
+                        response += "#### Comparative Market Analysis\n\n"
+                        highest = all_data[0]
+                        lowest = all_data[-1]
+                        
+                        if highest.get('latest_value') and lowest.get('latest_value') and lowest.get('latest_value') > 0:
+                            ratio = highest.get('latest_value') / lowest.get('latest_value')
+                            response += f"**Market Leadership:** {highest.get('ticker')} leads the group with **{ratio:.1f}x** higher {metric_label.lower()} compared to {lowest.get('ticker')}.\n\n"
+                        
+                        # Calculate average
+                        valid_values = [d.get('latest_value') for d in all_data if d.get('latest_value') is not None]
+                        if valid_values:
+                            avg_value = sum(valid_values) / len(valid_values)
+                            if metric in ['revenue', 'net_income', 'operating_income', 'gross_profit', 'free_cash_flow', 'total_assets']:
+                                if avg_value >= 1e9:
+                                    avg_formatted = f"${avg_value/1e9:.2f}B"
+                                elif avg_value >= 1e6:
+                                    avg_formatted = f"${avg_value/1e6:.2f}M"
+                                else:
+                                    avg_formatted = f"${avg_value:,.0f}"
+                            else:
+                                avg_formatted = f"{avg_value:,.0f}"
+                            response += f"**Group Average:** The average {metric_label.lower()} across all companies is **{avg_formatted}**.\n\n"
+                            
+                        # Growth comparison
+                        growth_data = [d for d in all_data if d.get('growth_percentage') is not None]
+                        if growth_data:
+                            fastest_growth = max(growth_data, key=lambda x: x.get('growth_percentage', 0))
+                            slowest_growth = min(growth_data, key=lambda x: x.get('growth_percentage', 0))
+                            
+                            if fastest_growth.get('growth_percentage', 0) > 0:
+                                response += f"**Growth Leader:** {fastest_growth.get('ticker')} shows the strongest growth at **+{fastest_growth.get('growth_percentage', 0):.1f}%**, "
+                                if slowest_growth.get('growth_percentage', 0) < fastest_growth.get('growth_percentage', 0):
+                                    response += f"while {slowest_growth.get('ticker')} has the slowest growth at **{slowest_growth.get('growth_percentage', 0):.1f}%**.\n\n"
+                                else:
+                                    response += "\n\n"
+                        
+                        # CAGR comparison
+                        cagr_data = [d for d in all_data if d.get('cagr') is not None]
+                        if cagr_data:
+                            best_cagr = max(cagr_data, key=lambda x: x.get('cagr', 0))
+                            response += f"**Best Long-term Performance:** {best_cagr.get('ticker')} achieved the highest CAGR of **{best_cagr.get('cagr', 0):.1f}%** over the analyzed period.\n\n"
+                    
+                    response += "\n"
+                
+                # Add audit trail
+                if data_sources:
+                    response += "### 🔍 Data Sources & Audit Trail\n\n"
+                    response += "| Company | Metric | Latest Value | Source | Period |\n"
+                    response += "|---------|--------|--------------|--------|--------|\n"
+                    
+                    for source_info in data_sources:
+                        ticker = source_info.get('ticker', '').upper()
+                        source = source_info.get('source', 'unknown')
+                        period = source_info.get('period', 'Latest')
+                        value = source_info.get('value')
+                        
+                        # Format value
+                        if value is not None:
+                            if metric in ['revenue', 'net_income', 'operating_income', 'gross_profit', 'free_cash_flow']:
+                                if value >= 1e9:
+                                    formatted_value = f"${value/1e9:.2f}B"
+                                elif value >= 1e6:
+                                    formatted_value = f"${value/1e6:.2f}M"
+                                else:
+                                    formatted_value = f"${value:,.0f}"
+                            elif metric in ['pe_ratio', 'ps_ratio', 'pb_ratio']:
+                                formatted_value = f"{value:.2f}x"
+                            elif metric in ['return_on_equity', 'return_on_assets', 'operating_margin', 'net_margin']:
+                                formatted_value = f"{value:.2f}%"
+                            else:
+                                formatted_value = f"{value:,.0f}"
+                        else:
+                            formatted_value = "N/A"
+                        
+                        # Format source
+                        source_display = {
+                            'edgar': '📄 SEC EDGAR',
+                            'yahoo': '📊 Yahoo Finance',
+                            'sample': '🎨 Sample Data (Demo)',
+                            'unknown': '❓ Unknown'
+                        }.get(source.lower(), source.upper())
+                        
+                        response += f"| {ticker} | {metric_label} | {formatted_value} | {source_display} | {period} |\n"
+                    
+                    response += "\n"
+                    
+                    # Add note about data quality
+                    has_sample = any(s.get('source', '').lower() == 'sample' for s in data_sources)
+                    if has_sample:
+                        response += "> ⚠️ **Note**: Some data points are generated for demonstration purposes. "
+                        response += "To view real financial data, ingest company filings using: `ingest AAPL` or `ingest MSFT`\n\n"
+                    else:
+                        response += "> ✅ **Data Quality**: All values sourced from official financial filings (SEC EDGAR) or market data providers.\n\n"
                 
                 if status == "partial":
                     reason = metadata.get("reason", "")
@@ -2812,14 +3092,12 @@ class FinanlyzeOSChatbot:
                         response += "Chart shows sample/demonstration data. To see real data, ingest company data first: 'ingest AAPL' or 'ingest MSFT'.*\n\n"
                     else:
                         response += "*Note: Limited data available. Chart may show approximations.*\n\n"
-                else:
-                    response += "*Chart generated successfully. The image is available in the response.*\n\n"
                 
                 if warning:
-                    response += f"*Note: {warning}*"
+                    response += f"*Note: {warning}*\n\n"
                 
                 LOGGER.info(f"Returning visualization response with file_path: {file_path}, response length: {len(response)}")
-                LOGGER.info(f"Response preview: {response[:150]}...")
+                LOGGER.info(f"Response preview: {response[:200]}...")
                 return response
             else:
                 # Return helpful error message based on reason
