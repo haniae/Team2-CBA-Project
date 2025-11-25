@@ -101,6 +101,9 @@ fill_gaps_summary.json
 
 # HTML files (generated)
 *.html
+# Generated chart files (keep directory structure)
+src/charts/*.html
+src/charts/*.png
 
 # Setup files (temporary)
 setup.py
