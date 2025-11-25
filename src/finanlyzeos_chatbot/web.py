@@ -385,14 +385,26 @@ async def serve_portfolio_dashboard_js():
 # Chart serving endpoint
 @app.get("/api/charts/{chart_id}")
 async def serve_chart(chart_id: str):
-    """Serve chart images by ID."""
-    chart_path = CHARTS_DIR / f"{chart_id}.png"
-    if not chart_path.exists():
-        raise HTTPException(status_code=404, detail="Chart not found")
-    return FileResponse(
-        chart_path,
-        media_type="image/png",
-        headers={
+    """Serve chart files by ID (supports both PNG and HTML)."""
+    # Try HTML first (interactive Plotly charts)
+    html_path = CHARTS_DIR / f"{chart_id}.html"
+    if html_path.exists():
+        return FileResponse(
+            html_path,
+            media_type="text/html",
+            headers={
+                "Content-Disposition": f'inline; filename="{chart_id}.html"',
+                "X-Content-Type-Options": "nosniff"
+            }
+        )
+    
+    # Fallback to PNG (static matplotlib charts)
+    png_path = CHARTS_DIR / f"{chart_id}.png"
+    if png_path.exists():
+        return FileResponse(
+            png_path,
+            media_type="image/png",
+            headers={
             "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
         }
     )

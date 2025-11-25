@@ -364,26 +364,51 @@ class VisualizationGenerator:
         if self.charts_dir:
             self.charts_dir.mkdir(exist_ok=True)
     
-    def _save_chart(self, fig, chart_type: str) -> str:
-        """Save chart and return web URL or file path."""
-        import matplotlib.pyplot as plt
+    def _save_chart(self, fig, chart_type: str, is_plotly: bool = False) -> str:
+        """Save chart and return web URL or file path.
+        
+        Args:
+            fig: Chart figure (matplotlib or plotly)
+            chart_type: Type of chart (for file naming)
+            is_plotly: If True, fig is a Plotly figure; if False, matplotlib figure
+        """
         chart_id = str(uuid.uuid4())
         
         if self.charts_dir:
-            # Save to charts directory with unique ID
-            chart_path = self.charts_dir / f"{chart_id}.png"
-            fig.tight_layout()
-            fig.savefig(chart_path, dpi=150, bbox_inches='tight')
-            plt.close(fig)
-            # Return web URL
-            return f"/api/charts/{chart_id}"
+            if is_plotly:
+                # Save Plotly chart as HTML
+                chart_path = self.charts_dir / f"{chart_id}.html"
+                try:
+                    fig.write_html(str(chart_path), include_plotlyjs='cdn', config={'displayModeBar': True, 'responsive': True})
+                    # Return web URL for HTML chart
+                    return f"/api/charts/{chart_id}.html"
+                except Exception as e:
+                    LOGGER.error(f"Failed to save Plotly chart: {e}")
+                    # Fallback to PNG export
+                    chart_path = self.charts_dir / f"{chart_id}.png"
+                    fig.write_image(str(chart_path), width=1200, height=600, scale=2)
+                    return f"/api/charts/{chart_id}.png"
+            else:
+                # Save matplotlib chart as PNG (fallback)
+                import matplotlib.pyplot as plt
+                chart_path = self.charts_dir / f"{chart_id}.png"
+                fig.tight_layout()
+                fig.savefig(chart_path, dpi=150, bbox_inches='tight')
+                plt.close(fig)
+                return f"/api/charts/{chart_id}.png"
         else:
             # Fallback to temp file
-            tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-            fig.tight_layout()
-            fig.savefig(tmp_file.name, dpi=150, bbox_inches='tight')
-            plt.close(fig)
-            return tmp_file.name
+            if is_plotly:
+                tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+                fig.write_html(tmp_file.name, include_plotlyjs='cdn')
+                return tmp_file.name
+            else:
+                import matplotlib.pyplot as plt
+                tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+                fig.tight_layout()
+                fig.savefig(tmp_file.name, dpi=150, bbox_inches='tight')
+                plt.close(fig)
+                return tmp_file.name
     
     def generate(
         self,
@@ -558,43 +583,113 @@ class VisualizationGenerator:
         request: VisualizationRequest,
         context: Optional[Dict[str, Any]]
     ) -> Tuple[Optional[str], Dict[str, Any], Optional[str]]:
-        """Generate line chart."""
+        """Generate interactive line chart using Plotly."""
         try:
-            import matplotlib.pyplot as plt
-            
-            fig, ax = plt.subplots(figsize=(10, 6))
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
             
             metric = request.metrics[0] if request.metrics else "revenue"
+            metric_label = metric.replace('_', ' ').title()
             
+            # Create Plotly figure
+            fig = go.Figure()
+            
+            has_data = False
             for ticker in request.tickers[:5]:  # Limit to 5 tickers
                 years, values = self._get_metric_data(ticker, metric)
                 if years and values:
-                    ax.plot(years, values, marker='o', label=ticker.upper(), linewidth=2)
+                    fig.add_trace(go.Scatter(
+                        x=years,
+                        y=values,
+                        mode='lines+markers',
+                        name=ticker.upper(),
+                        line=dict(width=2),
+                        marker=dict(size=6),
+                        hovertemplate=f'<b>{ticker.upper()}</b><br>' +
+                                     'Year: %{x}<br>' +
+                                     f'{metric_label}: %{{y:,.0f}}<extra></extra>'
+                    ))
+                    has_data = True
                 else:
                     LOGGER.warning(f"No data available for {ticker} {metric}")
             
-            if not ax.lines:  # No data plotted
-                ax.text(0.5, 0.5, 'No data available for visualization', 
-                       ha='center', va='center', transform=ax.transAxes, fontsize=12)
-                ax.set_title(f"{metric.replace('_', ' ').title()} Trend (No Data)", fontsize=14, fontweight='bold')
-            
-            ax.set_title(f"{metric.replace('_', ' ').title()} Trend", fontsize=14, fontweight='bold')
-            ax.set_xlabel("Year", fontsize=12)
-            ax.set_ylabel(metric.replace('_', ' ').title(), fontsize=12)
-            ax.legend(loc='best')
-            ax.grid(True, linestyle='--', alpha=0.3)
+            if not has_data:
+                # Create a message chart
+                fig.add_annotation(
+                    text='No data available for visualization',
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=16)
+                )
+                fig.update_layout(title=f"{metric_label} Trend (No Data)")
+            else:
+                fig.update_layout(
+                    title=dict(
+                        text=f"{metric_label} Trend Over Time",
+                        font=dict(size=18, color='#1f2937')
+                    ),
+                    xaxis=dict(
+                        title=dict(text="Year", font=dict(size=14)),
+                        gridcolor='rgba(128, 128, 128, 0.2)'
+                    ),
+                    yaxis=dict(
+                        title=dict(text=metric_label, font=dict(size=14)),
+                        gridcolor='rgba(128, 128, 128, 0.2)'
+                    ),
+                    hovermode='x unified',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    ),
+                    height=500,
+                    margin=dict(l=60, r=20, t=60, b=60)
+                )
             
             # Save chart and get URL/path
-            chart_url = self._save_chart(fig, "line")
+            chart_url = self._save_chart(fig, "line", is_plotly=True)
             
             metadata = {
                 "status": "success",
                 "chart_type": "line",
                 "tickers": request.tickers,
                 "metric": metric,
+                "interactive": True
             }
             return chart_url, metadata, None
             
+        except ImportError:
+            # Fallback to matplotlib if Plotly not available
+            LOGGER.warning("Plotly not available, falling back to matplotlib")
+            try:
+                import matplotlib.pyplot as plt
+                
+                fig, ax = plt.subplots(figsize=(10, 6))
+                
+                metric = request.metrics[0] if request.metrics else "revenue"
+                
+                for ticker in request.tickers[:5]:
+                    years, values = self._get_metric_data(ticker, metric)
+                    if years and values:
+                        ax.plot(years, values, marker='o', label=ticker.upper(), linewidth=2)
+                
+                ax.set_title(f"{metric.replace('_', ' ').title()} Trend", fontsize=14, fontweight='bold')
+                ax.set_xlabel("Year", fontsize=12)
+                ax.set_ylabel(metric.replace('_', ' ').title(), fontsize=12)
+                ax.legend(loc='best')
+                ax.grid(True, linestyle='--', alpha=0.3)
+                
+                chart_url = self._save_chart(fig, "line", is_plotly=False)
+                return chart_url, {"status": "success", "chart_type": "line", "tickers": request.tickers, "metric": metric, "interactive": False}, None
+            except Exception as e:
+                warning = f"Line chart generation failed: {e}"
+                LOGGER.error(warning, exc_info=True)
+                return None, {"status": "error"}, warning
         except Exception as e:
             warning = f"Line chart generation failed: {e}"
             LOGGER.error(warning, exc_info=True)
@@ -605,14 +700,13 @@ class VisualizationGenerator:
         request: VisualizationRequest,
         context: Optional[Dict[str, Any]]
     ) -> Tuple[Optional[str], Dict[str, Any], Optional[str]]:
-        """Generate bar chart."""
+        """Generate interactive bar chart using Plotly."""
         try:
-            import matplotlib.pyplot as plt
-            import numpy as np
-            
-            fig, ax = plt.subplots(figsize=(10, 6))
+            import plotly.graph_objects as go
+            import plotly.colors as colors
             
             metric = request.metrics[0] if request.metrics else "revenue"
+            metric_label = metric.replace('_', ' ').title()
             tickers = request.tickers[:10]  # Limit to 10 tickers
             
             # Get latest values for each ticker
@@ -625,40 +719,111 @@ class VisualizationGenerator:
                     labels.append(ticker.upper())
             
             if not values:
-                # Create a message chart instead
-                fig, ax = plt.subplots(figsize=(10, 6))
-                ax.text(0.5, 0.5, 'No data available for visualization', 
-                       ha='center', va='center', transform=ax.transAxes, fontsize=14)
-                ax.set_title(f"{metric.replace('_', ' ').title()} Comparison (No Data)", fontsize=14, fontweight='bold')
-                ax.axis('off')
-                
-                chart_url = self._save_chart(fig, "bar")
+                # Create a message chart
+                fig = go.Figure()
+                fig.add_annotation(
+                    text='No data available for visualization',
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=16)
+                )
+                fig.update_layout(title=f"{metric_label} Comparison (No Data)")
+                chart_url = self._save_chart(fig, "bar", is_plotly=True)
                 return chart_url, {"status": "partial", "reason": "no_data"}, "No data available for requested companies"
             
-            bars = ax.bar(labels, values, color=plt.cm.viridis(np.linspace(0, 1, len(labels))))
-            ax.set_title(f"{metric.replace('_', ' ').title()} Comparison", fontsize=14, fontweight='bold')
-            ax.set_xlabel("Company", fontsize=12)
-            ax.set_ylabel(metric.replace('_', ' ').title(), fontsize=12)
-            ax.tick_params(axis='x', rotation=45)
-            ax.grid(True, axis='y', linestyle='--', alpha=0.3)
+            # Create Plotly bar chart
+            fig = go.Figure(data=[
+                go.Bar(
+                    x=labels,
+                    y=values,
+                    marker=dict(
+                        color=values,
+                        colorscale='Viridis',
+                        showscale=True,
+                        colorbar=dict(title=metric_label)
+                    ),
+                    text=[f'{v:,.0f}' for v in values],
+                    textposition='outside',
+                    hovertemplate='<b>%{x}</b><br>' +
+                                 f'{metric_label}: %{{y:,.0f}}<extra></extra>'
+                )
+            ])
             
-            # Add value labels on bars
-            for bar, value in zip(bars, values):
-                height = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2., height,
-                       f'{value:.1f}', ha='center', va='bottom', fontsize=9)
+            fig.update_layout(
+                title=dict(
+                    text=f"{metric_label} Comparison",
+                    font=dict(size=18, color='#1f2937')
+                ),
+                xaxis=dict(
+                    title=dict(text="Company", font=dict(size=14)),
+                    tickangle=-45
+                ),
+                yaxis=dict(
+                    title=dict(text=metric_label, font=dict(size=14)),
+                    gridcolor='rgba(128, 128, 128, 0.2)'
+                ),
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                height=500,
+                margin=dict(l=60, r=20, t=60, b=100)
+            )
             
-            # Save to temp file
-            chart_url = self._save_chart(fig, "bar")
+            chart_url = self._save_chart(fig, "bar", is_plotly=True)
             
             metadata = {
                 "status": "success",
                 "chart_type": "bar",
                 "tickers": tickers,
                 "metric": metric,
+                "interactive": True
             }
             return chart_url, metadata, None
             
+        except ImportError:
+            # Fallback to matplotlib
+            LOGGER.warning("Plotly not available, falling back to matplotlib")
+            try:
+                import matplotlib.pyplot as plt
+                import numpy as np
+                
+                fig, ax = plt.subplots(figsize=(10, 6))
+                
+                metric = request.metrics[0] if request.metrics else "revenue"
+                tickers = request.tickers[:10]
+                
+                values = []
+                labels = []
+                for ticker in tickers:
+                    _, ticker_values = self._get_metric_data(ticker, metric, years=1)
+                    if ticker_values:
+                        values.append(ticker_values[-1])
+                        labels.append(ticker.upper())
+                
+                if not values:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    ax.text(0.5, 0.5, 'No data available', ha='center', va='center', transform=ax.transAxes, fontsize=14)
+                    ax.axis('off')
+                    chart_url = self._save_chart(fig, "bar", is_plotly=False)
+                    return chart_url, {"status": "partial", "reason": "no_data"}, "No data available"
+                
+                bars = ax.bar(labels, values, color=plt.cm.viridis(np.linspace(0, 1, len(labels))))
+                ax.set_title(f"{metric.replace('_', ' ').title()} Comparison", fontsize=14, fontweight='bold')
+                ax.set_xlabel("Company", fontsize=12)
+                ax.set_ylabel(metric.replace('_', ' ').title(), fontsize=12)
+                ax.tick_params(axis='x', rotation=45)
+                ax.grid(True, axis='y', linestyle='--', alpha=0.3)
+                
+                for bar, value in zip(bars, values):
+                    height = bar.get_height()
+                    ax.text(bar.get_x() + bar.get_width()/2., height, f'{value:.1f}', ha='center', va='bottom', fontsize=9)
+                
+                chart_url = self._save_chart(fig, "bar", is_plotly=False)
+                return chart_url, {"status": "success", "chart_type": "bar", "tickers": tickers, "metric": metric, "interactive": False}, None
+            except Exception as e:
+                warning = f"Bar chart generation failed: {e}"
+                LOGGER.error(warning, exc_info=True)
+                return None, {"status": "error"}, warning
         except Exception as e:
             warning = f"Bar chart generation failed: {e}"
             LOGGER.error(warning, exc_info=True)
@@ -669,13 +834,12 @@ class VisualizationGenerator:
         request: VisualizationRequest,
         context: Optional[Dict[str, Any]]
     ) -> Tuple[Optional[str], Dict[str, Any], Optional[str]]:
-        """Generate pie chart."""
+        """Generate interactive pie chart using Plotly."""
         try:
-            import matplotlib.pyplot as plt
-            
-            fig, ax = plt.subplots(figsize=(8, 8))
+            import plotly.graph_objects as go
             
             metric = request.metrics[0] if request.metrics else "revenue"
+            metric_label = metric.replace('_', ' ').title()
             tickers = request.tickers[:10]  # Limit to 10 tickers
             
             # Get latest values
@@ -688,34 +852,123 @@ class VisualizationGenerator:
                     labels.append(ticker.upper())
             
             if not values:
-                # Create a message chart instead of returning None
-                fig, ax = plt.subplots(figsize=(8, 8))
-                ax.text(0.5, 0.5, f'No data available for {", ".join(tickers)}\n\nPlease ensure these companies have data in the database.', 
-                       ha='center', va='center', transform=ax.transAxes, fontsize=12, 
-                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-                ax.set_title(f"{metric.replace('_', ' ').title()} Distribution (No Data)", fontsize=14, fontweight='bold')
-                ax.axis('off')
-                
-                chart_url = self._save_chart(fig, "pie")
+                # Create a message chart
+                fig = go.Figure()
+                fig.add_annotation(
+                    text=f'No data available for {", ".join(tickers)}<br>Please ensure these companies have data in the database.',
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=14)
+                )
+                fig.update_layout(title=f"{metric_label} Distribution (No Data)")
+                chart_url = self._save_chart(fig, "pie", is_plotly=True)
                 return chart_url, {"status": "partial", "reason": "no_data", "tickers": tickers}, f"No data available for {', '.join(tickers)}"
             
             # Normalize to percentages
             total = sum(values)
             if total == 0:
-                # Create a message chart instead of returning None
-                fig, ax = plt.subplots(figsize=(8, 8))
-                ax.text(0.5, 0.5, f'Total value is zero for {", ".join(tickers)}\n\nCannot create pie chart with zero values.', 
-                       ha='center', va='center', transform=ax.transAxes, fontsize=12, 
-                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-                ax.set_title(f"{metric.replace('_', ' ').title()} Distribution (Zero Total)", fontsize=14, fontweight='bold')
-                ax.axis('off')
+                # Create a message chart
+                fig = go.Figure()
+                fig.add_annotation(
+                    text=f'Total value is zero for {", ".join(tickers)}<br>Cannot create pie chart with zero values.',
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=14)
+                )
+                fig.update_layout(title=f"{metric_label} Distribution (No Data)")
+                chart_url = self._save_chart(fig, "pie", is_plotly=True)
+                return chart_url, {"status": "partial", "reason": "zero_total", "tickers": tickers}, f"Total value is zero for {', '.join(tickers)}"
+            
+            # Create Plotly pie chart
+            fig = go.Figure(data=[go.Pie(
+                labels=labels,
+                values=values,
+                hole=0.3,  # Makes it a donut chart
+                hovertemplate='<b>%{label}</b><br>' +
+                             f'{metric_label}: %{{value:,.0f}}<br>' +
+                             'Percentage: %{percent}<extra></extra>',
+                textinfo='label+percent',
+                textposition='outside'
+            )])
+            
+            fig.update_layout(
+                title=dict(
+                    text=f"{metric_label} Distribution",
+                    font=dict(size=18, color='#1f2937')
+                ),
+                height=500,
+                margin=dict(l=20, r=20, t=60, b=20),
+                showlegend=True,
+                legend=dict(
+                    orientation="v",
+                    yanchor="middle",
+                    y=0.5,
+                    xanchor="left",
+                    x=1.05
+                )
+            )
+            
+            chart_url = self._save_chart(fig, "pie", is_plotly=True)
+            
+            metadata = {
+                "status": "success",
+                "chart_type": "pie",
+                "tickers": tickers,
+                "metric": metric,
+                "interactive": True
+            }
+            return chart_url, metadata, None
+            
+        except ImportError:
+            # Fallback to matplotlib
+            LOGGER.warning("Plotly not available, falling back to matplotlib")
+            try:
+                import matplotlib.pyplot as plt
                 
-                chart_url = self._save_chart(fig, "pie")
-                return chart_url, {"status": "partial", "reason": "zero_total", "tickers": tickers}, "Total value is zero for requested companies"
-            
-            percentages = [v / total * 100 for v in values]
-            
-            ax.pie(percentages, labels=labels, autopct='%1.1f%%', startangle=90)
+                fig, ax = plt.subplots(figsize=(8, 8))
+                
+                metric = request.metrics[0] if request.metrics else "revenue"
+                tickers = request.tickers[:10]
+                
+                values = []
+                labels = []
+                for ticker in tickers:
+                    _, ticker_values = self._get_metric_data(ticker, metric, years=1)
+                    if ticker_values:
+                        values.append(ticker_values[-1])
+                        labels.append(ticker.upper())
+                
+                if not values:
+                    fig, ax = plt.subplots(figsize=(8, 8))
+                    ax.text(0.5, 0.5, 'No data available', ha='center', va='center', transform=ax.transAxes, fontsize=12)
+                    ax.axis('off')
+                    chart_url = self._save_chart(fig, "pie", is_plotly=False)
+                    return chart_url, {"status": "partial", "reason": "no_data"}, "No data available"
+                
+                total = sum(values)
+                if total == 0:
+                    fig, ax = plt.subplots(figsize=(8, 8))
+                    ax.text(0.5, 0.5, 'Total value is zero', ha='center', va='center', transform=ax.transAxes, fontsize=12)
+                    ax.axis('off')
+                    chart_url = self._save_chart(fig, "pie", is_plotly=False)
+                    return chart_url, {"status": "partial", "reason": "zero_total"}, "Total value is zero"
+                
+                # Create pie chart
+                ax.pie(values, labels=labels, autopct='%1.1f%%', startangle=90)
+                ax.set_title(f"{metric.replace('_', ' ').title()} Distribution", fontsize=14, fontweight='bold')
+                
+                chart_url = self._save_chart(fig, "pie", is_plotly=False)
+                return chart_url, {"status": "success", "chart_type": "pie", "tickers": tickers, "metric": metric, "interactive": False}, None
+            except Exception as e:
+                warning = f"Pie chart generation failed: {e}"
+                LOGGER.error(warning, exc_info=True)
+                return None, {"status": "error"}, warning
+        except Exception as e:
+            warning = f"Pie chart generation failed: {e}"
+            LOGGER.error(warning, exc_info=True)
+            return None, {"status": "error"}, warning
             ax.set_title(f"{metric.replace('_', ' ').title()} Distribution", fontsize=14, fontweight='bold')
             
             # Save chart and get URL/path
