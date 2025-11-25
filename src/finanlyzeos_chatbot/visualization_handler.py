@@ -3,6 +3,7 @@ Visualization Handler for FinalyzeOS Chatbot
 
 Allows users to request specific visualizations without breaking the chatbot flow.
 Supports various chart types: line, bar, pie, scatter, heatmap, etc.
+Supports all 76+ metrics from the analytics engine.
 """
 
 from __future__ import annotations
@@ -16,6 +17,21 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 from enum import Enum
+
+# Import all metrics from analytics engine for comprehensive support
+try:
+    from .analytics_engine import (
+        BASE_METRICS, DERIVED_METRICS, AGGREGATE_METRICS,
+        SUPPLEMENTAL_METRICS, METRIC_NAME_ALIASES, METRIC_LABELS
+    )
+except ImportError:
+    # Fallback if import fails
+    BASE_METRICS = set()
+    DERIVED_METRICS = set()
+    AGGREGATE_METRICS = set()
+    SUPPLEMENTAL_METRICS = set()
+    METRIC_NAME_ALIASES = {}
+    METRIC_LABELS = {}
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +68,83 @@ class VisualizationRequest:
 
 class VisualizationIntentDetector:
     """Detects visualization requests from user queries."""
+    
+    def __init__(self):
+        """Initialize the detector with comprehensive metric mapping."""
+        # Build comprehensive metric keyword mapping (supports all 76+ metrics)
+        self._build_metric_keyword_map()
+    
+    def _build_metric_keyword_map(self):
+        """Build a mapping from user-friendly keywords to metric names."""
+        # Get all unique metrics
+        all_metrics = BASE_METRICS | DERIVED_METRICS | AGGREGATE_METRICS | SUPPLEMENTAL_METRICS | set(METRIC_NAME_ALIASES.keys())
+        
+        # Map: keyword -> metric_name
+        self.metric_keyword_map: Dict[str, str] = {}
+        
+        # Add direct metric names (e.g., "revenue" -> "revenue", "net_income" -> "net_income")
+        for metric in all_metrics:
+            # Add the metric name itself
+            self.metric_keyword_map[metric] = metric
+            # Add space-separated version (e.g., "net_income" -> "net income")
+            self.metric_keyword_map[metric.replace('_', ' ')] = metric
+            # Add hyphen-separated version
+            self.metric_keyword_map[metric.replace('_', '-')] = metric
+        
+        # Add metric labels (e.g., "Revenue" -> "revenue", "Net income" -> "net_income")
+        for metric, label in METRIC_LABELS.items():
+            label_lower = label.lower()
+            self.metric_keyword_map[label_lower] = metric
+            # Also add without spaces for compound terms
+            self.metric_keyword_map[label_lower.replace(' ', '')] = metric
+        
+        # Add aliases (e.g., "operating_cash_flow" -> "cash_from_operations")
+        for alias, metric in METRIC_NAME_ALIASES.items():
+            self.metric_keyword_map[alias] = metric
+            self.metric_keyword_map[alias.replace('_', ' ')] = metric
+        
+        # Add common abbreviations and variations
+        common_variations = {
+            'roa': 'return_on_assets',
+            'roe': 'return_on_equity',
+            'roic': 'return_on_invested_capital',
+            'fcf': 'free_cash_flow',
+            'ocf': 'cash_from_operations',
+            'capex': 'capital_expenditures',
+            'd&a': 'depreciation_and_amortization',
+            'da': 'depreciation_and_amortization',
+            'eps': 'eps_diluted',
+            'pe': 'pe_ratio',
+            'p/e': 'pe_ratio',
+            'ps': 'ps_ratio',
+            'p/s': 'ps_ratio',
+            'pb': 'pb_ratio',
+            'p/b': 'pb_ratio',
+            'ev/ebitda': 'ev_ebitda',
+            'peg': 'peg_ratio',
+            'cagr': 'revenue_cagr',
+            'market cap': 'market_cap',
+            'enterprise value': 'enterprise_value',
+            'ev': 'enterprise_value',
+        }
+        for keyword, metric in common_variations.items():
+            if metric in all_metrics:
+                self.metric_keyword_map[keyword] = metric
+        
+        # Handle metrics that are aliases themselves (e.g., 'roa' is in DERIVED_METRICS but maps to 'return_on_assets')
+        # These should map to their canonical names
+        alias_to_canonical = {
+            'roa': 'return_on_assets',
+            'roe': 'return_on_equity',
+            'roic': 'return_on_invested_capital',
+        }
+        for alias_metric, canonical in alias_to_canonical.items():
+            if alias_metric in all_metrics and canonical in all_metrics:
+                # Map the alias metric name to the canonical name
+                self.metric_keyword_map[alias_metric] = canonical
+                self.metric_keyword_map[alias_metric.replace('_', ' ')] = canonical
+        
+        LOGGER.info(f"Built metric keyword map with {len(self.metric_keyword_map)} entries for {len(all_metrics)} unique metrics")
     
     # Chart type patterns
     CHART_TYPE_PATTERNS = {
@@ -175,17 +268,52 @@ class VisualizationIntentDetector:
         
         LOGGER.info(f"Extracted tickers from query '{query}': {tickers}")
         
-        # Extract metrics (common financial metrics)
-        metric_keywords = [
-            'revenue', 'profit', 'margin', 'earnings', 'income', 'cash flow',
-            'growth', 'roi', 'roe', 'roa', 'pe ratio', 'price', 'valuation'
-        ]
+        # Extract metrics using comprehensive metric keyword map (supports all 76+ metrics)
         metrics = []
-        for keyword in metric_keywords:
-            if keyword in query_lower:
-                metrics.append(keyword.replace(' ', '_'))
+        query_words = query_lower.split()
         
-        LOGGER.info(f"Extracted metrics from query: {metrics}")
+        # Try to match multi-word phrases first (longer matches take precedence)
+        # Sort keywords by length (longest first) to match "free cash flow" before "cash flow"
+        sorted_keywords = sorted(self.metric_keyword_map.keys(), key=len, reverse=True)
+        
+        matched_positions = set()  # Track which character positions have been matched
+        
+        for keyword in sorted_keywords:
+            keyword_lower = keyword.lower()
+            # Check if keyword appears in query (as whole word/phrase)
+            # Use word boundaries for single words, allow phrase matching for multi-word
+            if ' ' in keyword_lower:
+                # Multi-word phrase: check if it appears in query
+                if keyword_lower in query_lower:
+                    # Find all occurrences
+                    start = 0
+                    while True:
+                        pos = query_lower.find(keyword_lower, start)
+                        if pos == -1:
+                            break
+                        # Check if this position hasn't been matched yet
+                        end_pos = pos + len(keyword_lower)
+                        if not any(pos <= p < end_pos for p in matched_positions):
+                            metric_name = self.metric_keyword_map[keyword]
+                            if metric_name not in metrics:
+                                metrics.append(metric_name)
+                            # Mark this range as matched
+                            matched_positions.update(range(pos, end_pos))
+                        start = pos + 1
+            else:
+                # Single word: use word boundary matching
+                pattern = r'\b' + re.escape(keyword_lower) + r'\b'
+                matches = list(re.finditer(pattern, query_lower))
+                for match in matches:
+                    pos = match.start()
+                    end_pos = match.end()
+                    if not any(pos <= p < end_pos for p in matched_positions):
+                        metric_name = self.metric_keyword_map[keyword]
+                        if metric_name not in metrics:
+                            metrics.append(metric_name)
+                        matched_positions.update(range(pos, end_pos))
+        
+        LOGGER.info(f"Extracted metrics from query '{query}': {metrics} (from {len(self.metric_keyword_map)} possible keywords)")
         
         # Detect comparison
         is_comparison = any(
