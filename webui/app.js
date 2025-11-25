@@ -330,10 +330,10 @@ function renderMarkdown(text) {
       
       // Check if URL is an HTML chart (interactive Plotly chart)
       if (safeUrl.endsWith('.html') || (safeUrl.includes('/api/charts/') && safeUrl.includes('.html'))) {
-        // Return iframe for interactive HTML charts
+        // Return iframe for interactive HTML charts (no sandbox attributes to avoid Chrome warning)
         const fullUrl = /^([a-z][a-z\d+\-.]*:|\/\/)/i.test(safeUrl) ? safeUrl : (API_BASE + safeUrl);
         const safeAlt = escapeAttribute(altText || "Interactive Chart");
-        return `<iframe src="${fullUrl}" style="width: 100%; height: 500px; border: none; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" sandbox="allow-scripts allow-same-origin" title="${safeAlt}"></iframe>`;
+        return `<iframe src="${fullUrl}" title="${safeAlt}" loading="lazy" allowfullscreen style="width: 100%; height: 520px; border: none; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08);"></iframe>`;
       }
       
       // Regular image handling
