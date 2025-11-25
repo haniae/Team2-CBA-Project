@@ -385,29 +385,45 @@ async def serve_portfolio_dashboard_js():
 # Chart serving endpoint
 @app.get("/api/charts/{chart_id}")
 async def serve_chart(chart_id: str):
-    """Serve chart files by ID (supports both PNG and HTML)."""
+    """Serve chart files by ID (supports both PNG and HTML).
+    
+    Handles URLs like:
+    - /api/charts/abc123.html
+    - /api/charts/abc123.png
+    - /api/charts/abc123 (without extension)
+    """
+    # Strip .html or .png extension if present in chart_id (FastAPI path parameter)
+    chart_id_clean = chart_id
+    if chart_id.endswith('.html'):
+        chart_id_clean = chart_id[:-5]  # Remove .html
+    elif chart_id.endswith('.png'):
+        chart_id_clean = chart_id[:-4]  # Remove .png
+    
     # Try HTML first (interactive Plotly charts)
-    html_path = CHARTS_DIR / f"{chart_id}.html"
+    html_path = CHARTS_DIR / f"{chart_id_clean}.html"
     if html_path.exists():
         return FileResponse(
             html_path,
             media_type="text/html",
             headers={
-                "Content-Disposition": f'inline; filename="{chart_id}.html"',
-                "X-Content-Type-Options": "nosniff"
+                "Content-Disposition": f'inline; filename="{chart_id_clean}.html"',
+                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
             }
         )
     
     # Fallback to PNG (static matplotlib charts)
-    png_path = CHARTS_DIR / f"{chart_id}.png"
+    png_path = CHARTS_DIR / f"{chart_id_clean}.png"
     if png_path.exists():
         return FileResponse(
             png_path,
             media_type="image/png",
             headers={
-            "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
-        }
-    )
+                "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+            }
+        )
+    
+    raise HTTPException(status_code=404, detail=f"Chart not found: {chart_id_clean}")
 
 # Mount static files for other assets (images, fonts, etc.)
 # The specific routes above will take precedence for app.js, styles.css, and index.html
