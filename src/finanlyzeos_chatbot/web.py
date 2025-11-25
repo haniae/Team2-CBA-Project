@@ -232,6 +232,10 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = (BASE_DIR.parent / "webui").resolve()
 PACKAGE_STATIC = (BASE_DIR / "static").resolve()
 
+# Chart storage directory
+CHARTS_DIR = (BASE_DIR / "charts").resolve()
+CHARTS_DIR.mkdir(exist_ok=True)
+
 
 # Custom handlers with no-cache headers to prevent stale JavaScript
 # IMPORTANT: These MUST be defined BEFORE app.mount() to take precedence
@@ -377,6 +381,21 @@ async def serve_portfolio_dashboard_js():
         }
     )
 
+
+# Chart serving endpoint
+@app.get("/api/charts/{chart_id}")
+async def serve_chart(chart_id: str):
+    """Serve chart images by ID."""
+    chart_path = CHARTS_DIR / f"{chart_id}.png"
+    if not chart_path.exists():
+        raise HTTPException(status_code=404, detail="Chart not found")
+    return FileResponse(
+        chart_path,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+        }
+    )
 
 # Mount static files for other assets (images, fonts, etc.)
 # The specific routes above will take precedence for app.js, styles.css, and index.html

@@ -61,6 +61,7 @@ from .query_classifier import classify_query, QueryComplexity, QueryType, get_fa
 from .framework_processor import FrameworkProcessor
 from .template_processor import TemplateProcessor
 from .document_context import build_uploaded_document_context
+from .visualization_handler import VisualizationIntentDetector, VisualizationGenerator
 
 # Portfolio module imports (combined portfolio.py)
 from .portfolio import (
@@ -2750,6 +2751,102 @@ class FinanlyzeOSChatbot:
                     best_len = alias_len
         return best_match
 
+    def _detect_visualization_intent(self, text: str) -> Optional[Any]:
+        """Detect if the prompt is a visualization request."""
+        try:
+            detector = VisualizationIntentDetector()
+            request = detector.detect(text)
+            if request and request.confidence >= 0.5:
+                return request
+        except Exception as e:
+            LOGGER.debug(f"Visualization intent detection failed: {e}")
+        return None
+
+    def _handle_visualization_intent(self, request: Any) -> Optional[str]:
+        """Handle visualization requests."""
+        try:
+            LOGGER.info(f"Handling visualization request - tickers: {request.tickers}, chart_type: {request.chart_type.value}, metrics: {request.metrics}")
+            
+            if not hasattr(self, 'analytics_engine') or self.analytics_engine is None:
+                LOGGER.error("Analytics engine not available in chatbot instance")
+                return "I encountered an issue: Analytics engine not initialized. Please restart the chatbot."
+            
+            # Get charts directory - use same location as web module
+            from pathlib import Path as PathLib
+            base_dir = PathLib(__file__).resolve().parents[1]
+            charts_dir = (base_dir / "charts").resolve()
+            charts_dir.mkdir(exist_ok=True)
+            
+            # Pass ticker resolver to support S&P 1500+ companies
+            ticker_resolver = getattr(self, '_name_to_ticker', None)
+            
+            generator = VisualizationGenerator(
+                db_path=Path(self.settings.database_path),
+                analytics_engine=self.analytics_engine,
+                charts_dir=charts_dir,
+                ticker_resolver=ticker_resolver
+            )
+            
+            file_path, metadata, warning = generator.generate(request)
+            
+            LOGGER.info(f"Visualization generator returned - file_path is not None: {file_path is not None}, file_path type: {type(file_path)}, file_path value: {str(file_path)[:100] if file_path else None}..., status: {metadata.get('status')}, reason: {metadata.get('reason')}")
+            
+            # Handle both success and partial (partial means chart generated but with limited/no data)
+            if file_path:
+                status = metadata.get("status", "unknown")
+                # Return response with chart reference if we have a file path
+                chart_type = metadata.get("chart_type", "chart")
+                tickers = metadata.get("tickers", [])
+                metric = metadata.get("metric", "data")
+                
+                response = f"I've created a {chart_type} chart showing {metric.replace('_', ' ')}"
+                if tickers:
+                    response += f" for {', '.join(tickers)}"
+                response += ".\n\n"
+                response += f"![{chart_type} chart]({file_path})\n\n"
+                
+                if status == "partial":
+                    reason = metadata.get("reason", "")
+                    if reason == "no_data":
+                        response += f"*Note: No financial data found in database for {', '.join(tickers) if tickers else 'these companies'}. "
+                        response += "Chart shows sample/demonstration data. To see real data, ingest company data first: 'ingest AAPL' or 'ingest MSFT'.*\n\n"
+                    else:
+                        response += "*Note: Limited data available. Chart may show approximations.*\n\n"
+                else:
+                    response += "*Chart generated successfully. The image is available in the response.*\n\n"
+                
+                if warning:
+                    response += f"*Note: {warning}*"
+                
+                LOGGER.info(f"Returning visualization response with file_path: {file_path}, response length: {len(response)}")
+                LOGGER.info(f"Response preview: {response[:150]}...")
+                return response
+            else:
+                # Return helpful error message based on reason
+                reason = metadata.get("reason", "unknown error")
+                tickers = request.tickers if hasattr(request, 'tickers') else []
+                
+                LOGGER.warning(f"No file_path returned from generator. Status: {metadata.get('status')}, reason: {reason}")
+                
+                if reason == "no_tickers":
+                    return f"I couldn't identify which companies to visualize from your request. Please specify ticker symbols (e.g., 'Show me a pie chart of AAPL, MSFT, GOOGL revenue')."
+                elif reason == "no_data":
+                    return f"I couldn't find data for {', '.join(tickers) if tickers else 'the requested companies'}. Please ensure these companies have financial data in the database. You may need to ingest data first using: 'ingest AAPL' or 'ingest MSFT'."
+                elif reason == "matplotlib_unavailable":
+                    return "Chart generation is not available (matplotlib not installed). Please install matplotlib to enable visualizations."
+                elif reason == "zero_total":
+                    return f"All values for {', '.join(tickers) if tickers else 'the companies'} are zero, so I cannot create a meaningful pie chart."
+                else:
+                    error_msg = f"I encountered an issue generating the visualization: {reason}."
+                    if tickers:
+                        error_msg += f" Tickers detected: {', '.join(tickers)}."
+                    error_msg += " Please try rephrasing your request or ensure the companies have data."
+                    return error_msg
+        except Exception as e:
+            LOGGER.error(f"Visualization handling failed: {e}", exc_info=True)
+            tickers_info = f" Tickers: {request.tickers}" if hasattr(request, 'tickers') and request.tickers else ""
+            return f"I encountered an error while generating the visualization.{tickers_info} Error: {str(e)}. Please try again or check that the companies have data available."
+
     def _detect_custom_kpi_intent(self, text: str) -> Optional[Dict[str, Any]]:
         """Detect if the prompt is about creating or using custom KPIs."""
         intent = self.kpi_intent_parser.detect(text)
@@ -4156,12 +4253,48 @@ Content:
                     except ImportError:
                         pass
                     
-                    # Check for custom KPI intent first
-                    custom_kpi_intent = self._detect_custom_kpi_intent(user_input)
-                    if custom_kpi_intent:
-                        emit("intent_custom_kpi", f"Custom KPI intent detected: {custom_kpi_intent['action']}")
-                        reply = self._handle_custom_kpi_intent(custom_kpi_intent)
+                    # Check for visualization intent first (before other intents)
+                    visualization_request = self._detect_visualization_intent(user_input)
+                    if visualization_request:
+                        emit("intent_visualization", f"Visualization intent detected: {visualization_request.chart_type.value}, tickers: {visualization_request.tickers}")
+                        LOGGER.info(f"Processing visualization request - tickers: {visualization_request.tickers}, metrics: {visualization_request.metrics}")
+                        reply = self._handle_visualization_intent(visualization_request)
                         attempted_intent = True
+                        LOGGER.info(f"Visualization handler returned reply (length: {len(reply) if reply else 0}), type: {type(reply)}")
+                        
+                        # Store the original reply to prevent it from being lost
+                        original_visualization_reply = reply
+                        
+                        if reply:
+                            LOGGER.info(f"Reply preview (first 200 chars): {repr(reply[:200])}")
+                            stripped = reply.strip() if isinstance(reply, str) else ""
+                            LOGGER.info(f"Reply after strip length: {len(stripped)}, is empty: {stripped == ''}")
+                        
+                        # CRITICAL: If visualization was attempted, always return something and skip LLM
+                        # Even if it failed, return error message instead of None
+                        # IMPORTANT: Only check if reply is truly None or empty string - don't overwrite valid responses
+                        if reply is None:
+                            LOGGER.warning(f"Visualization handler returned None. Request had tickers: {visualization_request.tickers}")
+                            reply = f"I encountered an issue generating the visualization. Detected tickers: {visualization_request.tickers if visualization_request.tickers else 'none'}. Please try again with explicit ticker symbols."
+                        elif isinstance(reply, str) and reply.strip() == "":
+                            LOGGER.warning(f"Visualization handler returned empty string. Request had tickers: {visualization_request.tickers}")
+                            reply = f"I encountered an issue generating the visualization. Detected tickers: {visualization_request.tickers if visualization_request.tickers else 'none'}. Please try again with explicit ticker symbols."
+                        else:
+                            LOGGER.info(f"Visualization reply is valid, keeping it (length: {len(reply) if reply else 0})")
+                            # Ensure reply is preserved
+                            reply = original_visualization_reply
+                        
+                        # Mark that we should skip LLM processing for visualization requests
+                        self._skip_llm_for_visualization = True
+                        # Store the reply in an attribute to ensure it's not lost
+                        self._visualization_reply = reply
+                    # Check for custom KPI intent
+                    elif not attempted_intent:
+                        custom_kpi_intent = self._detect_custom_kpi_intent(user_input)
+                        if custom_kpi_intent:
+                            emit("intent_custom_kpi", f"Custom KPI intent detected: {custom_kpi_intent['action']}")
+                            reply = self._handle_custom_kpi_intent(custom_kpi_intent)
+                            attempted_intent = True
                     # Check for plugin workflow intent
                     elif not attempted_intent:
                         try:
@@ -4241,6 +4374,38 @@ Content:
                         else:
                             emit("intent_complete", "Intent routing completed with no direct answer")
 
+            # CRITICAL: Skip LLM processing if visualization was handled
+            # This MUST happen BEFORE any LLM context building to avoid database locks
+            if hasattr(self, '_skip_llm_for_visualization') and self._skip_llm_for_visualization:
+                self._skip_llm_for_visualization = False  # Reset flag
+                
+                # Use stored visualization reply if available (more reliable)
+                if hasattr(self, '_visualization_reply') and self._visualization_reply:
+                    stored_reply = self._visualization_reply
+                    delattr(self, '_visualization_reply')  # Clean up
+                    LOGGER.info(f"Returning stored visualization response (length: {len(stored_reply)}): {stored_reply[:150]}...")
+                    emit("visualization_complete", f"Visualization request handled, skipping LLM. Reply length: {len(stored_reply)}")
+                    return stored_reply
+                
+                # Fallback to current reply
+                emit("visualization_complete", f"Visualization request handled, skipping LLM. Reply length: {len(reply) if reply else 0}")
+                
+                # Always return the reply from visualization handler (even if it's an error message)
+                # The handler already provides helpful error messages
+                if reply is not None and reply:
+                    reply_str = str(reply).strip() if isinstance(reply, str) else str(reply)
+                    if reply_str:
+                        LOGGER.info(f"Returning visualization response (length: {len(reply_str)}): {reply_str[:150]}...")
+                        return reply_str
+                    else:
+                        LOGGER.warning(f"Visualization handler returned empty string after strip. Original reply type: {type(reply)}, value: {repr(reply)[:100]}")
+                else:
+                    LOGGER.warning(f"Visualization handler returned None or empty. Reply: {repr(reply)[:100] if reply else 'None'}")
+                
+                # Fallback error message
+                return "I encountered an issue generating the visualization. Please try again with explicit ticker symbols (e.g., 'Show me a pie chart of AAPL, MSFT, GOOGL revenue')."
+            
+            # Only proceed to LLM if visualization was NOT handled
             if reply is None:
                 # Check if this is a question - if so, skip summary and let LLM handle it
                 lowered_input = user_input.lower()
@@ -5853,6 +6018,24 @@ Content:
             tickers,
             period_filters=period_filters,
         )
+
+    def _handle_financial_intent(self, user_input: str) -> Optional[str]:
+        """Handle financial intent queries by parsing and processing structured metrics."""
+        try:
+            # Parse the input to structured format
+            structured = parse_to_structured(user_input)
+            
+            # Try to handle as structured metrics
+            if structured:
+                reply = self._handle_structured_metrics(structured)
+                if reply:
+                    return reply
+            
+            # If structured parsing didn't work, return None to let LLM handle it
+            return None
+        except Exception as e:
+            LOGGER.debug(f"Error in _handle_financial_intent: {e}")
+            return None
 
     def _handle_structured_metrics(self, structured: Dict[str, Any]) -> Optional[str]:
         """Handle parsed structured intents without relying on legacy commands."""

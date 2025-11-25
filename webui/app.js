@@ -319,6 +319,20 @@ function renderMarkdown(text) {
       return `\uE000${codeTokens.length - 1}\uE000`;
     });
 
+    // Handle markdown images ![alt](url) BEFORE links
+    working = working.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, altText, urlValue) => {
+      const rawUrl = urlValue.trim();
+      if (!rawUrl) {
+        return altText || "Image";
+      }
+      const safeUrl = escapeAttribute(rawUrl);
+      // If it's a relative URL (starts with /), use it as-is
+      // Otherwise, treat as absolute URL
+      const imgSrc = /^([a-z][a-z\d+\-.]*:|\/\/)/i.test(safeUrl) ? safeUrl : safeUrl;
+      const safeAlt = escapeAttribute(altText || "Chart");
+      return `<img src="${imgSrc}" alt="${safeAlt}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0;" />`;
+    });
+
     working = working.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, textValue, urlValue) => {
       const rawUrl = urlValue.trim();
       if (!rawUrl) {
