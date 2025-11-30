@@ -1,5 +1,19 @@
 # RAG (Retrieval-Augmented Generation) - Complete Explanation
 
+## Table of Contents
+
+1. [What is RAG?](#what-is-rag)
+2. [The Three Core Components](#the-three-core-components)
+3. [How RAG Works in Your Chatbot](#how-rag-works-in-your-chatbot)
+4. [Detailed Component Breakdown](#detailed-component-breakdown)
+5. [Advanced Features](#advanced-features-in-your-rag-system)
+6. [Performance Optimizations](#performance-optimizations)
+7. [Summary](#summary-why-rag-works)
+8. [Key Files in Your Codebase](#key-files-in-your-codebase)
+9. [Example: Complete RAG Flow](#example-complete-rag-flow)
+
+---
+
 ## What is RAG?
 
 **RAG (Retrieval-Augmented Generation)** is a technique that enhances LLM responses by:
@@ -25,14 +39,17 @@
 
 ## The Three Core Components
 
-### 1. **Retriever** 🔍
-Finds relevant information from your knowledge base
+### 1. Retriever 🔍
 
-### 2. **Augmenter** 📝
-Combines the user query with retrieved context into a prompt
+Finds relevant information from your knowledge base.
 
-### 3. **Generator** 🤖
-LLM generates the final answer using the augmented prompt
+### 2. Augmenter 📝
+
+Combines the user query with retrieved context into a prompt.
+
+### 3. Generator 🤖
+
+LLM generates the final answer using the augmented prompt.
 
 ---
 
@@ -188,6 +205,8 @@ User Query: "Compare Apple and Meta's revenue in FY2024"
 Your chatbot uses **multiple retrieval strategies** working together:
 
 #### A. SQL Retrieval (Deterministic)
+
+**Purpose**: Retrieve exact, structured data from the database.
 ```python
 # From rag_retriever.py
 def _retrieve_sql_data(self, tickers: List[str]):
@@ -216,6 +235,8 @@ def _retrieve_sql_data(self, tickers: List[str]):
 - Structured, exact data
 
 #### B. Vector Search (Semantic)
+
+**Purpose**: Find semantically similar documents using embeddings.
 ```python
 # From rag_retriever.py - VectorStore
 def search_sec_narratives(self, query: str, n_results: int = 5):
@@ -247,6 +268,8 @@ def search_sec_narratives(self, query: str, n_results: int = 5):
 3. **Ranking**: Return documents sorted by similarity score
 
 #### C. Hybrid Retrieval (Sparse + Dense)
+
+**Purpose**: Combine keyword and semantic matching for best results.
 ```python
 # From rag_hybrid_retriever.py
 class HybridRetriever:
