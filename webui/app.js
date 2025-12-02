@@ -54,7 +54,8 @@ const chatPanel = document.querySelector(".chat-panel");
 const chatFormContainer = document.getElementById("chat-form");
 const savedSearchTrigger = document.querySelector("[data-action='search-saved']");
 const archivedToggleButton = document.querySelector("[data-action='toggle-archived']");
-const sidebarToggleButton = document.getElementById("sidebar-toggle");
+const sidebarToggleButton = document.getElementById("sidebar-toggle") || document.getElementById("sidebar-toggle-header");
+const sidebarToggleButtons = document.querySelectorAll(".sidebar-toggle");
 const sidebar = document.getElementById("sidebar");
 const sidebarBackdrop = document.getElementById("sidebar-backdrop");
 const chatsView = document.getElementById("chats-view");
@@ -280,7 +281,7 @@ function isMobile() {
 }
 
 function initializeSidebarToggle() {
-  if (!sidebarToggleButton || !sidebar) {
+  if (!sidebar) {
     return;
   }
 
@@ -298,8 +299,10 @@ function initializeSidebarToggle() {
   // Apply initial state
   setSidebarState(sidebarOpen);
 
-  // Add click event listener
-  sidebarToggleButton.addEventListener("click", toggleSidebar);
+  // Add click event listener to all toggle buttons
+  sidebarToggleButtons.forEach(button => {
+    button.addEventListener("click", toggleSidebar);
+  });
 
   // Backdrop click to close (mobile only)
   if (sidebarBackdrop) {
@@ -389,7 +392,10 @@ function setSidebarState(open) {
     }
   }
 
-  sidebarToggleButton?.setAttribute("aria-expanded", String(open));
+  // Update all toggle buttons
+  sidebarToggleButtons.forEach(button => {
+    button.setAttribute("aria-expanded", String(open));
+  });
 
   // Save state to localStorage (only on desktop)
   if (!isMobile()) {
