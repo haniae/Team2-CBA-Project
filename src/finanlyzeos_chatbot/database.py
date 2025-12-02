@@ -277,28 +277,34 @@ def _normalize_ticker(t: Optional[str]) -> str:
     return (t or "").upper()
 
 
-def _connect(database_path: Path) -> sqlite3.Connection:
-    """Open a SQLite connection with recommended pragmas enabled and optional pooling."""
-    if CONNECTION_POOLING_AVAILABLE:
-        # Use connection pooling for better performance
-        pool = get_connection_pool(database_path)
-        # Note: This is a simplified integration - full pooling would need context manager refactoring
-        conn = sqlite3.connect(database_path)
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        conn.execute("PRAGMA temp_store=MEMORY;")
-        conn.execute("PRAGMA cache_size=-16000;")
-        conn.execute("PRAGMA foreign_keys=ON;")
-        return conn
-    else:
-        # Direct connection (existing behavior)
-        conn = sqlite3.connect(database_path)
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        conn.execute("PRAGMA temp_store=MEMORY;")
-        conn.execute("PRAGMA cache_size=-16000;")
-        conn.execute("PRAGMA foreign_keys=ON;")
-        return conn
+def _connect(database_path: Path, timeout: float = 30.0) -> sqlite3.Connection:
+    """Open a SQLite connection with recommended pragmas enabled and timeout handling."""
+    # CRITICAL: Add timeout to prevent indefinite locks and enable WAL mode for concurrent access
+    import time
+    max_retries = 5
+    retry_delay = 0.5
+    
+    for attempt in range(max_retries):
+        try:
+            # Use timeout parameter to handle locked database gracefully
+            conn = sqlite3.connect(database_path, timeout=timeout, check_same_thread=False)
+            
+            # Enable WAL mode for better concurrency (allows multiple readers and one writer)
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA temp_store=MEMORY;")
+            conn.execute("PRAGMA cache_size=-16000;")
+            conn.execute("PRAGMA foreign_keys=ON;")
+            # Set busy timeout to handle concurrent access gracefully
+            conn.execute(f"PRAGMA busy_timeout={int(timeout * 1000)};")
+            
+            return conn
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e).lower() and attempt < max_retries - 1:
+                # Retry with exponential backoff
+                time.sleep(retry_delay * (attempt + 1))
+                continue
+            raise
 
 
 def _table_has_column(connection: sqlite3.Connection, table: str, column: str) -> bool:

@@ -131,6 +131,9 @@ _MANUAL_OVERRIDES: Dict[str, str] = {
     "mara": "MARA",
     "mativ": "MATV",
     "medpace": "MEDP",
+    "mizuho": "MFG",
+    "mizuho financial": "MFG",
+    "mizuho financial group": "MFG",
     "marketaxess": "MKTX",
     "norwegian cruise line": "NCLH",
     "norwegian cruise": "NCLH",
@@ -628,9 +631,11 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
         tickers_to_try = lookup.get(alias_key, [])
         
         # If not in lookup, check manual overrides directly (in case aliases.json wasn't regenerated)
+        # Manual overrides should work even if ticker isn't in ticker_set yet (for new companies)
         if not tickers_to_try and alias_key in _MANUAL_OVERRIDES:
             override_ticker = _MANUAL_OVERRIDES[alias_key]
-            if override_ticker in ticker_set:
+            # Allow manual override even if ticker not in ticker_set (it might be a valid ticker not yet loaded)
+            if override_ticker in ticker_set or len(override_ticker) >= 1:  # Allow if it looks like a valid ticker
                 tickers_to_try = [override_ticker]
         
         # Also try normalized version in manual overrides
@@ -638,7 +643,8 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
             normalized_key = normalize_alias(alias_key)
             if normalized_key and normalized_key != alias_key and normalized_key in _MANUAL_OVERRIDES:
                 override_ticker = _MANUAL_OVERRIDES[normalized_key]
-                if override_ticker in ticker_set:
+                # Allow manual override even if ticker not in ticker_set
+                if override_ticker in ticker_set or len(override_ticker) >= 1:  # Allow if it looks like a valid ticker
                     tickers_to_try = [override_ticker]
         
         for ticker in tickers_to_try:
@@ -679,15 +685,18 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
                 continue
         
         # Check manual overrides FIRST (before exact match, in case aliases.json wasn't regenerated)
+        # Manual overrides should work even if ticker isn't in ticker_set yet (for new companies)
         if token_normalized in _MANUAL_OVERRIDES:
             override_ticker = _MANUAL_OVERRIDES[token_normalized]
-            if override_ticker in ticker_set:
+            # Allow manual override even if ticker not in ticker_set (it might be a valid ticker not yet loaded)
+            if override_ticker in ticker_set or len(override_ticker) >= 1:  # Allow if it looks like a valid ticker
                 if _try_add_alias(token_normalized, token):
                     continue
         # Also check original token
         if token.lower().strip() != token_normalized and token.lower().strip() in _MANUAL_OVERRIDES:
             override_ticker = _MANUAL_OVERRIDES[token.lower().strip()]
-            if override_ticker in ticker_set:
+            # Allow manual override even if ticker not in ticker_set
+            if override_ticker in ticker_set or len(override_ticker) >= 1:  # Allow if it looks like a valid ticker
                 if _try_add_alias(token.lower().strip(), token):
                     continue
         
@@ -773,11 +782,13 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
             if not is_valid_ticker:
                 if normalised_phrase in _MANUAL_OVERRIDES:
                     override_ticker = _MANUAL_OVERRIDES[normalised_phrase]
-                    if override_ticker in ticker_set:
+                    # Allow manual override even if ticker not in ticker_set
+                    if override_ticker in ticker_set or len(override_ticker) >= 1:
                         is_valid_ticker = True
                 elif candidate_phrase.lower().strip() in _MANUAL_OVERRIDES:
                     override_ticker = _MANUAL_OVERRIDES[candidate_phrase.lower().strip()]
-                    if override_ticker in ticker_set:
+                    # Allow manual override even if ticker not in ticker_set
+                    if override_ticker in ticker_set or len(override_ticker) >= 1:
                         is_valid_ticker = True
             
             # Only filter out stopwords if they're NOT valid tickers (including manual overrides)
@@ -792,13 +803,15 @@ def resolve_tickers_freeform(text: str) -> Tuple[List[Dict[str, str]], List[str]
             # Check manual overrides FIRST (before lookup, in case aliases.json wasn't regenerated)
             if normalised_phrase in _MANUAL_OVERRIDES:
                 override_ticker = _MANUAL_OVERRIDES[normalised_phrase]
-                if override_ticker in ticker_set:
+                # Allow manual override even if ticker not in ticker_set
+                if override_ticker in ticker_set or len(override_ticker) >= 1:
                     if _try_add_alias(normalised_phrase, candidate_phrase):
                         continue
             # Also check original phrase
             if candidate_phrase.lower().strip() in _MANUAL_OVERRIDES:
                 override_ticker = _MANUAL_OVERRIDES[candidate_phrase.lower().strip()]
-                if override_ticker in ticker_set:
+                # Allow manual override even if ticker not in ticker_set
+                if override_ticker in ticker_set or len(override_ticker) >= 1:
                     if _try_add_alias(candidate_phrase.lower().strip(), candidate_phrase):
                         continue
             
