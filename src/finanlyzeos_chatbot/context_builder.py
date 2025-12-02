@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Dict, Any, List, Optional
 from datetime import datetime
 import os
@@ -3430,7 +3431,48 @@ def build_financial_context(
         structured = parse_to_structured(query)
         LOGGER.critical(f"🔍 DEBUG: Parsed structured: {structured}")
         LOGGER.critical(f"🔍 DEBUG: structured.get('tickers'): {structured.get('tickers') if structured else None}")
-        tickers = [t["ticker"] for t in structured.get("tickers", [])][:max_tickers]
+        # FIXED: Filter tickers to reduce false positives
+        # Prioritize exact matches and filter out low-confidence fuzzy matches
+        raw_tickers = structured.get("tickers", [])
+        
+        # Known false positive tickers to exclude
+        FALSE_POSITIVE_TICKERS = {"APLE", "CPRT", "ACT", "A", "AN", "THE", "AND", "OR"}
+        
+        # Score tickers by confidence
+        scored_tickers = []
+        query_lower = query.lower()
+        
+        for t in raw_tickers:
+            ticker = t.get("ticker", "").upper()
+            input_text = t.get("input", "").lower()
+            
+            # Skip known false positives
+            if ticker in FALSE_POSITIVE_TICKERS:
+                continue
+            
+            # Check if input text appears in query (higher confidence)
+            confidence = 1.0 if input_text in query_lower else 0.6
+            
+            # Boost confidence if ticker is a well-known company
+            well_known = {"AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "JPM", "BAC", "WMT"}
+            if ticker in well_known:
+                confidence += 0.2
+            
+            # Reduce confidence for very short input or common words
+            if len(input_text) <= 2 or input_text in ["compare", "and", "the", "a", "an", "or", "vs"]:
+                confidence = 0.2
+            
+            scored_tickers.append((ticker, confidence, t))
+        
+        # Sort by confidence (highest first) and filter low-confidence matches
+        scored_tickers.sort(key=lambda x: x[1], reverse=True)
+        filtered_tickers = [t[0] for t in scored_tickers if t[1] > 0.5]  # Only keep confidence > 0.5
+        
+        # If we filtered out too many, keep top max_tickers by confidence
+        if len(filtered_tickers) == 0 and scored_tickers:
+            filtered_tickers = [t[0] for t in scored_tickers[:max_tickers]]
+        
+        tickers = filtered_tickers[:max_tickers]
         LOGGER.critical(f"🔍 DEBUG: Final tickers list: {tickers}")
         
         # ENHANCED: If structured parsing failed to extract tickers, try partial extraction
@@ -3707,9 +3749,44 @@ def build_financial_context(
                 LOGGER.critical(f"🔍 DEBUG: Latest records selected from period: {latest_records.get('revenue').period if latest_records and 'revenue' in latest_records else 'NONE'}")
                 LOGGER.critical(f"🔍 DEBUG: Latest records keys: {list(latest_records.keys()) if latest_records else 'NONE'}")
                 
+                # FIXED: If _select_latest_records returns empty, try to build context from raw records
+                # This ensures we don't skip companies that have data but failed the selection logic
                 if not latest_records:
-                    LOGGER.critical(f"🔍 DEBUG: No latest_records - skipping {ticker}")
-                    continue
+                    LOGGER.warning(f"⚠️  _select_latest_records returned empty for {ticker}, but {len(records)} records exist. Attempting fallback...")
+                    
+                    # Fallback: Build latest_records manually from raw records
+                    # Group by metric and pick the one with the latest period
+                    from collections import defaultdict
+                    by_metric = defaultdict(list)
+                    for record in records:
+                        if record.metric and record.value is not None:
+                            by_metric[record.metric].append(record)
+                    
+                    # For each metric, pick the record with the latest period
+                    latest_records = {}
+                    for metric, metric_records in by_metric.items():
+                        if not metric_records:
+                            continue
+                        # Sort by period (extract year from period string)
+                        try:
+                            def get_year(record):
+                                if not record.period:
+                                    return 0
+                                years = re.findall(r'\d{4}', record.period)
+                                return int(years[0]) if years else 0
+                            
+                            latest_for_metric = max(metric_records, key=get_year)
+                            latest_records[metric] = latest_for_metric
+                        except Exception as e:
+                            LOGGER.debug(f"Error selecting latest for {metric}: {e}")
+                            # Just use the first one as fallback
+                            latest_records[metric] = metric_records[0]
+                    
+                    if latest_records:
+                        LOGGER.info(f"✅ Fallback succeeded: Built {len(latest_records)} latest records for {ticker}")
+                    else:
+                        LOGGER.error(f"❌ Fallback also failed for {ticker} - no valid records found")
+                        continue
                 
                 # Extract period information from a representative record
                 period_label = "latest available"
@@ -3951,6 +4028,21 @@ def build_financial_context(
                 # Also skip growth/ratios/valuation analysis for forecasting queries
                 if ticker_context:
                     context_parts.append(ticker_context)
+                elif latest_records:
+                    # FIXED: Even if ticker_context is empty, if we have latest_records, build minimal context
+                    # This ensures we don't skip companies that have data
+                    LOGGER.warning(f"⚠️  ticker_context is empty for {ticker} but {len(latest_records)} latest_records exist. Building minimal context...")
+                    minimal_context = f"\n{'='*80}\n{company_name} ({ticker}) - Financial Data\n{'='*80}\n\n"
+                    # Add at least revenue if available
+                    if latest_records.get("revenue"):
+                        minimal_context += f"Revenue: {format_currency(latest_records['revenue'].value)} ({latest_records['revenue'].period})\n"
+                    # Add other key metrics
+                    for metric_name in ["net_income", "ebitda", "free_cash_flow", "total_assets"]:
+                        if latest_records.get(metric_name):
+                            minimal_context += f"{metric_name.replace('_', ' ').title()}: {format_currency(latest_records[metric_name].value)} ({latest_records[metric_name].period})\n"
+                    minimal_context += "\n"
+                    context_parts.append(minimal_context)
+                    LOGGER.info(f"✅ Added minimal context for {ticker} with {len(latest_records)} metrics")
                     
                     # Add comprehensive historical trend and growth analysis
                     # CRITICAL: Only add for non-forecasting queries

@@ -504,6 +504,11 @@ class RAGRetriever:
         *,
         max_sec_results: int = 5,
         max_uploaded_results: int = 3,
+        max_earnings_results: int = 3,
+        max_news_results: int = 3,
+        max_analyst_results: int = 3,
+        max_press_results: int = 3,
+        max_industry_results: int = 2,
         use_semantic_search: bool = True,
         conversation_id: Optional[str] = None,
         use_reranking: bool = True,
@@ -518,6 +523,11 @@ class RAGRetriever:
             tickers: List of ticker symbols
             max_sec_results: Max SEC documents to retrieve (before reranking)
             max_uploaded_results: Max uploaded documents to retrieve (before reranking)
+            max_earnings_results: Max earnings transcripts to retrieve (before reranking)
+            max_news_results: Max financial news articles to retrieve (before reranking)
+            max_analyst_results: Max analyst reports to retrieve (before reranking)
+            max_press_results: Max press releases to retrieve (before reranking)
+            max_industry_results: Max industry research to retrieve (before reranking)
             use_semantic_search: Enable semantic search
             conversation_id: Filter uploaded docs by conversation
             use_reranking: Enable reranking stage
@@ -628,9 +638,128 @@ class RAGRetriever:
                 )
                 uploaded_docs.extend(results)
         
+        # 4. Retrieve from additional collections (earnings, news, analyst, press, industry)
+        earnings_transcripts = []
+        financial_news = []
+        analyst_reports = []
+        press_releases = []
+        industry_research = []
+        
+        if use_semantic_search and tickers and self.vector_store and self.vector_store._available:
+            # Use parallel retrieval for all additional collections
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            def retrieve_additional_sources():
+                """Retrieve from all additional collections in parallel."""
+                results = {
+                    "earnings": [],
+                    "news": [],
+                    "analyst": [],
+                    "press": [],
+                    "industry": [],
+                }
+                
+                def search_collection(collection_name: str, search_func, max_results: int):
+                    """Helper to search a collection for all tickers."""
+                    all_results = []
+                    # Retrieve max_results per ticker to get diverse results across tickers
+                    results_per_ticker = max(2, max_results // max(len(tickers), 1))
+                    for ticker in tickers:
+                        try:
+                            filter_metadata = {"ticker": ticker.upper()}
+                            ticker_results = search_func(
+                                query=query,
+                                n_results=results_per_ticker,
+                                filter_metadata=filter_metadata,
+                            )
+                            all_results.extend(ticker_results)
+                        except Exception as e:
+                            LOGGER.debug(f"Retrieval from {collection_name} failed for {ticker}: {e}")
+                    return all_results
+                
+                # Search all collections in parallel
+                with ThreadPoolExecutor(max_workers=5) as executor:
+                    futures = {
+                        executor.submit(
+                            search_collection,
+                            "earnings",
+                            self.vector_store.search_earnings_transcripts,
+                            max_earnings_results
+                        ): "earnings",
+                        executor.submit(
+                            search_collection,
+                            "news",
+                            self.vector_store.search_financial_news,
+                            max_news_results
+                        ): "news",
+                        executor.submit(
+                            search_collection,
+                            "analyst",
+                            self.vector_store.search_analyst_reports,
+                            max_analyst_results
+                        ): "analyst",
+                        executor.submit(
+                            search_collection,
+                            "press",
+                            self.vector_store.search_press_releases,
+                            max_press_results
+                        ): "press",
+                        executor.submit(
+                            search_collection,
+                            "industry",
+                            self.vector_store.search_industry_research,
+                            max_industry_results
+                        ): "industry",
+                    }
+                    
+                    for future in as_completed(futures):
+                        collection_name = futures[future]
+                        try:
+                            results[collection_name] = future.result()
+                            LOGGER.debug(f"Retrieved {len(results[collection_name])} documents from {collection_name}")
+                        except Exception as e:
+                            LOGGER.warning(f"Retrieval from {collection_name} failed: {e}")
+                
+                return results
+            
+            try:
+                additional_results = retrieve_additional_sources()
+                earnings_transcripts = additional_results["earnings"]
+                financial_news = additional_results["news"]
+                analyst_reports = additional_results["analyst"]
+                press_releases = additional_results["press"]
+                industry_research = additional_results["industry"]
+                
+                LOGGER.debug(
+                    f"Additional collections retrieval: "
+                    f"{len(earnings_transcripts)} earnings, "
+                    f"{len(financial_news)} news, "
+                    f"{len(analyst_reports)} analyst, "
+                    f"{len(press_releases)} press, "
+                    f"{len(industry_research)} industry"
+                )
+            except Exception as e:
+                LOGGER.warning(f"Additional collections retrieval failed: {e}")
+                import traceback
+                LOGGER.debug(f"Additional collections retrieval traceback: {traceback.format_exc()}")
+                # Ensure lists are initialized even if retrieval fails
+                earnings_transcripts = []
+                financial_news = []
+                analyst_reports = []
+                press_releases = []
+                industry_research = []
+        
         retrieval_time_ms = (time.time() - start_time) * 1000
         
-        # 4. Reranking stage (if enabled)
+        # 5. Limit results before reranking (if reranking disabled, this is the final limit)
+        # Limit SEC and uploaded docs if reranking is disabled
+        if not use_reranking:
+            sec_narratives = sec_narratives[:max_sec_results] if sec_narratives else []
+            uploaded_docs = uploaded_docs[:max_uploaded_results] if uploaded_docs else []
+        
+        # 6. Reranking stage (if enabled)
+        # Note: Reranker currently supports SEC and uploaded docs only
+        # Additional collections are returned as-is (can be enhanced later)
         reranking_time_ms = 0.0
         if use_reranking and (sec_narratives or uploaded_docs):
             rerank_start = time.time()
@@ -656,13 +785,30 @@ class RAGRetriever:
                     LOGGER.debug(f"Reranking completed in {reranking_time_ms:.1f}ms")
                 except Exception as e:
                     LOGGER.warning(f"Reranking failed: {e}, using original results")
+                    # Fallback: limit results if reranking fails
+                    sec_narratives = sec_narratives[:max_sec_results] if sec_narratives else []
+                    uploaded_docs = uploaded_docs[:max_uploaded_results] if uploaded_docs else []
         
-        # 5. Apply guardrails (if observer provided)
+        # 7. Limit results from additional collections (simple top-k, no reranking yet)
+        # Apply limits after retrieval to respect max_*_results parameters
+        earnings_transcripts = earnings_transcripts[:max_earnings_results] if earnings_transcripts else []
+        financial_news = financial_news[:max_news_results] if financial_news else []
+        analyst_reports = analyst_reports[:max_analyst_results] if analyst_reports else []
+        press_releases = press_releases[:max_press_results] if press_releases else []
+        industry_research = industry_research[:max_industry_results] if industry_research else []
+        
+        # 8. Apply guardrails (if observer provided)
+        # Return empty lists instead of None for consistency (dataclass allows None, but lists are better)
         result = RetrievalResult(
             metrics=metrics,
             facts=facts,
             sec_narratives=sec_narratives,
             uploaded_docs=uploaded_docs,
+            earnings_transcripts=earnings_transcripts,  # Already a list (empty if no results)
+            financial_news=financial_news,  # Already a list (empty if no results)
+            analyst_reports=analyst_reports,  # Already a list (empty if no results)
+            press_releases=press_releases,  # Already a list (empty if no results)
+            industry_research=industry_research,  # Already a list (empty if no results)
         )
         
         # Note: Source fusion is handled by RAGOrchestrator or can be done separately

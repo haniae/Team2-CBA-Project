@@ -1,8 +1,6 @@
-<div align="center">
-
 # 📊 FinalyzeOS Chatbot Platform
 
-### Institutional-Grade Finance Copilot with Explainable AI
+**Institutional-Grade Finance Copilot with Explainable AI**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -16,22 +14,24 @@
 
 **FinalyzeOS** is an institutional-grade copilot for finance teams. It pairs deterministic market analytics with a conversational interface so analysts can ask natural-language questions, inspect lineage, and keep data pipelines auditable. This repository underpins our Fall 2025 DNSC 6317 practicum at The George Washington University, where we are building and governing an explainable finance copilot that can support regulated teams. Our objectives include stress-testing FinalyzeOS against real analyst workflows, documenting orchestration strategies for enterprise rollouts, and demonstrating responsible AI guardrails around data access, lineage, and scenario planning.
 
-Contributors  
-**Hania A.** haniaa@gwmail.gwu.edu
+## Contributors
 
-**Van Nhi Vuong** vannhi.vuong@gwmail.gwu.edu
+- **Hania A.** - haniaa@gwmail.gwu.edu
+- **Van Nhi Vuong** - vannhi.vuong@gwmail.gwu.edu
+- **Malcolm Muoriyarwa** - malcolm.munoriyarwa@gwmail.gwu.edu
+- **Devarsh Patel** - devarsh.patel@gwmail.gwu.edu
 
-**Malcolm Muoriyarwa** malcolm.munoriyarwa@gwmail.gwu.edu
+## Acknowledgments
 
-**Devarsh Patel** devarsh.patel@gwmail.gwu.edu . 
-
-**Acknowledgments** Special thanks to Professor Patrick Hall (The George Washington University) for his outstanding mentorship and tireless support. His guidance and encouragement made this project possible.
-
-[Setup Guide](#️-complete-setup-guide) • [Documentation](docs/) • [Features](#core-capabilities) • [Contributing](CONTRIBUTING.md)
+Special thanks to Professor Patrick Hall (The George Washington University) for his outstanding mentorship and tireless support. His guidance and encouragement made this project possible.
 
 ---
 
-## ⚡Quick Start
+**Quick Links:** [Setup Guide](#️-complete-setup-guide) • [Documentation](docs/) • [Features](#core-capabilities) • [Contributing](CONTRIBUTING.md)
+
+---
+
+## ⚡ Quick Start
 
 **Get started in 30 seconds:**
 
@@ -79,8 +79,6 @@ python run_chatbot.py
 📖 **For detailed setup with options (100/250/500/1500 companies), see [Complete Setup Guide](#️-complete-setup-guide)**
 
 ---
-
-</div>
 
 ## 📚 Table of Contents
 

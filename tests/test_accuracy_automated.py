@@ -2,8 +2,12 @@
 Automated Accuracy Testing for BenchmarkOS Chatbot
 Based on NIST Measurement Trees Framework (arXiv:2509.26632)
 
-This script implements Level 5 (leaf node) data collection and 
-Level 4 (metric-level) aggregation for automated factual accuracy testing.
+This script implements the complete 5-level hierarchical testing framework:
+- Level 5: Individual test cases (leaf nodes)
+- Level 4: Construct-level aggregation (FA-1, FA-3, etc.)
+- Level 3: Overall automated testing score
+- Level 2: Component-level aggregation (Database, LLM, RAG)
+- Level 1: System-level score (Overall Chatbot Performance)
 """
 
 import json
@@ -45,13 +49,49 @@ class TestResult:
 class AccuracyTester:
     """
     Implements automated accuracy testing using measurement tree framework.
+    
+    Complete 5-level hierarchical structure:
+    - Level 5: Individual test cases
+    - Level 4: Construct-level aggregation (FA-1, FA-3, etc.)
+    - Level 3: Overall automated testing score
+    - Level 2: Component-level aggregation (Database, LLM, RAG)
+    - Level 1: System-level score (Overall Chatbot Performance)
     """
+    
+    # Component mapping: Maps constructs to system components
+    COMPONENT_MAPPING = {
+        # Database Component: Factual accuracy, data retrieval, calculations
+        'FA-1': 'Database',  # Numerical Value Accuracy
+        'FA-2': 'Database',  # Metric Calculation Accuracy
+        'FA-3': 'Database',  # Growth Rate Calculation
+        'FA-4': 'Database',  # Multi-Metric Retrieval
+        'FA-5': 'Database',  # Temporal Query Accuracy
+        # RAG Component: Context retrieval, source citations, narratives
+        'RAG-1': 'RAG',  # Context Retrieval Quality
+        'RAG-2': 'RAG',  # Source Citation Accuracy
+        'RAG-3': 'RAG',  # Narrative Retrieval Quality
+        'RAG-4': 'RAG',  # Multi-Hop Retrieval
+        # LLM Component: Response generation, formatting, natural language
+        'LLM-1': 'LLM',  # Response Format Quality
+        'LLM-2': 'LLM',  # Natural Language Quality
+        'LLM-3': 'LLM',  # Explanation Clarity
+        'LLM-4': 'LLM',  # Response Completeness
+    }
     
     def __init__(self, chatbot_api_url: str = "http://localhost:8000", 
                  database_path: str = "data/sqlite/finanlyzeos_chatbot.sqlite3"):
         self.api_url = chatbot_api_url
         self.database_path = Path(database_path)
         self.results: List[TestResult] = []
+    
+    def get_component_for_construct(self, construct: str) -> str:
+        """
+        Map a construct (FA-1, FA-3, etc.) to its component (Database, LLM, RAG).
+        
+        Defaults to 'Database' for unknown constructs as most accuracy tests
+        are database-related.
+        """
+        return self.COMPONENT_MAPPING.get(construct, 'Database')
         
     def load_ground_truth(self) -> Dict[str, Any]:
         """Load ground truth values from database"""
@@ -323,15 +363,116 @@ class AccuracyTester:
         
         return aggregated
     
-    def generate_report(self) -> Dict[str, Any]:
-        """Generate comprehensive test report"""
-        aggregated = self.aggregate_by_construct()
+    def aggregate_by_component(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Aggregate Level 4 results to Level 2 (component level).
         
-        # Level 4 scores
-        level4_scores = {k: v['risk_score'] for k, v in aggregated.items()}
+        Groups constructs by component (Database, LLM, RAG) and aggregates scores.
+        
+        Returns dict: {component: {risk_score, n, passed, failed, constructs}}
+        """
+        from collections import defaultdict
+        
+        # First, get Level 4 aggregates
+        level4_aggregates = self.aggregate_by_construct()
+        
+        # Group constructs by component
+        component_constructs = defaultdict(list)
+        for construct, data in level4_aggregates.items():
+            component = self.get_component_for_construct(construct)
+            component_constructs[component].append((construct, data))
+        
+        # Aggregate by component
+        component_results = {}
+        for component, construct_list in component_constructs.items():
+            # Collect all test results for this component
+            component_tests = []
+            for construct, construct_data in construct_list:
+                # Get all results for this construct
+                construct_results = [
+                    r for r in self.results 
+                    if r.test_case.construct == construct
+                ]
+                component_tests.extend(construct_results)
+            
+            if component_tests:
+                risk_scores = [r.risk_score for r in component_tests]
+                passed_count = sum(1 for r in component_tests if r.passed)
+                failed_count = len(component_tests) - passed_count
+                
+                component_results[component] = {
+                    'component': component,
+                    'risk_score': sum(risk_scores) / len(risk_scores) if risk_scores else 0,  # Mean
+                    'n': len(component_tests),
+                    'passed': passed_count,
+                    'failed': failed_count,
+                    'pass_rate': passed_count / len(component_tests) if component_tests else 0,
+                    'constructs': [c for c, _ in construct_list],
+                    'construct_count': len(construct_list)
+                }
+            else:
+                component_results[component] = {
+                    'component': component,
+                    'risk_score': 0.0,
+                    'n': 0,
+                    'passed': 0,
+                    'failed': 0,
+                    'pass_rate': 0.0,
+                    'constructs': [],
+                    'construct_count': 0
+                }
+        
+        return component_results
+    
+    def aggregate_system_level(self) -> Dict[str, Any]:
+        """
+        Aggregate Level 2 results to Level 1 (system level).
+        
+        Calculates overall chatbot performance score as the mean of component scores.
+        
+        Returns dict: {system_score, component_scores, risk_level}
+        """
+        # Get Level 2 aggregates
+        component_aggregates = self.aggregate_by_component()
+        
+        # Calculate system-level score (mean of all component scores)
+        component_risk_scores = [
+            data['risk_score'] for data in component_aggregates.values()
+            if data['n'] > 0  # Only include components with tests
+        ]
+        
+        if component_risk_scores:
+            system_score = sum(component_risk_scores) / len(component_risk_scores)
+        else:
+            system_score = 0.0
+        
+        return {
+            'system_score': system_score,
+            'risk_level': self._risk_level(system_score),
+            'component_scores': {
+                comp: data['risk_score'] 
+                for comp, data in component_aggregates.items()
+                if data['n'] > 0
+            },
+            'total_components': len([c for c in component_aggregates.values() if c['n'] > 0]),
+            'total_tests': sum(data['n'] for data in component_aggregates.values())
+        }
+    
+    def generate_report(self) -> Dict[str, Any]:
+        """Generate comprehensive test report with all 5 levels"""
+        # Level 4: Construct-level aggregation
+        level4_aggregates = self.aggregate_by_construct()
+        level4_scores = {k: v['risk_score'] for k, v in level4_aggregates.items()}
         
         # Level 3: Overall automated testing score (mean of constructs)
         level3_score = sum(level4_scores.values()) / len(level4_scores) if level4_scores else 0
+        
+        # Level 2: Component-level aggregation
+        level2_aggregates = self.aggregate_by_component()
+        level2_scores = {k: v['risk_score'] for k, v in level2_aggregates.items() if v['n'] > 0}
+        
+        # Level 1: System-level aggregation
+        level1_result = self.aggregate_system_level()
         
         # Identify critical failures
         critical_failures = [
@@ -348,7 +489,10 @@ class AccuracyTester:
                 'overall_risk_score': level3_score,
                 'risk_level': self._risk_level(level3_score)
             },
-            'by_construct': aggregated,
+            # Level 5: Individual test results (implicit in results list)
+            'by_construct': level4_aggregates,  # Level 4
+            'by_component': level2_aggregates,  # Level 2
+            'system_level': level1_result,  # Level 1
             'critical_failures': [
                 {
                     'test_id': r.test_case.test_id,
@@ -361,8 +505,11 @@ class AccuracyTester:
                 }
                 for r in critical_failures
             ],
-            'level4_scores': level4_scores,
-            'level3_score': level3_score,
+            # Scores for each level
+            'level4_scores': level4_scores,  # Level 4
+            'level3_score': level3_score,  # Level 3
+            'level2_scores': level2_scores,  # Level 2
+            'level1_score': level1_result['system_score'],  # Level 1
             'timestamp': datetime.now().isoformat()
         }
         
@@ -391,29 +538,74 @@ class AccuracyTester:
         print(f"Results saved to {output_path}")
     
     def print_summary(self):
-        """Print human-readable summary"""
+        """Print human-readable summary with all 5 levels"""
         report = self.generate_report()
         
         print("=" * 80)
         print("AUTOMATED ACCURACY TEST RESULTS")
+        print("NIST Measurement Trees Framework - Complete 5-Level Hierarchy")
         print("=" * 80)
         print()
         
         summary = report['summary']
-        print(f"Overall Risk Score: {summary['overall_risk_score']:.1f}/10 - {summary['risk_level']}")
+        
+        # Level 1: System-Level Score
+        level1 = report['system_level']
+        print("=" * 80)
+        print("LEVEL 1: SYSTEM-LEVEL SCORE (Overall Chatbot Performance)")
+        print("=" * 80)
+        print(f"System Risk Score: {level1['system_score']:.2f}/10 - {level1['risk_level']}")
+        print(f"Total Tests: {level1['total_tests']}")
+        print(f"Components Tested: {level1['total_components']}")
+        print()
+        
+        # Level 2: Component-Level Aggregation
+        print("=" * 80)
+        print("LEVEL 2: COMPONENT-LEVEL AGGREGATION (Database, LLM, RAG)")
+        print("=" * 80)
+        for component in ['Database', 'LLM', 'RAG']:
+            if component in report['by_component']:
+                data = report['by_component'][component]
+                status = "✅" if data['risk_score'] <= 2.0 else "⚠️" if data['risk_score'] <= 5.0 else "❌"
+                print(f"{status} {component:12s}: {data['risk_score']:.2f}/10 "
+                      f"({data['passed']}/{data['n']} passed, {data['pass_rate']*100:.1f}%)")
+                print(f"   Constructs: {', '.join(data['constructs']) if data['constructs'] else 'None'}")
+        print()
+        
+        # Level 3: Overall Automated Testing Score
+        print("=" * 80)
+        print("LEVEL 3: OVERALL AUTOMATED TESTING SCORE")
+        print("=" * 80)
+        print(f"Overall Risk Score: {report['level3_score']:.2f}/10")
         print(f"Tests Passed: {summary['passed']}/{summary['total_tests']} ({summary['pass_rate']*100:.1f}%)")
         print()
         
-        print("Risk Scores by Construct:")
-        print("-" * 60)
+        # Level 4: Construct-Level Aggregation
+        print("=" * 80)
+        print("LEVEL 4: CONSTRUCT-LEVEL AGGREGATION (FA-1, FA-3, etc.)")
+        print("=" * 80)
         for construct, data in sorted(report['by_construct'].items()):
+            component = self.get_component_for_construct(construct)
             status = "✅" if data['risk_score'] <= 2.0 else "⚠️" if data['risk_score'] <= 5.0 else "❌"
-            print(f"{status} {construct}: {data['risk_score']:.1f}/10 ({data['passed']}/{data['n']} passed)")
+            print(f"{status} {construct:8s} ({component:8s}): {data['risk_score']:.2f}/10 "
+                  f"({data['passed']}/{data['n']} passed, {data['pass_rate']*100:.1f}%)")
         print()
         
+        # Level 5: Individual Test Cases (summary)
+        print("=" * 80)
+        print("LEVEL 5: INDIVIDUAL TEST CASES (Leaf Nodes)")
+        print("=" * 80)
+        print(f"Total Test Cases: {summary['total_tests']}")
+        print(f"Passed: {summary['passed']}")
+        print(f"Failed: {summary['failed']}")
+        print(f"Pass Rate: {summary['pass_rate']*100:.1f}%")
+        print()
+        
+        # Critical Failures
         if report['critical_failures']:
-            print("Critical Failures (Risk ≥ 8.0):")
-            print("-" * 60)
+            print("=" * 80)
+            print("CRITICAL FAILURES (Risk ≥ 8.0)")
+            print("=" * 80)
             for failure in report['critical_failures']:
                 print(f"❌ {failure['test_id']}")
                 print(f"   Query: {failure['query']}")
@@ -422,6 +614,18 @@ class AccuracyTester:
                 print()
         else:
             print("✅ No critical failures!")
+            print()
+        
+        # Hierarchy Summary
+        print("=" * 80)
+        print("HIERARCHY SUMMARY")
+        print("=" * 80)
+        print(f"Level 1 (System):       {report['level1_score']:.2f}/10")
+        print(f"Level 2 (Components):   {', '.join([f'{k}: {v:.2f}' for k, v in report['level2_scores'].items()])}")
+        print(f"Level 3 (Overall):      {report['level3_score']:.2f}/10")
+        print(f"Level 4 (Constructs):   {len(report['level4_scores'])} constructs")
+        print(f"Level 5 (Test Cases):   {summary['total_tests']} cases")
+        print()
         
         print("=" * 80)
 

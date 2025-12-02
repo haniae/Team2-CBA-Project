@@ -262,10 +262,93 @@ const DEFAULT_PROMPT_SUGGESTIONS = [
  * @param {string} text - Raw markdown text
  * @returns {string} HTML string
  */
+/**
+ * Fix common markdown formatting issues before rendering
+ * @param {string} text - Raw markdown text
+ * @returns {string} Fixed markdown text
+ */
+function fixMarkdownFormatting(text) {
+  if (!text) {
+    return "";
+  }
+  
+  let fixed = text;
+  
+  // Fix 1: Convert all "1." to sequential numbering (1., 2., 3., 4.)
+  // This handles cases where LLM generates all "1." instead of sequential numbers
+  const lines = fixed.split('\n');
+  const fixedLines = [];
+  let inOrderedList = false;
+  let listCounter = 1;
+  let listIndent = 0;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const listMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+    
+    if (listMatch) {
+      const indent = listMatch[1].length;
+      const number = parseInt(listMatch[2], 10);
+      const content = listMatch[3];
+      
+      // If this is a new list or different indent level, reset counter
+      if (!inOrderedList || indent !== listIndent) {
+        listCounter = 1;
+        inOrderedList = true;
+        listIndent = indent;
+      }
+      
+      // Replace with sequential number
+      fixedLines.push(`${listMatch[1]}${listCounter}. ${content}`);
+      listCounter++;
+    } else {
+      // Not a list item - reset list state if we had a blank line
+      if (line.trim() === '' && inOrderedList) {
+        // Keep list state for continuation, but reset if multiple blank lines
+        if (i > 0 && lines[i - 1].trim() === '') {
+          inOrderedList = false;
+          listCounter = 1;
+        }
+      } else if (line.trim() !== '' && !line.match(/^\s*\d+\.\s+/)) {
+        // Non-list line - reset if not indented continuation
+        if (!line.match(/^\s{2,}/)) {
+          inOrderedList = false;
+          listCounter = 1;
+        }
+      }
+      
+      fixedLines.push(line);
+    }
+  }
+  
+  fixed = fixedLines.join('\n');
+  
+  // Fix 2: Normalize spacing - ensure consistent blank lines
+  // Multiple blank lines → single blank line
+  fixed = fixed.replace(/\n{3,}/g, '\n\n');
+  
+  // Fix 3: Ensure blank line before headers
+  fixed = fixed.replace(/([^\n])\n(#{1,6}\s+)/g, '$1\n\n$2');
+  
+  // Fix 4: Ensure blank line after headers
+  fixed = fixed.replace(/(#{1,6}\s+[^\n]+)\n([^\n#])/g, '$1\n\n$2');
+  
+  // Fix 5: Ensure blank line before lists
+  fixed = fixed.replace(/([^\n])\n(\s*[-*+]|\s*\d+\.)\s/g, '$1\n\n$2 ');
+  
+  // Fix 6: Ensure blank line after lists
+  fixed = fixed.replace(/(\n\s*[-*+]|\n\s*\d+\.)\s+[^\n]+\n([^\n\s-*0-9])/g, '$1 $2');
+  
+  return fixed;
+}
+
 function renderMarkdown(text) {
   if (!text) {
     return "";
   }
+  
+  // Apply markdown fixes before rendering
+  text = fixMarkdownFormatting(text);
 
   const escapeHtml = (value) =>
     value
@@ -452,10 +535,29 @@ function renderMarkdown(text) {
       const type = marker.endsWith(".") ? "ol" : "ul";
       ensureList(type, indent);
 
+      // FIXED: For ordered lists, use proper numbering (let browser handle it)
+      // Remove the number from content since <ol> will auto-number
       html.push("<li>");
       html.push(processInline(content.trim()));
       html.push("</li>");
       continue;
+    }
+
+    // Handle continuation lines for lists (indented text after list items)
+    const currentList = listStack[listStack.length - 1];
+    if (currentList && line.match(/^\s{2,}/)) {
+      // If we're in a list and this line is indented, it's a continuation
+      const lastLiIndex = html.lastIndexOf('</li>');
+      if (lastLiIndex !== -1) {
+        // Find the opening <li> tag
+        let liStartIndex = lastLiIndex;
+        while (liStartIndex > 0 && html[liStartIndex] !== '<') {
+          liStartIndex--;
+        }
+        // Append to the last list item
+        html[lastLiIndex] = html[lastLiIndex].replace('</li>', ' ' + processInline(line.trim()) + '</li>');
+        continue;
+      }
     }
 
     if (listStack.length) {

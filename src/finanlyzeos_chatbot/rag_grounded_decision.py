@@ -39,7 +39,7 @@ class GroundedDecisionLayer:
     
     def __init__(
         self,
-        min_confidence_threshold: float = 0.25,
+        min_confidence_threshold: float = 0.15,  # FIXED: Lowered from 0.25 to 0.15 for simple queries
         require_min_docs: int = 1,
         check_contradictions: bool = True,
     ):

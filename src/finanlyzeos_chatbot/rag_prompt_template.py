@@ -89,7 +89,37 @@ def build_rag_prompt(
             sections.append(_format_table_data(table_docs))
             sections.append("\n")
     
-    # Section 4: Additional context
+    # Section 4: Earnings Transcripts (management commentary)
+    if retrieval_result.earnings_transcripts:
+        sections.append("🎤 **EARNINGS CALL TRANSCRIPTS** (management commentary & Q&A):\n")
+        sections.append(_format_earnings_transcripts(retrieval_result.earnings_transcripts))
+        sections.append("\n")
+    
+    # Section 5: Financial News (current market sentiment)
+    if retrieval_result.financial_news:
+        sections.append("📰 **FINANCIAL NEWS** (current market sentiment & breaking news):\n")
+        sections.append(_format_financial_news(retrieval_result.financial_news))
+        sections.append("\n")
+    
+    # Section 6: Analyst Reports (professional research)
+    if retrieval_result.analyst_reports:
+        sections.append("📊 **ANALYST RESEARCH REPORTS** (professional analysis & price targets):\n")
+        sections.append(_format_analyst_reports(retrieval_result.analyst_reports))
+        sections.append("\n")
+    
+    # Section 7: Press Releases (company announcements)
+    if retrieval_result.press_releases:
+        sections.append("📢 **PRESS RELEASES** (company announcements & strategic updates):\n")
+        sections.append(_format_press_releases(retrieval_result.press_releases))
+        sections.append("\n")
+    
+    # Section 8: Industry Research (sector analysis)
+    if retrieval_result.industry_research:
+        sections.append("🏭 **INDUSTRY RESEARCH** (sector analysis & market trends):\n")
+        sections.append(_format_industry_research(retrieval_result.industry_research))
+        sections.append("\n")
+    
+    # Section 9: Additional context
     if retrieval_result.macro_data:
         sections.append("🌍 **MACROECONOMIC DATA**:\n")
         sections.append(_format_dict(retrieval_result.macro_data))
@@ -219,5 +249,131 @@ def _format_dict(data: Dict[str, Any]) -> str:
     lines = []
     for key, value in data.items():
         lines.append(f"  - {key}: {value}")
+    return "\n".join(lines)
+
+
+def _format_earnings_transcripts(transcripts: List[RetrievedDocument]) -> str:
+    """Format earnings call transcripts for RAG prompt."""
+    lines = []
+    
+    for i, doc in enumerate(transcripts, 1):
+        meta = doc.metadata
+        ticker = meta.get('ticker', 'N/A')
+        date = meta.get('date', 'N/A')
+        quarter = meta.get('quarter', 'N/A')
+        source = meta.get('source', 'N/A')
+        
+        lines.append(f"\n**Transcript {i}** - {ticker} Earnings Call")
+        lines.append(f"Date: {date} | Quarter: {quarter} | Source: {source}")
+        
+        if doc.score is not None:
+            lines.append(f"Relevance Score: {1 - doc.score:.3f}")
+        
+        lines.append(f"\n{doc.text[:1000]}...")
+        lines.append("─" * 80)
+    
+    return "\n".join(lines)
+
+
+def _format_financial_news(news: List[RetrievedDocument]) -> str:
+    """Format financial news articles for RAG prompt."""
+    lines = []
+    
+    for i, doc in enumerate(news, 1):
+        meta = doc.metadata
+        ticker = meta.get('ticker', 'N/A')
+        title = meta.get('title', 'N/A')
+        date = meta.get('date', 'N/A')
+        publisher = meta.get('publisher', meta.get('source', 'N/A'))
+        url = meta.get('url', '')
+        
+        lines.append(f"\n**News Article {i}**: {title}")
+        lines.append(f"Ticker: {ticker} | Date: {date} | Publisher: {publisher}")
+        if url:
+            lines.append(f"URL: {url}")
+        
+        if doc.score is not None:
+            lines.append(f"Relevance Score: {1 - doc.score:.3f}")
+        
+        lines.append(f"\n{doc.text[:1000]}...")
+        lines.append("─" * 80)
+    
+    return "\n".join(lines)
+
+
+def _format_analyst_reports(reports: List[RetrievedDocument]) -> str:
+    """Format analyst reports for RAG prompt."""
+    lines = []
+    
+    for i, doc in enumerate(reports, 1):
+        meta = doc.metadata
+        ticker = meta.get('ticker', 'N/A')
+        date = meta.get('date', 'N/A')
+        analyst = meta.get('analyst', meta.get('firm', 'N/A'))
+        rating = meta.get('rating', '')
+        price_target = meta.get('price_target', '')
+        source = meta.get('source', 'N/A')
+        
+        lines.append(f"\n**Report {i}** - {ticker} Analysis")
+        lines.append(f"Date: {date} | Analyst: {analyst} | Source: {source}")
+        if rating:
+            lines.append(f"Rating: {rating}")
+        if price_target:
+            lines.append(f"Price Target: {price_target}")
+        
+        if doc.score is not None:
+            lines.append(f"Relevance Score: {1 - doc.score:.3f}")
+        
+        lines.append(f"\n{doc.text[:1000]}...")
+        lines.append("─" * 80)
+    
+    return "\n".join(lines)
+
+
+def _format_press_releases(releases: List[RetrievedDocument]) -> str:
+    """Format press releases for RAG prompt."""
+    lines = []
+    
+    for i, doc in enumerate(releases, 1):
+        meta = doc.metadata
+        ticker = meta.get('ticker', 'N/A')
+        title = meta.get('title', 'N/A')
+        date = meta.get('date', 'N/A')
+        url = meta.get('url', '')
+        
+        lines.append(f"\n**Press Release {i}**: {title}")
+        lines.append(f"Ticker: {ticker} | Date: {date}")
+        if url:
+            lines.append(f"URL: {url}")
+        
+        if doc.score is not None:
+            lines.append(f"Relevance Score: {1 - doc.score:.3f}")
+        
+        lines.append(f"\n{doc.text[:1000]}...")
+        lines.append("─" * 80)
+    
+    return "\n".join(lines)
+
+
+def _format_industry_research(research: List[RetrievedDocument]) -> str:
+    """Format industry research for RAG prompt."""
+    lines = []
+    
+    for i, doc in enumerate(research, 1):
+        meta = doc.metadata
+        sector = meta.get('sector', 'N/A')
+        title = meta.get('title', 'N/A')
+        date = meta.get('date', 'N/A')
+        source = meta.get('source', 'N/A')
+        
+        lines.append(f"\n**Research {i}**: {title}")
+        lines.append(f"Sector: {sector} | Date: {date} | Source: {source}")
+        
+        if doc.score is not None:
+            lines.append(f"Relevance Score: {1 - doc.score:.3f}")
+        
+        lines.append(f"\n{doc.text[:1000]}...")
+        lines.append("─" * 80)
+    
     return "\n".join(lines)
 

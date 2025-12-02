@@ -1,5 +1,21 @@
 # BenchmarkOS Chatbot Setup Guide
 
+## Table of Contents
+
+1. [Quick Start](#-quick-start)
+2. [Dependencies](#-dependencies)
+3. [Configuration Files](#-configuration-files)
+4. [Project Structure](#️-project-structure)
+5. [Running the Application](#-running-the-application)
+6. [Troubleshooting](#-troubleshooting)
+7. [Features](#-features)
+8. [Security Notes](#-security-notes)
+9. [Performance Tips](#-performance-tips)
+10. [Support](#-support)
+11. [Development Notes](#-development-notes)
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -8,20 +24,32 @@
 - Git
 
 ### 1. Clone Repository
+
 ```bash
 git clone <repository-url>
 cd Team2-CBA-Project-1
 ```
 
 ### 2. Python Environment Setup
+
+**On Windows:**
 ```bash
 # Create virtual environment
 python -m venv venv
 
 # Activate virtual environment
-# On Windows:
 venv\Scripts\activate
-# On macOS/Linux:
+
+# Install Python dependencies
+pip install -r requirements.txt
+```
+
+**On macOS/Linux:**
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
 source venv/bin/activate
 
 # Install Python dependencies
@@ -29,62 +57,103 @@ pip install -r requirements.txt
 ```
 
 ### 3. Environment Configuration
+
 ```bash
 # Copy environment template
 cp .env.example .env
 
 # Edit .env file with your configuration
-# Required variables:
-# - OPENAI_API_KEY=your_openai_api_key
-# - DATABASE_URL=your_database_url
-# - SEC_API_KEY=your_sec_api_key (optional)
+# On Windows: notepad .env
+# On macOS/Linux: nano .env
 ```
 
+**Required variables:**
+- `OPENAI_API_KEY` - Your OpenAI API key (required)
+- `DATABASE_URL` - Database connection string (required)
+- `SEC_API_KEY` - SEC API key (optional, for SEC data fetching)
+
 ### 4. Database Setup
+
 ```bash
 # Initialize database
 python -c "from src.finanlyzeos_chatbot.database import init_db; init_db()"
+```
 
-# Load sample data (optional)
+**Optional:** Load sample data for testing:
+
+```bash
 python scripts/utility/load_sample_data.py
 ```
 
-### 5. Web Dashboard Setup
+### 5. Web Dashboard Setup (Optional)
+
+If you want to use the web dashboard:
+
 ```bash
-# Install Node.js dependencies
+# Navigate to webui directory
 cd webui
+
+# Install Node.js dependencies
 npm install
 
 # Start web server
 npm start
-# or
-python -m http.server 8000
 ```
+
+> **Alternative**: You can also use Python's built-in HTTP server:
+> ```bash
+> python -m http.server 8000
+> ```
 
 ### 6. Run Chatbot
-```bash
-# Start chatbot server
-python run_chatbot.py
 
-# Or use the web interface
-python serve_chatbot.py
+Start the chatbot server:
+
+```bash
+# From project root directory
+python run_chatbot.py
 ```
+
+> **Alternative**: Use the web interface launcher:
+> ```bash
+> python serve_chatbot.py
+> ```
 
 ## 📦 Dependencies
 
-### Python Dependencies (requirements.txt)
-- **Core Framework**: FastAPI, Uvicorn
-- **Database**: SQLAlchemy, psycopg2-binary
-- **AI/ML**: OpenAI, python-dotenv
-- **Data Processing**: requests, openpyxl
-- **Documentation**: fpdf2, python-pptx
-- **Testing**: pytest
+### Python Dependencies
 
-### Node.js Dependencies (webui/package.json)
-- **Web Framework**: Express.js
-- **Frontend**: Vanilla JavaScript, CSS3
-- **Charts**: Chart.js (for financial visualizations)
-- **HTTP Client**: Axios
+Core packages required for the chatbot backend:
+
+| Category | Packages | Purpose |
+|----------|----------|---------|
+| **Core Framework** | FastAPI, Uvicorn | Web framework and ASGI server |
+| **Database** | SQLAlchemy, psycopg2-binary | ORM and PostgreSQL driver |
+| **AI/ML** | OpenAI, python-dotenv | LLM integration and environment management |
+| **Data Processing** | requests, openpyxl | HTTP requests and Excel file handling |
+| **Documentation** | fpdf2, python-pptx | PDF and PowerPoint generation |
+| **Testing** | pytest | Unit and integration testing |
+
+**Install all dependencies:**
+```bash
+pip install -r requirements.txt
+```
+
+### Node.js Dependencies
+
+Required for the web dashboard (optional):
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| **express** | ^4.18.2 | Web server framework |
+| **axios** | ^1.6.0 | HTTP client for API calls |
+| **chart.js** | ^4.4.0 | Financial data visualization |
+
+**Install Node.js dependencies:**
+```bash
+cd webui
+npm install
+```
 
 ## 🔧 Configuration Files
 
@@ -266,11 +335,20 @@ grep ERROR logs/chatbot.log
 
 ## 🔐 Security Notes
 
-1. **Never commit .env files**
-2. **Use environment variables for secrets**
-3. **Rotate API keys regularly**
-4. **Use HTTPS in production**
-5. **Validate all user inputs**
+> **Important**: Follow these security best practices to protect your system and data.
+
+1. **Never commit `.env` files** - Environment files contain sensitive API keys and credentials
+2. **Use environment variables for secrets** - Never hardcode API keys in source code
+3. **Rotate API keys regularly** - Update your API keys periodically for better security
+4. **Use HTTPS in production** - Always use encrypted connections in production environments
+5. **Validate all user inputs** - Sanitize and validate all user-provided data
+
+**Additional Recommendations:**
+- Use secrets management tools (e.g., AWS Secrets Manager, HashiCorp Vault) in production
+- Implement rate limiting to prevent abuse
+- Regularly update dependencies to patch security vulnerabilities
+- Use strong passwords for database connections
+- Enable authentication for production deployments
 
 ## 📈 Performance Tips
 
@@ -282,11 +360,17 @@ grep ERROR logs/chatbot.log
 
 ## 🆘 Support
 
-For issues and questions:
-1. Check this setup guide
-2. Review error logs
-3. Check GitHub issues
-4. Contact team members
+If you encounter issues or have questions:
+
+1. **Check this setup guide** - Many common issues are covered here
+2. **Review error logs** - Check `logs/chatbot.log` for detailed error messages
+3. **Check GitHub issues** - Search existing issues or create a new one
+4. **Contact team members** - Reach out to the development team for assistance
+
+**Useful Resources:**
+- [RAG Explained](../RAG_EXPLAINED.md) - Understanding the RAG system
+- [Architecture Documentation](../ARCHITECTURE_TECHNICAL_FLOW.md) - System architecture details
+- [Troubleshooting Guide](TROUBLESHOOTING.md) - Additional troubleshooting steps
 
 ## 📝 Development Notes
 

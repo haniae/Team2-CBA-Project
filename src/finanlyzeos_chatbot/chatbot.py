@@ -61,6 +61,7 @@ from .query_classifier import classify_query, QueryComplexity, QueryType, get_fa
 from .framework_processor import FrameworkProcessor
 from .template_processor import TemplateProcessor
 from .document_context import build_uploaded_document_context
+from .visualization_handler import VisualizationIntentDetector, VisualizationGenerator
 
 # Portfolio module imports (combined portfolio.py)
 from .portfolio import (
@@ -1101,8 +1102,58 @@ SYSTEM_PROMPT = (
     "- ### Business Drivers (what's causing the numbers)\n"
     "- ### Future Outlook (implications, catalysts, risks)\n\n"
     
-    "## Markdown Formatting - Professional Presentation\n\n"
-    "**CRITICAL: Use proper markdown formatting for professional, readable responses:**\n\n"
+    "## Markdown Formatting - ChatGPT Standard (MANDATORY)\n\n"
+    "**🚨 CRITICAL: Use ChatGPT-standard markdown formatting for professional, readable responses:**\n\n"
+    "**NUMBERED LISTS (CRITICAL - READ CAREFULLY):**\n"
+    "- **🚨 MANDATORY: ALWAYS use sequential numbering**: 1., 2., 3., 4., 5. (NOT all 1., 1., 1., 1.)\n"
+    "- **EVERY numbered list item MUST have a different number**: First item = 1., Second = 2., Third = 3., etc.\n"
+    "- **Format**: Each numbered item on a new line with proper spacing\n"
+    "- **Blank line before list**: Add a blank line before starting a numbered list\n"
+    "- **Blank line after list**: Add a blank line after ending a numbered list\n"
+    "- **Example CORRECT format (USE THIS):**\n"
+    "  \n"
+    "  1. First item with detailed explanation\n"
+    "  2. Second item with detailed explanation\n"
+    "  3. Third item with detailed explanation\n"
+    "  4. Fourth item with detailed explanation\n"
+    "  \n"
+    "- **Example WRONG format (NEVER DO THIS):**\n"
+    "  1. First item\n"
+    "  1. Second item (WRONG - should be 2.)\n"
+    "  1. Third item (WRONG - should be 3.)\n"
+    "  1. Fourth item (WRONG - should be 4.)\n"
+    "- **Before sending response, verify**: Count your numbered items - do they go 1., 2., 3., 4.? If not, FIX IT.\n\n"
+    "**BULLET LISTS:**\n"
+    "- Use `-` or `*` for unordered lists\n"
+    "- Proper spacing between items (blank line before list, after list)\n"
+    "- Consistent indentation\n\n"
+    "**HEADERS:**\n"
+    "- Use `###` for main sections (not `##` or `#`)\n"
+    "- Use `####` for subsections\n"
+    "- Always add blank line before and after headers\n\n"
+    "**PARAGRAPHS:**\n"
+    "- Always separate paragraphs with blank lines\n"
+    "- Don't use single-line breaks within paragraphs\n"
+    "- Use proper spacing for readability\n\n"
+    "**BOLD & EMPHASIS:**\n"
+    "- Use `**text**` for bold (key numbers, important terms)\n"
+    "- Use `*text*` for emphasis (subtle emphasis)\n"
+    "- Don't overuse - only for truly important information\n\n"
+    "**SPACING & READABILITY (ChatGPT Standard):**\n"
+    "- **Paragraph spacing**: One blank line between paragraphs (not two, not zero)\n"
+    "- **Section spacing**: Two blank lines between major sections\n"
+    "- **List spacing**: One blank line before list, one blank line after list\n"
+    "- **Header spacing**: One blank line before header, one blank line after header\n"
+    "- **Consistent spacing**: Use the same spacing pattern throughout the entire response\n"
+    "- **Match ChatGPT's style**: Clean, professional, with consistent 1.25rem paragraph margins\n"
+    "- **Visual breathing room**: Don't cram text together - use proper spacing\n\n"
+    "**FORMATTING CHECKLIST (Verify before sending):**\n"
+    "✅ All numbered lists use sequential numbers (1., 2., 3., 4.)\n"
+    "✅ Blank lines between paragraphs\n"
+    "✅ Blank lines before/after lists\n"
+    "✅ Blank lines before/after headers\n"
+    "✅ Consistent spacing throughout\n"
+    "✅ Professional, clean appearance\n\n"
     "**⚠️ NEVER USE LaTeX MATH NOTATION:**\n"
     "- ❌ DON'T use \\[ \\], \\( \\), $$, or LaTeX syntax\n"
     "- ❌ DON'T write formulas like: \\[Revenue = Volume \\times Price\\]\n"
@@ -2856,6 +2907,380 @@ class FinanlyzeOSChatbot:
                     best_len = alias_len
         return best_match
 
+    def _detect_visualization_intent(self, text: str) -> Optional[Any]:
+        """Detect if the prompt is a visualization request."""
+        try:
+            # Pass ticker resolver for company name resolution
+            ticker_resolver = getattr(self, '_name_to_ticker', None)
+            detector = VisualizationIntentDetector(ticker_resolver=ticker_resolver)
+            request = detector.detect(text)
+            if request:
+                # Check confidence if available, otherwise accept if request exists
+                confidence = getattr(request, 'confidence', 1.0)
+                if confidence >= 0.5:
+                    LOGGER.info(f"Visualization intent detected: {request.chart_type.value}, tickers: {request.tickers}, confidence: {confidence}")
+                    return request
+                else:
+                    LOGGER.debug(f"Visualization intent detected but confidence too low: {confidence}")
+        except Exception as e:
+            LOGGER.warning(f"Visualization intent detection failed: {e}", exc_info=True)
+        return None
+
+    def _handle_visualization_intent(self, request: Any) -> Optional[str]:
+        """Handle visualization requests."""
+        try:
+            LOGGER.info(f"Handling visualization request - tickers: {request.tickers}, chart_type: {request.chart_type.value}, metrics: {request.metrics}")
+            
+            if not hasattr(self, 'analytics_engine') or self.analytics_engine is None:
+                LOGGER.error("Analytics engine not available in chatbot instance")
+                return "I encountered an issue: Analytics engine not initialized. Please restart the chatbot."
+            
+            # Get charts directory - use same location as web module
+            from pathlib import Path as PathLib
+            base_dir = PathLib(__file__).resolve().parents[1]
+            charts_dir = (base_dir / "charts").resolve()
+            charts_dir.mkdir(exist_ok=True)
+            
+            # Pass ticker resolver to support S&P 1500+ companies
+            ticker_resolver = getattr(self, '_name_to_ticker', None)
+            
+            # Initialize VisualizationGenerator with correct parameters
+            generator = VisualizationGenerator(
+                db_path=Path(self.settings.database_path),
+                analytics_engine=self.analytics_engine,
+                charts_dir=charts_dir,
+                ticker_resolver=ticker_resolver
+            )
+            
+            file_path, metadata, warning = generator.generate(request)
+            
+            LOGGER.info(f"Visualization generator returned - file_path is not None: {file_path is not None}, file_path type: {type(file_path)}, file_path value: {str(file_path)[:100] if file_path else None}..., status: {metadata.get('status')}, reason: {metadata.get('reason')}")
+            
+            # Handle both success and partial (partial means chart generated but with limited/no data)
+            if file_path:
+                status = metadata.get("status", "unknown")
+                # Return response with chart reference if we have a file path
+                chart_type = metadata.get("chart_type", "chart")
+                tickers = metadata.get("tickers", [])
+                metric = metadata.get("metric", "data")
+                metric_label = metric.replace('_', ' ').title()
+                data_sources = metadata.get("data_sources", [])
+                chart_data = metadata.get("chart_data", [])
+                
+                # Build comprehensive response with explanation and audit trail
+                response = f"## 📊 {chart_type.title()} Chart: {metric_label}\n\n"
+                response += f"I've created an interactive {chart_type} chart showing **{metric_label}**"
+                if tickers:
+                    response += f" for **{', '.join(tickers)}**"
+                response += ".\n\n"
+                response += f"![{chart_type} chart]({file_path})\n\n"
+                
+                # Add comprehensive, detailed explanation (always show if we have data sources or chart data)
+                if chart_data or data_sources:
+                    response += "### 📊 Detailed Analysis & Insights\n\n"
+                    
+                    # Collect all data for analysis
+                    all_data = []
+                    if chart_data:
+                        for data in chart_data:
+                            ticker = data.get('ticker', '').upper()
+                            latest_value = data.get('latest_value')
+                            values = data.get('values', [])
+                            years = data.get('years', [])
+                            trend = data.get('trend', 'stable')
+                            
+                            # Calculate comprehensive growth metrics
+                            growth_rate = None
+                            growth_percentage = None
+                            cagr = None  # Compound Annual Growth Rate
+                            volatility = None
+                            min_value = None
+                            max_value = None
+                            
+                            if len(values) > 1 and values[0] > 0:
+                                growth_rate = values[-1] - values[0]
+                                growth_percentage = ((values[-1] - values[0]) / values[0]) * 100
+                                
+                                # Calculate CAGR if we have multiple years
+                                if len(years) > 1 and len(values) == len(years):
+                                    num_years = years[-1] - years[0]
+                                    if num_years > 0:
+                                        cagr = (((values[-1] / values[0]) ** (1.0 / num_years)) - 1) * 100
+                                
+                                # Calculate volatility (standard deviation of year-over-year changes)
+                                if len(values) > 2:
+                                    try:
+                                        import statistics
+                                        yoy_changes = [(values[i] - values[i-1]) / values[i-1] * 100 for i in range(1, len(values))]
+                                        if yoy_changes:
+                                            volatility = statistics.stdev(yoy_changes) if len(yoy_changes) > 1 else 0
+                                    except:
+                                        volatility = None
+                                
+                                min_value = min(values)
+                                max_value = max(values)
+                            
+                            all_data.append({
+                                'ticker': ticker,
+                                'latest_value': latest_value,
+                                'values': values,
+                                'years': years,
+                                'trend': trend,
+                                'growth_rate': growth_rate,
+                                'growth_percentage': growth_percentage,
+                                'cagr': cagr,
+                                'volatility': volatility,
+                                'min_value': min_value,
+                                'max_value': max_value
+                            })
+                    elif data_sources:
+                        # Fallback: use data_sources if chart_data is empty
+                        for source_info in data_sources:
+                            ticker = source_info.get('ticker', '').upper()
+                            value = source_info.get('value')
+                            all_data.append({
+                                'ticker': ticker,
+                                'latest_value': value,
+                                'values': [value] if value else [],
+                                'years': [],
+                                'trend': 'stable',
+                                'growth_rate': None,
+                                'growth_percentage': None
+                            })
+                    
+                    # Sort by latest value (highest first) for comparison
+                    all_data.sort(key=lambda x: x.get('latest_value') or 0, reverse=True)
+                    
+                    # Generate detailed insights for each company
+                    response += "#### Company Performance Breakdown\n\n"
+                    for i, data in enumerate(all_data):
+                        ticker = data.get('ticker', '').upper()
+                        latest_value = data.get('latest_value')
+                        trend = data.get('trend', 'stable')
+                        growth_percentage = data.get('growth_percentage')
+                        cagr = data.get('cagr')
+                        volatility = data.get('volatility')
+                        min_value = data.get('min_value')
+                        max_value = data.get('max_value')
+                        years = data.get('years', [])
+                        
+                        if latest_value is not None:
+                            # Format value based on metric type
+                            if metric in ['revenue', 'net_income', 'operating_income', 'gross_profit', 'free_cash_flow', 'total_assets']:
+                                if latest_value >= 1e9:
+                                    formatted_value = f"${latest_value/1e9:.2f}B"
+                                elif latest_value >= 1e6:
+                                    formatted_value = f"${latest_value/1e6:.2f}M"
+                                else:
+                                    formatted_value = f"${latest_value:,.0f}"
+                            elif metric in ['pe_ratio', 'ps_ratio', 'pb_ratio', 'ev_ebitda']:
+                                formatted_value = f"{latest_value:.2f}x"
+                            elif metric in ['return_on_equity', 'return_on_assets', 'operating_margin', 'net_margin', 'ebitda_margin']:
+                                formatted_value = f"{latest_value:.2f}%"
+                            else:
+                                formatted_value = f"{latest_value:,.0f}"
+                            
+                            # Build detailed insight header
+                            response += f"**{ticker}** — Latest {metric_label}: **{formatted_value}**"
+                            
+                            # Add ranking for multi-company comparisons
+                            if len(all_data) > 1:
+                                if i == 0:
+                                    response += " *(Highest)*"
+                                elif i == len(all_data) - 1:
+                                    response += " *(Lowest)*"
+                            
+                            response += "\n"
+                            
+                            # Add detailed metrics
+                            details = []
+                            
+                            if growth_percentage is not None:
+                                if growth_percentage > 0:
+                                    details.append(f"Total growth: **+{growth_percentage:.1f}%** over the period")
+                                elif growth_percentage < 0:
+                                    details.append(f"Total decline: **{growth_percentage:.1f}%** over the period")
+                                else:
+                                    details.append("Stable performance with no significant change")
+                            
+                            if cagr is not None:
+                                if cagr > 0:
+                                    details.append(f"CAGR: **+{cagr:.1f}%** (compound annual growth rate)")
+                                elif cagr < 0:
+                                    details.append(f"CAGR: **{cagr:.1f}%** (compound annual decline)")
+                            
+                            if volatility is not None and volatility > 0:
+                                if volatility < 5:
+                                    details.append(f"Low volatility: **{volatility:.1f}%** (stable growth pattern)")
+                                elif volatility < 15:
+                                    details.append(f"Moderate volatility: **{volatility:.1f}%** (some fluctuation)")
+                                else:
+                                    details.append(f"High volatility: **{volatility:.1f}%** (significant fluctuations)")
+                            
+                            if min_value is not None and max_value is not None and min_value != max_value:
+                                range_pct = ((max_value - min_value) / min_value) * 100 if min_value > 0 else 0
+                                if metric in ['revenue', 'net_income', 'operating_income', 'gross_profit', 'free_cash_flow', 'total_assets']:
+                                    if min_value >= 1e9:
+                                        min_formatted = f"${min_value/1e9:.2f}B"
+                                        max_formatted = f"${max_value/1e9:.2f}B"
+                                    elif min_value >= 1e6:
+                                        min_formatted = f"${min_value/1e6:.2f}M"
+                                        max_formatted = f"${max_value/1e6:.2f}M"
+                                    else:
+                                        min_formatted = f"${min_value:,.0f}"
+                                        max_formatted = f"${max_value:,.0f}"
+                                else:
+                                    min_formatted = f"{min_value:,.0f}"
+                                    max_formatted = f"{max_value:,.0f}"
+                                details.append(f"Range: {min_formatted} to {max_formatted} ({range_pct:.1f}% spread)")
+                            
+                            if years and len(years) > 1:
+                                details.append(f"Period analyzed: **{years[0]} to {years[-1]}** ({len(years)} data points)")
+                            
+                            if details:
+                                for detail in details:
+                                    response += f"  - {detail}\n"
+                            else:
+                                response += f"  - Trend: {trend.capitalize()}\n"
+                            
+                            response += "\n"
+                    
+                    # Add comparative analysis for multi-company charts
+                    if len(all_data) > 1:
+                        response += "#### Comparative Market Analysis\n\n"
+                        highest = all_data[0]
+                        lowest = all_data[-1]
+                        
+                        if highest.get('latest_value') and lowest.get('latest_value') and lowest.get('latest_value') > 0:
+                            ratio = highest.get('latest_value') / lowest.get('latest_value')
+                            response += f"**Market Leadership:** {highest.get('ticker')} leads the group with **{ratio:.1f}x** higher {metric_label.lower()} compared to {lowest.get('ticker')}.\n\n"
+                        
+                        # Calculate average
+                        valid_values = [d.get('latest_value') for d in all_data if d.get('latest_value') is not None]
+                        if valid_values:
+                            avg_value = sum(valid_values) / len(valid_values)
+                            if metric in ['revenue', 'net_income', 'operating_income', 'gross_profit', 'free_cash_flow', 'total_assets']:
+                                if avg_value >= 1e9:
+                                    avg_formatted = f"${avg_value/1e9:.2f}B"
+                                elif avg_value >= 1e6:
+                                    avg_formatted = f"${avg_value/1e6:.2f}M"
+                                else:
+                                    avg_formatted = f"${avg_value:,.0f}"
+                            else:
+                                avg_formatted = f"{avg_value:,.0f}"
+                            response += f"**Group Average:** The average {metric_label.lower()} across all companies is **{avg_formatted}**.\n\n"
+                            
+                        # Growth comparison
+                        growth_data = [d for d in all_data if d.get('growth_percentage') is not None]
+                        if growth_data:
+                            fastest_growth = max(growth_data, key=lambda x: x.get('growth_percentage', 0))
+                            slowest_growth = min(growth_data, key=lambda x: x.get('growth_percentage', 0))
+                            
+                            if fastest_growth.get('growth_percentage', 0) > 0:
+                                response += f"**Growth Leader:** {fastest_growth.get('ticker')} shows the strongest growth at **+{fastest_growth.get('growth_percentage', 0):.1f}%**, "
+                                if slowest_growth.get('growth_percentage', 0) < fastest_growth.get('growth_percentage', 0):
+                                    response += f"while {slowest_growth.get('ticker')} has the slowest growth at **{slowest_growth.get('growth_percentage', 0):.1f}%**.\n\n"
+                                else:
+                                    response += "\n\n"
+                        
+                        # CAGR comparison
+                        cagr_data = [d for d in all_data if d.get('cagr') is not None]
+                        if cagr_data:
+                            best_cagr = max(cagr_data, key=lambda x: x.get('cagr', 0))
+                            response += f"**Best Long-term Performance:** {best_cagr.get('ticker')} achieved the highest CAGR of **{best_cagr.get('cagr', 0):.1f}%** over the analyzed period.\n\n"
+                    
+                    response += "\n"
+                
+                # Add audit trail
+                if data_sources:
+                    response += "### 🔍 Data Sources & Audit Trail\n\n"
+                    response += "| Company | Metric | Latest Value | Source | Period |\n"
+                    response += "|---------|--------|--------------|--------|--------|\n"
+                    
+                    for source_info in data_sources:
+                        ticker = source_info.get('ticker', '').upper()
+                        source = source_info.get('source', 'unknown')
+                        period = source_info.get('period', 'Latest')
+                        value = source_info.get('value')
+                        
+                        # Format value
+                        if value is not None:
+                            if metric in ['revenue', 'net_income', 'operating_income', 'gross_profit', 'free_cash_flow']:
+                                if value >= 1e9:
+                                    formatted_value = f"${value/1e9:.2f}B"
+                                elif value >= 1e6:
+                                    formatted_value = f"${value/1e6:.2f}M"
+                                else:
+                                    formatted_value = f"${value:,.0f}"
+                            elif metric in ['pe_ratio', 'ps_ratio', 'pb_ratio']:
+                                formatted_value = f"{value:.2f}x"
+                            elif metric in ['return_on_equity', 'return_on_assets', 'operating_margin', 'net_margin']:
+                                formatted_value = f"{value:.2f}%"
+                            else:
+                                formatted_value = f"{value:,.0f}"
+                        else:
+                            formatted_value = "N/A"
+                        
+                        # Format source
+                        source_display = {
+                            'edgar': '📄 SEC EDGAR',
+                            'yahoo': '📊 Yahoo Finance',
+                            'sample': '🎨 Sample Data (Demo)',
+                            'unknown': '❓ Unknown'
+                        }.get(source.lower(), source.upper())
+                        
+                        response += f"| {ticker} | {metric_label} | {formatted_value} | {source_display} | {period} |\n"
+                    
+                    response += "\n"
+                    
+                    # Add note about data quality
+                    has_sample = any(s.get('source', '').lower() == 'sample' for s in data_sources)
+                    if has_sample:
+                        response += "> ⚠️ **Note**: Some data points are generated for demonstration purposes. "
+                        response += "To view real financial data, ingest company filings using: `ingest AAPL` or `ingest MSFT`\n\n"
+                    else:
+                        response += "> ✅ **Data Quality**: All values sourced from official financial filings (SEC EDGAR) or market data providers.\n\n"
+                
+                if status == "partial":
+                    reason = metadata.get("reason", "")
+                    if reason == "no_data":
+                        response += f"*Note: No financial data found in database for {', '.join(tickers) if tickers else 'these companies'}. "
+                        response += "Chart shows sample/demonstration data. To see real data, ingest company data first: 'ingest AAPL' or 'ingest MSFT'.*\n\n"
+                    else:
+                        response += "*Note: Limited data available. Chart may show approximations.*\n\n"
+                
+                if warning:
+                    response += f"*Note: {warning}*\n\n"
+                
+                LOGGER.info(f"Returning visualization response with file_path: {file_path}, response length: {len(response)}")
+                LOGGER.info(f"Response preview: {response[:200]}...")
+                return response
+            else:
+                # Return helpful error message based on reason
+                reason = metadata.get("reason", "unknown error")
+                tickers = request.tickers if hasattr(request, 'tickers') else []
+                
+                LOGGER.warning(f"No file_path returned from generator. Status: {metadata.get('status')}, reason: {reason}")
+                
+                if reason == "no_tickers":
+                    return f"I couldn't identify which companies to visualize from your request. Please specify ticker symbols (e.g., 'Show me a pie chart of AAPL, MSFT, GOOGL revenue')."
+                elif reason == "no_data":
+                    return f"I couldn't find data for {', '.join(tickers) if tickers else 'the requested companies'}. Please ensure these companies have financial data in the database. You may need to ingest data first using: 'ingest AAPL' or 'ingest MSFT'."
+                elif reason == "matplotlib_unavailable":
+                    return "Chart generation is not available (matplotlib not installed). Please install matplotlib to enable visualizations."
+                elif reason == "zero_total":
+                    return f"All values for {', '.join(tickers) if tickers else 'the companies'} are zero, so I cannot create a meaningful pie chart."
+                else:
+                    error_msg = f"I encountered an issue generating the visualization: {reason}."
+                    if tickers:
+                        error_msg += f" Tickers detected: {', '.join(tickers)}."
+                    error_msg += " Please try rephrasing your request or ensure the companies have data."
+                    return error_msg
+        except Exception as e:
+            LOGGER.error(f"Visualization handling failed: {e}", exc_info=True)
+            tickers_info = f" Tickers: {request.tickers}" if hasattr(request, 'tickers') and request.tickers else ""
+            return f"I encountered an error while generating the visualization.{tickers_info} Error: {str(e)}. Please try again or check that the companies have data available."
+
     def _detect_custom_kpi_intent(self, text: str) -> Optional[Dict[str, Any]]:
         """Detect if the prompt is about creating or using custom KPIs."""
         intent = self.kpi_intent_parser.detect(text)
@@ -4262,12 +4687,73 @@ Content:
                     except ImportError:
                         pass
                     
-                    # Check for custom KPI intent first
-                    custom_kpi_intent = self._detect_custom_kpi_intent(user_input)
-                    if custom_kpi_intent:
-                        emit("intent_custom_kpi", f"Custom KPI intent detected: {custom_kpi_intent['action']}")
-                        reply = self._handle_custom_kpi_intent(custom_kpi_intent)
+                    # Check for visualization intent first (before other intents)
+                    # FIXED: Only detect visualization for explicit chart/graph requests
+                    # Simple queries and comparison queries should get rich text, not charts
+                    is_simple_query = bool(
+                        re.search(r'^(what|how|when|where|why|tell me|show me|give me)\s+(was|is|are|were)', user_input, re.IGNORECASE) or
+                        re.search(r'^(what|how|when|where|why)\s+(was|is|are|were)\s+', user_input, re.IGNORECASE)
+                    )
+                    is_comparison_query = bool(
+                        re.search(r'\b(compare|comparison|versus|vs\.?|against|between)\b', user_input, re.IGNORECASE) or
+                        re.search(r'\bin terms of\b', user_input, re.IGNORECASE) or
+                        re.search(r'\bcompared to\b', user_input, re.IGNORECASE)
+                    )
+                    has_explicit_chart_keyword = bool(
+                        re.search(r'\b(chart|graph|plot|visualization|visual|diagram|figure|visualize)\b', user_input, re.IGNORECASE) or
+                        re.search(r'\b(show|create|generate|make|draw|display|render)\s+(?:me|a|an)?\s+(?:chart|graph|plot|visual)\b', user_input, re.IGNORECASE)
+                    )
+                    
+                    # Only detect visualization if:
+                    # 1. Query explicitly mentions chart/graph keywords, AND
+                    # 2. Query is NOT a comparison query (comparisons should be rich text)
+                    # 3. Query is NOT a simple "what was/is" question
+                    should_check_visualization = has_explicit_chart_keyword and not is_comparison_query and not is_simple_query
+                    
+                    visualization_request = None
+                    if should_check_visualization:
+                        visualization_request = self._detect_visualization_intent(user_input)
+                    
+                    if visualization_request:
+                        emit("intent_visualization", f"Visualization intent detected: {visualization_request.chart_type.value}, tickers: {visualization_request.tickers}")
+                        LOGGER.info(f"Processing visualization request - tickers: {visualization_request.tickers}, metrics: {visualization_request.metrics}")
+                        reply = self._handle_visualization_intent(visualization_request)
                         attempted_intent = True
+                        LOGGER.info(f"Visualization handler returned reply (length: {len(reply) if reply else 0}), type: {type(reply)}")
+                        
+                        # Store the original reply to prevent it from being lost
+                        original_visualization_reply = reply
+                        
+                        if reply:
+                            LOGGER.info(f"Reply preview (first 200 chars): {repr(reply[:200])}")
+                            stripped = reply.strip() if isinstance(reply, str) else ""
+                            LOGGER.info(f"Reply after strip length: {len(stripped)}, is empty: {stripped == ''}")
+                        
+                        # CRITICAL: If visualization was attempted, always return something and skip LLM
+                        # Even if it failed, return error message instead of None
+                        # IMPORTANT: Only check if reply is truly None or empty string - don't overwrite valid responses
+                        if reply is None:
+                            LOGGER.warning(f"Visualization handler returned None. Request had tickers: {visualization_request.tickers}")
+                            reply = f"I encountered an issue generating the visualization. Detected tickers: {visualization_request.tickers if visualization_request.tickers else 'none'}. Please try again with explicit ticker symbols."
+                        elif isinstance(reply, str) and reply.strip() == "":
+                            LOGGER.warning(f"Visualization handler returned empty string. Request had tickers: {visualization_request.tickers}")
+                            reply = f"I encountered an issue generating the visualization. Detected tickers: {visualization_request.tickers if visualization_request.tickers else 'none'}. Please try again with explicit ticker symbols."
+                        else:
+                            LOGGER.info(f"Visualization reply is valid, keeping it (length: {len(reply) if reply else 0})")
+                            # Ensure reply is preserved
+                            reply = original_visualization_reply
+                        
+                        # Mark that we should skip LLM processing for visualization requests
+                        self._skip_llm_for_visualization = True
+                        # Store the reply in an attribute to ensure it's not lost
+                        self._visualization_reply = reply
+                    # Check for custom KPI intent
+                    elif not attempted_intent:
+                        custom_kpi_intent = self._detect_custom_kpi_intent(user_input)
+                        if custom_kpi_intent:
+                            emit("intent_custom_kpi", f"Custom KPI intent detected: {custom_kpi_intent['action']}")
+                            reply = self._handle_custom_kpi_intent(custom_kpi_intent)
+                            attempted_intent = True
                     # Check for plugin workflow intent
                     elif not attempted_intent:
                         try:
@@ -4347,6 +4833,38 @@ Content:
                         else:
                             emit("intent_complete", "Intent routing completed with no direct answer")
 
+            # CRITICAL: Skip LLM processing if visualization was handled
+            # This MUST happen BEFORE any LLM context building to avoid database locks
+            if hasattr(self, '_skip_llm_for_visualization') and self._skip_llm_for_visualization:
+                self._skip_llm_for_visualization = False  # Reset flag
+                
+                # Use stored visualization reply if available (more reliable)
+                if hasattr(self, '_visualization_reply') and self._visualization_reply:
+                    stored_reply = self._visualization_reply
+                    delattr(self, '_visualization_reply')  # Clean up
+                    LOGGER.info(f"Returning stored visualization response (length: {len(stored_reply)}): {stored_reply[:150]}...")
+                    emit("visualization_complete", f"Visualization request handled, skipping LLM. Reply length: {len(stored_reply)}")
+                    return stored_reply
+                
+                # Fallback to current reply
+                emit("visualization_complete", f"Visualization request handled, skipping LLM. Reply length: {len(reply) if reply else 0}")
+                
+                # Always return the reply from visualization handler (even if it's an error message)
+                # The handler already provides helpful error messages
+                if reply is not None and reply:
+                    reply_str = str(reply).strip() if isinstance(reply, str) else str(reply)
+                    if reply_str:
+                        LOGGER.info(f"Returning visualization response (length: {len(reply_str)}): {reply_str[:150]}...")
+                        return reply_str
+                    else:
+                        LOGGER.warning(f"Visualization handler returned empty string after strip. Original reply type: {type(reply)}, value: {repr(reply)[:100]}")
+                else:
+                    LOGGER.warning(f"Visualization handler returned None or empty. Reply: {repr(reply)[:100] if reply else 'None'}")
+                
+                # Fallback error message
+                return "I encountered an issue generating the visualization. Please try again with explicit ticker symbols (e.g., 'Show me a pie chart of AAPL, MSFT, GOOGL revenue')."
+            
+            # Only proceed to LLM if visualization was NOT handled
             if reply is None:
                 # Check if this is a question - if so, skip summary and let LLM handle it
                 lowered_input = user_input.lower()
@@ -4954,12 +5472,20 @@ Content:
                                     suggested_response = grounded_decision_obj.suggested_response
                                 
                                 if suggested_response:
-                                    reply = suggested_response
-                                    emit("rag_grounded_decision", "Low confidence - returning suggested response")
-                                    LOGGER.info(f"Grounded decision: {rag_metadata.get('grounded_decision', 'N/A')}")
-                                    # Continue to reply processing below (don't skip LLM path, just use the suggested response)
-                                    context = None  # No context needed since we have the response
-                                    context_detail = "Grounded decision: low confidence response"
+                                    # FIXED: If suggested response says "no data", try build_financial_context as fallback
+                                    # This ensures we check the database even if RAG returns low confidence
+                                    if "don't have" in suggested_response.lower() or "no data" in suggested_response.lower() or "ingest" in suggested_response.lower():
+                                        LOGGER.warning(f"RAG suggested 'no data' response, but trying build_financial_context as fallback to verify")
+                                        use_rag_orchestrator = False  # Force fallback to build_financial_context
+                                        context = None
+                                        context_detail = "RAG returned no data, falling back to build_financial_context"
+                                    else:
+                                        reply = suggested_response
+                                        emit("rag_grounded_decision", "Low confidence - returning suggested response")
+                                        LOGGER.info(f"Grounded decision: {rag_metadata.get('grounded_decision', 'N/A')}")
+                                        # Continue to reply processing below (don't skip LLM path, just use the suggested response)
+                                        context = None  # No context needed since we have the response
+                                        context_detail = "Grounded decision: low confidence response"
                                 else:
                                     context = rag_prompt
                                     context_detail = f"RAG context (confidence: {rag_metadata.get('confidence', 0.0):.2f})"
@@ -6005,6 +6531,24 @@ Content:
             tickers,
             period_filters=period_filters,
         )
+
+    def _handle_financial_intent(self, user_input: str) -> Optional[str]:
+        """Handle financial intent queries by parsing and processing structured metrics."""
+        try:
+            # Parse the input to structured format
+            structured = parse_to_structured(user_input)
+            
+            # Try to handle as structured metrics
+            if structured:
+                reply = self._handle_structured_metrics(structured)
+                if reply:
+                    return reply
+            
+            # If structured parsing didn't work, return None to let LLM handle it
+            return None
+        except Exception as e:
+            LOGGER.debug(f"Error in _handle_financial_intent: {e}")
+            return None
 
     def _handle_structured_metrics(self, structured: Dict[str, Any]) -> Optional[str]:
         """Handle parsed structured intents without relying on legacy commands."""

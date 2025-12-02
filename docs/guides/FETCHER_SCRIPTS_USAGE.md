@@ -112,23 +112,31 @@ python scripts/fetchers/fetch_financial_news.py --database data/financial.db --t
 
 ### 3. Analyst Reports
 
-**Sources**: Seeking Alpha
+**Sources**: Yahoo Finance (primary, reliable), Seeking Alpha (fallback, may be blocked)
 
 ```bash
-# Basic usage
+# Basic usage (tries Yahoo Finance first, then Seeking Alpha)
 python scripts/fetchers/fetch_analyst_reports.py --database data/financial.db --ticker AAPL
+
+# Use only Yahoo Finance (most reliable)
+python scripts/fetchers/fetch_analyst_reports.py --database data/financial.db --ticker AAPL --source yahoo
+
+# Use only Seeking Alpha (may be blocked with 403)
+python scripts/fetchers/fetch_analyst_reports.py --database data/financial.db --ticker AAPL --source seeking_alpha
 
 # Limit reports
 python scripts/fetchers/fetch_analyst_reports.py --database data/financial.db --ticker AAPL --limit 20
 ```
 
 **What it does**:
-- Fetches analyst research articles from Seeking Alpha
-- Extracts ratings, price targets, and analysis
+- Fetches analyst recommendations and data from Yahoo Finance (reliable, no blocking)
+- Falls back to Seeking Alpha if needed (may be blocked with 403 errors)
+- Extracts ratings, price targets, analyst upgrades/downgrades, and consensus
 - Chunks and indexes into `analyst_reports` collection
 
 **Requirements**:
-- `requests`, `beautifulsoup4`
+- `yfinance` (for Yahoo Finance - recommended)
+- `requests`, `beautifulsoup4` (for Seeking Alpha fallback)
 
 ---
 

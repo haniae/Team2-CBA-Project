@@ -319,6 +319,29 @@ function renderMarkdown(text) {
       return `\uE000${codeTokens.length - 1}\uE000`;
     });
 
+    // Handle markdown images ![alt](url) BEFORE links
+    // Also handle HTML charts (iframes) for interactive visualizations
+    working = working.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, altText, urlValue) => {
+      const rawUrl = urlValue.trim();
+      if (!rawUrl) {
+        return altText || "Image";
+      }
+      const safeUrl = escapeAttribute(rawUrl);
+      
+      // Check if URL is an HTML chart (interactive Plotly chart)
+      if (safeUrl.endsWith('.html') || (safeUrl.includes('/api/charts/') && safeUrl.includes('.html'))) {
+        // Return iframe for interactive HTML charts (no sandbox attributes to avoid Chrome warning)
+        const fullUrl = /^([a-z][a-z\d+\-.]*:|\/\/)/i.test(safeUrl) ? safeUrl : (API_BASE + safeUrl);
+        const safeAlt = escapeAttribute(altText || "Interactive Chart");
+        return `<iframe src="${fullUrl}" title="${safeAlt}" loading="lazy" allowfullscreen style="width: 100%; height: 520px; border: none; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08);"></iframe>`;
+      }
+      
+      // Regular image handling
+      const imgSrc = /^([a-z][a-z\d+\-.]*:|\/\/)/i.test(safeUrl) ? safeUrl : (API_BASE + safeUrl);
+      const safeAlt = escapeAttribute(altText || "Chart");
+      return `<img src="${imgSrc}" alt="${safeAlt}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0;" />`;
+    });
+
     working = working.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, textValue, urlValue) => {
       const rawUrl = urlValue.trim();
       if (!rawUrl) {

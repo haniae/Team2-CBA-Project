@@ -1,5 +1,26 @@
 # System Architecture: Technical Flow with Advanced RAG
 
+## Table of Contents
+
+1. [Overview](#overview)
+2. [System Architecture Overview](#system-architecture-overview)
+3. [Frontend Interface](#frontend-interface)
+4. [Backend Logic](#backend-logic)
+   - [API & Orchestration](#1-api--orchestration)
+   - [Analytics & NLP](#2-analytics--nlp)
+   - [RAG Orchestrator](#3-rag-orchestrator)
+   - [Metrics Query & Derivation](#4-metrics-query--derivation)
+   - [LLM Response Engine](#5-llm-response-engine)
+   - [Post-Generation Verification](#6-post-generation-verification)
+   - [Response Processing & Assembly](#7-response-processing--assembly)
+5. [Data Pipeline](#data-pipeline)
+6. [Complete Query Flow Example](#complete-query-flow-example)
+7. [Key Features Integration](#key-features-integration)
+8. [Performance Characteristics](#performance-characteristics)
+9. [Summary](#summary)
+
+---
+
 ## Overview
 
 This document provides a detailed technical flow description of FinalyzeOS, incorporating all 16 advanced RAG features into the system architecture.
@@ -36,7 +57,7 @@ The frontend provides a web-based chat interface where users can:
 
 ### 1. API & Orchestration
 
-**Function**: Route and manage requests
+**Function**: Route and manage requests.
 
 **Process**:
 - Receives user query from WebUI
@@ -44,13 +65,13 @@ The frontend provides a web-based chat interface where users can:
 - Manages conversation state
 - Handles request/response lifecycle
 
-**Output**: Routed query to Analytics & NLP
+**Output**: Routed query to Analytics & NLP.
 
 ---
 
 ### 2. Analytics & NLP
 
-**Function**: Understand intent and normalize prompt
+**Function**: Understand intent and normalize prompt.
 
 **Components**:
 
@@ -74,13 +95,13 @@ The frontend provides a web-based chat interface where users can:
 - Rewrites query based on detected intent
 - Adds intent-specific instructions (e.g., "Focus on risk factors" for RISK intent)
 
-**Output**: Structured query with tickers, intent, time filter, and retrieval policy
+**Output**: Structured query with tickers, intent, time filter, and retrieval policy.
 
 ---
 
 ### 3. RAG Orchestrator
 
-**Function**: Complete RAG pipeline with all 16 advanced features
+**Function**: Complete RAG pipeline with all 16 advanced features.
 
 The RAG Orchestrator is the central component that coordinates all retrieval and generation features. It processes queries through multiple stages:
 
