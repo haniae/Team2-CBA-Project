@@ -1034,16 +1034,19 @@ table[id*="market-table"] td:last-child {
   gap: 16px;
 }
 
+/* Valuation Table */
 .valuation-table,
+table#cfi-valuation-table,
 table[id*="valuation-table"] {
-  width: 100%;
-  border-collapse: collapse;
-  font: 500 12px/1.5 "Inter", "Open Sans", Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font: 500 12px/1.5 "Inter", "Open Sans", Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
   word-break: normal !important;
   word-wrap: normal !important;
 }
 
 .valuation-table *,
+table#cfi-valuation-table *,
 table[id*="valuation-table"] * {
   word-break: normal !important;
   white-space: normal !important;
@@ -1051,63 +1054,69 @@ table[id*="valuation-table"] * {
 }
 
 .valuation-table thead th,
+table#cfi-valuation-table thead th,
 table[id*="valuation-table"] thead th {
-  background: #f3f6ff;
-  border-bottom: 2px solid var(--grid);
-  padding: 10px 12px;
+  background: #f3f6ff !important;
+  border-bottom: 2px solid var(--grid) !important;
+  padding: 10px 12px !important;
   text-align: right !important;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  font-size: 11px;
-  color: #0f172a;
-  font-variant-numeric: tabular-nums;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+  font-size: 11px !important;
+  color: #0f172a !important;
+  font-variant-numeric: tabular-nums !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif !important;
 }
 
 .valuation-table thead th:first-child,
+table#cfi-valuation-table thead th:first-child,
 table[id*="valuation-table"] thead th:first-child {
   text-align: left !important;
 }
 
 .valuation-table td,
+table#cfi-valuation-table td,
 table[id*="valuation-table"] td {
-  padding: 8px 12px;
-  border-bottom: 1px solid #eef2fb;
+  padding: 8px 12px !important;
+  border-bottom: 1px solid #eef2fb !important;
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
-  font-size: 12px;
-  vertical-align: middle;
-  font-weight: 500;
-  color: #1e293b;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  font-size: 12px !important;
+  vertical-align: middle !important;
+  font-weight: 500 !important;
+  color: #1e293b !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif !important;
 }
 
 .valuation-table td:first-child,
+table#cfi-valuation-table td:first-child,
 table[id*="valuation-table"] td:first-child {
   text-align: left !important;
-  font-weight: 600;
-  color: #243554;
-  font-variant-numeric: normal;
+  font-weight: 600 !important;
+  color: #243554 !important;
+  font-variant-numeric: normal !important;
 }
 
 .valuation-table .kv-label,
+table#cfi-valuation-table .kv-label,
 table[id*="valuation-table"] .kv-label {
   text-align: left !important;
-  font-weight: 600;
-  color: #243554;
-  padding: 8px 12px;
-  font-variant-numeric: normal;
+  font-weight: 600 !important;
+  color: #243554 !important;
+  padding: 8px 12px !important;
+  font-variant-numeric: normal !important;
 }
 
 .valuation-table .kv-value,
+table#cfi-valuation-table .kv-value,
 table[id*="valuation-table"] .kv-value {
   text-align: right !important;
   font-variant-numeric: tabular-nums !important;
-  font-weight: 500;
-  color: #1e293b;
-  padding: 8px 12px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 500 !important;
+  color: #1e293b !important;
+  padding: 8px 12px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif !important;
 }
 
 .valuation-list {
