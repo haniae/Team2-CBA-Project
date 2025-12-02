@@ -159,6 +159,22 @@ body {
   box-shadow: var(--shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  word-break: normal !important;
+  word-wrap: normal !important;
+}
+
+.cfi-panel * {
+  word-break: normal !important;
+  word-wrap: normal !important;
+}
+
+.cfi-panel td,
+.cfi-panel th,
+.cfi-panel .kv-label,
+.cfi-panel .kv-value {
+  word-break: normal !important;
+  white-space: normal !important;
+  letter-spacing: normal !important;
 }
 
 .cfi-panel::before {
@@ -857,6 +873,14 @@ body {
   padding: 0 20px;
   border-bottom: none;
   position: relative;
+  word-break: normal !important;
+  white-space: nowrap !important;
+}
+
+.cfi-strip * {
+  word-break: normal !important;
+  white-space: nowrap !important;
+  letter-spacing: normal !important;
 }
 
 .cfi-strip::after {
@@ -873,6 +897,16 @@ body {
   flex: 1;
   overflow: auto;
   background: #ffffff;
+  word-break: normal !important;
+  word-wrap: normal !important;
+  white-space: normal !important;
+}
+
+.cfi-body * {
+  word-break: normal !important;
+  word-wrap: normal !important;
+  white-space: normal !important;
+  letter-spacing: normal !important;
 }
 
 .cfi-body.tight {
@@ -950,6 +984,9 @@ table[id*="market-table"] td:first-child {
   font-size: 11px;
   text-align: left;
   vertical-align: top;
+  word-break: normal !important;
+  white-space: normal !important;
+  letter-spacing: normal !important;
 }
 
 .overview-table .kv-value,
