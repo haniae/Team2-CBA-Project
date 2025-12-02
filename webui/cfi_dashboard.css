@@ -262,6 +262,10 @@ body {
   visibility: visible !important;
   opacity: 1 !important;
   width: 100%;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 /* Hide peer comparison section */
@@ -353,9 +357,10 @@ body {
 }
 
 .cfi-panel[data-area="sources"] #sources-body {
-  max-height: 2000px;
-  overflow: hidden;
-  transition: max-height 0.4s ease, opacity 0.3s ease, padding 0.4s ease;
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+  transition: opacity 0.3s ease, padding 0.4s ease;
   opacity: 1 !important;
   padding: 20px;
   display: block !important;
@@ -363,17 +368,24 @@ body {
 }
 
 .cfi-panel[data-area="sources"] #sources-body.collapsed {
-  max-height: 0;
-  opacity: 0;
-  padding: 0;
+  max-height: none !important;
+  height: auto !important;
+  opacity: 1 !important;
+  padding: 20px;
+  display: block !important;
+  visibility: visible !important;
 }
 
-.sources-grid {
+.sources-grid,
+#cfi-sources-grid {
   display: grid !important;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
   padding: 20px;
   min-height: 100px;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
   visibility: visible !important;
   opacity: 1 !important;
 }
@@ -388,7 +400,7 @@ body {
 }
 
 .source-item {
-  display: flex;
+  display: flex !important;
   flex-direction: column;
   gap: 8px;
   padding: 14px 16px;
@@ -398,6 +410,8 @@ body {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .source-item::before {
