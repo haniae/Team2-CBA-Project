@@ -618,10 +618,10 @@ body::-webkit-scrollbar {
 /* Desktop: sidebar shrinks to thin rail when closed */
 @media (min-width: 1024px) {
   .sidebar.closed {
-    width: 48px;
-    min-width: 48px;
-    max-width: 48px;
-    padding: 18px 8px;
+    width: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    padding: 18px 4px;
   }
 }
 
@@ -718,6 +718,12 @@ body::-webkit-scrollbar {
   width: 100%;
 }
 
+/* Ensure toggle button aligns with nav items when sidebar is open */
+.sidebar:not(.closed) .sidebar-toggle {
+  margin: 0;
+  align-self: flex-start;
+}
+
 .sidebar-content {
   transition: opacity 0.2s ease, visibility 0.2s ease;
 }
@@ -742,46 +748,44 @@ body::-webkit-scrollbar {
   
   /* Chats button stays visible when collapsed */
   .sidebar.closed .chats-toggle-button {
-    margin: 14px auto;
+    margin: 0 auto;
   }
 }
 
-/* Toggle button always visible */
+/* Toggle button always visible - minimal sidebar rail style */
 .sidebar-toggle {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 10px;
-  padding: 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(226, 232, 240, 0.95);
+  color: rgba(226, 232, 240, 0.7);
   transition: all 0.2s ease;
-  width: 36px;
-  height: 36px;
+  width: auto;
+  height: auto;
+  min-width: 36px;
+  min-height: 36px;
   flex-shrink: 0;
   margin: 0;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar-toggle:hover {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: #e2e8f0;
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(226, 232, 240, 1);
 }
 
 .sidebar-toggle:active {
-  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .sidebar-toggle svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   stroke: currentColor;
+  stroke-width: 2;
   fill: none;
 }
 
@@ -790,9 +794,19 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 14px 0;
-  margin-top: 8px;
+  gap: 0;
+  padding: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Remove any spacing between buttons when sidebar is closed */
+.sidebar.closed .sidebar-rail-buttons {
+  gap: 0;
+}
+
+.sidebar.closed .sidebar-rail-buttons .chats-toggle-button {
+  margin-top: -4px;
 }
 
 /* Show rail buttons when sidebar is open too, but hide when collapsed */
@@ -806,40 +820,42 @@ body::-webkit-scrollbar {
   }
 }
 
-/* Chats toggle button - same size as sidebar toggle */
+/* Chats toggle button - seamless sidebar rail style */
 .chats-toggle-button {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: none;
   border-radius: 8px;
   padding: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(226, 232, 240, 0.9);
+  color: rgba(226, 232, 240, 0.7);
   transition: all 0.2s ease;
-  width: 32px;
-  height: 32px;
+  width: auto;
+  height: auto;
+  min-width: 36px;
+  min-height: 36px;
   flex-shrink: 0;
+  margin: 0;
 }
 
 .chats-toggle-button:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.35);
-  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(226, 232, 240, 1);
 }
 
 .chats-toggle-button:active {
-  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .chats-toggle-button.active {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(226, 232, 240, 1);
 }
 
 .chats-icon {
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -854,12 +870,13 @@ body::-webkit-scrollbar {
   }
   
   .sidebar.closed .sidebar-brand-zone {
-    padding: 18px 0;
+    padding: 18px 0 0 0;
     align-items: center;
   }
   
   .sidebar.closed .sidebar-toggle {
     margin: 0 auto;
+    display: flex;
   }
 }
 
