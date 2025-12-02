@@ -372,7 +372,12 @@
     headings.forEach((heading, index) => {
       const th = document.createElement("th");
       th.textContent = sanitizeText(heading);
-      if (index === 0) th.className = "col-label";
+      if (index === 0) {
+        th.className = "col-label";
+        th.style.textAlign = "left";
+      } else {
+        th.style.textAlign = "right";
+      }
       headRow.appendChild(th);
     });
     thead.appendChild(headRow);
@@ -382,11 +387,14 @@
       const tr = document.createElement("tr");
       const labelCell = document.createElement("td");
       labelCell.className = "kv-label";
+      labelCell.style.textAlign = "left";
       labelCell.textContent = sanitizeText(row.Label || row.label || "");
       tr.appendChild(labelCell);
       columns.forEach((field) => {
         const td = document.createElement("td");
         td.className = "kv-value";
+        td.style.textAlign = "right";
+        td.style.fontVariantNumeric = "tabular-nums";
         td.textContent = formatValue(field, row[field]);
         tr.appendChild(td);
       });
@@ -429,6 +437,7 @@
     const headerRow = document.createElement("tr");
     const metricHeader = document.createElement("th");
     metricHeader.textContent = "Metric";
+    metricHeader.style.textAlign = "left";
     headerRow.appendChild(metricHeader);
     columns.forEach((year) => {
       const th = document.createElement("th");
@@ -443,11 +452,14 @@
       const tr = document.createElement("tr");
       const metricCell = document.createElement("td");
       metricCell.className = "metric";
+      metricCell.style.textAlign = "left";
       metricCell.textContent = sanitizeText(row.label || "");
       tr.appendChild(metricCell);
       columns.forEach((_, index) => {
         const td = document.createElement("td");
         td.className = "num";
+        td.style.textAlign = "right";
+        td.style.fontVariantNumeric = "tabular-nums";
         const rawValue = row.values ? row.values[index] : null;
         let numericValue = null;
         let fallback = "";
