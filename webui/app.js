@@ -4494,6 +4494,209 @@ async function renderFilingViewerSection({ container } = {}) {
   }
 }
 
+async function renderInteractiveDashboardSection({ container } = {}) {
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="interactive-dashboard">
+      <div class="interactive-dashboard__sticky-container">
+        <section class="interactive-dashboard__hero">
+          <div class="interactive-dashboard__badge">📈</div>
+          <div class="interactive-dashboard__hero-copy">
+            <h3 class="interactive-dashboard__title">Interactive Dashboard</h3>
+            <p class="interactive-dashboard__subtitle">
+              Enter one or more company names or ticker symbols (comma-separated) to view a comprehensive financial dashboard with interactive charts, KPIs, and valuation metrics.
+            </p>
+          </div>
+        </section>
+        <div class="interactive-dashboard__status" data-role="dashboard-status" aria-live="polite"></div>
+        <form class="interactive-dashboard__form" data-role="interactive-dashboard-form">
+          <div class="interactive-dashboard__form-group">
+            <label for="interactive-dashboard-company">Company Name(s) or Ticker(s)</label>
+            <div style="position: relative;">
+              <input 
+                id="interactive-dashboard-company" 
+                name="company" 
+                type="text" 
+                placeholder="e.g. AAPL, MSFT or Apple, Microsoft, Amazon..." 
+                required 
+                autocomplete="off" 
+                list="interactive-dashboard-company-list" 
+              />
+              <datalist id="interactive-dashboard-company-list"></datalist>
+            </div>
+          </div>
+          <div class="interactive-dashboard__form-actions">
+            <button type="submit">Load Dashboard</button>
+          </div>
+        </form>
+      </div>
+      <div class="interactive-dashboard__notice">
+        <p>Enter one or more company names or ticker symbols (comma-separated) to generate an interactive financial dashboard with comprehensive metrics and visualizations. Multiple companies will be compared side-by-side.</p>
+      </div>
+      <div class="interactive-dashboard__dashboard-container" data-role="dashboard-container">
+        <p class="interactive-dashboard__empty" data-role="dashboard-empty">Enter a company name or ticker above to load the dashboard.</p>
+      </div>
+    </div>
+  `;
+
+  const form = container.querySelector("[data-role='interactive-dashboard-form']");
+  const companyInput = container.querySelector("#interactive-dashboard-company");
+  const statusBox = container.querySelector("[data-role='dashboard-status']");
+  const dashboardContainer = container.querySelector("[data-role='dashboard-container']");
+  const emptyState = container.querySelector("[data-role='dashboard-empty']");
+  const submitButton = form?.querySelector("button[type='submit']");
+
+  const resetStatus = () => {
+    if (statusBox) {
+      statusBox.textContent = "";
+      statusBox.classList.remove("error", "success");
+    }
+  };
+
+  const setStatus = (message, tone = "info") => {
+    if (!statusBox) {
+      return;
+    }
+    statusBox.textContent = message;
+    statusBox.classList.remove("error", "success");
+    if (tone === "error" || tone === "success") {
+      statusBox.classList.add(tone);
+    }
+  };
+
+  const setLoading = (isLoading) => {
+    if (submitButton) {
+      submitButton.disabled = isLoading;
+      submitButton.textContent = isLoading ? "Loading…" : "Load Dashboard";
+    }
+    if (isLoading) {
+      setStatus("Loading dashboard…", "info");
+    } else {
+      resetStatus();
+    }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!form || !companyInput) {
+      return;
+    }
+    resetStatus();
+
+    const companyValue = companyInput.value.trim();
+    if (!companyValue) {
+      setStatus("Please enter a company name or ticker symbol.", "error");
+      companyInput.focus();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      if (emptyState) {
+        emptyState.style.display = "none";
+      }
+      
+      // Clear previous dashboard
+      if (dashboardContainer) {
+        dashboardContainer.innerHTML = '<div class="cfi-loading">Loading dashboard...</div>';
+      }
+
+      // Parse multiple companies (comma-separated)
+      const companyEntries = companyValue.split(',').map(c => c.trim()).filter(c => c.length > 0);
+      
+      if (companyEntries.length === 0) {
+        throw new Error("Please enter at least one company name or ticker symbol.");
+      }
+
+      // Extract tickers from input (could be company names or tickers)
+      // For single ticker, try to extract just the ticker part
+      // For multiple, we'll pass them as-is and let the API handle it
+      let tickers;
+      if (companyEntries.length === 1) {
+        // Single company - extract ticker if possible
+        const singleEntry = companyEntries[0];
+        const extractedTicker = singleEntry.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        tickers = [extractedTicker || singleEntry];
+      } else {
+        // Multiple companies - extract tickers from each
+        tickers = companyEntries.map(entry => {
+          const extracted = entry.toUpperCase().replace(/[^A-Z0-9]/g, '');
+          return extracted || entry.toUpperCase();
+        });
+      }
+      
+      // Use showCfiCompareDashboard for multiple companies, showCfiDashboard for single
+      if (tickers.length === 1) {
+        if (typeof showCfiDashboard === "function") {
+          await showCfiDashboard({
+            container: dashboardContainer,
+            ticker: tickers[0],
+          });
+          setStatus(`Dashboard loaded for ${companyEntries[0]}.`, "success");
+        } else {
+          throw new Error("Dashboard renderer not available. Please refresh the page.");
+        }
+      } else {
+        if (typeof showCfiCompareDashboard === "function") {
+          await showCfiCompareDashboard({
+            container: dashboardContainer,
+            tickers: tickers,
+          });
+          setStatus(`Comparison dashboard loaded for ${companyEntries.join(", ")}.`, "success");
+        } else {
+          throw new Error("Comparison dashboard renderer not available. Please refresh the page.");
+        }
+      }
+    } catch (error) {
+      console.error("Unable to load dashboard:", error);
+      if (dashboardContainer) {
+        dashboardContainer.innerHTML = `
+          <div class="cfi-error">
+            <p>Unable to load dashboard for "${companyValue}".</p>
+            <p>${error?.message || "Please check that the company name or ticker is correct and try again."}</p>
+          </div>
+        `;
+      }
+      setStatus(error?.message || "Unable to load dashboard. Please try again.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load company universe for autocomplete
+  const companyDatalist = container.querySelector("#interactive-dashboard-company-list");
+  if (companyDatalist && companyInput) {
+    loadCompanyUniverseData()
+      .then((companies) => {
+        if (!companyDatalist || !container.isConnected) return;
+        companyDatalist.innerHTML = "";
+        companies.forEach((company) => {
+          const option = document.createElement("option");
+          option.value = company.ticker;
+          option.textContent = `${company.ticker} - ${company.company || company.ticker}`;
+          companyDatalist.appendChild(option);
+        });
+      })
+      .catch((error) => {
+        console.warn("Failed to load company universe for interactive dashboard:", error);
+      });
+  }
+
+  if (form) {
+    form.addEventListener("submit", handleSubmit);
+    window.queueMicrotask(() => {
+      if (companyInput) {
+        companyInput.focus();
+      }
+    });
+  } else if (companyInput) {
+    window.queueMicrotask(() => companyInput.focus());
+  }
+}
+
 function renderSettingsSection({ container } = {}) {
   if (!container) {
     return;
@@ -4745,6 +4948,11 @@ const UTILITY_SECTIONS = {
     title: "",
     html: `<div class="filing-viewer" data-role="filing-viewer-root"></div>`,
     render: renderFilingViewerSection,
+  },
+  "interactive-dashboard": {
+    title: "",
+    html: `<div class="interactive-dashboard" data-role="interactive-dashboard-root"></div>`,
+    render: renderInteractiveDashboardSection,
   },
   projects: {
     title: "Projects",
@@ -9216,7 +9424,7 @@ function openUtilityPanel(key) {
     }
   }
   setActiveNav(`open-${key}`);
-  if (["help", "kpi-library", "company-universe", "filing-viewer", "portfolio"].includes(key)) {
+  if (["help", "kpi-library", "company-universe", "filing-viewer", "portfolio", "interactive-dashboard"].includes(key)) {
     if (chatPanel) {
       chatPanel.classList.add("chat-panel--collapsed");
     }
