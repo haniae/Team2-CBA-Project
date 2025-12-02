@@ -589,6 +589,21 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+.sidebar-toggle-bar {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  background: linear-gradient(180deg, #0A1F44 0%, #0D2847 50%, #1E4D8B 100%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 16px;
+  position: relative;
+  z-index: 100;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease;
+}
+
 .sidebar {
   width: 260px;
   min-width: 260px;
@@ -611,6 +626,16 @@ body::-webkit-scrollbar {
   -webkit-overflow-scrolling: touch;
   box-shadow: none !important;
   filter: none !important;
+  transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+}
+
+.sidebar.closed {
+  width: 0;
+  min-width: 0;
+  max-width: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
 }
 
 .sidebar::-webkit-scrollbar {
@@ -879,6 +904,37 @@ body::-webkit-scrollbar {
 .top-bar--left {
   justify-content: flex-start;
   text-align: left;
+}
+
+.sidebar-toggle {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(226, 232, 240, 0.9);
+  transition: all 0.2s ease;
+  width: 36px;
+  height: 36px;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #e2e8f0;
+}
+
+.sidebar-toggle:active {
+  transform: scale(0.95);
+}
+
+.sidebar-toggle svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
 }
 
 .top-bar::after {

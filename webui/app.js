@@ -54,6 +54,8 @@ const chatPanel = document.querySelector(".chat-panel");
 const chatFormContainer = document.getElementById("chat-form");
 const savedSearchTrigger = document.querySelector("[data-action='search-saved']");
 const archivedToggleButton = document.querySelector("[data-action='toggle-archived']");
+const sidebarToggleButton = document.getElementById("sidebar-toggle");
+const sidebar = document.querySelector(".sidebar");
 
 const CHAT_FILE_INPUT_ID = "chat-file-upload";
 const CHAT_FILE_BUTTON_ID = "chat-file-upload-btn";
@@ -262,6 +264,70 @@ if (typeof document !== "undefined") {
     scheduleUploadInit();
   }
   window.addEventListener("load", tryInitializeFileUpload, { once: true });
+}
+
+// Sidebar toggle functionality
+const SIDEBAR_STATE_KEY = "benchmarkos.sidebarOpen";
+
+function initializeSidebarToggle() {
+  if (!sidebarToggleButton || !sidebar) {
+    return;
+  }
+
+  // Load saved state from localStorage (default to true/open)
+  let sidebarOpen = true;
+  try {
+    const savedState = localStorage.getItem(SIDEBAR_STATE_KEY);
+    if (savedState !== null) {
+      sidebarOpen = savedState === "true";
+    }
+  } catch (error) {
+    console.warn("Unable to load sidebar state from storage", error);
+  }
+
+  // Apply initial state
+  setSidebarState(sidebarOpen);
+
+  // Add click event listener
+  sidebarToggleButton.addEventListener("click", toggleSidebar);
+}
+
+function toggleSidebar() {
+  if (!sidebar) {
+    return;
+  }
+  const isCurrentlyOpen = !sidebar.classList.contains("closed");
+  setSidebarState(!isCurrentlyOpen);
+}
+
+function setSidebarState(open) {
+  if (!sidebar) {
+    return;
+  }
+  
+  if (open) {
+    sidebar.classList.remove("closed");
+    sidebarToggleButton?.setAttribute("aria-expanded", "true");
+  } else {
+    sidebar.classList.add("closed");
+    sidebarToggleButton?.setAttribute("aria-expanded", "false");
+  }
+
+  // Save state to localStorage
+  try {
+    localStorage.setItem(SIDEBAR_STATE_KEY, String(open));
+  } catch (error) {
+    console.warn("Unable to save sidebar state to storage", error);
+  }
+}
+
+// Initialize sidebar toggle when DOM is ready
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeSidebarToggle, { once: true });
+  } else {
+    initializeSidebarToggle();
+  }
 }
 
 const STREAM_STEP_MS = 18;
