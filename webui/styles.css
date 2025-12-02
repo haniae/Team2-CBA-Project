@@ -724,6 +724,13 @@ body::-webkit-scrollbar {
   align-self: flex-start;
 }
 
+/* Show rail buttons when sidebar is open */
+@media (min-width: 1024px) {
+  .sidebar:not(.closed) .sidebar-rail-buttons {
+    display: flex;
+  }
+}
+
 .sidebar-content {
   transition: opacity 0.2s ease, visibility 0.2s ease;
 }
@@ -794,19 +801,55 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0;
-  padding: 0;
-  margin-top: 0;
-  margin-bottom: 0;
+  gap: 12px;
+  padding: 12px 0;
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 /* Remove any spacing between buttons when sidebar is closed */
 .sidebar.closed .sidebar-rail-buttons {
-  gap: 0;
+  gap: 12px;
+  padding: 12px 0;
 }
 
 .sidebar.closed .sidebar-rail-buttons .chats-toggle-button {
-  margin-top: -4px;
+  margin-top: 0;
+}
+
+/* Sidebar toggle rail button - rectangular icon style - seamless blend */
+.sidebar-toggle-rail {
+  background: transparent;
+  border: 1.5px solid rgba(226, 232, 240, 0.2);
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(226, 232, 240, 0.7);
+  transition: all 0.2s ease;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.sidebar-toggle-rail:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(226, 232, 240, 0.4);
+  color: rgba(226, 232, 240, 1);
+}
+
+.sidebar-toggle-rail:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sidebar-toggle-rail svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* Show rail buttons when sidebar is open too, but hide when collapsed */
@@ -820,7 +863,7 @@ body::-webkit-scrollbar {
   }
 }
 
-/* Chats toggle button - seamless sidebar rail style */
+/* Chats toggle button - seamless design matching toggle button */
 .chats-toggle-button {
   background: transparent;
   border: none;
@@ -854,14 +897,46 @@ body::-webkit-scrollbar {
   color: rgba(226, 232, 240, 1);
 }
 
-.chats-icon {
-  font-size: 20px;
-  line-height: 1;
+.chats-toggle-button svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+}
+
+/* New chat icon button - seamless design matching toggle button */
+.new-chat-icon-button {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: rgba(226, 232, 240, 0.7);
+  transition: all 0.2s ease;
+  width: auto;
+  height: auto;
+  min-width: 36px;
+  min-height: 36px;
+  flex-shrink: 0;
+  margin: 0;
 }
 
+.new-chat-icon-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(226, 232, 240, 1);
+}
+
+.new-chat-icon-button:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.new-chat-icon-button svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+}
 
 /* When sidebar is closed, center the toggle button */
 @media (min-width: 1024px) {

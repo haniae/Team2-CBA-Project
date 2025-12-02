@@ -9134,6 +9134,14 @@ if (chatsButton) {
   });
 }
 
+const newChatIconButton = document.getElementById("new-chat-icon-button");
+if (newChatIconButton) {
+  newChatIconButton.addEventListener("click", (e) => {
+    e.preventDefault();
+    handleNavAction("new-chat");
+  });
+}
+
 if (chatsSearchInput) {
   chatsSearchInput.addEventListener("input", (e) => {
     chatsSearchQuery = e.target.value;
@@ -9257,7 +9265,7 @@ function handleNavAction(action) {
   if (!action) {
     return;
   }
-  if (action === "new-analysis") {
+  if (action === "new-chat" || action === "new-analysis") {
     closeUtilityPanel();
     clearConversationSearch({ hide: true });
     resetNavActive();
