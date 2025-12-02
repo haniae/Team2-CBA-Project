@@ -562,10 +562,10 @@ body {
 
 .header-top {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 32px;
-  padding: 24px 32px;
+  padding: 20px 32px;
   background: var(--header-bg);
   border-bottom: 1px solid var(--border-color);
 }
@@ -609,21 +609,22 @@ body {
 
 .header-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-start;
-  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .export-button {
-  writing-mode: vertical-rl;
+  writing-mode: horizontal-tb;
   text-orientation: mixed;
   border: 1px solid #1e40af;
   border-radius: 6px;
   background: #ffffff;
   color: #1e40af;
-  padding: 12px 8px;
-  font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  padding: 10px 18px;
+  font: 600 12px/1.4 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   cursor: pointer;
@@ -631,10 +632,11 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   position: relative;
   overflow: visible;
-  min-height: 60px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+  min-width: 100px;
 }
 
 .export-button::before {
@@ -706,9 +708,10 @@ body {
 
 .header-meta {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-  align-items: flex-start;
+  flex-direction: row;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .meta-item {
@@ -724,9 +727,9 @@ body {
 
 .meta-item.recommendation {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .meta-item:hover {
@@ -754,20 +757,21 @@ body {
 }
 
 .meta-value.recommendation-pill {
-  writing-mode: vertical-rl;
+  writing-mode: horizontal-tb;
   text-orientation: mixed;
   background: #1e40af;
   color: #ffffff;
-  padding: 12px 8px;
+  padding: 10px 20px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  min-height: 60px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 80px;
+  text-align: center;
 }
 
 .header-side {
@@ -1106,6 +1110,7 @@ table[id*="valuation-table"] .kv-value {
   font-variant-numeric: tabular-nums;
   font-size: 13px;
   line-height: 1.5;
+  font-weight: 500;
 }
 
 .cfi-table tbody td:first-child {
@@ -1113,6 +1118,15 @@ table[id*="valuation-table"] .kv-value {
   font-weight: 600;
   color: #243554;
   font-variant-numeric: normal;
+  white-space: normal;
+}
+
+/* Force right alignment for all numeric columns */
+.cfi-table tbody td.num,
+.cfi-table tbody td:not(:first-child) {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+  font-weight: 500 !important;
 }
 
 .cfi-table tbody tr:nth-child(even) {
@@ -1134,14 +1148,22 @@ table[id*="valuation-table"] .kv-value {
   color: #1b2f4e;
   text-align: left !important;
   font-variant-numeric: normal;
+  white-space: normal;
 }
 
 .cfi-table .num,
-.cfi-table td:not(:first-child) {
+.cfi-table td:not(:first-child),
+.cfi-table tbody td.num {
   text-align: right !important;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-variant-numeric: tabular-nums !important;
+  font-weight: 500 !important;
   color: #10274b;
+}
+
+/* Force alignment for all data cells except first */
+.cfi-table tbody tr td:not(:first-child) {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
 }
 
 .cfi-kpi-grid {
