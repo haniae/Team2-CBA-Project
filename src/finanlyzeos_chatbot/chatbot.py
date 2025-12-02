@@ -1102,8 +1102,58 @@ SYSTEM_PROMPT = (
     "- ### Business Drivers (what's causing the numbers)\n"
     "- ### Future Outlook (implications, catalysts, risks)\n\n"
     
-    "## Markdown Formatting - Professional Presentation\n\n"
-    "**CRITICAL: Use proper markdown formatting for professional, readable responses:**\n\n"
+    "## Markdown Formatting - ChatGPT Standard (MANDATORY)\n\n"
+    "**🚨 CRITICAL: Use ChatGPT-standard markdown formatting for professional, readable responses:**\n\n"
+    "**NUMBERED LISTS (CRITICAL - READ CAREFULLY):**\n"
+    "- **🚨 MANDATORY: ALWAYS use sequential numbering**: 1., 2., 3., 4., 5. (NOT all 1., 1., 1., 1.)\n"
+    "- **EVERY numbered list item MUST have a different number**: First item = 1., Second = 2., Third = 3., etc.\n"
+    "- **Format**: Each numbered item on a new line with proper spacing\n"
+    "- **Blank line before list**: Add a blank line before starting a numbered list\n"
+    "- **Blank line after list**: Add a blank line after ending a numbered list\n"
+    "- **Example CORRECT format (USE THIS):**\n"
+    "  \n"
+    "  1. First item with detailed explanation\n"
+    "  2. Second item with detailed explanation\n"
+    "  3. Third item with detailed explanation\n"
+    "  4. Fourth item with detailed explanation\n"
+    "  \n"
+    "- **Example WRONG format (NEVER DO THIS):**\n"
+    "  1. First item\n"
+    "  1. Second item (WRONG - should be 2.)\n"
+    "  1. Third item (WRONG - should be 3.)\n"
+    "  1. Fourth item (WRONG - should be 4.)\n"
+    "- **Before sending response, verify**: Count your numbered items - do they go 1., 2., 3., 4.? If not, FIX IT.\n\n"
+    "**BULLET LISTS:**\n"
+    "- Use `-` or `*` for unordered lists\n"
+    "- Proper spacing between items (blank line before list, after list)\n"
+    "- Consistent indentation\n\n"
+    "**HEADERS:**\n"
+    "- Use `###` for main sections (not `##` or `#`)\n"
+    "- Use `####` for subsections\n"
+    "- Always add blank line before and after headers\n\n"
+    "**PARAGRAPHS:**\n"
+    "- Always separate paragraphs with blank lines\n"
+    "- Don't use single-line breaks within paragraphs\n"
+    "- Use proper spacing for readability\n\n"
+    "**BOLD & EMPHASIS:**\n"
+    "- Use `**text**` for bold (key numbers, important terms)\n"
+    "- Use `*text*` for emphasis (subtle emphasis)\n"
+    "- Don't overuse - only for truly important information\n\n"
+    "**SPACING & READABILITY (ChatGPT Standard):**\n"
+    "- **Paragraph spacing**: One blank line between paragraphs (not two, not zero)\n"
+    "- **Section spacing**: Two blank lines between major sections\n"
+    "- **List spacing**: One blank line before list, one blank line after list\n"
+    "- **Header spacing**: One blank line before header, one blank line after header\n"
+    "- **Consistent spacing**: Use the same spacing pattern throughout the entire response\n"
+    "- **Match ChatGPT's style**: Clean, professional, with consistent 1.25rem paragraph margins\n"
+    "- **Visual breathing room**: Don't cram text together - use proper spacing\n\n"
+    "**FORMATTING CHECKLIST (Verify before sending):**\n"
+    "✅ All numbered lists use sequential numbers (1., 2., 3., 4.)\n"
+    "✅ Blank lines between paragraphs\n"
+    "✅ Blank lines before/after lists\n"
+    "✅ Blank lines before/after headers\n"
+    "✅ Consistent spacing throughout\n"
+    "✅ Professional, clean appearance\n\n"
     "**⚠️ NEVER USE LaTeX MATH NOTATION:**\n"
     "- ❌ DON'T use \\[ \\], \\( \\), $$, or LaTeX syntax\n"
     "- ❌ DON'T write formulas like: \\[Revenue = Volume \\times Price\\]\n"
@@ -4638,7 +4688,32 @@ Content:
                         pass
                     
                     # Check for visualization intent first (before other intents)
-                    visualization_request = self._detect_visualization_intent(user_input)
+                    # FIXED: Only detect visualization for explicit chart/graph requests
+                    # Simple queries and comparison queries should get rich text, not charts
+                    is_simple_query = bool(
+                        re.search(r'^(what|how|when|where|why|tell me|show me|give me)\s+(was|is|are|were)', user_input, re.IGNORECASE) or
+                        re.search(r'^(what|how|when|where|why)\s+(was|is|are|were)\s+', user_input, re.IGNORECASE)
+                    )
+                    is_comparison_query = bool(
+                        re.search(r'\b(compare|comparison|versus|vs\.?|against|between)\b', user_input, re.IGNORECASE) or
+                        re.search(r'\bin terms of\b', user_input, re.IGNORECASE) or
+                        re.search(r'\bcompared to\b', user_input, re.IGNORECASE)
+                    )
+                    has_explicit_chart_keyword = bool(
+                        re.search(r'\b(chart|graph|plot|visualization|visual|diagram|figure|visualize)\b', user_input, re.IGNORECASE) or
+                        re.search(r'\b(show|create|generate|make|draw|display|render)\s+(?:me|a|an)?\s+(?:chart|graph|plot|visual)\b', user_input, re.IGNORECASE)
+                    )
+                    
+                    # Only detect visualization if:
+                    # 1. Query explicitly mentions chart/graph keywords, AND
+                    # 2. Query is NOT a comparison query (comparisons should be rich text)
+                    # 3. Query is NOT a simple "what was/is" question
+                    should_check_visualization = has_explicit_chart_keyword and not is_comparison_query and not is_simple_query
+                    
+                    visualization_request = None
+                    if should_check_visualization:
+                        visualization_request = self._detect_visualization_intent(user_input)
+                    
                     if visualization_request:
                         emit("intent_visualization", f"Visualization intent detected: {visualization_request.chart_type.value}, tickers: {visualization_request.tickers}")
                         LOGGER.info(f"Processing visualization request - tickers: {visualization_request.tickers}, metrics: {visualization_request.metrics}")
@@ -5397,12 +5472,20 @@ Content:
                                     suggested_response = grounded_decision_obj.suggested_response
                                 
                                 if suggested_response:
-                                    reply = suggested_response
-                                    emit("rag_grounded_decision", "Low confidence - returning suggested response")
-                                    LOGGER.info(f"Grounded decision: {rag_metadata.get('grounded_decision', 'N/A')}")
-                                    # Continue to reply processing below (don't skip LLM path, just use the suggested response)
-                                    context = None  # No context needed since we have the response
-                                    context_detail = "Grounded decision: low confidence response"
+                                    # FIXED: If suggested response says "no data", try build_financial_context as fallback
+                                    # This ensures we check the database even if RAG returns low confidence
+                                    if "don't have" in suggested_response.lower() or "no data" in suggested_response.lower() or "ingest" in suggested_response.lower():
+                                        LOGGER.warning(f"RAG suggested 'no data' response, but trying build_financial_context as fallback to verify")
+                                        use_rag_orchestrator = False  # Force fallback to build_financial_context
+                                        context = None
+                                        context_detail = "RAG returned no data, falling back to build_financial_context"
+                                    else:
+                                        reply = suggested_response
+                                        emit("rag_grounded_decision", "Low confidence - returning suggested response")
+                                        LOGGER.info(f"Grounded decision: {rag_metadata.get('grounded_decision', 'N/A')}")
+                                        # Continue to reply processing below (don't skip LLM path, just use the suggested response)
+                                        context = None  # No context needed since we have the response
+                                        context_detail = "Grounded decision: low confidence response"
                                 else:
                                     context = rag_prompt
                                     context_detail = f"RAG context (confidence: {rag_metadata.get('confidence', 0.0):.2f})"

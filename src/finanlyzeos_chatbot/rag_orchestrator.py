@@ -148,7 +148,37 @@ class RAGOrchestrator:
         """
         # 1. Parse query
         structured = parse_to_structured(query)
-        tickers = [t["ticker"] for t in structured.get("tickers", [])][:3]
+        
+        # FIXED: Filter tickers to reduce false positives (same logic as context_builder)
+        raw_tickers = structured.get("tickers", [])
+        FALSE_POSITIVE_TICKERS = {"APLE", "CPRT", "ACT", "A", "AN", "THE", "AND", "OR"}
+        
+        scored_tickers = []
+        query_lower = query.lower()
+        
+        for t in raw_tickers:
+            ticker = t.get("ticker", "").upper()
+            input_text = t.get("input", "").lower()
+            
+            if ticker in FALSE_POSITIVE_TICKERS:
+                continue
+            
+            confidence = 1.0 if input_text in query_lower else 0.6
+            well_known = {"AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "JPM", "BAC", "WMT"}
+            if ticker in well_known:
+                confidence += 0.2
+            
+            if len(input_text) <= 2 or input_text in ["compare", "and", "the", "a", "an", "or", "vs"]:
+                confidence = 0.2
+            
+            scored_tickers.append((ticker, confidence, t))
+        
+        scored_tickers.sort(key=lambda x: x[1], reverse=True)
+        filtered_tickers = [t[0] for t in scored_tickers if t[1] > 0.5]
+        if len(filtered_tickers) == 0 and scored_tickers:
+            filtered_tickers = [t[0] for t in scored_tickers[:3]]
+        
+        tickers = filtered_tickers[:3]
         
         # 2. Detect intent and get retrieval policy
         intent = RetrievalIntent.GENERAL

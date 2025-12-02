@@ -891,21 +891,61 @@ class VisualizationGenerator:
                             
                             LOGGER.info(f"Retrieved data for {ticker} {metric}: {latest_value} (source: {data_source})")
                             
-                            # Create data points with realistic growth trend for visualization
-                            # Apply a growth rate to make the chart more meaningful
-                            growth_rate = 0.05  # 5% annual growth for demonstration
-                            for year_offset in range(years):
-                                year = current_year - year_offset
-                                years_list.append(year)
-                                # Apply compound growth backwards from latest value
-                                growth_factor = (1 + growth_rate) ** (years - year_offset - 1)
-                                value = latest_value / growth_factor
-                                values_list.append(value)
+                            # FIXED: Query actual historical values from database instead of generating fake data
+                            # Get historical metric values for the requested years
+                            try:
+                                from . import database
+                                
+                                # Use db_path from VisualizationGenerator instance
+                                db_path = self.db_path if hasattr(self, 'db_path') else None
+                                if not db_path:
+                                    # Fallback to settings
+                                    from .config import load_settings
+                                    settings = load_settings()
+                                    db_path = settings.database_path
+                                
+                                if db_path:
+                                    # Fetch all metric snapshots for this ticker and metric
+                                    all_records = database.fetch_metric_snapshots(db_path, ticker)
+                                    metric_records = [r for r in all_records if r.metric.lower() == metric.lower()]
+                                    
+                                    if metric_records:
+                                        # Group by fiscal year
+                                        from collections import defaultdict
+                                        by_year = defaultdict(list)
+                                        for r in metric_records:
+                                            if r.period:
+                                                # Extract year from period (e.g., 'FY2024' -> 2024)
+                                                year = None
+                                                if 'FY' in r.period:
+                                                    try:
+                                                        year = int(r.period.replace('FY', ''))
+                                                    except:
+                                                        pass
+                                                if year:
+                                                    by_year[year].append(r)
+                                        
+                                        # Get values for requested years (most recent N years)
+                                        sorted_years = sorted(by_year.keys(), reverse=True)[:years]
+                                        for year in sorted(sorted_years):
+                                            records_for_year = by_year[year]
+                                            # Get the latest record for this year
+                                            latest_record = max(records_for_year, key=lambda x: x.snapshot_date if hasattr(x, 'snapshot_date') else '')
+                                            years_list.append(year)
+                                            values_list.append(float(latest_record.value))
+                                        
+                                        if years_list and values_list:
+                                            LOGGER.info(f"Retrieved {len(values_list)} actual historical values for {ticker} {metric} from database")
+                                            return years_list, values_list, data_source or 'edgar', metadata
+                            except Exception as e:
+                                LOGGER.warning(f"Failed to fetch historical data from database: {e}, falling back to latest value only", exc_info=True)
                             
-                            if years_list and values_list:
-                                years_list.reverse()
-                                values_list.reverse()
-                                LOGGER.info(f"Returning data for {ticker} {metric}: {len(values_list)} values")
+                            # Fallback: If historical query fails, use only the latest value
+                            # This is better than generating fake data
+                            if latest_value is not None:
+                                years_list = [current_year]
+                                values_list = [latest_value]
+                                LOGGER.warning(f"Using only latest value for {ticker} {metric} (historical query failed)")
                                 return years_list, values_list, data_source or 'edgar', metadata
                         else:
                             LOGGER.warning(f"No data returned from analytics engine for {ticker} {metric}")
