@@ -127,13 +127,14 @@ body {
 }
 
 #cfi-root {
-  max-width: 100%;
+  width: 100%;
+  max-width: none;
   margin: 0;
-  padding: 16px 24px 32px;
+  padding: 16px 12px 32px 12px;
   display: grid;
-  grid-gap: 20px;
+  grid-gap: 16px;
   grid-template-columns: repeat(12, 1fr);
-  grid-template-rows: auto auto minmax(320px, auto) minmax(400px, auto) minmax(280px, auto) auto;
+  grid-template-rows: auto auto minmax(320px, auto) minmax(400px, auto) minmax(280px, auto) minmax(200px, auto);
   grid-template-areas:
     "toolbar toolbar toolbar toolbar toolbar toolbar toolbar toolbar toolbar toolbar toolbar toolbar"
     "header header header header header header header header header header header header"
@@ -147,6 +148,8 @@ body {
   box-shadow: none;
   backdrop-filter: none;
   min-height: 100vh;
+  justify-content: stretch;
+  align-items: stretch;
 }
 
 .cfi-panel {
@@ -159,6 +162,15 @@ body {
   box-shadow: var(--shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  min-width: 400px;
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.cfi-panel * {
+  word-break: normal;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .cfi-panel::before {
@@ -185,6 +197,22 @@ body {
 
 .cfi-panel[data-area="header"] {
   grid-area: header;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 100%;
+  min-height: 120px;
+  height: auto;
+}
+
+.cfi-panel[data-area="overview"],
+.cfi-panel[data-area="valuation"],
+.cfi-panel[data-area="pricechart"] {
+  width: 100%;
+  max-width: none;
+  min-width: 0 !important;
+  flex: 1 1 0;
+  margin: 0;
 }
 
 .cfi-panel[data-area="overview"] {
@@ -195,16 +223,16 @@ body {
   grid-area: valuation;
 }
 
+.cfi-panel[data-area="pricechart"] {
+  grid-area: pricechart;
+}
+
 .cfi-panel[data-area="keyfin"] {
   grid-area: keyfin;
 }
 
 .cfi-panel[data-area="kpi"] {
   grid-area: kpi;
-}
-
-.cfi-panel[data-area="pricechart"] {
-  grid-area: pricechart;
 }
 
 .cfi-panel[data-area="trend"] {
@@ -230,6 +258,10 @@ body {
 /* Sources Panel Styles */
 .cfi-panel[data-area="sources"] {
   grid-area: sources;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 100%;
 }
 
 /* Hide peer comparison section */
@@ -324,8 +356,10 @@ body {
   max-height: 2000px;
   overflow: hidden;
   transition: max-height 0.4s ease, opacity 0.3s ease, padding 0.4s ease;
-  opacity: 1;
+  opacity: 1 !important;
   padding: 20px;
+  display: block !important;
+  visibility: visible !important;
 }
 
 .cfi-panel[data-area="sources"] #sources-body.collapsed {
@@ -545,7 +579,9 @@ body {
 
 .cfi-header {
   padding: 0;
-  display: flex;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   flex-direction: column;
   gap: 0;
   background: var(--header-bg);
@@ -553,7 +589,10 @@ body {
   border: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
+  width: 100%;
+  min-height: 120px;
+  height: auto;
 }
 
 .cfi-header::before {
@@ -571,17 +610,23 @@ body {
 }
 
 .header-top {
-  display: grid;
+  display: grid !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 40px;
   padding: 20px 32px;
   background: var(--header-bg);
   border-bottom: 1px solid #e2e8f0;
+  min-height: 80px;
+  height: auto;
 }
 
 .brand-stack {
-  display: flex;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   flex-direction: column;
   gap: 8px;
   padding: 0;
@@ -591,7 +636,9 @@ body {
 }
 
 .brand-row {
-  display: flex;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   align-items: center;
   gap: 12px;
 }
@@ -618,7 +665,9 @@ body {
 }
 
 .header-actions {
-  display: flex;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   flex-direction: row;
   align-items: center;
   justify-content: flex-end;
@@ -640,7 +689,9 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   position: relative;
   overflow: visible;
-  display: inline-flex;
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
@@ -684,10 +735,15 @@ body {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .header-title {
-  display: flex;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   flex-direction: column;
   gap: 4px;
   align-items: flex-start;
@@ -700,7 +756,9 @@ body {
   letter-spacing: -0.01em;
   color: #0f172a;
   text-transform: none;
-  opacity: 1;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
   font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
 }
 
@@ -711,6 +769,9 @@ body {
   letter-spacing: -0.01em;
   color: #0f172a;
   text-transform: none;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
   font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
 }
 
@@ -909,7 +970,7 @@ body {
 
 .overview-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
   gap: 24px;
 }
 
@@ -983,7 +1044,7 @@ table[id*="market-table"] td:last-child {
 
 .valuation-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 200px;
+  grid-template-columns: minmax(450px, 1fr) minmax(250px, auto);
   gap: 16px;
 }
 
@@ -1162,7 +1223,7 @@ table[id*="valuation-table"] .kv-value {
 
 .cfi-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 12px;
 }
 
@@ -1580,7 +1641,9 @@ table[id*="valuation-table"] .kv-value {
 /* Improvement #9: Dashboard Toolbar */
 .dashboard-toolbar {
   grid-area: toolbar;
-  display: flex;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   justify-content: space-between;
   align-items: center;
   padding: 14px 18px;
@@ -1591,6 +1654,7 @@ table[id*="valuation-table"] .kv-value {
   box-shadow: var(--shadow);
   backdrop-filter: blur(10px);
   position: relative;
+  width: 100%;
 }
 
 .dashboard-toolbar::before {
