@@ -342,12 +342,11 @@
       const tr = document.createElement("tr");
       const left = document.createElement("td");
       left.className = "kv-label";
-      left.style.textAlign = "left";
+      // CSS handles alignment - no inline styles needed
       left.textContent = sanitizeText(String(label).replace(/_/g, " "));
       const right = document.createElement("td");
       right.className = "kv-value";
-      right.style.textAlign = "right";
-      right.style.fontVariantNumeric = "tabular-nums";
+      // CSS handles alignment and font-variant-numeric - no inline styles needed
       right.textContent = formatValue(label, value);
       tr.append(left, right);
       tbody.appendChild(tr);
@@ -377,10 +376,9 @@
       th.textContent = sanitizeText(heading);
       if (index === 0) {
         th.className = "col-label";
-        th.style.textAlign = "left";
-      } else {
-        th.style.textAlign = "right";
+        // CSS handles alignment - no inline styles needed
       }
+      // CSS handles alignment for numeric columns - no inline styles needed
       headRow.appendChild(th);
     });
     thead.appendChild(headRow);
@@ -390,14 +388,13 @@
       const tr = document.createElement("tr");
       const labelCell = document.createElement("td");
       labelCell.className = "kv-label";
-      labelCell.style.textAlign = "left";
+      // CSS handles alignment - no inline styles needed
       labelCell.textContent = sanitizeText(row.Label || row.label || "");
       tr.appendChild(labelCell);
       columns.forEach((field) => {
         const td = document.createElement("td");
         td.className = "kv-value";
-        td.style.textAlign = "right";
-        td.style.fontVariantNumeric = "tabular-nums";
+        // CSS handles alignment and font-variant-numeric - no inline styles needed
         td.textContent = formatValue(field, row[field]);
         tr.appendChild(td);
       });
@@ -440,13 +437,12 @@
     const headerRow = document.createElement("tr");
     const metricHeader = document.createElement("th");
     metricHeader.textContent = "Metric";
-    metricHeader.style.textAlign = "left";
+    // CSS handles alignment - no inline styles needed
     headerRow.appendChild(metricHeader);
     columns.forEach((year) => {
       const th = document.createElement("th");
       th.textContent = sanitizeText(year);
-      th.style.textAlign = "right";
-      th.style.fontVariantNumeric = "tabular-nums";
+      // CSS handles alignment and font-variant-numeric - no inline styles needed
       headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
@@ -457,14 +453,13 @@
       const tr = document.createElement("tr");
       const metricCell = document.createElement("td");
       metricCell.className = "metric";
-      metricCell.style.textAlign = "left";
+      // CSS handles alignment - no inline styles needed
       metricCell.textContent = sanitizeText(row.label || "");
       tr.appendChild(metricCell);
       columns.forEach((_, index) => {
         const td = document.createElement("td");
         td.className = "num";
-        td.style.textAlign = "right";
-        td.style.fontVariantNumeric = "tabular-nums";
+        // CSS handles alignment and font-variant-numeric - no inline styles needed
         const rawValue = row.values ? row.values[index] : null;
         let numericValue = null;
         let fallback = "";
