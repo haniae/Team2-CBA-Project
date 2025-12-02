@@ -55,7 +55,8 @@ const chatFormContainer = document.getElementById("chat-form");
 const savedSearchTrigger = document.querySelector("[data-action='search-saved']");
 const archivedToggleButton = document.querySelector("[data-action='toggle-archived']");
 const sidebarToggleButton = document.getElementById("sidebar-toggle");
-const sidebar = document.querySelector(".sidebar");
+const sidebar = document.getElementById("sidebar");
+const sidebarBackdrop = document.getElementById("sidebar-backdrop");
 
 const CHAT_FILE_INPUT_ID = "chat-file-upload";
 const CHAT_FILE_BUTTON_ID = "chat-file-upload-btn";
@@ -268,14 +269,19 @@ if (typeof document !== "undefined") {
 
 // Sidebar toggle functionality
 const SIDEBAR_STATE_KEY = "benchmarkos.sidebarOpen";
+const MOBILE_BREAKPOINT = 1024; // matches CSS lg breakpoint
+
+function isMobile() {
+  return window.innerWidth < MOBILE_BREAKPOINT;
+}
 
 function initializeSidebarToggle() {
   if (!sidebarToggleButton || !sidebar) {
     return;
   }
 
-  // Load saved state from localStorage (default to true/open)
-  let sidebarOpen = true;
+  // Load saved state from localStorage (default to true/open on desktop, false on mobile)
+  let sidebarOpen = !isMobile();
   try {
     const savedState = localStorage.getItem(SIDEBAR_STATE_KEY);
     if (savedState !== null) {
@@ -290,14 +296,53 @@ function initializeSidebarToggle() {
 
   // Add click event listener
   sidebarToggleButton.addEventListener("click", toggleSidebar);
+
+  // Backdrop click to close (mobile only)
+  if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener("click", () => {
+      if (isMobile()) {
+        setSidebarState(false);
+      }
+    });
+  }
+
+  // Handle window resize
+  let resizeTimeout;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      // On desktop, restore saved state; on mobile, close sidebar
+      if (!isMobile()) {
+        try {
+          const savedState = localStorage.getItem(SIDEBAR_STATE_KEY);
+          if (savedState !== null) {
+            setSidebarState(savedState === "true");
+          }
+        } catch (error) {
+          // ignore
+        }
+      } else {
+        setSidebarState(false);
+      }
+    }, 150);
+  });
 }
 
 function toggleSidebar() {
   if (!sidebar) {
     return;
   }
-  const isCurrentlyOpen = !sidebar.classList.contains("closed");
+  const isCurrentlyOpen = isSidebarOpen();
   setSidebarState(!isCurrentlyOpen);
+}
+
+function isSidebarOpen() {
+  if (!sidebar) return false;
+  if (isMobile()) {
+    return sidebar.classList.contains("open");
+  } else {
+    return !sidebar.classList.contains("closed");
+  }
 }
 
 function setSidebarState(open) {
@@ -305,19 +350,50 @@ function setSidebarState(open) {
     return;
   }
   
-  if (open) {
-    sidebar.classList.remove("closed");
-    sidebarToggleButton?.setAttribute("aria-expanded", "true");
+  if (isMobile()) {
+    // Mobile: use transform-based overlay
+    if (open) {
+      sidebar.classList.remove("closed");
+      sidebar.classList.add("open");
+      if (sidebarBackdrop) {
+        sidebarBackdrop.classList.add("visible");
+        sidebarBackdrop.setAttribute("aria-hidden", "false");
+      }
+    } else {
+      sidebar.classList.remove("open");
+      sidebar.classList.add("closed");
+      if (sidebarBackdrop) {
+        sidebarBackdrop.classList.remove("visible");
+        sidebarBackdrop.setAttribute("aria-hidden", "true");
+      }
+    }
   } else {
-    sidebar.classList.add("closed");
-    sidebarToggleButton?.setAttribute("aria-expanded", "false");
+    // Desktop: sidebar shrinks to thin rail (48px) when closed
+    // Content is hidden but sidebar remains visible with toggle button
+    if (open) {
+      sidebar.classList.remove("closed");
+      if (sidebarBackdrop) {
+        sidebarBackdrop.classList.remove("visible");
+        sidebarBackdrop.setAttribute("aria-hidden", "true");
+      }
+    } else {
+      sidebar.classList.add("closed");
+      if (sidebarBackdrop) {
+        sidebarBackdrop.classList.remove("visible");
+        sidebarBackdrop.setAttribute("aria-hidden", "true");
+      }
+    }
   }
 
-  // Save state to localStorage
-  try {
-    localStorage.setItem(SIDEBAR_STATE_KEY, String(open));
-  } catch (error) {
-    console.warn("Unable to save sidebar state to storage", error);
+  sidebarToggleButton?.setAttribute("aria-expanded", String(open));
+
+  // Save state to localStorage (only on desktop)
+  if (!isMobile()) {
+    try {
+      localStorage.setItem(SIDEBAR_STATE_KEY, String(open));
+    } catch (error) {
+      console.warn("Unable to save sidebar state to storage", error);
+    }
   }
 }
 

@@ -11,7 +11,15 @@
 </head>
 <body>
 <div class="layout">
-<div class="sidebar-toggle-bar">
+<aside class="sidebar" id="sidebar">
+<div class="sidebar-brand-zone">
+<div class="brand-identity">
+<div class="sidebar-content" id="sidebar-content">
+<div aria-hidden="true" class="brand-badge">FZ</div>
+<div class="brand-text">
+<span class="brand-name">FinalyzeOS</span>
+</div>
+</div>
 <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar" title="Toggle sidebar">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -20,23 +28,15 @@
   </svg>
 </button>
 </div>
-<aside class="sidebar">
-<div class="sidebar-brand-zone">
-<div class="brand-identity">
-<div aria-hidden="true" class="brand-badge">FZ</div>
-<div class="brand-text">
-<span class="brand-name">FinalyzeOS</span>
-</div>
-</div>
-<div class="brand-status">
+<div class="brand-status sidebar-content" id="sidebar-status">
 <div class="status-connection">
 <span class="status-dot" id="api-status"></span>
 <span id="status-message">Checking API...</span>
 </div>
 </div>
 </div>
-<div class="sidebar-divider" role="presentation"></div>
-<nav aria-label="Analyst navigation" class="sidebar-nav">
+<div class="sidebar-divider sidebar-content" role="presentation" id="sidebar-divider"></div>
+<nav aria-label="Analyst navigation" class="sidebar-nav sidebar-content" id="sidebar-nav">
 <button class="nav-item" data-action="new-analysis">
 <span aria-hidden="true" class="nav-icon">🔍</span>
 <span class="nav-label">New Analysis</span>
@@ -66,8 +66,8 @@
 <span class="nav-label">Help Center</span>
 </button>
 </nav>
-<div class="sidebar-divider" role="presentation"></div>
-<nav aria-label="Workspace navigation" class="sidebar-nav secondary">
+<div class="sidebar-divider sidebar-content" role="presentation"></div>
+<nav aria-label="Workspace navigation" class="sidebar-nav secondary sidebar-content">
 <button class="nav-item" data-action="open-settings">
 <span aria-hidden="true" class="nav-icon">⚙️</span>
 <span class="nav-label">Settings</span>
@@ -77,7 +77,7 @@
 <span class="nav-label">Alerts</span>
 </button>
 </nav>
-<section aria-labelledby="saved-reports-heading" class="sidebar-section saved-reports">
+<section aria-labelledby="saved-reports-heading" class="sidebar-section saved-reports sidebar-content">
 <div class="section-header">
 <h2 id="saved-reports-heading">Saved Reports</h2>
 <button class="section-action" data-action="search-saved">
@@ -94,7 +94,7 @@
 <p class="empty-state">Saved analyses will appear here.</p>
 </div>
 </section>
-<footer class="sidebar-footer">
+<footer class="sidebar-footer sidebar-content">
 </footer>
 </aside>
 <main class="main-panel">
