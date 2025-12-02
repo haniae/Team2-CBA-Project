@@ -57,6 +57,10 @@ const archivedToggleButton = document.querySelector("[data-action='toggle-archiv
 const sidebarToggleButton = document.getElementById("sidebar-toggle");
 const sidebar = document.getElementById("sidebar");
 const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+const chatsView = document.getElementById("chats-view");
+const chatsList = document.getElementById("chats-list");
+const chatsSearchInput = document.getElementById("chats-search-input");
+const chatsButton = document.getElementById("chats-button");
 
 const CHAT_FILE_INPUT_ID = "chat-file-upload";
 const CHAT_FILE_BUTTON_ID = "chat-file-upload-btn";
@@ -8938,6 +8942,9 @@ function loadConversation(conversationId) {
     resetNavActive();
   }
 
+  // Show chat view when loading a conversation
+  showChatView();
+
   if (chatLog) {
     chatLog.innerHTML = "";
   }
@@ -9025,6 +9032,113 @@ function deleteConversation(conversationId) {
   }
 
   renderConversationList();
+}
+
+// Chats view functionality
+let chatsSearchQuery = "";
+let currentView = "chat"; // "chat" or "chats"
+
+function showChatsView() {
+  currentView = "chats";
+  if (chatsView) {
+    chatsView.classList.remove("hidden");
+  }
+  if (chatPanel) {
+    chatPanel.classList.add("hidden");
+  }
+  if (utilityPanel) {
+    utilityPanel.classList.add("hidden");
+  }
+  resetNavActive();
+  if (chatsButton) {
+    chatsButton.classList.add("active");
+  }
+  renderChatsList();
+  if (chatsSearchInput) {
+    chatsSearchInput.focus();
+  }
+}
+
+function showChatView() {
+  currentView = "chat";
+  if (chatsView) {
+    chatsView.classList.add("hidden");
+  }
+  if (chatPanel) {
+    chatPanel.classList.remove("hidden");
+  }
+  if (chatsButton) {
+    chatsButton.classList.remove("active");
+  }
+}
+
+function renderChatsList() {
+  if (!chatsList) {
+    return;
+  }
+
+  // Get all conversations, sorted by updatedAt DESC
+  const allChats = [...conversations].sort((a, b) => {
+    const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return bTime - aTime;
+  });
+
+  // Filter by search query
+  const filtered = chatsSearchQuery
+    ? allChats.filter((chat) => {
+        const title = (chat.title || "").toLowerCase();
+        return title.includes(chatsSearchQuery.toLowerCase());
+      })
+    : allChats;
+
+  if (filtered.length === 0) {
+    chatsList.innerHTML = '<p class="chats-empty">No chats found.</p>';
+    return;
+  }
+
+  chatsList.innerHTML = filtered
+    .map(
+      (chat) => `
+    <button class="chats-item" data-chat-id="${chat.id}" role="listitem">
+      <div class="chats-item-title">${escapeHtml(chat.title || "Untitled Chat")}</div>
+      <div class="chats-item-time">${formatRelativeTime(chat.updatedAt || chat.createdAt)}</div>
+    </button>
+  `
+    )
+    .join("");
+
+  // Add click handlers
+  chatsList.querySelectorAll(".chats-item").forEach((button) => {
+    button.addEventListener("click", () => {
+      const chatId = button.dataset.chatId;
+      if (chatId) {
+        loadConversation(chatId);
+        showChatView();
+      }
+    });
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Initialize chats view handlers
+if (chatsButton) {
+  chatsButton.addEventListener("click", (e) => {
+    e.preventDefault();
+    showChatsView();
+  });
+}
+
+if (chatsSearchInput) {
+  chatsSearchInput.addEventListener("input", (e) => {
+    chatsSearchQuery = e.target.value;
+    renderChatsList();
+  });
 }
 
 function setActiveNav(action) {
