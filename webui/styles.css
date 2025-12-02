@@ -1157,17 +1157,21 @@ body::-webkit-scrollbar {
 }
 
 .main-panel {
-   flex: 1;
+   flex: 1 1 auto;
    display: flex;
    flex-direction: column;
    background: transparent;
-   width: 100%;
+   width: 100% !important;
+   max-width: none !important;
    min-width: 0;
    overflow: hidden;
    height: 100vh;
    padding-bottom: 14px;
+   padding-right: 0;
+   margin: 0;
    scrollbar-width: none;
    -ms-overflow-style: none;
+   align-items: stretch;
  }
 
 .main-panel::-webkit-scrollbar {
@@ -5461,13 +5465,16 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 100%;
-  max-width: 100%;
+  width: 100% !important;
+  max-width: none !important;
   color: var(--text-secondary);
   max-height: calc(100vh - 200px);
   overflow-y: auto;
   overflow-x: hidden;
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  align-items: stretch;
 }
 
 .utility-content:has(.filing-viewer) {
@@ -7438,6 +7445,11 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0;
+  padding: 0;
+  align-items: stretch;
 }
 
 .utility-content:has(.interactive-dashboard) .interactive-dashboard {
@@ -7445,17 +7457,23 @@ body::-webkit-scrollbar {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0;
+  align-items: stretch;
 }
 
 .interactive-dashboard {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 100%;
-  max-width: 100%;
+  width: 100% !important;
+  max-width: none !important;
   height: 100%;
   min-height: 0;
   box-sizing: border-box;
+  margin: 0;
+  align-items: stretch;
 }
 
 .interactive-dashboard__sticky-container {
@@ -7724,7 +7742,9 @@ body::-webkit-scrollbar {
   transition: box-shadow 0.3s ease;
   padding: 0;
   box-sizing: border-box;
-  margin: 0;
+  margin: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 .interactive-dashboard__dashboard-container > #cfi-root {
@@ -7737,6 +7757,19 @@ body::-webkit-scrollbar {
   padding-top: 16px !important;
   padding-bottom: 32px !important;
   box-sizing: border-box !important;
+}
+
+/* Ensure utility-content and its children extend fully to the right */
+.utility-content:has(.interactive-dashboard),
+.utility-content:has(.interactive-dashboard) > * {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Remove any right padding from the dashboard container wrapper */
+.interactive-dashboard__dashboard-container {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
 }
 
 .interactive-dashboard__dashboard-container > #cfi-root > .cfi-panel {
