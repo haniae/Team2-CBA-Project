@@ -718,17 +718,15 @@ body::-webkit-scrollbar {
   width: 100%;
 }
 
-/* Ensure toggle button aligns with nav items when sidebar is open */
-.sidebar:not(.closed) .sidebar-toggle {
-  margin: 0;
-  align-self: flex-start;
-}
-
-/* Show rail buttons when sidebar is open */
-@media (min-width: 1024px) {
-  .sidebar:not(.closed) .sidebar-rail-buttons {
-    display: flex;
-  }
+/* Rail buttons container - hidden when sidebar is open, visible when closed */
+.sidebar-rail-buttons {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .sidebar-content {
@@ -753,13 +751,9 @@ body::-webkit-scrollbar {
     pointer-events: none;
   }
   
-  /* Chats button stays visible when collapsed */
-  .sidebar.closed .chats-toggle-button {
-    margin: 0 auto;
-  }
 }
 
-/* Toggle button always visible - minimal sidebar rail style */
+/* Toggle button in header - right side */
 .sidebar-toggle {
   background: transparent;
   border: none;
@@ -777,6 +771,7 @@ body::-webkit-scrollbar {
   min-height: 36px;
   flex-shrink: 0;
   margin: 0;
+  margin-left: auto;
 }
 
 .sidebar-toggle:hover {
@@ -796,25 +791,16 @@ body::-webkit-scrollbar {
   fill: none;
 }
 
-/* Sidebar rail buttons container - visible when collapsed */
-.sidebar-rail-buttons {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  margin-top: 8px;
-  margin-bottom: 8px;
-}
-
-/* Remove any spacing between buttons when sidebar is closed */
+/* Ensure all rail buttons are centered when sidebar is closed */
 .sidebar.closed .sidebar-rail-buttons {
   gap: 12px;
   padding: 12px 0;
+  align-items: center;
 }
 
-.sidebar.closed .sidebar-rail-buttons .chats-toggle-button {
-  margin-top: 0;
+.sidebar.closed .sidebar-rail-buttons .chats-toggle-button,
+.sidebar.closed .sidebar-rail-buttons .new-chat-icon-button {
+  margin: 0 auto;
 }
 
 /* Sidebar toggle rail button - rectangular icon style - seamless blend */
@@ -852,14 +838,16 @@ body::-webkit-scrollbar {
   height: 20px;
 }
 
-/* Show rail buttons when sidebar is open too, but hide when collapsed */
+/* Rail buttons visible and centered when sidebar is closed */
 @media (min-width: 1024px) {
-  .sidebar:not(.closed) .sidebar-rail-buttons {
-    display: none;
-  }
-  
   .sidebar.closed .sidebar-rail-buttons {
     display: flex;
+    align-items: center;
+  }
+  
+  /* Hide rail buttons when sidebar is open */
+  .sidebar:not(.closed) .sidebar-rail-buttons {
+    display: none;
   }
 }
 
@@ -938,7 +926,7 @@ body::-webkit-scrollbar {
   stroke: currentColor;
 }
 
-/* When sidebar is closed, center the toggle button */
+/* When sidebar is closed, center the brand identity */
 @media (min-width: 1024px) {
   .sidebar.closed .brand-identity {
     justify-content: center;
@@ -947,11 +935,6 @@ body::-webkit-scrollbar {
   .sidebar.closed .sidebar-brand-zone {
     padding: 18px 0 0 0;
     align-items: center;
-  }
-  
-  .sidebar.closed .sidebar-toggle {
-    margin: 0 auto;
-    display: flex;
   }
 }
 
