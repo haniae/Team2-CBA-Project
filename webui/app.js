@@ -9140,6 +9140,16 @@ if (chatsButton) {
   });
 }
 
+// Handle new chat button - use event delegation for reliability
+document.addEventListener("click", (e) => {
+  const newChatButton = e.target.closest("#new-chat-icon-button, .new-chat-icon-button");
+  if (newChatButton) {
+    e.preventDefault();
+    handleNavAction("new-chat");
+  }
+});
+
+// Also attach directly if button exists (for immediate availability)
 const newChatIconButton = document.getElementById("new-chat-icon-button");
 if (newChatIconButton) {
   newChatIconButton.addEventListener("click", (e) => {
