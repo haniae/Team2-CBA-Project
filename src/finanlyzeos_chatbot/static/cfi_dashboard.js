@@ -342,9 +342,12 @@
       const tr = document.createElement("tr");
       const left = document.createElement("td");
       left.className = "kv-label";
+      left.style.textAlign = "left";
       left.textContent = sanitizeText(String(label).replace(/_/g, " "));
       const right = document.createElement("td");
       right.className = "kv-value";
+      right.style.textAlign = "right";
+      right.style.fontVariantNumeric = "tabular-nums";
       right.textContent = formatValue(label, value);
       tr.append(left, right);
       tbody.appendChild(tr);
