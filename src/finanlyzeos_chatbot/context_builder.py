@@ -3410,13 +3410,17 @@ def build_financial_context(
     Args:
         query: User's question
         analytics_engine: Analytics engine instance
-        database_path: Path to database
+        database_path: Path to database (string or Path object)
         max_tickers: Maximum tickers to include in context
         
     Returns:
         Formatted financial context as natural language text with source citations
     """
+    # CRITICAL: Convert database_path to Path if it's a string
+    from pathlib import Path
+    db_path = Path(database_path) if isinstance(database_path, str) else database_path
     LOGGER.critical(f"🔍 DEBUG: build_financial_context called for: {query}")
+    LOGGER.critical(f"🔍 DEBUG: Using database path: {db_path} (exists: {db_path.exists()})")
     try:
         # Check if this is a forecasting query FIRST - forecasting queries need special handling
         is_forecasting = _is_forecasting_query(query)
@@ -3566,11 +3570,36 @@ def build_financial_context(
         context_parts = []
         
         # 🚨 CRITICAL DIRECTIVE: Add at the very beginning of context
-        context_parts.append("🚨 **CRITICAL INSTRUCTION - READ FIRST:**\n")
-        context_parts.append("All financial metric values below are DIRECT DATABASE VALUES extracted from SEC filings.\n")
-        context_parts.append("PRESENT THEM AS FACTS. NEVER show formulas, calculations, or derivation steps.\n")
-        context_parts.append("NEVER write 'To calculate...', 'Using the formula...', 'Plugging in the numbers...'.\n")
-        context_parts.append("Just state the value directly (e.g., 'Google's gross profit is $223.8 billion').\n")
+        context_parts.append("╔═══════════════════════════════════════════════════════════════════════════════╗\n")
+        context_parts.append("║                    🧠 INTELLIGENCE & QUALITY REQUIREMENTS                      ║\n")
+        context_parts.append("╚═══════════════════════════════════════════════════════════════════════════════╝\n\n")
+        context_parts.append("🚨 **CRITICAL INSTRUCTIONS - APPLY TO ALL RESPONSES:**\n\n")
+        context_parts.append("1. **CORRECTNESS FIRST**:\n")
+        context_parts.append("   - All financial metric values below are DIRECT DATABASE VALUES from SEC filings\n")
+        context_parts.append("   - PRESENT THEM AS FACTS - NEVER show formulas, calculations, or derivation steps\n")
+        context_parts.append("   - NEVER write 'To calculate...', 'Using the formula...', 'Plugging in the numbers...'\n")
+        context_parts.append("   - Just state the value directly (e.g., 'Google's gross profit is $223.8 billion')\n")
+        context_parts.append("   - ALWAYS specify the period (FY2024, Q3 2024, etc.)\n")
+        context_parts.append("   - VERIFY every number exists in the context before using it\n\n")
+        context_parts.append("2. **INTELLIGENCE - Think Like a Senior Analyst:**\n")
+        context_parts.append("   - Connect the dots: Explain relationships between metrics and business drivers\n")
+        context_parts.append("   - Provide insights: Go beyond reporting to offer strategic analysis\n")
+        context_parts.append("   - Identify patterns: Highlight trends, anomalies, and noteworthy changes\n")
+        context_parts.append("   - Synthesize information: Combine multiple data points into coherent narratives\n")
+        context_parts.append("   - Contextualize: Explain what numbers mean in business and investment terms\n")
+        context_parts.append("   - Anticipate questions: Address likely follow-ups proactively\n\n")
+        context_parts.append("3. **COMPREHENSIVENESS - Cover All Angles:**\n")
+        context_parts.append("   - Multi-layered analysis: Direct answer + Historical + Drivers + Comparison + Outlook\n")
+        context_parts.append("   - Multiple perspectives: Company + Market + Analyst + Investor views\n")
+        context_parts.append("   - Complete picture: Current state + 3-5 year trends + Forward implications\n")
+        context_parts.append("   - Comprehensive sourcing: Include ALL relevant SEC filing links (5-10 minimum)\n")
+        context_parts.append("   - Depth: 400-1500 words depending on query complexity\n\n")
+        context_parts.append("4. **MANDATORY SOURCES SECTION**:\n")
+        context_parts.append("   - Include a '📊 Sources:' section at the END of your response\n")
+        context_parts.append("   - Include ALL SEC filing links provided in the 'SEC FILING SOURCES' section below\n")
+        context_parts.append("   - Format as clickable markdown links: [10-K FY2024](URL)\n")
+        context_parts.append("   - Minimum 5-10 source links covering all data types used\n")
+        context_parts.append("   - Include audit trails showing where each major data point came from\n\n")
         context_parts.append("═══════════════════════════════════════════════════════════════════════════════\n\n")
         
         # Add macro economic context at the beginning
@@ -3607,12 +3636,27 @@ def build_financial_context(
                 try:
                     # Try to get company name from financial_facts table
                     import sqlite3
-                    conn = sqlite3.connect(database_path)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT company_name FROM financial_facts WHERE ticker = ? AND company_name IS NOT NULL LIMIT 1", (ticker,))
-                    row = cursor.fetchone()
-                    company_name = row[0] if row else ticker
-                    conn.close()
+                    import time
+                    # Use timeout and retry logic for database connections
+                    max_retries = 3
+                    retry_delay = 0.3
+                    for attempt in range(max_retries):
+                        try:
+                            conn = sqlite3.connect(str(db_path), timeout=30.0, check_same_thread=False)
+                            conn.execute("PRAGMA journal_mode=WAL;")
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT company_name FROM financial_facts WHERE ticker = ? AND company_name IS NOT NULL LIMIT 1", (ticker,))
+                            row = cursor.fetchone()
+                            company_name = row[0] if row else ticker
+                            conn.close()
+                            break
+                        except sqlite3.OperationalError as e:
+                            if "database is locked" in str(e).lower() and attempt < max_retries - 1:
+                                time.sleep(retry_delay * (attempt + 1))
+                                continue
+                            raise
+                    else:
+                        company_name = ticker
                 except:
                     company_name = ticker
                 LOGGER.critical(f"🔍 DEBUG: Company name: {company_name}")
@@ -3628,9 +3672,10 @@ def build_financial_context(
                 ]
                 
                 # Fetch metric records from database
-                LOGGER.critical(f"🔍 DEBUG: About to fetch metrics for {ticker} from {database_path}")
+                # Use db_path (already converted to Path at function start)
+                LOGGER.critical(f"🔍 DEBUG: About to fetch metrics for {ticker} from {db_path}")
                 try:
-                    records = database.fetch_metric_snapshots(database_path, ticker)
+                    records = database.fetch_metric_snapshots(db_path, ticker)
                     LOGGER.critical(f"🔍 DEBUG: Successfully fetched {len(records) if records else 0} records for {ticker}")
                 except Exception as fetch_error:
                     LOGGER.critical(f"🔍 DEBUG: EXCEPTION fetching metrics: {fetch_error}")
@@ -4039,13 +4084,46 @@ def build_financial_context(
                         LOGGER.debug(f"Could not build valuation context for {ticker}: {e}")
                 
             except Exception as e:
-                LOGGER.debug(f"Could not fetch metrics for {ticker}: {e}")
+                LOGGER.critical(f"🔍 DEBUG: EXCEPTION processing ticker {ticker}: {e}")
+                import traceback
+                LOGGER.critical(f"🔍 DEBUG: Traceback: {traceback.format_exc()}")
                 continue
         
         LOGGER.critical(f"🔍 DEBUG: Built {len(context_parts)} context parts")
         LOGGER.critical(f"🔍 DEBUG: Context parts types: {[type(p).__name__ for p in context_parts]}")
         
-        if not context_parts:
+        # Check if we have actual financial data (not just headers)
+        # context_parts always has at least the header, so check for actual data content
+        has_financial_data = False
+        context_text = "".join(context_parts) if context_parts else ""
+        if context_text:
+            # Check if context contains actual financial metrics (not just headers)
+            has_financial_data = (
+                "MANDATORY DATA" in context_text or
+                "Revenue:" in context_text or
+                "revenue" in context_text.lower() or
+                "FINANCIAL DATA" in context_text or
+                "DATABASE RECORDS" in context_text or
+                "Net Income:" in context_text or
+                "net income" in context_text.lower() or
+                any(ticker in context_text for ticker in tickers)
+            )
+        
+        LOGGER.critical(f"🔍 DEBUG: Has financial data: {has_financial_data}, tickers: {tickers}")
+        LOGGER.critical(f"🔍 DEBUG: Context text length: {len(context_text)}, preview: {context_text[:500]}")
+        
+        # CRITICAL: If we have tickers but no financial data markers, check if we actually have data
+        # Sometimes the data exists but the markers aren't present - return context anyway
+        if not has_financial_data and tickers:
+            # Check if context_parts has more than just headers (which means we have some data)
+            non_header_parts = [p for p in context_parts if len(p) > 200 and not p.startswith("🚨 **CRITICAL INSTRUCTION")]
+            if non_header_parts:
+                LOGGER.warning(f"⚠️ WARNING: Tickers detected ({tickers}) but financial data markers not found. However, context has substantial content ({len(non_header_parts)} parts), returning it anyway.")
+                return "".join(context_parts) if context_parts else ""
+            else:
+                LOGGER.warning(f"⚠️ WARNING: Tickers detected ({tickers}) but no financial data found. Returning 'no data' message.")
+        
+        if not has_financial_data and not tickers:
             # CRITICAL: Return explicit "no data" message instead of empty string
             # Empty string causes LLM to hallucinate from training data
             return (
@@ -4084,7 +4162,80 @@ def build_financial_context(
                 except Exception as e:
                     LOGGER.warning(f"Could not fetch multi-source data for {ticker}: {e}")
         
-        # Add comprehensive context header with detailed instructions
+        # Add comprehensive context header with detailed instructions for providing in-depth answers
+        # This ensures the LLM provides detailed analysis with audit trails
+        if not is_forecasting:
+            detailed_instructions = (
+                "\n" + "="*80 + "\n"
+                "📊 **INSTITUTIONAL-GRADE ANALYSIS REQUIREMENTS - YOU MUST PROVIDE:**\n"
+                "="*80 + "\n\n"
+                "🚨 **CRITICAL: Your response must be SMART, CORRECT, and COMPREHENSIVE for ALL query types.**\n\n"
+                "**🧠 INTELLIGENCE REQUIREMENTS:**\n"
+                "- Think like a senior analyst: Connect dots, identify patterns, provide strategic insights\n"
+                "- Synthesize information: Combine multiple data points into coherent narratives\n"
+                "- Anticipate questions: Address likely follow-ups proactively\n"
+                "- Contextualize: Explain what numbers mean in business and investment terms\n"
+                "- Identify anomalies: Highlight unusual patterns or noteworthy trends\n\n"
+                "**✅ CORRECTNESS REQUIREMENTS:**\n"
+                "- Verify every number exists in context before using it\n"
+                "- Always specify periods (FY2024, Q3 2024, etc.)\n"
+                "- Check units (billions vs millions, percentages vs absolute values)\n"
+                "- Use exact values from context, never training data\n"
+                "- Cross-reference for consistency across metrics\n\n"
+                "**📊 COMPREHENSIVENESS REQUIREMENTS:**\n"
+                "- Multi-dimensional: Quantitative + Qualitative + Temporal + Comparative\n"
+                "- Complete picture: Current + Historical (3-5 years) + Forward outlook\n"
+                "- Multiple perspectives: Company + Market + Analyst + Investor views\n"
+                "- Comprehensive sourcing: 5-10 sources covering all data types\n"
+                "- Depth: 400-1500 words depending on query complexity\n\n"
+                "1. **COMPREHENSIVE ANALYSIS STRUCTURE** - Your answer must organically integrate:\n"
+                "   - **Direct Answer**: Lead with specific numbers and periods (e.g., 'Apple's revenue was $394.3B in FY2024, representing 7.2% YoY growth')\n"
+                "   - **Historical Context**: Seamlessly weave in 3-5 year trends, CAGR, growth trajectory (e.g., 'Revenue has grown at a 5.8% CAGR over the past 5 years, from $260.2B in FY2019')\n"
+                "   - **Business Drivers**: Naturally explain WHY the numbers are what they are (e.g., 'Growth was driven by strong iPhone 15 sales, Services revenue expansion, and emerging markets penetration')\n"
+                "   - **Comparative Analysis**: Integrate peer comparison and sector benchmarks where relevant (e.g., 'Apple's 7.2% growth outpaced Microsoft's 6.5% but lagged Meta's 15.7%')\n"
+                "   - **Forward Outlook**: Flow naturally into implications, catalysts, and risks (e.g., 'Looking ahead, Services growth and AI integration present opportunities, while China exposure remains a risk')\n"
+                "   - **Investment Perspective**: Conclude with valuation context and investment implications (e.g., 'At current P/E of 28.5x, Apple trades at a premium to the sector, justified by its strong cash generation')\n"
+                "   **CRITICAL**: Write as a cohesive, intelligent narrative - DO NOT explicitly label sections as 'Layer 1', 'Layer 2', etc. Let all elements flow naturally together in a sophisticated analysis.\n\n"
+                "2. **COMPREHENSIVE DATA INTEGRATION** - Use ALL available data:\n"
+                "   - **Financial Metrics**: Revenue, margins, cash flow, balance sheet items\n"
+                "   - **Growth Trends**: YoY growth, CAGR, margin trends, efficiency metrics\n"
+                "   - **Valuation Metrics**: P/E, P/B, EV/EBITDA, market cap\n"
+                "   - **Business Context**: Segment breakdowns, geographic data, product mix\n"
+                "   - **Market Data**: Analyst ratings, institutional ownership, price targets\n\n"
+                "3. **AUDIT TRAILS & SOURCING** - Show where each data point comes from:\n"
+                "   - Reference specific SEC filings for each metric (e.g., 'per 10-K FY2024')\n"
+                "   - Cite the fiscal year and period for each value\n"
+                "   - Link data points to their sources in your narrative\n"
+                "   - Include a '📊 Sources:' section at the END with ALL SEC filing links\n"
+                "   - Format as clickable markdown links: [10-K FY2024](URL)\n"
+                "   - Include 3-5 most relevant SEC filing links\n\n"
+                "4. **QUALITY STANDARDS** - Your analysis must meet institutional standards:\n"
+                "   - **Depth**: 400-1500 words depending on query complexity (simple: 400-600, complex: 800-1200, comparisons: 1000-1500)\n"
+                "   - **Data Points**: 10-30 specific metrics and comparisons (simple: 10-15, complex: 15-25, comparisons: 20-30)\n"
+                "   - **Sources**: 5-10 clickable source links with real URLs from context\n"
+                "   - **Analysis**: Not just numbers, but insights, context, implications, and strategic thinking\n"
+                "   - **Flow**: Seamless narrative that reads naturally, not a checklist of separate elements\n"
+                "   - **Intelligence**: Demonstrate analytical thinking through connections, insights, and pattern recognition\n\n"
+                "5. **BUSINESS INTELLIGENCE & STRATEGIC THINKING** - Provide actionable, insightful analysis:\n"
+                "   - Explain what the numbers mean for the business in strategic terms\n"
+                "   - Identify and quantify key drivers and risk factors\n"
+                "   - Compare to industry standards, peers, and historical patterns\n"
+                "   - Provide forward-looking perspective with scenario considerations\n"
+                "   - Connect financial metrics to business strategy and competitive positioning\n"
+                "   - Synthesize multiple data points to form coherent investment insights\n"
+                "   - Highlight what's most important and why it matters\n\n"
+                "6. **WRITING STYLE - Natural and Sophisticated:**\n"
+                "   - Write as a cohesive narrative, not separate labeled sections\n"
+                "   - Use smooth transitions to connect different analytical perspectives\n"
+                "   - Integrate historical context, drivers, comparisons naturally into the flow\n"
+                "   - Build connections between different data points to tell a complete story\n"
+                "   - Avoid: Explicitly labeling sections like 'Historical Context:', 'Business Drivers:', etc.\n"
+                "   - Prefer: Seamless integration where all elements flow naturally together\n"
+                "   - Think: Senior analyst presenting insights, not reciting a template\n\n"
+                "="*80 + "\n\n"
+            )
+            context_parts.insert(1, detailed_instructions)  # Insert after the critical instruction
+        
         # For forecasting queries, use a different header that emphasizes forecast data
         if is_forecasting and any("ML FORECAST" in part or "CRITICAL: THIS IS THE PRIMARY ANSWER" in part for part in context_parts):
             header = (

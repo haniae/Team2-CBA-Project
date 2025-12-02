@@ -6006,9 +6006,15 @@ function renderTable(lines) {
 
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
-  headerCells.forEach((cell) => {
+  headerCells.forEach((cell, idx) => {
     const th = document.createElement("th");
     th.textContent = cell;
+    // First column (metric name) should be left-aligned, others right-aligned for numbers
+    if (idx === 0) {
+      th.style.textAlign = "left";
+    } else {
+      th.style.textAlign = "right";
+    }
     headRow.append(th);
   });
   thead.append(headRow);
@@ -6024,23 +6030,30 @@ function renderTable(lines) {
     cells.forEach((cell, idx) => {
       const td = document.createElement("td");
       const parsed = parseNumericCell(cell);
-      if (parsed.isNumeric) {
-        td.classList.add("numeric");
-        const value = document.createElement("span");
-        value.className = "cell-value";
-        value.textContent = parsed.value;
-        td.append(value);
-        if (parsed.suffix) {
-          const suffix = document.createElement("span");
-          suffix.className = "cell-suffix";
-          suffix.textContent = parsed.suffix;
-          td.append(suffix);
-        }
-      } else {
-        td.textContent = parsed.value;
-      }
       if (idx === 0) {
+        // First column (metric name) - always left-aligned
+        td.style.textAlign = "left";
+        td.textContent = parsed.isNumeric ? parsed.value + (parsed.suffix ? parsed.suffix : "") : parsed.value;
         td.scope = "row";
+      } else {
+        // Other columns - right-align for numeric values
+        if (parsed.isNumeric) {
+          td.classList.add("numeric");
+          td.style.textAlign = "right";
+          const value = document.createElement("span");
+          value.className = "cell-value";
+          value.textContent = parsed.value;
+          td.append(value);
+          if (parsed.suffix) {
+            const suffix = document.createElement("span");
+            suffix.className = "cell-suffix";
+            suffix.textContent = parsed.suffix;
+            td.append(suffix);
+          }
+        } else {
+          td.style.textAlign = "right";
+          td.textContent = parsed.value;
+        }
       }
       row.append(td);
     });

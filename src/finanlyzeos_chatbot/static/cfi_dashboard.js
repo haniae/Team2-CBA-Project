@@ -320,6 +320,10 @@
   function renderPairsTable(target, source) {
     const table = typeof target === "string" ? scopedQuery(target) : target;
     if (!table) return;
+    // Ensure table has overview-table class for proper styling
+    if (!table.classList.contains("overview-table")) {
+      table.classList.add("overview-table");
+    }
     const tbody = ensureTBody(table);
     if (!tbody) return;
     tbody.innerHTML = "";
@@ -350,6 +354,10 @@
   function renderValuationTable(target, rows) {
     const table = typeof target === "string" ? scopedQuery(target) : target;
     if (!table) return;
+    // Ensure table has valuation-table class for proper styling
+    if (!table.classList.contains("valuation-table")) {
+      table.classList.add("valuation-table");
+    }
     table.innerHTML = "";
     if (!rows || !rows.length) {
       const empty = document.createElement("caption");
