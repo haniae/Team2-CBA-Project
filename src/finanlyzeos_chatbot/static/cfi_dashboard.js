@@ -445,6 +445,8 @@
     columns.forEach((year) => {
       const th = document.createElement("th");
       th.textContent = sanitizeText(year);
+      th.style.textAlign = "right";
+      th.style.fontVariantNumeric = "tabular-nums";
       headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
