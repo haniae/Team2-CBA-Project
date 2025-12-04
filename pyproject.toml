@@ -27,6 +27,9 @@ dependencies = [
     "numpy>=1.26,<2.3",
 ]
 
+[project.scripts]
+app = "finanlyzeos_chatbot.web:app"
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-ra"
