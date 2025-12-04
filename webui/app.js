@@ -3370,11 +3370,11 @@ function formatDisplayDate(value) {
   if (Number.isNaN(parsed.getTime())) {
     return `${value}`;
   }
-  return parsed.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  // Format manually to avoid thousands separators in year
+  const year = parsed.getFullYear();
+  const month = parsed.toLocaleDateString(undefined, { month: "short" });
+  const day = parsed.getDate();
+  return `${month} ${day}, ${year}`;
 }
 
 function humaniseLabel(value) {
@@ -4193,7 +4193,11 @@ function formatFilingDate(dateString) {
   if (Number.isNaN(date.getTime())) {
     return dateString;
   }
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  // Format manually to avoid thousands separators in year
+  const year = date.getFullYear();
+  const month = date.toLocaleDateString(undefined, { month: "short" });
+  const day = date.getDate();
+  return `${month} ${day}, ${year}`;
 }
 
 async function renderFilingViewerSection({ container } = {}) {
@@ -9731,11 +9735,11 @@ function formatDateHuman(dateInput) {
   if (Number.isNaN(parsed.getTime())) {
     return dateInput;
   }
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(parsed);
+  // Format manually to avoid thousands separators in year
+  const year = parsed.getFullYear();
+  const month = parsed.toLocaleDateString(undefined, { month: "short" });
+  const day = parsed.getDate();
+  return `${month} ${day}, ${year}`;
 }
 
 function createCoverageBadge(coverage) {

@@ -91,7 +91,7 @@ class Settings:
     edgar_base_url: str = "https://data.sec.gov"
     yahoo_quote_url: str = "https://query1.finance.yahoo.com/v7/finance/quote"
     yahoo_quote_batch_size: int = 50
-    http_request_timeout: float = 30.0
+    http_request_timeout: float = 10.0
     max_ingestion_workers: int = 8
     cache_dir: Path = field(default_factory=lambda: Path.cwd() / "cache")
     enable_bloomberg: bool = False
@@ -251,7 +251,7 @@ def load_settings() -> Settings:
     if yahoo_quote_batch_size <= 0:
         raise ValueError("YAHOO_QUOTE_BATCH_SIZE must be positive.")
 
-    timeout_env = os.getenv("HTTP_REQUEST_TIMEOUT", "30")
+    timeout_env = os.getenv("HTTP_REQUEST_TIMEOUT", "10")
     try:
         http_request_timeout = float(timeout_env)
     except ValueError as exc:
