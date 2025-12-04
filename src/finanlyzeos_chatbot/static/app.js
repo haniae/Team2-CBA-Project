@@ -292,6 +292,7 @@ function fixMarkdownFormatting(text) {
   let inOrderedList = false;
   let listCounter = 1;
   let listIndent = 0;
+  let indentStack = []; // Track indent levels: [{indent: number, counter: number}]
   let consecutiveBlankLines = 0;
   
   for (let i = 0; i < lines.length; i++) {
@@ -305,16 +306,59 @@ function fixMarkdownFormatting(text) {
       // Reset consecutive blank lines counter
       consecutiveBlankLines = 0;
       
-      // If this is a new list or different indent level, reset counter
-      if (!inOrderedList || indent !== listIndent) {
+      // Handle indent changes
+      if (!inOrderedList) {
+        // Starting a new list
         listCounter = 1;
         inOrderedList = true;
         listIndent = indent;
+        indentStack = [{indent: indent, counter: 1}];
+      } else if (indent === listIndent) {
+        // Same indent level - continue numbering
+        // listCounter continues
+      } else if (indent > listIndent) {
+        // Increased indent - new nested list, save current state (with updated counter) and reset counter
+        // Update the current level's counter in the stack before saving
+        if (indentStack.length > 0 && indentStack[indentStack.length - 1].indent === listIndent) {
+          indentStack[indentStack.length - 1].counter = listCounter;
+        }
+        // Save the parent level state
+        indentStack.push({indent: listIndent, counter: listCounter});
+        // Start nested list
+        listCounter = 1;
+        listIndent = indent;
+        indentStack.push({indent: indent, counter: 1});
+      } else {
+        // Decreased indent - going back to parent level
+        // Update current level's counter before leaving
+        if (indentStack.length > 0 && indentStack[indentStack.length - 1].indent === listIndent) {
+          indentStack[indentStack.length - 1].counter = listCounter;
+        }
+        // Find the matching indent level in the stack and restore its counter
+        while (indentStack.length > 0 && indentStack[indentStack.length - 1].indent > indent) {
+          indentStack.pop();
+        }
+        // If we found a matching indent level, restore its counter
+        if (indentStack.length > 0 && indentStack[indentStack.length - 1].indent === indent) {
+          const stackEntry = indentStack[indentStack.length - 1];
+          listCounter = stackEntry.counter;
+          listIndent = indent;
+        } else {
+          // New list at this indent level
+          listCounter = 1;
+          listIndent = indent;
+          indentStack = [{indent: indent, counter: 1}];
+        }
       }
       
       // Replace with sequential number (always use sequential, ignore original number)
       fixedLines.push(`${listMatch[1]}${listCounter}. ${content}`);
       listCounter++;
+      
+      // Update the counter in the stack for the current indent level
+      if (indentStack.length > 0 && indentStack[indentStack.length - 1].indent === listIndent) {
+        indentStack[indentStack.length - 1].counter = listCounter;
+      }
     } else {
       // Track consecutive blank lines
       if (line.trim() === '') {
@@ -332,23 +376,26 @@ function fixMarkdownFormatting(text) {
         if (consecutiveBlankLines >= 2 && inOrderedList) {
           inOrderedList = false;
           listCounter = 1;
+          listIndent = 0;
+          indentStack = [];
         }
         fixedLines.push(line);
       } else if (line.match(/^#{1,6}\s+/)) {
         // Header - definitely reset list
         inOrderedList = false;
         listCounter = 1;
+        listIndent = 0;
+        indentStack = [];
         fixedLines.push(line);
       } else if (!line.match(/^\s{2,}/) && line.trim() !== '') {
         // Non-indented, non-empty line - reset list (new section)
-        // But only if we're not in the middle of a list continuation
-        if (inOrderedList && i > 0) {
-          const prevLine = lines[i - 1];
-          // If previous line was blank, we're starting a new section
-          if (prevLine.trim() === '') {
-            inOrderedList = false;
-            listCounter = 1;
-          }
+        // If we're in a list and encounter non-list text, reset the list
+        // This handles cases like "1. Item\nSome text\n1. Item" where text breaks the list
+        if (inOrderedList) {
+          // Reset list state when we encounter non-list content
+          inOrderedList = false;
+          listCounter = 1;
+          listIndent = 0;
         }
         fixedLines.push(line);
       } else {
@@ -366,6 +413,8 @@ function fixMarkdownFormatting(text) {
     let inList = false;
     let expectedNum = 1;
     let listIndent = 0;
+    let indentStack = []; // Track indent levels: [{indent: number, counter: number}]
+    let consecutiveBlankLines = 0;
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -374,11 +423,43 @@ function fixMarkdownFormatting(text) {
       if (match) {
         const indent = match[1].length;
         const num = parseInt(match[2], 10);
+        consecutiveBlankLines = 0;
         
-        if (!inList || indent !== listIndent) {
+        // Handle indent changes (similar to first pass)
+        if (!inList) {
           inList = true;
           listIndent = indent;
           expectedNum = 1;
+          indentStack = [{indent: indent, counter: 1}];
+        } else if (indent === listIndent) {
+          // Same indent level - continue numbering
+          // expectedNum continues
+        } else if (indent > listIndent) {
+          // Increased indent - new nested list
+          if (indentStack.length > 0 && indentStack[indentStack.length - 1].indent === listIndent) {
+            indentStack[indentStack.length - 1].counter = expectedNum;
+          }
+          indentStack.push({indent: listIndent, counter: expectedNum});
+          expectedNum = 1;
+          listIndent = indent;
+          indentStack.push({indent: indent, counter: 1});
+        } else {
+          // Decreased indent - going back to parent level
+          if (indentStack.length > 0 && indentStack[indentStack.length - 1].indent === listIndent) {
+            indentStack[indentStack.length - 1].counter = expectedNum;
+          }
+          while (indentStack.length > 0 && indentStack[indentStack.length - 1].indent > indent) {
+            indentStack.pop();
+          }
+          if (indentStack.length > 0 && indentStack[indentStack.length - 1].indent === indent) {
+            const stackEntry = indentStack[indentStack.length - 1];
+            expectedNum = stackEntry.counter;
+            listIndent = indent;
+          } else {
+            expectedNum = 1;
+            listIndent = indent;
+            indentStack = [{indent: indent, counter: 1}];
+          }
         }
         
         if (num !== expectedNum) {
@@ -386,13 +467,37 @@ function fixMarkdownFormatting(text) {
           lines[i] = `${match[1]}${expectedNum}. ${match[3]}`;
         }
         expectedNum++;
-      } else if (line.trim() === '' && inList) {
-        // Keep list state for single blank line
-        continue;
-      } else if (line.match(/^#{1,6}\s+/) || (!line.match(/^\s{2,}/) && line.trim() !== '')) {
-        // Reset on headers or non-indented content
-        inList = false;
-        expectedNum = 1;
+        
+        // Update the counter in the stack for the current indent level
+        if (indentStack.length > 0 && indentStack[indentStack.length - 1].indent === listIndent) {
+          indentStack[indentStack.length - 1].counter = expectedNum;
+        }
+      } else {
+        // Track consecutive blank lines
+        if (line.trim() === '') {
+          consecutiveBlankLines++;
+        } else {
+          consecutiveBlankLines = 0;
+        }
+        
+        if (line.trim() === '') {
+          // Reset list if we have 2+ consecutive blank lines
+          if (consecutiveBlankLines >= 2 && inList) {
+            inList = false;
+            expectedNum = 1;
+          }
+        } else if (line.match(/^#{1,6}\s+/)) {
+          // Reset on headers
+          inList = false;
+          expectedNum = 1;
+        } else if (!line.match(/^\s{2,}/) && line.trim() !== '') {
+          // Reset on non-indented, non-list content
+          // If we're in a list and encounter text, always reset (text breaks the list)
+          if (inList) {
+            inList = false;
+            expectedNum = 1;
+          }
+        }
       }
     }
     
@@ -411,8 +516,37 @@ function fixMarkdownFormatting(text) {
   // Fix 4: Ensure blank line after headers
   fixed = fixed.replace(/(#{1,6}\s+[^\n]+)\n([^\n#\s])/g, '$1\n\n$2');
   
-  // Fix 5: Ensure blank line before lists (but not if already blank)
-  fixed = fixed.replace(/([^\n])\n(\s*[-*+]|\s*\d+\.)\s/g, '$1\n\n$2 ');
+  // Fix 5: Ensure blank line before lists (but NOT if previous line is already a list item)
+  // Only add blank lines for clear section breaks, not when text appears between list items
+  // Process line by line to check context properly
+  const spacingLines = fixed.split('\n');
+  const processedSpacingLines = [];
+  for (let i = 0; i < spacingLines.length; i++) {
+    const line = spacingLines[i];
+    const listMatch = line.match(/^(\s*[-*+]|\s*\d+\.)\s/);
+    
+    if (listMatch && i > 0) {
+      const prevLine = spacingLines[i - 1];
+      // Only add blank line if:
+      // 1. Previous line is blank (already has spacing) - don't add another
+      // 2. Previous line is a list item - don't add (consecutive list items)
+      // 3. Previous line is a header - already handled by Fix 3
+      // 4. Previous line is text AND there's a blank line before it (section break)
+      // Otherwise, don't add blank line (text directly before list item means continuation)
+      if (prevLine.trim() !== '' && !prevLine.match(/^\s*(\d+\.|[-*+])\s/) && !prevLine.match(/^#{1,6}\s+/)) {
+        // Check if there's a blank line before the previous line (section break)
+        if (i > 1 && spacingLines[i - 2].trim() === '') {
+          // There's a section break, add blank line
+          if (processedSpacingLines.length > 0 && processedSpacingLines[processedSpacingLines.length - 1].trim() !== '') {
+            processedSpacingLines.push(''); // Add blank line
+          }
+        }
+        // Otherwise, don't add blank line - text directly before list means it's part of the same flow
+      }
+    }
+    processedSpacingLines.push(line);
+  }
+  fixed = processedSpacingLines.join('\n');
   
   // Fix 6: Ensure blank line after lists (when followed by non-list content)
   fixed = fixed.replace(/(\n\s*[-*+]|\n\s*\d+\.)\s+[^\n]+\n([^\n\s-*0-9#])/g, '$1 $2');
@@ -964,10 +1098,6 @@ function renderMarkdown(text) {
   try {
     // Apply markdown fixes before rendering
     text = fixMarkdownFormatting(text);
-  } catch (error) {
-    console.warn('Markdown formatting error, using original text:', error);
-    // Continue with original text if formatting fails
-  }
 
   const escapeHtml = (value) =>
     value
@@ -1457,6 +1587,11 @@ function renderMarkdown(text) {
     // Phase 1 Tightening: Graceful error recovery
     console.error('Markdown rendering error:', error);
     // Return escaped plain text as fallback
+    const escapeHtml = (value) =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
     return `<p>${escapeHtml(text)}</p>`;
   }
 }
