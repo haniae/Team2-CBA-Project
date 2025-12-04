@@ -7452,9 +7452,25 @@ function resolvePendingMessage(
   return wrapper;
 }
 
+function convertNumberedListsToBullets(text) {
+  if (!text || typeof text !== 'string') {
+    return text;
+  }
+  
+  // Convert numbered lists (1., 2., 3., etc.) to bullet points (-)
+  // This regex matches lines that start with optional whitespace, followed by a number and period
+  // It handles various formats: "1. ", "  2. ", "1)", "  2)", etc.
+  return text.replace(/^(\s*)(\d+)([.)])\s+/gm, (match, indent, number, marker) => {
+    // Replace with bullet point, preserving indentation
+    return indent + '- ';
+  });
+}
+
 function buildMessageBlocks(text) {
   const fragments = [];
-  const blocks = splitBlocks(text);
+  // Preprocess text to convert numbered lists to bullet points
+  const processedText = convertNumberedListsToBullets(text);
+  const blocks = splitBlocks(processedText);
 
   blocks.forEach((block) => {
     if (block.type === "table") {
@@ -7480,7 +7496,7 @@ function buildMessageBlocks(text) {
   if (!blocks.length) {
     const div = document.createElement("div");
     div.className = "message-content";
-    div.innerHTML = renderMarkdown(text);
+    div.innerHTML = renderMarkdown(processedText);
     // Render KaTeX math after markdown is processed
     if (typeof renderMathInElement !== 'undefined') {
       renderMathInElement(div, {
