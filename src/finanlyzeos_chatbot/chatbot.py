@@ -1207,35 +1207,109 @@ SYSTEM_PROMPT = (
     "- Keep cells plain text (no bold in table cells)\n"
     "- Right-align numbers with ---:\n\n"
     
-    "## Table Formatting - CRITICAL RULES\n\n"
-    "When creating tables in your response:\n\n"
-    "**✅ DO:**\n"
-    "- Use standard markdown table format with THREE separate lines:\n"
-    "  Line 1: Header row with column names\n"
-    "  Line 2: Separator row with dashes (---|---|---)\n"
-    "  Line 3+: Data rows\n"
-    "- Keep ALL cells plain text (no bold within table cells)\n"
-    "- Bold the ANSWER company name ONLY in the text ABOVE the table\n"
-    "- Use proper alignment for numbers (right-align with ---:)\n"
-    "- Include column headers\n"
-    "- Each row MUST end with a pipe (|) character\n\n"
+    "## Response Structure - MANDATORY ORDER (PHASE 3 ENHANCED)\n\n"
+    "🚨 **EVERY RESPONSE MUST FOLLOW THIS EXACT STRUCTURE:**\n\n"
+    "1. **Opening Statement** (1-2 sentences)\n"
+    "   - Direct answer to the question with specific numbers and period\n"
+    "   - Example: 'Apple's revenue for FY2024 was $394.3 billion, up 7.2% from $367.8B in FY2023.'\n"
+    "   - NO section header needed for opening statement\n\n"
+    "2. **### Key Metrics / Overview** (H3 header - REQUIRED for most queries)\n"
+    "   - Primary metrics, key numbers, main findings\n"
+    "   - Use bullet points or short paragraphs\n"
+    "   - Keep it concise and scannable\n"
+    "   - Alternative headers: '### Overview', '### Summary', '### Key Findings'\n\n"
+    "3. **### Historical Context** (H3 header - if relevant)\n"
+    "   - Multi-year trends (3-5 years)\n"
+    "   - Growth rates, CAGR analysis\n"
+    "   - Historical comparisons\n"
+    "   - Alternative headers: '### History', '### Trends', '### Historical Trends'\n\n"
+    "4. **### Analysis / Drivers** (H3 header - REQUIRED for 'why' questions)\n"
+    "   - WHY the numbers are what they are\n"
+    "   - Business drivers, market dynamics\n"
+    "   - Key factors and explanations\n"
+    "   - Alternative headers: '### Key Drivers', '### Business Drivers', '### Factors'\n\n"
+    "5. **### Comparison** (H3 header - if comparing companies)\n"
+    "   - Side-by-side metrics\n"
+    "   - Competitive positioning\n"
+    "   - Relative performance\n"
+    "   - Alternative headers: '### Compared', '### Versus', '### Competitive Analysis'\n\n"
+    "6. **### Forward Outlook** (H3 header - if relevant)\n"
+    "   - Implications and catalysts\n"
+    "   - Risks and opportunities\n"
+    "   - Future expectations\n"
+    "   - Alternative headers: '### Outlook', '### Future', '### Looking Ahead', '### Implications'\n\n"
+    "7. **📊 Sources:** (ALWAYS LAST - no exceptions)\n"
+    "   - Must be the final section - NEVER put anything after sources\n"
+    "   - Use markdown links: [10-K FY2024](url)\n"
+    "   - Include 5-10 sources covering all data used\n"
+    "   - Format: '📊 Sources:' (or '📊 Sources' or just 'Sources:') followed by bullet list of links\n"
+    "   - Can be H3 header or paragraph, but MUST be last\n\n"
+    "**CRITICAL RULES (PHASE 3 ENHANCED):**\n"
+    "- Sources section MUST be the absolute last thing in your response\n"
+    "- Use H3 headers (###) for all major sections (not H2 unless it's a main title)\n"
+    "- Maintain consistent section ordering (Overview → Historical → Analysis → Comparison → Outlook → Sources)\n"
+    "- Never put sources in the middle or beginning - it will be automatically moved to end\n"
+    "- If a section isn't relevant, skip it (but Sources is ALWAYS required)\n"
+    "- Section headers can use alternative names (see above), but maintain the order\n"
+    "- Opening statement should NOT have a header - it's the direct answer\n\n"
     
-    "**❌ DON'T:**\n"
-    "- DON'T concatenate the separator row to the header row (e.g., | Header ||---|---|)\n"
-    "- DON'T bold individual cells within the table\n"
-    "- DON'T bold only the first row of data\n"
-    "- DON'T use inconsistent formatting across rows\n"
-    "- DON'T mix bold and non-bold text in table cells\n"
-    "- DON'T forget the newline between header and separator rows\n"
-    "- 🚨 DON'T create fake tables with bullet points and pipes (e.g., '**Apple:** 26% | $100B | ...')\n"
-    "- 🚨 DON'T use lists instead of tables - if comparing multiple items, ALWAYS use proper markdown table format\n\n"
+    "## Table Formatting - CRITICAL RULES (PHASE 2 ENHANCED)\n\n"
+    "🚨 **ABSOLUTE REQUIREMENTS FOR ALL TABLES:**\n\n"
+    "1. **ALWAYS use THREE separate lines:**\n"
+    "   ```\n"
+    "   | Header 1 | Header 2 | Header 3 |\n"
+    "   | --- | ---: | ---: |\n"
+    "   | Data 1 | Data 2 | Data 3 |\n"
+    "   ```\n"
+    "   - Line 1: Header row with pipes separating columns\n"
+    "   - Line 2: Separator row with dashes (REQUIRED - cannot skip this line)\n"
+    "   - Line 3+: Data rows with pipes separating values\n\n"
     
-    "**Example CORRECT table (note the separate lines):**\n"
-    "| Company | Profit Margin | Revenue |\n"
+    "2. **NEVER create fake tables:**\n"
+    "   ❌ WRONG: `- **Apple:** 26% | $100B | ...`\n"
+    "   ❌ WRONG: `* **Revenue:** $100B | **Margin:** 20%`\n"
+    "   ✅ RIGHT: Use proper markdown table format above\n\n"
+    
+    "3. **NEVER bold cells in tables:**\n"
+    "   ❌ WRONG: `| **Apple** | **$100B** | **20%** |`\n"
+    "   ✅ RIGHT: `| Apple | $100B | 20% |`\n"
+    "   - Bold the company name ONLY in the text ABOVE the table, not in cells\n\n"
+    
+    "4. **ALWAYS right-align numbers:**\n"
+    "   - Use `| ---: |` for numeric columns (colon on right)\n"
+    "   - Use `| --- |` for text columns (no colon)\n\n"
+    
+    "5. **NEVER use lists instead of tables:**\n"
+    "   - If comparing multiple items/metrics, ALWAYS use a table\n"
+    "   - Lists are for single-item enumerations, not comparisons\n\n"
+    
+    "6. **Table structure validation:**\n"
+    "   - Every table MUST have a header row\n"
+    "   - Every table MUST have a separator row (| --- |)\n"
+    "   - Every table MUST have at least one data row\n"
+    "   - All rows MUST have the same number of columns\n\n"
+    
+    "**Examples:**\n\n"
+    "✅ CORRECT:\n"
+    "```\n"
+    "| Company | Revenue | Margin |\n"
     "| --- | ---: | ---: |\n"
-    "| Apple | 26.92% | $391.8B |\n"
-    "| Microsoft | 35.71% | $222.9B |\n"
-    "| Google | 27.99% | $221.7B |\n\n"
+    "| Apple | $394.3B | 25.3% |\n"
+    "| Microsoft | $211.9B | 42.0% |\n"
+    "```\n\n"
+    
+    "❌ WRONG (fake table):\n"
+    "```\n"
+    "- **Apple:** $394.3B | 25.3%\n"
+    "- **Microsoft:** $211.9B | 42.0%\n"
+    "```\n\n"
+    
+    "❌ WRONG (bold in cells):\n"
+    "```\n"
+    "| **Company** | **Revenue** | **Margin** |\n"
+    "| --- | ---: | ---: |\n"
+    "| **Apple** | **$394.3B** | **25.3%** |\n"
+    "```\n\n"
     
     "**Example INCORRECT table (separator concatenated to header):**\n"
     "| Company | Profit Margin | Revenue ||---|---|---|\n"
@@ -2597,6 +2671,94 @@ class FinanlyzeOSChatbot:
             return valid_tickers[-1]
         
         return None
+    def _count_tokens(self, text: str, model: str = "gpt-4o") -> int:
+        """Count tokens in text using tiktoken (approximate if not available)."""
+        try:
+            import tiktoken
+            encoding = tiktoken.encoding_for_model(model)
+            return len(encoding.encode(text))
+        except (ImportError, KeyError):
+            # Fallback: approximate 1 token = 4 characters (conservative estimate)
+            return len(text) // 4
+    
+    def _truncate_context(self, context: str, max_tokens: int = 100000) -> str:
+        """Truncate context to fit within token limit, preserving important sections."""
+        token_count = self._count_tokens(context)
+        if token_count <= max_tokens:
+            return context
+        
+        LOGGER.warning(f"Context too large: {token_count} tokens, truncating to {max_tokens} tokens")
+        
+        # Try to preserve important sections
+        important_markers = [
+            "🚨 MANDATORY DATA",
+            "CRITICAL: THIS IS THE PRIMARY ANSWER",
+            "ML FORECAST",
+            "FINANCIAL DATA",
+            "UPLOADED FILES",
+        ]
+        
+        # Find positions of important sections
+        important_sections = []
+        for marker in important_markers:
+            pos = context.find(marker)
+            if pos >= 0:
+                important_sections.append((pos, marker))
+        
+        # If we have important sections, try to keep them
+        if important_sections:
+            important_sections.sort()
+            # Keep from start to first important section, then truncate after
+            first_important = important_sections[0][0]
+            header = context[:first_important]
+            remaining = context[first_important:]
+            
+            # Truncate remaining to fit
+            header_tokens = self._count_tokens(header)
+            remaining_max_tokens = max_tokens - header_tokens - 1000  # Safety margin
+            if remaining_max_tokens > 0:
+                # Truncate from end, preserving structure
+                truncated_remaining = self._truncate_text_by_tokens(remaining, remaining_max_tokens)
+                return header + truncated_remaining
+        
+        # No important sections found, truncate from end
+        return self._truncate_text_by_tokens(context, max_tokens)
+    
+    def _truncate_text_by_tokens(self, text: str, max_tokens: int) -> str:
+        """Truncate text to fit within token limit, trying to break at paragraph boundaries."""
+        # Start with full text
+        current = text
+        current_tokens = self._count_tokens(current)
+        
+        if current_tokens <= max_tokens:
+            return current
+        
+        # Binary search for the right length
+        low, high = 0, len(text)
+        best = text[:high]
+        
+        while low < high:
+            mid = (low + high) // 2
+            candidate = text[:mid]
+            tokens = self._count_tokens(candidate)
+            
+            if tokens <= max_tokens:
+                best = candidate
+                low = mid + 1
+            else:
+                high = mid
+        
+        # Try to break at a paragraph boundary
+        truncated = best
+        last_paragraph = truncated.rfind('\n\n')
+        if last_paragraph > len(truncated) * 0.8:  # Only if we're keeping most of it
+            truncated = truncated[:last_paragraph]
+            if self._count_tokens(truncated) <= max_tokens:
+                best = truncated
+        
+        # Add truncation notice
+        return best + "\n\n[Context truncated due to length limit]"
+    
     def _prepare_llm_messages(self, rag_context: Optional[str], *, is_forecasting: bool = False, user_query: Optional[str] = None) -> List[Mapping[str, str]]:
         """Trim history before sending to the LLM and append optional RAG context."""
         history = self.conversation.as_llm_messages()
@@ -2625,6 +2787,11 @@ class FinanlyzeOSChatbot:
                 pass
         
         if rag_context:
+            # CRITICAL: Truncate context if too large to prevent token limit errors
+            # Reserve ~20k tokens for system prompt, conversation history, and response
+            MAX_CONTEXT_TOKENS = 100000  # Leave room for system prompt, history, and response
+            rag_context = self._truncate_context(rag_context, max_tokens=MAX_CONTEXT_TOKENS)
+            
             # CRITICAL FIX: Always add context as a separate system message
             # DO NOT prepend to user message - this causes "looped system prompt interpretation"
             # LLM thinks the context is user input, not data to use
@@ -2638,6 +2805,21 @@ class FinanlyzeOSChatbot:
                 "End of system data context - User question follows below\n"
                 "═══════════════════════════════════════════════════════════════════════════════\n"
             )
+            
+            # Check total token count before adding
+            all_messages_content = "\n".join([msg.get("content", "") for msg in messages] + [context_with_marker] + [msg.get("content", "") for msg in chat_history])
+            total_tokens = self._count_tokens(all_messages_content)
+            LOGGER.info(f"📊 Total message tokens: {total_tokens} (limit: 128000)")
+            
+            if total_tokens > 120000:  # Safety margin
+                LOGGER.warning(f"⚠️ Total tokens ({total_tokens}) approaching limit, truncating conversation history")
+                # Truncate conversation history if needed
+                while total_tokens > 120000 and len(chat_history) > 2:
+                    chat_history = chat_history[1:]  # Remove oldest messages
+                    all_messages_content = "\n".join([msg.get("content", "") for msg in messages] + [context_with_marker] + [msg.get("content", "") for msg in chat_history])
+                    total_tokens = self._count_tokens(all_messages_content)
+                LOGGER.info(f"📊 After truncation: {total_tokens} tokens, {len(chat_history)} history messages")
+            
             # Add context as a system message (NOT user message)
             messages.append({"role": "system", "content": context_with_marker})
             

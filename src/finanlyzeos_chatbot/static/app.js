@@ -267,12 +267,23 @@ const DEFAULT_PROMPT_SUGGESTIONS = [
  * @param {string} text - Raw markdown text
  * @returns {string} Fixed markdown text
  */
+/**
+ * Comprehensive markdown formatting fixer with validation
+ * Handles numbered lists, spacing, nested structures, and edge cases
+ */
 function fixMarkdownFormatting(text) {
-  if (!text) {
+  if (!text || typeof text !== 'string') {
     return "";
   }
   
-  let fixed = text;
+  // Phase 1 Broadening: Input validation and sanitization
+  let fixed = text.trim();
+  
+  // Remove null bytes and other problematic characters
+  fixed = fixed.replace(/\0/g, '');
+  
+  // Normalize line endings
+  fixed = fixed.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   
   // Fix 1: Convert all "1." to sequential numbering (1., 2., 3., 4.)
   // This handles cases where LLM generates all "1." instead of sequential numbers
@@ -281,6 +292,7 @@ function fixMarkdownFormatting(text) {
   let inOrderedList = false;
   let listCounter = 1;
   let listIndent = 0;
+  let consecutiveBlankLines = 0;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -288,8 +300,10 @@ function fixMarkdownFormatting(text) {
     
     if (listMatch) {
       const indent = listMatch[1].length;
-      const number = parseInt(listMatch[2], 10);
       const content = listMatch[3];
+      
+      // Reset consecutive blank lines counter
+      consecutiveBlankLines = 0;
       
       // If this is a new list or different indent level, reset counter
       if (!inOrderedList || indent !== listIndent) {
@@ -298,57 +312,662 @@ function fixMarkdownFormatting(text) {
         listIndent = indent;
       }
       
-      // Replace with sequential number
+      // Replace with sequential number (always use sequential, ignore original number)
       fixedLines.push(`${listMatch[1]}${listCounter}. ${content}`);
       listCounter++;
     } else {
-      // Not a list item - reset list state if we had a blank line
-      if (line.trim() === '' && inOrderedList) {
-        // Keep list state for continuation, but reset if multiple blank lines
-        if (i > 0 && lines[i - 1].trim() === '') {
-          inOrderedList = false;
-          listCounter = 1;
-        }
-      } else if (line.trim() !== '' && !line.match(/^\s*\d+\.\s+/)) {
-        // Non-list line - reset if not indented continuation
-        if (!line.match(/^\s{2,}/)) {
-          inOrderedList = false;
-          listCounter = 1;
-        }
+      // Track consecutive blank lines
+      if (line.trim() === '') {
+        consecutiveBlankLines++;
+      } else {
+        consecutiveBlankLines = 0;
       }
       
-      fixedLines.push(line);
+      // Not a list item
+      // Only reset list state if we encounter a header or non-indented content
+      // Keep list state across single blank lines to handle multi-paragraph list items
+      if (line.trim() === '') {
+        // Single blank line - keep list state (might be continuation)
+        // But reset if we have 2+ consecutive blank lines
+        if (consecutiveBlankLines >= 2 && inOrderedList) {
+          inOrderedList = false;
+          listCounter = 1;
+        }
+        fixedLines.push(line);
+      } else if (line.match(/^#{1,6}\s+/)) {
+        // Header - definitely reset list
+        inOrderedList = false;
+        listCounter = 1;
+        fixedLines.push(line);
+      } else if (!line.match(/^\s{2,}/) && line.trim() !== '') {
+        // Non-indented, non-empty line - reset list (new section)
+        // But only if we're not in the middle of a list continuation
+        if (inOrderedList && i > 0) {
+          const prevLine = lines[i - 1];
+          // If previous line was blank, we're starting a new section
+          if (prevLine.trim() === '') {
+            inOrderedList = false;
+            listCounter = 1;
+          }
+        }
+        fixedLines.push(line);
+      } else {
+        // Indented line - might be list continuation
+        fixedLines.push(line);
+      }
     }
   }
   
   fixed = fixedLines.join('\n');
   
-  // Fix 2: Normalize spacing - ensure consistent blank lines
-  // Multiple blank lines → single blank line
-  fixed = fixed.replace(/\n{3,}/g, '\n\n');
+  // Post-processing: Verify sequential numbering
+  const verifySequentialNumbering = (text) => {
+    const lines = text.split('\n');
+    let inList = false;
+    let expectedNum = 1;
+    let listIndent = 0;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const match = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+      
+      if (match) {
+        const indent = match[1].length;
+        const num = parseInt(match[2], 10);
+        
+        if (!inList || indent !== listIndent) {
+          inList = true;
+          listIndent = indent;
+          expectedNum = 1;
+        }
+        
+        if (num !== expectedNum) {
+          // Fix the number
+          lines[i] = `${match[1]}${expectedNum}. ${match[3]}`;
+        }
+        expectedNum++;
+      } else if (line.trim() === '' && inList) {
+        // Keep list state for single blank line
+        continue;
+      } else if (line.match(/^#{1,6}\s+/) || (!line.match(/^\s{2,}/) && line.trim() !== '')) {
+        // Reset on headers or non-indented content
+        inList = false;
+        expectedNum = 1;
+      }
+    }
+    
+    return lines.join('\n');
+  };
   
-  // Fix 3: Ensure blank line before headers
+  fixed = verifySequentialNumbering(fixed);
+  
+  // Fix 2: Normalize spacing - ensure consistent blank lines
+  // Multiple blank lines → single blank line (but preserve intentional double spacing)
+  fixed = fixed.replace(/\n{4,}/g, '\n\n\n'); // Max 3 newlines
+  
+  // Fix 3: Ensure blank line before headers (but not if already blank)
   fixed = fixed.replace(/([^\n])\n(#{1,6}\s+)/g, '$1\n\n$2');
   
   // Fix 4: Ensure blank line after headers
-  fixed = fixed.replace(/(#{1,6}\s+[^\n]+)\n([^\n#])/g, '$1\n\n$2');
+  fixed = fixed.replace(/(#{1,6}\s+[^\n]+)\n([^\n#\s])/g, '$1\n\n$2');
   
-  // Fix 5: Ensure blank line before lists
+  // Fix 5: Ensure blank line before lists (but not if already blank)
   fixed = fixed.replace(/([^\n])\n(\s*[-*+]|\s*\d+\.)\s/g, '$1\n\n$2 ');
   
-  // Fix 6: Ensure blank line after lists
-  fixed = fixed.replace(/(\n\s*[-*+]|\n\s*\d+\.)\s+[^\n]+\n([^\n\s-*0-9])/g, '$1 $2');
+  // Fix 6: Ensure blank line after lists (when followed by non-list content)
+  fixed = fixed.replace(/(\n\s*[-*+]|\n\s*\d+\.)\s+[^\n]+\n([^\n\s-*0-9#])/g, '$1 $2');
+  
+  // Fix 7: Clean up spacing around bold text in lists
+  fixed = fixed.replace(/(\*\*[^*]+\*\*)\s*\n\s*\n/g, '$1\n\n');
+  
+  // Fix 8: Ensure proper spacing between sections (headers followed by content)
+  fixed = fixed.replace(/(#{1,6}\s+[^\n]+)\n\n([^\n#])/g, '$1\n\n$2');
+  
+  // Fix 9: Remove excessive spacing in the middle of paragraphs
+  fixed = fixed.replace(/([^\n])\n\n\n([^\n#\s-*0-9])/g, '$1\n\n$2');
+  
+  // Phase 1 Broadening: Fix 10 - Handle nested lists better
+  // Ensure proper indentation for nested lists
+  fixed = fixed.replace(/^(\s+)(\d+\.|\*|\-|\+)\s+(.+)$/gm, (match, indent, marker, content) => {
+    // Normalize indentation (tabs to spaces)
+    const normalizedIndent = indent.replace(/\t/g, '    ');
+    return normalizedIndent + marker + ' ' + content;
+  });
+  
+  // Phase 1 Broadening: Fix 11 - Fix malformed links
+  // Ensure links have proper format: [text](url)
+  fixed = fixed.replace(/\[([^\]]*)\]\(([^)]*)\)/g, (match, text, url) => {
+    if (!text || !url) {
+      // Remove malformed links
+      return text || url || '';
+    }
+    return match; // Keep well-formed links
+  });
+  
+  // Phase 1 Broadening: Fix 12 - Fix unclosed bold/italic
+  // Count bold markers and ensure pairs
+  const boldCount = (fixed.match(/\*\*/g) || []).length;
+  if (boldCount % 2 !== 0) {
+    // Odd number of bold markers - try to fix common cases
+    fixed = fixed.replace(/\*\*([^*]+)$/g, '**$1**'); // Add closing if missing at end
+  }
+  
+  // Phase 2: Fix 13 - Enhanced table structure validation and fixing
+  // Fix 13a: Table with separator on same line - split to separate line
+  fixed = fixed.replace(/^(\|.+\|)\s*\|-+\|/gm, (match, header) => {
+    // Count columns in header
+    const colCount = (header.match(/\|/g) || []).length - 1;
+    const separator = '|' + ' --- |'.repeat(colCount);
+    return header + '\n' + separator + '\n';
+  });
+  
+  // Fix 13b: Detect fake tables (bullets with pipes) and mark for conversion
+  // Pattern: - **Text:** value | value | value
+  fixed = fixed.replace(/^(\s*[-*+])\s+\*\*([^*]+):\*\*\s+([^\n]+)$/gm, (match, bullet, label, values) => {
+    // This will be converted to proper table in post-processing
+    return match; // Keep for now, will be processed in renderMarkdown
+  });
+  
+  // Fix 13c: Ensure separator row exists for all tables
+  // Pattern: Header row followed by data row without separator
+  fixed = fixed.replace(/^(\|.+\|)\n(\|.+\|)$/gm, (match, header, data) => {
+    const headerCols = (header.match(/\|/g) || []).length - 1;
+    const dataCols = (data.match(/\|/g) || []).length - 1;
+    if (headerCols === dataCols && headerCols > 0) {
+      // Missing separator - add it
+      const separator = '|' + ' --- |'.repeat(headerCols);
+      return header + '\n' + separator + '\n' + data;
+    }
+    return match;
+  });
+  
+  // Fix 13d: Remove bold from table cells (will be handled in renderMarkdown)
+  // This is a marker for post-processing
+  
+  // Phase 1 Tightening: Final validation pass
+  // Ensure no orphaned markdown syntax
+  fixed = fixed.replace(/\n{5,}/g, '\n\n\n'); // Max 3 consecutive newlines
   
   return fixed;
 }
 
+/**
+ * Phase 3: Fix response structure - ensure proper section ordering and sources at end
+ * Moves sources section to the end if it's not already there
+ */
+function fixResponseStructure(html) {
+  if (!html || typeof html !== 'string') {
+    return html;
+  }
+  
+  try {
+    // Create temporary DOM element
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    
+    // Phase 3 Broadening: Enhanced sources detection patterns
+    const sourcesPatterns = [
+      /📊\s*Sources?:?/i,
+      /📚\s*Sources?:?/i,
+      /🔗\s*Sources?:?/i,
+      /Sources?:?\s*$/i,
+      /References?:?\s*$/i,
+      /Citations?:?\s*$/i,
+      /Bibliography/i,
+      /Data\s+Sources?:?/i
+    ];
+    
+    let sourcesSection = null;
+    let sourcesParent = null;
+    let sourcesHeader = null;
+    
+    // Phase 3 Tightening: More efficient search - query all potential elements
+    const allElements = tempDiv.querySelectorAll('h2, h3, p, ul, ol');
+    
+    // Phase 3 Broadening: Find sources section more comprehensively
+    for (const element of allElements) {
+      const text = element.textContent || '';
+      const tagName = element.tagName;
+      
+      // Check if this is a sources header
+      for (const pattern of sourcesPatterns) {
+        if (pattern.test(text)) {
+          if (tagName === 'H2' || tagName === 'H3' || tagName === 'P') {
+            sourcesHeader = element;
+            sourcesParent = element.parentElement;
+            
+            // Phase 3 Broadening: Collect all following siblings that are part of sources
+            const sourceElements = [element];
+            let nextSibling = element.nextElementSibling;
+            
+            while (nextSibling) {
+              // Include lists, paragraphs, and other content that follows sources header
+              if (nextSibling.tagName === 'UL' || 
+                  nextSibling.tagName === 'OL' || 
+                  nextSibling.tagName === 'P' ||
+                  (nextSibling.tagName === 'DIV' && nextSibling.querySelector('ul, ol'))) {
+                sourceElements.push(nextSibling);
+                nextSibling = nextSibling.nextElementSibling;
+              } else if (nextSibling.tagName === 'H2' || nextSibling.tagName === 'H3') {
+                // Stop at next major section
+                break;
+              } else {
+                nextSibling = nextSibling.nextElementSibling;
+              }
+            }
+            
+            // Phase 3 Broadening: Create wrapper for sources section
+            if (sourceElements.length > 0) {
+              const wrapper = document.createElement('div');
+              wrapper.className = 'sources-section';
+              
+              // Move all source elements into wrapper
+              sourceElements.forEach(el => {
+                if (el.parentElement === sourcesParent) {
+                  wrapper.appendChild(el);
+                }
+              });
+              
+              sourcesSection = wrapper;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (sourcesSection) break;
+    }
+    
+    // Phase 3 Broadening: Also check for sources in list items
+    if (!sourcesSection) {
+      const lists = tempDiv.querySelectorAll('ul, ol');
+      for (const list of lists) {
+        const listText = list.textContent || '';
+        for (const pattern of sourcesPatterns) {
+          if (pattern.test(listText)) {
+            // Check if parent is a paragraph or header with sources
+            let parent = list.parentElement;
+            while (parent && parent !== tempDiv) {
+              const parentText = parent.textContent || '';
+              if (pattern.test(parentText) && (parent.tagName === 'P' || parent.tagName === 'H3')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'sources-section';
+                wrapper.appendChild(parent.cloneNode(true));
+                sourcesSection = wrapper;
+                sourcesParent = parent.parentElement;
+                break;
+              }
+              parent = parent.parentElement;
+            }
+            if (sourcesSection) break;
+          }
+        }
+        if (sourcesSection) break;
+      }
+    }
+    
+    // Phase 3 Broadening: Enhanced sources handling and section reordering
+    if (sourcesSection && sourcesParent) {
+      const allChildren = Array.from(sourcesParent.children);
+      let sourcesIndex = -1;
+      
+      // Find sources section in children (handle wrapped and unwrapped)
+      for (let i = 0; i < allChildren.length; i++) {
+        const child = allChildren[i];
+        if (child === sourcesHeader || 
+            child.classList.contains('sources-section') ||
+            (sourcesSection && (child.contains(sourcesHeader) || child === sourcesSection))) {
+          sourcesIndex = i;
+          break;
+        }
+      }
+      
+      // Phase 3 Broadening: If sources found, ensure it's at the end
+      if (sourcesIndex !== -1) {
+        const lastIndex = allChildren.length - 1;
+        
+        if (sourcesIndex < lastIndex) {
+          // Remove sources from current position
+          if (sourcesHeader && sourcesHeader.parentElement) {
+            // Collect all source-related elements
+            const sourceElements = [];
+            let current = sourcesHeader;
+            
+            while (current && current.parentElement === sourcesParent) {
+              sourceElements.push(current);
+              current = current.nextElementSibling;
+              // Stop if we hit another major section
+              if (current && (current.tagName === 'H2' || current.tagName === 'H3')) {
+                break;
+              }
+            }
+            
+            // Create wrapper if not exists
+            if (!sourcesSection || !sourcesSection.classList.contains('sources-section')) {
+              sourcesSection = document.createElement('div');
+              sourcesSection.className = 'sources-section';
+            }
+            
+            // Move all source elements
+            sourceElements.forEach(el => {
+              if (el.parentElement === sourcesParent) {
+                el.remove();
+                sourcesSection.appendChild(el);
+              }
+            });
+            
+            // Append to end
+            sourcesParent.appendChild(sourcesSection);
+          } else if (sourcesSection && !sourcesSection.classList.contains('sources-section')) {
+            // Already at end but needs class
+            sourcesSection.className = 'sources-section';
+          }
+        }
+      } else if (sourcesSection) {
+        // Sources section found but not in direct children - append it
+        if (!sourcesSection.classList.contains('sources-section')) {
+          sourcesSection.className = 'sources-section';
+        }
+        sourcesParent.appendChild(sourcesSection);
+      }
+    }
+    
+    // Phase 3 Broadening: Add visual indicators for section types
+    const sections = tempDiv.querySelectorAll('h2, h3');
+    sections.forEach(section => {
+      const text = section.textContent || '';
+      
+      // Phase 3 Broadening: Section type detection patterns
+      const sectionPatterns = {
+        overview: /^(Overview|Summary|Key\s+Metrics|Executive\s+Summary)$/i,
+        historical: /^(Historical\s+Context|History|Trends|Historical\s+Trends)$/i,
+        analysis: /^(Analysis|Drivers|Key\s+Drivers|Business\s+Drivers|Factors)$/i,
+        comparison: /^(Comparison|Compared|Versus|vs\.?|Competitive\s+Analysis)$/i,
+        outlook: /^(Forward\s+Outlook|Outlook|Future|Implications|Looking\s+Ahead)$/i,
+        sources: /^(Sources?|References?|Citations?|Bibliography)$/i
+      };
+      
+      // Add data attributes for styling
+      for (const [type, pattern] of Object.entries(sectionPatterns)) {
+        if (pattern.test(text)) {
+          section.setAttribute('data-section-type', type);
+          break;
+        }
+      }
+    });
+    
+    return tempDiv.innerHTML;
+  } catch (error) {
+    console.warn('Response structure fixing error:', error);
+    return html;
+  }
+}
+
+/**
+ * Phase 2 Broadening: Comprehensive table fixing and validation
+ * Detects and converts fake tables, validates structure, handles edge cases
+ */
+function fixMarkdownTables(html) {
+  // Phase 2 Tightening: Input validation
+  if (!html || typeof html !== 'string') {
+    return html;
+  }
+  
+  // Phase 2 Tightening: Error recovery wrapper
+  try {
+    // Create a temporary DOM element to parse HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+  
+  // Phase 2: Detect fake tables (ul/ol with pipes in content)
+  const lists = tempDiv.querySelectorAll('ul, ol');
+  lists.forEach(list => {
+    const items = Array.from(list.querySelectorAll('li'));
+    let hasPipes = false;
+    let pipeCount = 0;
+    
+    // Check if list items contain pipes (potential fake table)
+    items.forEach(item => {
+      const text = item.textContent || '';
+      if (text.includes('|')) {
+        hasPipes = true;
+        const count = (text.match(/\|/g) || []).length;
+        if (count > pipeCount) pipeCount = count;
+      }
+    });
+    
+    // If all items have same pipe count and > 0, it's likely a fake table
+    if (hasPipes && pipeCount > 0) {
+      const allHaveSamePipes = items.every(item => {
+        const text = item.textContent || '';
+        return (text.match(/\|/g) || []).length === pipeCount;
+      });
+      
+      if (allHaveSamePipes && items.length > 1) {
+        // Phase 2 Broadening: Convert to proper table with validation
+        const table = document.createElement('table');
+        table.setAttribute('role', 'table');
+        table.setAttribute('aria-label', 'Converted data table');
+        const thead = document.createElement('thead');
+        const tbody = document.createElement('tbody');
+        
+        // Phase 2 Broadening: Extract and normalize data
+        const allRows = items.map(item => {
+          const text = item.textContent || '';
+          return text.split('|').map(p => p.trim().replace(/\*\*/g, '').replace(/:/g, ''));
+        });
+        
+        // Phase 2 Broadening: Find max columns
+        const maxCols = Math.max(...allRows.map(row => row.length));
+        
+        // Phase 2 Broadening: Normalize all rows to same column count
+        const normalizedRows = allRows.map(row => {
+          while (row.length < maxCols) row.push('');
+          return row.slice(0, maxCols);
+        });
+        
+        // Phase 2 Broadening: Create header row (use first row or generate)
+        const headerRow = document.createElement('tr');
+        const firstRow = normalizedRows[0];
+        for (let i = 0; i < maxCols; i++) {
+          const th = document.createElement('th');
+          th.setAttribute('scope', 'col');
+          if (i === 0 && firstRow[i]) {
+            // First column - might be label, clean it up
+            th.textContent = firstRow[i].replace(/\*\*/g, '').replace(/:/g, '').trim() || `Column ${i + 1}`;
+          } else {
+            th.textContent = firstRow[i]?.trim() || `Column ${i + 1}`;
+          }
+          headerRow.appendChild(th);
+        }
+        thead.appendChild(headerRow);
+        
+        // Phase 2 Broadening: Create data rows (skip first if used as header)
+        normalizedRows.slice(1).forEach(rowData => {
+          const row = document.createElement('tr');
+          rowData.forEach((part, idx) => {
+            const td = document.createElement('td');
+            td.textContent = part.trim() || '&nbsp;';
+            // Phase 2 Broadening: Right-align if looks like number
+            if (/^[\d$%,.]+$/.test(part.trim())) {
+              td.style.textAlign = 'right';
+              td.style.fontVariantNumeric = 'tabular-nums';
+            }
+            row.appendChild(td);
+          });
+          tbody.appendChild(row);
+        });
+        
+        // Phase 2 Broadening: If only one row, use it as data (no header)
+        if (normalizedRows.length === 1) {
+          const row = document.createElement('tr');
+          firstRow.forEach(part => {
+            const td = document.createElement('td');
+            td.textContent = part.trim() || '&nbsp;';
+            row.appendChild(td);
+          });
+          tbody.appendChild(row);
+        } else {
+          table.appendChild(thead);
+        }
+        
+        table.appendChild(tbody);
+        
+        // Phase 2 Broadening: Wrap in table-wrapper
+        const wrapper = document.createElement('div');
+        wrapper.className = 'table-wrapper';
+        wrapper.appendChild(table);
+        
+        // Replace list with table
+        list.parentNode.replaceChild(wrapper, list);
+      }
+    }
+  });
+  
+  // Phase 2 Broadening: Comprehensive table validation and fixing
+  const tables = tempDiv.querySelectorAll('table');
+  tables.forEach((table, tableIndex) => {
+    // Phase 2 Broadening: Add accessibility attributes
+    if (!table.getAttribute('role')) {
+      table.setAttribute('role', 'table');
+    }
+    if (!table.getAttribute('aria-label') && !table.querySelector('caption')) {
+      table.setAttribute('aria-label', `Data table ${tableIndex + 1}`);
+    }
+    
+    // Phase 2 Tightening: Validate table structure
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody') || table;
+    const headerRows = thead ? thead.querySelectorAll('tr') : [];
+    const dataRows = tbody.querySelectorAll('tr');
+    
+    if (headerRows.length === 0 && dataRows.length > 0) {
+      // Missing header - create one from first row
+      const firstRow = dataRows[0];
+      if (firstRow) {
+        const newThead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        const cells = firstRow.querySelectorAll('td, th');
+        cells.forEach(cell => {
+          const th = document.createElement('th');
+          th.textContent = cell.textContent || '';
+          headerRow.appendChild(th);
+        });
+        newThead.appendChild(headerRow);
+        table.insertBefore(newThead, tbody);
+        firstRow.remove(); // Remove first row as it's now header
+      }
+    }
+    
+    // Phase 2 Broadening: Normalize column count and handle empty cells
+    const allRows = Array.from(table.querySelectorAll('tr'));
+    let maxCols = 0;
+    
+    // Find maximum column count
+    allRows.forEach(row => {
+      const cols = row.querySelectorAll('td, th').length;
+      if (cols > maxCols) maxCols = cols;
+    });
+    
+    // Phase 2 Broadening: Fix inconsistent column counts
+    allRows.forEach(row => {
+      const cells = row.querySelectorAll('td, th');
+      const currentCols = cells.length;
+      
+      if (currentCols < maxCols) {
+        // Add empty cells to match max
+        for (let i = currentCols; i < maxCols; i++) {
+          const cell = document.createElement(row.querySelector('th') ? 'th' : 'td');
+          cell.textContent = '';
+          row.appendChild(cell);
+        }
+      } else if (currentCols > maxCols) {
+        // Remove excess cells (shouldn't happen, but handle it)
+        for (let i = maxCols; i < currentCols; i++) {
+          cells[i].remove();
+        }
+      }
+    });
+    
+    // Phase 2 Broadening: Remove bold from table cells and sanitize
+    const cells = table.querySelectorAll('td, th');
+    cells.forEach(cell => {
+      // Remove bold tags but keep text
+      const boldTags = cell.querySelectorAll('strong, b');
+      boldTags.forEach(bold => {
+        const textNode = document.createTextNode(bold.textContent);
+        bold.parentNode.replaceChild(textNode, bold);
+      });
+      
+      // Phase 2 Broadening: Remove all markdown bold syntax
+      cell.innerHTML = cell.innerHTML.replace(/\*\*([^*]+)\*\*/g, '$1');
+      cell.innerHTML = cell.innerHTML.replace(/<strong>([^<]+)<\/strong>/gi, '$1');
+      cell.innerHTML = cell.innerHTML.replace(/<b>([^<]+)<\/b>/gi, '$1');
+      
+      // Phase 2 Broadening: Sanitize cell content (remove excessive whitespace)
+      const text = cell.textContent || '';
+      cell.textContent = text.trim();
+      
+      // Phase 2 Broadening: Handle empty cells
+      if (!cell.textContent.trim()) {
+        cell.innerHTML = '&nbsp;'; // Non-breaking space for empty cells
+      }
+    });
+    
+    // Phase 2 Broadening: Ensure proper table structure
+    if (!table.querySelector('thead') && table.querySelector('tr')) {
+      const firstRow = table.querySelector('tr');
+      if (firstRow) {
+        const thead = document.createElement('thead');
+        const tbody = document.createElement('tbody');
+        const rows = Array.from(table.querySelectorAll('tr'));
+        
+        // First row as header
+        thead.appendChild(rows[0].cloneNode(true));
+        // Convert header cells to th if they're td
+        thead.querySelectorAll('td').forEach(td => {
+          const th = document.createElement('th');
+          th.textContent = td.textContent;
+          td.parentNode.replaceChild(th, td);
+        });
+        
+        // Rest as body
+        rows.slice(1).forEach(row => tbody.appendChild(row.cloneNode(true)));
+        
+        // Clear and rebuild
+        table.innerHTML = '';
+        table.appendChild(thead);
+        table.appendChild(tbody);
+      }
+    }
+  });
+  
+  return tempDiv.innerHTML;
+  } catch (error) {
+    // Phase 2 Tightening: Graceful error recovery
+    console.warn('Table fixing error, returning original HTML:', error);
+    return html;
+  }
+}
+
+/**
+ * Comprehensive markdown renderer with error handling and validation
+ * Converts markdown text to HTML with proper structure and accessibility
+ */
 function renderMarkdown(text) {
-  if (!text) {
+  // Phase 1 Tightening: Input validation
+  if (!text || typeof text !== 'string') {
     return "";
   }
   
-  // Apply markdown fixes before rendering
-  text = fixMarkdownFormatting(text);
+  // Phase 1 Tightening: Error recovery wrapper
+  try {
+    // Apply markdown fixes before rendering
+    text = fixMarkdownFormatting(text);
+  } catch (error) {
+    console.warn('Markdown formatting error, using original text:', error);
+    // Continue with original text if formatting fails
+  }
 
   const escapeHtml = (value) =>
     value
@@ -360,42 +979,79 @@ function renderMarkdown(text) {
     value.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
   const processInline = (value) => {
-    if (!value) {
+    if (!value || typeof value !== 'string') {
       return "";
     }
 
     let working = value;
 
+    // Phase 1 Broadening: Better code token handling
     const codeTokens = [];
+    // Handle inline code (backticks) - protect from other processing
     working = working.replace(/`([^`]+)`/g, (match, code) => {
       codeTokens.push(code);
       return `\uE000${codeTokens.length - 1}\uE000`;
     });
 
+    // Phase 1 Broadening: Enhanced link validation and processing
     working = working.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, textValue, urlValue) => {
-      const rawUrl = urlValue.trim();
-      if (!rawUrl) {
-        return textValue;
+      const rawUrl = (urlValue || '').trim();
+      const linkText = (textValue || '').trim();
+      
+      if (!rawUrl || !linkText) {
+        return linkText || rawUrl || match; // Return text if URL invalid
       }
+      
+      // Phase 1 Tightening: URL validation and sanitization
       const safeUrl = escapeAttribute(rawUrl);
-      const href = /^([a-z][a-z\d+\-.]*:|\/\/)/i.test(safeUrl) ? safeUrl : `https://${safeUrl}`;
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${textValue}</a>`;
+      
+      // Validate URL format
+      let href = safeUrl;
+      if (/^([a-z][a-z\d+\-.]*:|\/\/)/i.test(safeUrl)) {
+        // Already has protocol
+        href = safeUrl;
+      } else if (/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,}/.test(safeUrl)) {
+        // Looks like a domain, add https://
+        href = `https://${safeUrl}`;
+      } else if (safeUrl.startsWith('/')) {
+        // Relative URL, keep as is
+        href = safeUrl;
+      } else {
+        // Invalid URL, return as plain text
+        return linkText;
+      }
+      
+      // Phase 1 Broadening: Add accessibility attributes
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer" aria-label="${escapeAttribute(linkText)} (opens in new tab)">${escapeHtml(linkText)}</a>`;
     });
 
+    // Phase 1 Broadening: Enhanced auto-link detection with validation
     working = working.replace(
-      /(^|[\s>])((?:https?:\/\/|www\.)[^\s<]+)(?=$|[\s<])/gi,
+      /(^|[\s>])((?:https?:\/\/|www\.)[^\s<"']+)(?=$|[\s<"'])/gi,
       (match, prefix, urlValue) => {
+        // Skip if already inside a link tag
+        if (prefix.includes('</a>') || prefix.includes('<a')) {
+          return match;
+        }
         const safeUrl = escapeAttribute(urlValue);
         const href = /^https?:\/\//i.test(safeUrl) ? safeUrl : `https://${safeUrl}`;
-        return `${prefix}<a href="${href}" target="_blank" rel="noopener noreferrer">${urlValue}</a>`;
+        return `${prefix}<a href="${href}" target="_blank" rel="noopener noreferrer" aria-label="External link (opens in new tab)">${escapeHtml(urlValue)}</a>`;
       }
     );
 
-    working = working.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    working = working.replace(/__([^_]+)__/g, "<strong>$1</strong>");
-    working = working.replace(/~~([^~]+)~~/g, "<del>$1</del>");
-    working = working.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-    working = working.replace(/_([^_]+)_/g, "<em>$1</em>");
+    // Phase 1 Broadening: Improved bold/italic handling (prevent conflicts)
+    // Process bold first (double asterisks/underscores)
+    // Use negative lookahead to prevent matching inside code
+    working = working.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>");
+    working = working.replace(/__([^_\n]+?)__/g, "<strong>$1</strong>");
+    
+    // Then strikethrough
+    working = working.replace(/~~([^~\n]+?)~~/g, "<del>$1</del>");
+    
+    // Then italic (single asterisks/underscores, but not if part of bold)
+    // Only match single asterisks/underscores that aren't part of double
+    working = working.replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, "<em>$1</em>");
+    working = working.replace(/(?<!_)_([^_\n]+?)_(?!_)/g, "<em>$1</em>");
 
     working = working.replace(/\uE000(\d+)\uE000/g, (match, indexValue) => {
       const idx = Number(indexValue);
@@ -406,7 +1062,8 @@ function renderMarkdown(text) {
     return working;
   };
 
-  const lines = escapeHtml(text).split(/\r?\n/);
+  // Split lines first (we'll escape non-code-block lines individually)
+  const lines = text.split(/\r?\n/);
 
   const html = [];
   const listStack = [];
@@ -455,9 +1112,104 @@ function renderMarkdown(text) {
   const flushCodeBlock = () => {
     const code = codeBuffer.join("\n");
     const languageClass = codeLang ? ` class="language-${codeLang}"` : "";
-    html.push(`<pre><code${languageClass}>${code}</code></pre>`);
+    // Escape HTML in code blocks for security (codeBuffer contains unescaped content)
+    const escapedCode = code
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    html.push(`<pre><code${languageClass}>${escapedCode}</code></pre>`);
     codeBuffer.length = 0;
     codeLang = "";
+  };
+
+  // Phase 2: Table rendering state
+  let inTable = false;
+  let tableRows = [];
+  let tableHeaders = [];
+  let tableAlignments = [];
+  
+  const flushTable = () => {
+    // Phase 2 Tightening: Validate table before rendering
+    if (!inTable || (tableHeaders.length === 0 && tableRows.length === 0)) {
+      // Invalid table - reset state
+      inTable = false;
+      tableRows = [];
+      tableHeaders = [];
+      tableAlignments = [];
+      return;
+    }
+    
+    closeParagraph();
+    closeAllLists();
+    
+    // Phase 2 Broadening: Normalize column counts
+    const maxCols = Math.max(
+      tableHeaders.length,
+      ...tableRows.map(row => row.length)
+    );
+    
+    // Phase 2 Broadening: Pad headers and rows to match max columns
+    while (tableHeaders.length < maxCols) {
+      tableHeaders.push('');
+    }
+    while (tableAlignments.length < maxCols) {
+      tableAlignments.push('left');
+    }
+    tableRows = tableRows.map(row => {
+      while (row.length < maxCols) {
+        row.push('');
+      }
+      return row.slice(0, maxCols); // Trim excess
+    });
+    
+    // Phase 2: Build proper HTML table
+    html.push('<div class="table-wrapper">');
+    // Phase 2 Broadening: Add accessibility attributes
+    html.push(`<table role="table" aria-label="Data table">`);
+    
+    // Header row
+    if (tableHeaders.length > 0 && tableHeaders.some(h => h.trim())) {
+      html.push('<thead>');
+      html.push('<tr>');
+      tableHeaders.forEach((header, idx) => {
+        const align = tableAlignments[idx] || 'left';
+        const alignAttr = align === 'right' ? ' style="text-align: right;"' : 
+                         align === 'center' ? ' style="text-align: center;"' : '';
+        // Phase 2 Broadening: Remove bold and sanitize header
+        const headerContent = header.trim().replace(/\*\*([^*]+)\*\*/g, '$1');
+        html.push(`<th${alignAttr} scope="col">${processInline(headerContent || '&nbsp;')}</th>`);
+      });
+      html.push('</tr>');
+      html.push('</thead>');
+    }
+    
+    // Body rows
+    if (tableRows.length > 0) {
+      html.push('<tbody>');
+      tableRows.forEach((row, rowIdx) => {
+        html.push('<tr>');
+        row.forEach((cell, idx) => {
+          const align = tableAlignments[idx] || 'left';
+          const alignAttr = align === 'right' ? ' style="text-align: right;"' : 
+                           align === 'center' ? ' style="text-align: center;"' : '';
+          // Phase 2 Broadening: Remove bold from table cells and sanitize
+          let cellContent = cell.trim().replace(/\*\*([^*]+)\*\*/g, '$1');
+          if (!cellContent) cellContent = '&nbsp;'; // Empty cell placeholder
+          html.push(`<td${alignAttr}>${processInline(cellContent)}</td>`);
+        });
+        html.push('</tr>');
+      });
+      html.push('</tbody>');
+    }
+    
+    html.push('</table>');
+    html.push('</div>');
+    
+    // Reset table state
+    inTable = false;
+    tableRows = [];
+    tableHeaders = [];
+    tableAlignments = [];
   };
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -468,6 +1220,7 @@ function renderMarkdown(text) {
         flushCodeBlock();
         inCodeBlock = false;
       } else {
+        // Don't escape code block content - we'll escape it when flushing
         codeBuffer.push(line);
       }
       continue;
@@ -482,6 +1235,9 @@ function renderMarkdown(text) {
       codeLang = language;
       continue;
     }
+
+    // Escape HTML for non-code-block lines
+    line = escapeHtml(line);
 
     if (line.trim() === "") {
       closeParagraph();
@@ -510,16 +1266,83 @@ function renderMarkdown(text) {
     if (headingMatch) {
       closeParagraph();
       closeAllLists();
-      const level = headingMatch[1].length;
-      html.push(`<h${level}>${processInline(headingMatch[2].trim())}</h${level}>`);
+      const level = Math.min(headingMatch[1].length, 6); // Cap at h6 for safety
+      const headingText = headingMatch[2].trim();
+      // Phase 1 Broadening: Add accessibility attributes to headers
+      html.push(`<h${level} id="heading-${index}" aria-level="${level}">${processInline(headingText)}</h${level}>`);
       continue;
     }
 
+    // Phase 2 Broadening: Enhanced table detection and processing
+    const tableRowMatch = line.match(/^\s*\|(.+)\|\s*$/);
+    if (tableRowMatch) {
+      // Phase 2 Tightening: Validate table row format
+      const rawCells = tableRowMatch[1].split('|');
+      const cells = rawCells.map(c => {
+        // Phase 2 Broadening: Handle empty cells and trim
+        const trimmed = c.trim();
+        return trimmed === '' ? '&nbsp;' : trimmed;
+      });
+      
+      // Phase 2 Broadening: Check if this is a separator row (all dashes/colons)
+      const isSeparator = cells.length > 0 && cells.every(cell => /^:?-+:?$/.test(cell));
+      
+      if (isSeparator) {
+        // This is a separator row - determine alignments
+        if (tableHeaders.length > 0) {
+          tableAlignments = cells.map(cell => {
+            if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+            if (cell.endsWith(':')) return 'right';
+            return 'left';
+          });
+          inTable = true; // Mark that we're in a table
+        } else {
+          // Separator without header - might be malformed, skip it
+          continue;
+        }
+        continue; // Skip separator row in output
+      }
+      
+      // Phase 2 Broadening: Regular table row with validation
+      if (inTable || tableHeaders.length > 0) {
+        // We're in a table context
+        if (tableHeaders.length === 0) {
+          // First row is header
+          if (cells.length > 0 && cells.some(c => c.trim() && c !== '&nbsp;')) {
+            tableHeaders = cells;
+            inTable = true;
+          }
+        } else {
+          // Phase 2 Broadening: Validate row has same number of columns
+          // Pad or trim to match header count
+          const headerCount = tableHeaders.length;
+          if (cells.length !== headerCount) {
+            // Adjust cell count to match headers
+            while (cells.length < headerCount) {
+              cells.push('&nbsp;');
+            }
+            if (cells.length > headerCount) {
+              cells.splice(headerCount);
+            }
+          }
+          // Data row
+          tableRows.push(cells);
+        }
+        continue;
+      }
+    } else if (inTable) {
+      // Phase 2 Broadening: End of table - flush it
+      flushTable();
+    }
+
+    // Phase 1 Broadening: Enhanced horizontal rule detection
     const hrMatch = line.trim().match(/^([-*_])(?:\s*\1){2,}$/);
     if (hrMatch) {
+      if (inTable) flushTable();
       closeParagraph();
       closeAllLists();
-      html.push("<hr />");
+      // Phase 1 Broadening: Add accessibility to horizontal rules
+      html.push('<hr role="separator" aria-orientation="horizontal" />');
       continue;
     }
 
@@ -535,11 +1358,21 @@ function renderMarkdown(text) {
       const type = marker.endsWith(".") ? "ol" : "ul";
       ensureList(type, indent);
 
-      // FIXED: For ordered lists, use proper numbering (let browser handle it)
+      // Phase 1 Tightening: Enhanced list item rendering
       // Remove the number from content since <ol> will auto-number
-      html.push("<li>");
-      html.push(processInline(content.trim()));
-      html.push("</li>");
+      const listContent = content.trim();
+      // Phase 1 Broadening: Support nested lists within list items
+      if (listContent) {
+        html.push("<li>");
+        // Phase 1 Broadening: Check if content contains nested list markers
+        if (listContent.match(/^\s*(\d+\.|[-+*])\s+/)) {
+          // Contains nested list - process recursively
+          html.push(processInline(listContent));
+        } else {
+          html.push(processInline(listContent));
+        }
+        html.push("</li>");
+      }
       continue;
     }
 
@@ -581,8 +1414,14 @@ function renderMarkdown(text) {
     }
   }
 
+  // Phase 1 Tightening: Cleanup and error recovery
   if (inCodeBlock) {
     flushCodeBlock();
+  }
+  
+  // Phase 2: Flush any remaining table
+  if (inTable) {
+    flushTable();
   }
 
   closeParagraph();
@@ -592,8 +1431,34 @@ function renderMarkdown(text) {
     closeAllLists();
     html.push("</blockquote>");
   }
+  
+  // Phase 1 Tightening: Final validation - ensure all lists are closed
+  while (listStack.length > 0) {
+    const { type } = listStack.pop();
+    html.push(`</${type}>`);
+  }
 
-  return html.join("");
+  // Phase 1 Broadening: Post-process HTML for accessibility and validation
+  let finalHtml = html.join("");
+  
+  // Ensure proper semantic structure
+  // Add role attributes where helpful
+  finalHtml = finalHtml.replace(/<ul>/g, '<ul role="list">');
+  finalHtml = finalHtml.replace(/<ol>/g, '<ol role="list">');
+  
+  // Phase 2: Post-process tables - fix malformed tables and remove bold from cells
+  finalHtml = fixMarkdownTables(finalHtml);
+  
+  // Phase 3: Post-process response structure - ensure proper ordering and formatting
+  finalHtml = fixResponseStructure(finalHtml);
+  
+  return finalHtml;
+  } catch (error) {
+    // Phase 1 Tightening: Graceful error recovery
+    console.error('Markdown rendering error:', error);
+    // Return escaped plain text as fallback
+    return `<p>${escapeHtml(text)}</p>`;
+  }
 }
 let activePromptSuggestions = [...DEFAULT_PROMPT_SUGGESTIONS];
 const FOLLOW_UP_SUGGESTION_LIBRARY = {

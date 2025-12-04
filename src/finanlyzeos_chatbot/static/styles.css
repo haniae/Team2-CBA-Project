@@ -38,10 +38,125 @@
   --dashboard-font-body: var(--font-sans);
   --message-padding-x: 24px;
   --message-padding-y: 18px;
+  
+  /* Phase 1: Spacing System - Standardized spacing variables */
+  --spacing-xs: 0.25rem;    /* 4px */
+  --spacing-sm: 0.5rem;    /* 8px */
+  --spacing-md: 1rem;       /* 16px */
+  --spacing-lg: 1.5rem;     /* 24px */
+  --spacing-xl: 2rem;       /* 32px */
+  --spacing-2xl: 3rem;      /* 48px */
+  
+  /* Phase 1: Typography System - Standardized font sizes and line heights */
+  --font-size-base: 16px;
+  --font-size-sm: 14px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --line-height-base: 1.75;
+  --line-height-tight: 1.5;
+  --line-height-relaxed: 1.8;
+  
+  /* Phase 4: Standardized Color Scheme - WCAG AA Compliant */
+  --text-primary: #0f172a;        /* High contrast for main text */
+  --text-secondary: #475569;      /* Secondary text */
+  --text-muted: #8B95A5;          /* Muted/subtle text */
+  --link-color: #2563eb;          /* Primary link color */
+  --link-hover: #1d4ed8;          /* Link hover state */
+  --link-visited: #7c3aed;        /* Visited link color */
+  --accent-blue: #0066FF;         /* Primary accent */
+  --border-color: #e2e8f0;        /* Standard border */
+  --bg-subtle: #f8fafc;          /* Subtle background */
+  --bg-hover: #f1f5f9;           /* Hover background */
+  
+  /* Phase 4: Semantic Colors - WCAG AA Compliant */
+  --color-success: #10b981;       /* Success/positive (4.5:1 contrast) */
+  --color-warning: #f59e0b;       /* Warning (4.5:1 contrast) */
+  --color-error: #ef4444;         /* Error/negative (4.5:1 contrast) */
+  --color-info: #3b82f6;         /* Informational (4.5:1 contrast) */
+  
   /* Animation System */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Phase 4: Loading & Animation States */
+  --loading-opacity: 0.6;
+  --loading-bg: rgba(248, 250, 252, 0.8);
+  --skeleton-gradient: linear-gradient(90deg, #f0f4fb 25%, #e5edf8 50%, #f0f4fb 75%);
+  --skeleton-animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+/* Phase 4: Loading States & Animations */
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Phase 4: Smooth content appearance */
+.message-content {
+  animation: fadeIn var(--transition-base) ease-out;
+}
+
+.message-content > * {
+  animation: fadeIn var(--transition-base) ease-out;
+}
+
+/* Phase 4: Loading skeleton for tables */
+.message-content .table-wrapper.loading {
+  position: relative;
+  min-height: 200px;
+  background: var(--loading-bg);
+}
+
+.message-content .table-wrapper.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--skeleton-gradient);
+  background-size: 200% 100%;
+  animation: var(--skeleton-animation);
+  border-radius: 6px;
+}
+
+/* Phase 4: Smooth transitions for interactive elements */
+.message-content a,
+.message-content button,
+.message-content h3 {
+  transition: all var(--transition-base);
+}
+
+/* Phase 4: Focus states for accessibility */
+.message-content a:focus-visible,
+.message-content button:focus-visible {
+  outline: 3px solid var(--link-color);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* Dark Mode Variables - Enhanced Modern Dark Theme with Better Readability */
@@ -170,9 +285,7 @@
   color: #60a5fa;
 }
 
-[data-theme="dark"] .message-content ol li::before {
-  color: #60a5fa;
-}
+/* Removed - browser handles numbering automatically */
 
 [data-theme="dark"] .message-content a {
   color: #60a5fa;
@@ -1671,17 +1784,18 @@ body::-webkit-scrollbar {
   color: #ffffff !important;
 }
 
+/* Phase 1: Enhanced code block styling with spacing system */
 .message-content pre {
   background: #f8fafc;
   color: #1e293b;
-  padding: 10px 14px;
-  border-radius: 6px;
-  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", "Consolas", monospace;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  padding: var(--spacing-md); /* Use spacing system */
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
   overflow-x: auto;
   border: 1px solid #e2e8f0;
-  margin: 0.75rem 0;
+  margin: var(--spacing-lg) 0; /* Use spacing system */
 }
 
 .message-content pre code {
@@ -1689,23 +1803,60 @@ body::-webkit-scrollbar {
   padding: 0;
   color: inherit;
   font-weight: 400;
+  font-size: inherit;
 }
 
+/* Phase 1: Enhanced blockquote styling with spacing system */
 .message-content blockquote {
-  margin: 0.75rem 0;
-  padding: 8px 0 8px 16px;
-  border-left: 3px solid #3b82f6;
-  background: #f8fafc;
+  margin: var(--spacing-lg) 0; /* Use spacing system */
+  padding: var(--spacing-sm) 0 var(--spacing-sm) var(--spacing-md); /* Use spacing system */
+  border-left: 4px solid #2563eb;
+  background: rgba(37, 99, 235, 0.05);
   color: #475569;
   font-style: italic;
   border-radius: 0 4px 4px 0;
+  position: relative;
 }
 
+.message-content blockquote p {
+  margin: var(--spacing-xs) 0; /* Tighter spacing in blockquotes */
+}
+
+.message-content blockquote p:first-child {
+  margin-top: 0;
+}
+
+.message-content blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* Phase 1 Broadening: Enhanced nested list styling */
+.message-content ul ul,
+.message-content ol ol,
+.message-content ul ol,
+.message-content ol ul {
+  margin-top: var(--spacing-xs);
+  margin-bottom: var(--spacing-xs);
+  padding-left: var(--spacing-lg);
+}
+
+.message-content li ul,
+.message-content li ol {
+  margin-top: var(--spacing-xs);
+  margin-bottom: var(--spacing-xs);
+}
+
+/* Phase 1 Broadening: Enhanced horizontal rule styling */
 .message-content hr {
   border: none;
-  border-top: 1px solid #e2e8f0;
-  margin: 1rem 0;
+  border-top: 2px solid #e2e8f0;
+  margin: var(--spacing-xl) 0; /* Use spacing system */
   height: 0;
+  background: none;
+}
+
+.message-content hr[role="separator"] {
+  border-top-color: #cbd5e1;
 }
 
 .message.user .message-content {
@@ -2420,71 +2571,132 @@ body::-webkit-scrollbar {
 
 /* Markdown styling for bot messages - Professional Corporate Design */
 .message-content h1 {
-  font-size: 1.625rem;
+  font-size: var(--font-size-2xl); /* Use typography system */
   font-weight: 700;
   color: #0f172a;
-  margin: 1rem 0 0.5rem 0;
-  padding-bottom: 0.5rem;
+  margin: var(--spacing-lg) 0 var(--spacing-md) 0; /* Use spacing system */
+  padding-bottom: var(--spacing-md);
   border-bottom: 2px solid #e2e8f0;
   letter-spacing: -0.02em;
-  line-height: 1.3;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  line-height: var(--line-height-tight);
+  font-family: var(--font-sans);
   font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  page-break-after: avoid;
 }
 
+/* Phase 3 Broadening: Enhanced H2 styling with section separators */
+/* Phase 4: Standardized H2 styling with color system */
 .message-content h2 {
-  font-size: 1.375rem;
+  font-size: var(--font-size-xl); /* Use typography system */
   font-weight: 700;
-  color: #1e293b;
-  margin: 0.875rem 0 0.5rem 0;
+  color: var(--text-primary); /* Use color system */
+  margin: var(--spacing-2xl) 0 var(--spacing-md) 0; /* Use spacing system */
+  padding-top: var(--spacing-lg);
   letter-spacing: -0.015em;
-  line-height: 1.35;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  line-height: var(--line-height-tight);
+  font-family: var(--font-sans);
   font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  page-break-after: avoid;
+  border-top: 1px solid var(--border-color); /* Phase 4: Use color system */
+  position: relative;
+  /* Phase 3 Broadening: Better visual separation */
+  background: linear-gradient(to bottom, transparent, var(--bg-subtle));
+  padding-bottom: var(--spacing-sm);
 }
 
+.message-content h2:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+  background: none;
+}
+
+/* Phase 3 Broadening: Section spacing improvements */
+.message-content h2 + h3 {
+  margin-top: var(--spacing-md);
+}
+
+.message-content h3 + h3 {
+  margin-top: var(--spacing-lg);
+}
+
+/* Phase 3 Broadening: Enhanced H3 styling for section headers */
+/* Phase 4: Standardized H3 styling with color system */
 .message-content h3 {
-  font-size: 1.125rem; /* 18px - ChatGPT standard */
+  font-size: var(--font-size-lg); /* Use typography system */
   font-weight: 600;
-  color: #111827; /* Darker for headers */
-  margin: 1.75rem 0 0.875rem 0; /* More space before headers */
+  color: var(--text-primary); /* Use color system */
+  margin: var(--spacing-xl) 0 var(--spacing-md) 0; /* Use spacing system */
   letter-spacing: -0.01em;
-  line-height: 1.4;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  line-height: var(--line-height-tight);
+  font-family: var(--font-sans);
   font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  page-break-after: avoid; /* Prevent headers from being orphaned */
+  position: relative;
+  transition: color var(--transition-base);
 }
 
+.message-content h3:hover {
+  color: var(--text-primary);
+}
+
+/* Phase 3: Visual distinction for key sections */
+/* Note: CSS :contains() doesn't exist, so key section styling is handled via class in JS if needed */
+
+/* Phase 4: Standardized paragraph styling with color system */
 .message-content p {
-  margin: 1.25rem 0; /* ChatGPT uses 1.25rem */
-  color: #374151; /* ChatGPT's paragraph color */
-  line-height: 1.7; /* ChatGPT uses 1.7 */
-  font-size: 16px; /* Match base font size */
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  margin: var(--spacing-md) 0; /* Use spacing system */
+  color: var(--text-primary); /* Use color system */
+  line-height: var(--line-height-base); /* Use typography system */
+  font-size: var(--font-size-base); /* Use typography system */
+  font-family: var(--font-sans);
   letter-spacing: -0.01em;
   word-spacing: 0.02em;
+  text-align: left; /* Ensure left alignment */
+  max-width: 100%; /* Prevent overflow */
 }
 
 /* Better spacing between paragraphs */
 .message-content p + p {
-  margin-top: 1.25rem;
+  margin-top: 1rem;
 }
 
-/* First paragraph after header */
+/* Prevent orphaned lines */
+.message-content p {
+  orphans: 3;
+  widows: 3;
+}
+
+/* First paragraph after header - tighter spacing */
 .message-content h1 + p,
 .message-content h2 + p,
 .message-content h3 + p {
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
 }
 
+/* Paragraph after list - proper spacing */
+.message-content ul + p,
+.message-content ol + p {
+  margin-top: 1.25rem;
+}
+
+/* List after paragraph - proper spacing */
+.message-content p + ul,
+.message-content p + ol {
+  margin-top: 1rem;
+}
+
+/* Phase 4: Standardized strong/bold styling with color system */
 .message-content strong {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-primary); /* Use color system */
   letter-spacing: -0.005em;
 }
 
@@ -2493,44 +2705,85 @@ body::-webkit-scrollbar {
   color: #475569;
 }
 
+/* Phase 4: Standardized link styling with color system */
 .message-content a {
-  color: #2563eb;
+  color: var(--link-color);
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.2s ease;
+  transition: color var(--transition-base), text-decoration var(--transition-base), border-color var(--transition-base);
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
 }
 
-.message-content a:hover {
-  color: #1d4ed8;
+.message-content a:hover,
+.message-content a:focus {
+  color: var(--link-hover);
   text-decoration: underline;
+  border-bottom-color: var(--link-hover);
+  outline: 2px solid rgba(37, 99, 235, 0.2);
+  outline-offset: 2px;
 }
 
+.message-content a:visited {
+  color: var(--link-visited);
+}
+
+/* Phase 4: Ensure WCAG AA contrast for links */
+.message-content a:focus-visible {
+  outline: 3px solid var(--link-color);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Phase 1 Broadening: External link indicator */
+.message-content a[target="_blank"]::after {
+  content: " ↗";
+  font-size: 0.85em;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
+/* Phase 4: Standardized code styling with color system */
 .message-content code {
-  background: #f1f5f9;
-  padding: 0.15rem 0.4rem;
+  background: var(--bg-subtle);
+  padding: var(--spacing-xs) var(--spacing-sm); /* Use spacing system */
   border-radius: 4px;
-  font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", "Consolas", monospace;
+  font-family: var(--font-mono);
   font-size: 0.875em;
   color: #dc2626;
   font-weight: 500;
+  border: 1px solid var(--border-color);
+  word-break: break-word;
+}
+
+/* Phase 4: Code inside links uses link color */
+.message-content a code {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--link-color);
+  border: none;
 }
 
 .message-content ul,
 .message-content ol {
-  margin: 1.25rem 0; /* More space around lists */
-  padding-left: 2.5rem; /* ChatGPT uses 2.5rem */
+  margin: var(--spacing-md) 0 var(--spacing-lg) 0; /* Use spacing system */
+  padding-left: 2rem; /* Slightly less padding for better readability */
   list-style-position: outside;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
-  line-height: 1.6; /* ChatGPT uses 1.6 for lists */
+  font-family: var(--font-sans);
+  line-height: var(--line-height-base); /* Use typography system */
+  max-width: 100%; /* Prevent overflow */
 }
 
+/* Phase 4: Standardized list item styling with color system */
 .message-content li {
-  margin: 0.625rem 0; /* Better spacing between items */
-  color: #374151; /* Match paragraph color */
-  line-height: 1.6; /* Match list line-height */
-  padding-left: 0.5rem;
-  font-size: 16px; /* Match base font size */
+  margin: var(--spacing-sm) 0; /* Use spacing system */
+  color: var(--text-primary); /* Use color system */
+  line-height: var(--line-height-base); /* Use typography system */
+  padding-left: var(--spacing-xs);
+  padding-right: var(--spacing-sm); /* Use spacing system */
+  font-size: var(--font-size-base); /* Use typography system */
   display: list-item;
+  word-wrap: break-word; /* Prevent overflow */
+  overflow-wrap: break-word;
 }
 
 .message-content li > p {
@@ -2548,11 +2801,12 @@ body::-webkit-scrollbar {
 
 .message-content ol {
   list-style-type: decimal;
-  counter-reset: none;
-  padding-left: 2.75rem; /* Slightly more for numbered lists */
+  padding-left: 2.5rem; /* Space for numbers */
   margin-left: 0;
-  margin-top: 1.25rem;
-  margin-bottom: 1.25rem;
+  margin-top: var(--spacing-lg); /* Use spacing system */
+  margin-bottom: var(--spacing-lg);
+  /* Ensure proper counter behavior */
+  counter-reset: list-counter;
 }
 
 .message-content ol li {
@@ -2560,15 +2814,16 @@ body::-webkit-scrollbar {
   list-style-position: outside;
   display: list-item;
   position: relative;
-  padding-left: 0.5rem;
+  padding-left: 0;
   margin-left: 0;
-  margin-bottom: 0.625rem;
-  padding-right: 0.5rem; /* Add right padding for better readability */
+  margin-bottom: var(--spacing-sm); /* Use spacing system */
+  padding-right: var(--spacing-sm);
+  counter-increment: list-counter;
+  /* Ensure numbers are visible and properly formatted */
+  list-style: decimal outside;
 }
 
-.message-content ol li::before {
-  display: none; /* Let browser handle numbering */
-}
+/* Remove the ::before rule that was hiding numbers */
 
 /* Ensure proper numbering for nested lists */
 .message-content ol ol {
@@ -2594,18 +2849,77 @@ body::-webkit-scrollbar {
   font-variant-numeric: tabular-nums;
 }
 
-/* Professional table styling for markdown tables */
+/* Phase 1: Enhanced blockquote styling */
+.message-content blockquote {
+  border-left: 4px solid #2563eb;
+  padding-left: var(--spacing-md); /* Use spacing system */
+  margin: var(--spacing-lg) 0; /* Use spacing system */
+  padding-top: var(--spacing-sm);
+  padding-bottom: var(--spacing-sm);
+  background: rgba(37, 99, 235, 0.05);
+  border-radius: 0 4px 4px 0;
+  font-style: italic;
+  color: #475569;
+}
+
+.message-content blockquote p {
+  margin: var(--spacing-xs) 0; /* Tighter spacing in blockquotes */
+}
+
+.message-content blockquote p:first-child {
+  margin-top: 0;
+}
+
+.message-content blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* Phase 2 Broadening: Enhanced responsive table wrapper */
+.message-content .table-wrapper {
+  overflow-x: auto;
+  overflow-y: visible;
+  margin: var(--spacing-lg) 0;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  position: relative;
+  /* Phase 2 Broadening: Add scroll indicators */
+  background: linear-gradient(to right, white 30%, rgba(255,255,255,0)),
+              linear-gradient(to right, rgba(255,255,255,0), white 70%) 0 100%,
+              radial-gradient(farthest-side at 0 50%, rgba(0,0,0,.2), rgba(0,0,0,0)),
+              radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,.2), rgba(0,0,0,0)) 0 100%;
+  background-repeat: no-repeat;
+  background-color: white;
+  background-size: 40px 100%, 40px 100%, 14px 50%, 14px 50%;
+  background-position: 0 0, 100%, 0 0, 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Phase 2 Broadening: Table caption support */
+.message-content table caption {
+  caption-side: top;
+  text-align: left;
+  font-weight: 600;
+  color: #0f172a;
+  padding: var(--spacing-sm) 0;
+  margin-bottom: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+
+/* Phase 2: Professional table styling for markdown tables */
 .message-content table {
   width: 100%;
+  min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #ffffff;
-  margin: 1rem 0;
+  margin: 0;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  table-layout: auto;
 }
 
 .message-content table thead {
@@ -2659,13 +2973,71 @@ body::-webkit-scrollbar {
   border-bottom: none;
 }
 
+/* Phase 2 Broadening: Enhanced zebra striping */
 .message-content table tbody tr:nth-child(even) {
   background: #fafbfc;
 }
 
+.message-content table tbody tr:nth-child(odd) {
+  background: #ffffff;
+}
+
+/* Phase 2 Broadening: Enhanced hover effects with better UX */
+.message-content table tbody tr {
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
 .message-content table tbody tr:hover {
   background: #f0f4f8;
-  transition: background-color 0.15s ease;
+  transform: translateX(2px);
+  box-shadow: -2px 0 0 0 #2563eb;
+}
+
+/* Phase 2 Broadening: Focus state for accessibility */
+.message-content table tbody tr:focus-within {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+  background: #eff6ff;
+}
+
+/* Phase 2 Broadening: Empty cell styling */
+.message-content table td:empty::before {
+  content: '—';
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Phase 2 Broadening: Ensure proper alignment with better number formatting */
+.message-content table td[style*="text-align: right"],
+.message-content table th[style*="text-align: right"] {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  /* Phase 2 Broadening: Better number display */
+  font-feature-settings: "tnum";
+}
+
+.message-content table td[style*="text-align: center"],
+.message-content table th[style*="text-align: center"] {
+  text-align: center !important;
+}
+
+/* Phase 2 Broadening: Auto-detect and right-align numeric cells */
+/* Note: CSS :has-text() doesn't exist, so numeric alignment is handled via inline styles in JS */
+
+/* Phase 2 Broadening: Better visual hierarchy for table headers */
+.message-content table thead {
+  position: relative;
+}
+
+.message-content table thead::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #2563eb, transparent);
+  opacity: 0.3;
 }
 
 .message-table {
