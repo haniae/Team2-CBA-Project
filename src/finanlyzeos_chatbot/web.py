@@ -333,16 +333,6 @@ async def serve_file_preview_css():
             "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
             "Pragma": "no-cache",
             "Expires": "0",
-        },
-    )
-    
-    return Response(
-        content=content,
-        media_type="text/css",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
-            "Pragma": "no-cache",
-            "Expires": "0",
             "ETag": f'"css-{int(time.time())}"',
             "Last-Modified": "Thu, 01 Jan 1970 00:00:00 GMT"
         }
