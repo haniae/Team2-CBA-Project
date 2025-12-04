@@ -465,11 +465,11 @@
 }
 
 [data-theme="dark"] .chat-actions #stop-button:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3), 0 0 0 1px rgba(239, 68, 68, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3), 0 0 0 1px rgba(0, 102, 255, 0.2);
 }
 
 [data-theme="dark"] .chat-actions #stop-button:not(:disabled):hover {
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4), 0 0 0 1px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 102, 255, 0.4), 0 0 0 1px rgba(0, 102, 255, 0.3);
   transform: translateY(-2px);
 }
 
@@ -3526,68 +3526,60 @@ body::-webkit-scrollbar {
   opacity: 1;
 }
 
-/* Send Button - Gradient Blue/Teal */
+/* Send Button - Gradient Blue */
 #send-button {
-  background: linear-gradient(135deg, 
-    rgba(0, 163, 255, 0.95) 0%, 
-    rgba(15, 118, 110, 0.92) 100%);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
 }
 
 #send-button:not(:disabled):hover {
   transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 8px 20px rgba(0, 163, 255, 0.3),
+  box-shadow: 0 8px 20px rgba(0, 102, 255, 0.3),
               inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 #send-button:not(:disabled):active {
   transform: translateY(0) scale(1);
-  box-shadow: 0 4px 12px rgba(0, 163, 255, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 102, 255, 0.25);
 }
 
 #send-button:disabled {
-  background: linear-gradient(135deg, 
-    rgba(0, 163, 255, 0.6) 0%, 
-    rgba(15, 118, 110, 0.55) 100%);
+  background: linear-gradient(145deg, rgba(0, 102, 255, 0.6) 0%, rgba(74, 144, 226, 0.5) 50%, rgba(96, 165, 250, 0.4) 100%);
   opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
 }
 
-/* Stop Button - Red */
+/* Stop Button - Blue Gradient */
 #stop-button {
-  background: linear-gradient(135deg, 
-    rgba(239, 68, 68, 0.95) 0%, 
-    rgba(220, 38, 38, 0.92) 100%);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
 }
 
 #stop-button:not(:disabled):hover {
   transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3),
+  box-shadow: 0 8px 20px rgba(0, 102, 255, 0.3),
               inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 #stop-button:not(:disabled):active {
   transform: translateY(0) scale(1);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 102, 255, 0.25);
 }
 
-/* File Upload Button - Emerald */
+/* File Upload Button - Blue Gradient */
 .chat-file-upload-btn {
-  background: linear-gradient(135deg, 
-    rgba(15, 118, 110, 0.95) 0%, 
-    rgba(20, 184, 166, 0.92) 100%);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
 }
 
 .chat-file-upload-btn:hover {
   transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 8px 20px rgba(15, 118, 110, 0.3),
+  box-shadow: 0 8px 20px rgba(0, 102, 255, 0.3),
               inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .chat-file-upload-btn:active {
   transform: translateY(0) scale(1);
-  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 102, 255, 0.25);
 }
 
 /* Button icons */
@@ -9175,24 +9167,24 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(15, 118, 110, 0.95), rgba(20, 184, 166, 0.9));
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: #ffffff;
   cursor: pointer;
   transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 12px 24px rgba(0, 102, 255, 0.18);
   position: relative;
   overflow: hidden;
 }
 
 .chat-file-upload-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 18px 30px rgba(15, 118, 110, 0.26);
-  background: linear-gradient(135deg, rgba(15, 118, 110, 1), rgba(20, 184, 166, 1));
+  box-shadow: 0 18px 30px rgba(0, 102, 255, 0.26);
+  background: linear-gradient(145deg, #0052CC 0%, #3D7BC8 50%, #4A90E2 100%);
 }
 
 .chat-file-upload-btn:active {
   transform: translateY(0);
-  box-shadow: 0 10px 18px rgba(15, 118, 110, 0.24);
+  box-shadow: 0 10px 18px rgba(0, 102, 255, 0.24);
 }
 
 .chat-file-upload-btn svg {
@@ -9218,28 +9210,26 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.9));
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: #ffffff;
   cursor: pointer;
   transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.18);
+  box-shadow: 0 12px 24px rgba(0, 102, 255, 0.18);
 }
 
 #stop-button:not(:disabled):hover {
   transform: translateY(-1px);
-  box-shadow: 0 18px 30px rgba(239, 68, 68, 0.26);
-  background: linear-gradient(135deg, rgba(239, 68, 68, 1), rgba(220, 38, 38, 1));
+  box-shadow: 0 18px 30px rgba(0, 102, 255, 0.26);
+  background: linear-gradient(145deg, #0052CC 0%, #3D7BC8 50%, #4A90E2 100%);
 }
 
 #stop-button:not(:disabled):active {
   transform: translateY(0);
-  box-shadow: 0 10px 18px rgba(239, 68, 68, 0.24);
+  box-shadow: 0 10px 18px rgba(0, 102, 255, 0.24);
 }
 
 #stop-button:disabled {
-  background: linear-gradient(135deg, 
-    rgba(239, 68, 68, 0.6) 0%, 
-    rgba(220, 38, 38, 0.55) 100%);
+  background: linear-gradient(145deg, rgba(0, 102, 255, 0.6) 0%, rgba(74, 144, 226, 0.5) 50%, rgba(96, 165, 250, 0.4) 100%);
   opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none;

@@ -59,7 +59,7 @@ class ChatGPTVoiceRecorder {
     style.id = 'voice-styles';
     style.textContent = `
       .voice-btn {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
         border: none;
         border-radius: 12px;
         color: white;
@@ -70,21 +70,21 @@ class ChatGPTVoiceRecorder {
         height: 44px;
         width: 44px;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
       }
 
       .voice-btn:hover {
         transform: translateY(-2px) scale(1.05);
-        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        box-shadow: 0 8px 25px rgba(0, 102, 255, 0.4);
+        background: linear-gradient(145deg, #0052CC 0%, #3D7BC8 50%, #4A90E2 100%);
         color: white;
       }
 
       .voice-btn.listening {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
         color: white;
         animation: pulse 1.5s infinite;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        box-shadow: 0 4px 12px rgba(0, 102, 255, 0.4);
       }
 
       .voice-btn.processing {

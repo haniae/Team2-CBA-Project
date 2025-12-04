@@ -139,7 +139,7 @@
 .app-tile-launch-button {
   width: 100%;
   padding: 0.75rem;
-  background: var(--accent-blue);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -207,9 +207,9 @@
 }
 
 .multi-select-button.selected {
-  background: var(--accent-blue);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: white;
-  border-color: var(--accent-blue);
+  border-color: #0066FF;
 }
 
 .period-selector {
@@ -250,7 +250,7 @@
 
 .transform-button {
   padding: 0.75rem 2rem;
-  background: var(--accent-blue);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -416,7 +416,7 @@
 
 .generate-button {
   padding: 0.75rem 2rem;
-  background: var(--accent-blue);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -465,7 +465,7 @@
 
 .drilldown-button {
   padding: 0.25rem 0.75rem;
-  background: var(--accent-blue);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: white;
   border: none;
   border-radius: 4px;
@@ -691,7 +691,7 @@
 .view-transactions-button {
   margin-top: 1rem;
   padding: 0.5rem 1rem;
-  background: var(--accent-blue);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: white;
   border: none;
   border-radius: 6px;
@@ -884,7 +884,7 @@
 
 .export-button {
   padding: 0.75rem 1.5rem;
-  background: var(--accent-blue);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -909,7 +909,7 @@
 .rollup-button {
   margin-top: 1rem;
   padding: 0.75rem 2rem;
-  background: var(--accent-blue);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -987,7 +987,7 @@
 
 .load-preview-button {
   padding: 0.75rem 1.5rem;
-  background: var(--accent-blue);
+  background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
   color: white;
   border: none;
   border-radius: 8px;

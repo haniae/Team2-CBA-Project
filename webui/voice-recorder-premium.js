@@ -156,12 +156,12 @@ class PremiumVoiceRecorder {
         height: 44px;
         border: none;
         border-radius: 12px;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
         color: white;
         cursor: pointer;
         overflow: hidden;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -169,8 +169,8 @@ class PremiumVoiceRecorder {
 
       .premium-voice-btn:hover {
         transform: translateY(-2px) scale(1.05);
-        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        box-shadow: 0 8px 25px rgba(0, 102, 255, 0.4);
+        background: linear-gradient(145deg, #0052CC 0%, #3D7BC8 50%, #4A90E2 100%);
       }
 
       .premium-voice-btn:active {
@@ -185,17 +185,17 @@ class PremiumVoiceRecorder {
 
       /* Button States */
       .premium-voice-btn.listening {
-        background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+        background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
         animation: listeningPulse 2s infinite;
       }
 
       .premium-voice-btn.processing {
-        background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+        background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
         animation: processingRotate 1s linear infinite;
       }
 
       .premium-voice-btn.error {
-        background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+        background: linear-gradient(145deg, #0066FF 0%, #4A90E2 50%, #60A5FA 100%);
         animation: errorShake 0.5s ease-in-out;
       }
 
