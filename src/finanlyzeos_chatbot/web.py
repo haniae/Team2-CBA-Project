@@ -244,8 +244,19 @@ FRONTEND_DIR = (BASE_DIR.parent / "webui").resolve()
 PACKAGE_STATIC = (BASE_DIR / "static").resolve()
 
 # Chart storage directory
+# Note: In serverless environments (like Vercel), the file system may be read-only
+# or have limited write access. We create the directory lazily only when needed.
 CHARTS_DIR = (BASE_DIR / "charts").resolve()
-CHARTS_DIR.mkdir(exist_ok=True)
+
+def ensure_charts_dir():
+    """Ensure CHARTS_DIR exists. Safe for serverless environments."""
+    try:
+        CHARTS_DIR.mkdir(parents=True, exist_ok=True)
+    except (OSError, PermissionError) as e:
+        # In serverless environments, directory creation may fail
+        # This is OK if we're only reading charts, not writing them
+        LOGGER.warning(f"Could not create charts directory {CHARTS_DIR}: {e}. "
+                      "Chart writing may be disabled in this environment.")
 
 
 # Custom handlers with no-cache headers to prevent stale JavaScript
