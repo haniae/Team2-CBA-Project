@@ -55,6 +55,15 @@
     <path d="M16 7.5a6.38 6.38 0 0 1-.7 2.8 6.5 6.5 0 0 1-5.8 3.6 6.38 6.38 0 0 1-2.8-.7L2 16l1.4-4.2a6.38 6.38 0 0 1-.7-2.8 6.5 6.5 0 0 1 3.6-5.8 6.38 6.38 0 0 1 2.8-.7h.4a6.48 6.48 0 0 1 6 6v.4z" transform="translate(-2 -1.5)" opacity="0.75"></path>
   </svg>
 </button>
+<button class="finance-studio-icon-button" data-action="open-finance-studio" id="finance-studio-button" aria-label="Finance Studio" title="Finance Studio" style="cursor: pointer; border: none; background: transparent; padding: 8px; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; transition: background 0.2s;">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" pointer-events="none">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+    <line x1="9" y1="3" x2="9" y2="21"></line>
+    <line x1="3" y1="9" x2="21" y2="9"></line>
+    <line x1="3" y1="15" x2="21" y2="15"></line>
+    <line x1="15" y1="3" x2="15" y2="21"></line>
+  </svg>
+</button>
 </div>
 <div class="sidebar-divider sidebar-content" role="presentation" id="sidebar-divider"></div>
 <nav aria-label="Analyst navigation" class="sidebar-nav sidebar-content" id="sidebar-nav">
@@ -146,6 +155,9 @@
 </div>
 </div>
 </section></div>
+<div class="content-container"><section class="finance-studio-view hidden" id="finance-studio-view">
+<div id="finance-studio-root"></div>
+</section></div>
 <div class="content-container"><section class="chat-panel">
 <section class="chat-intro" id="chat-intro"></section>
 <div aria-live="polite" class="chat-log" id="chat-log"></div>
@@ -206,7 +218,221 @@
 </div>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<link rel="stylesheet" href="/static/finance-studio.css">
+<link rel="stylesheet" href="/finance-studio/styles.css">
+<!-- Load Finance Studio bundle - try both locations -->
+<script src="/static/finance-studio-bundle.js" onerror="console.error('Failed to load from /static/');"></script>
+<script src="/finance-studio/finance-studio-bundle.js" onerror="console.error('Failed to load from /finance-studio/');"></script>
+<script>
+// Verify Finance Studio loaded
+(function() {
+  function checkLoaded() {
+    if (typeof window.initFinanceStudio === 'function') {
+      console.log('✓ Finance Studio bundle loaded - window.initFinanceStudio is available');
+      return true;
+    } else {
+      console.warn('✗ Finance Studio bundle not loaded - window.initFinanceStudio is', typeof window.initFinanceStudio);
+      return false;
+    }
+  }
+  
+  // Check immediately and after delays
+  if (checkLoaded()) {
+    console.log('Finance Studio ready immediately');
+  } else {
+    setTimeout(() => {
+      if (checkLoaded()) {
+        console.log('Finance Studio ready after 100ms');
+      } else {
+        setTimeout(() => {
+          if (checkLoaded()) {
+            console.log('Finance Studio ready after 500ms');
+          } else {
+            console.error('Finance Studio bundle failed to load after 500ms');
+          }
+        }, 400);
+      }
+    }, 100);
+  }
+})();
+</script>
+<script>
+// Check if Finance Studio loaded
+(function() {
+  function checkFinanceStudio() {
+    if (typeof window.initFinanceStudio === 'function') {
+      console.log('✓ Finance Studio bundle loaded successfully');
+    } else {
+      console.warn('✗ Finance Studio bundle not loaded yet');
+      // Try loading it manually if it failed
+      const script = document.createElement('script');
+      script.src = '/finance-studio/finance-studio-bundle.js';
+      script.onload = function() {
+        console.log('✓ Finance Studio bundle loaded manually');
+      };
+      script.onerror = function() {
+        console.error('✗ Failed to load finance-studio-bundle.js - check if endpoint /finance-studio/finance-studio-bundle.js is working');
+      };
+      document.head.appendChild(script);
+    }
+  }
+  // Check immediately and after a delay
+  checkFinanceStudio();
+  setTimeout(checkFinanceStudio, 500);
+})();
+</script>
 <script defer="" src="/static/app.js?v=20250207161500"></script>
+<script>
+// Finance Studio button handler - runs immediately
+(function() {
+  function showFinanceStudio() {
+    console.log('showFinanceStudio called');
+    
+    const view = document.getElementById('finance-studio-view');
+    const chatPanel = document.querySelector('.chat-panel');
+    const chatsView = document.getElementById('chats-view');
+    const utilityPanel = document.getElementById('utility-panel');
+    
+    // Hide other views
+    if (chatPanel) chatPanel.classList.add('hidden');
+    if (chatsView) chatsView.classList.add('hidden');
+    if (utilityPanel) utilityPanel.classList.add('hidden');
+    
+    // Show Finance Studio view
+    if (view) {
+      view.classList.remove('hidden');
+      console.log('Finance Studio view shown');
+      
+      // Initialize Finance Studio content
+      const root = document.getElementById('finance-studio-root');
+      if (root) {
+        console.log('Finance Studio view shown, root element found');
+        
+        // Function to try initialization
+        function tryInitFinanceStudio() {
+          console.log('Checking for window.initFinanceStudio...', typeof window.initFinanceStudio);
+          console.log('window object keys:', Object.keys(window).filter(k => k.includes('Finance') || k.includes('init')));
+          
+          if (typeof window.initFinanceStudio === 'function') {
+            try {
+              console.log('Calling window.initFinanceStudio()');
+              root.innerHTML = ''; // Clear loading message
+              window.initFinanceStudio();
+              console.log('initFinanceStudio() called successfully');
+              
+              // Verify it worked
+              setTimeout(() => {
+                const tiles = root.querySelectorAll('.app-tile');
+                console.log('App tiles found after init:', tiles.length);
+                if (tiles.length === 0) {
+                  console.error('No app tiles rendered! Root HTML:', root.innerHTML.substring(0, 500));
+                }
+              }, 100);
+            } catch (e) {
+              console.error('Error initializing Finance Studio:', e);
+              root.innerHTML = '<div style="padding: 2rem; text-align: center;"><h2>Finance Studio</h2><p style="color: #ef4444;">Error loading. Check console.</p><pre style="text-align: left; font-size: 0.75rem; max-width: 600px; margin: 1rem auto; background: #fee2e2; padding: 1rem; border-radius: 8px; overflow: auto;">' + e.toString() + '\n' + (e.stack || '') + '</pre></div>';
+            }
+          } else {
+            console.warn('window.initFinanceStudio not found, will retry...');
+            console.log('Available window properties:', Object.keys(window).filter(k => k.toLowerCase().includes('finance') || k.toLowerCase().includes('init')).join(', '));
+            if (!root.innerHTML.includes('Loading') && !root.innerHTML.includes('Error')) {
+              root.innerHTML = '<div style="padding: 2rem; text-align: center;"><h2>Finance Studio</h2><p>Loading Finance Studio...</p><p style="color: #666; font-size: 0.875rem;">Waiting for finance-studio-bundle.js to load...</p><p style="color: #999; font-size: 0.75rem;">Check console (F12) for details</p><p style="color: #999; font-size: 0.75rem;">If this persists, check Network tab for finance-studio-bundle.js</p></div>';
+            }
+          }
+        }
+        
+        // Try immediately and with retries
+        tryInitFinanceStudio();
+        setTimeout(tryInitFinanceStudio, 100);
+        setTimeout(tryInitFinanceStudio, 300);
+        setTimeout(tryInitFinanceStudio, 500);
+        setTimeout(tryInitFinanceStudio, 1000);
+        setTimeout(tryInitFinanceStudio, 2000);
+        setTimeout(tryInitFinanceStudio, 3000);
+      } else {
+        console.error('finance-studio-root element not found!');
+      }
+    }
+  }
+  
+  function initFinanceStudioButton() {
+    const button = document.getElementById('finance-studio-button');
+    
+    if (!button) {
+      console.warn('Finance Studio button not found, will retry...');
+      return false;
+    }
+    
+    console.log('Finance Studio button found, attaching handler');
+    
+    // Remove any existing listeners by cloning the button
+    const newButton = button.cloneNode(true);
+    button.parentNode.replaceChild(newButton, button);
+    
+    // Add click handler with multiple event types
+    newButton.onclick = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Finance Studio button CLICKED via onclick!');
+      showFinanceStudio();
+      return false;
+    };
+    
+    newButton.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Finance Studio button CLICKED via addEventListener!');
+      showFinanceStudio();
+      return false;
+    }, true); // Use capture phase
+    
+    newButton.addEventListener('mousedown', function(e) {
+      console.log('Finance Studio button mousedown');
+    });
+    
+    console.log('Finance Studio button handler attached successfully');
+    return true;
+  }
+  
+  // Global function for testing
+  window.testFinanceStudio = function() {
+    console.log('Testing Finance Studio...');
+    const button = document.getElementById('finance-studio-button');
+    const view = document.getElementById('finance-studio-view');
+    console.log('Button:', button);
+    console.log('View:', view);
+    if (button) {
+      button.click();
+    }
+  };
+  
+  // Try multiple times to ensure it works
+  function tryInit() {
+    if (!initFinanceStudioButton()) {
+      setTimeout(tryInit, 200);
+    }
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      tryInit();
+      setTimeout(tryInit, 500);
+      setTimeout(tryInit, 1000);
+    });
+  } else {
+    tryInit();
+    setTimeout(tryInit, 500);
+    setTimeout(tryInit, 1000);
+  }
+  
+  // Also try on window load
+  window.addEventListener('load', function() {
+    setTimeout(tryInit, 100);
+  });
+})();
+</script>
 <script defer="" src="/static/voice-chatgpt.js?v=20241127"></script>
 <script>
 // Simple immediate health check - runs before app.js loads

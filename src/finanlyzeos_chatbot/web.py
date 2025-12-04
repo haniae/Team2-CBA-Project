@@ -86,6 +86,17 @@ from .portfolio_trades import (
     TradeImpactResult,
     PortfolioState,
 )
+from .finance_consolidation import (
+    ConsolidationRequest,
+    consolidate_data,
+    get_pl_consolidation,
+    get_variance_analysis,
+    get_three_statement_data,
+    get_visualization_data,
+    get_drilldown_transactions,
+    SourceConfig,
+    ConsolidationFilters,
+)
 # TODO: portfolio_report_builder doesn't exist - using portfolio_reporting instead
 # from .portfolio_report_builder import (
 #     create_custom_report,
@@ -5773,3 +5784,165 @@ async def voice_to_text(audio: UploadFile = File(...)) -> JSONResponse:
                 os.unlink(temp_audio_path)
             except Exception as cleanup_error:
                 LOGGER.warning(f"Failed to cleanup temp file {temp_audio_path}: {cleanup_error}")
+
+# ============================================================================
+# Finance Studio API Endpoints
+# ============================================================================
+
+@app.post("/api/finance-studio/consolidate")
+async def api_consolidate(req: ConsolidationRequest) -> JSONResponse:
+    """Consolidate data from multiple sources."""
+    try:
+        result = consolidate_data(
+            sources=req.sources,
+            filters=req.filters,
+            view=req.view,
+        )
+        return JSONResponse(content=result.model_dump())
+    except Exception as e:
+        LOGGER.error(f"Consolidation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Consolidation failed: {str(e)}")
+
+
+@app.post("/api/finance-studio/pl-consolidation")
+async def api_pl_consolidation(req: ConsolidationRequest) -> JSONResponse:
+    """Get P&L consolidation view."""
+    try:
+        result = get_pl_consolidation(
+            sources=req.sources,
+            filters=req.filters,
+        )
+        return JSONResponse(content=result.model_dump())
+    except Exception as e:
+        LOGGER.error(f"P&L consolidation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"P&L consolidation failed: {str(e)}")
+
+
+@app.post("/api/finance-studio/variance")
+async def api_variance(req: ConsolidationRequest) -> JSONResponse:
+    """Get variance analysis."""
+    try:
+        result = get_variance_analysis(
+            sources=req.sources,
+            filters=req.filters,
+        )
+        return JSONResponse(content=result.model_dump())
+    except Exception as e:
+        LOGGER.error(f"Variance analysis failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Variance analysis failed: {str(e)}")
+
+
+@app.post("/api/finance-studio/three-statement")
+async def api_three_statement(
+    req: ConsolidationRequest,
+    statement_type: Optional[str] = Query("pl", alias="statement_type")
+) -> JSONResponse:
+    """Get three-statement data (P&L, Balance Sheet, or Cash Flow)."""
+    try:
+        result = get_three_statement_data(
+            sources=req.sources,
+            filters=req.filters,
+            statement_type=statement_type or "pl",
+        )
+        return JSONResponse(content=result.model_dump())
+    except Exception as e:
+        LOGGER.error(f"Three-statement data failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Three-statement data failed: {str(e)}")
+
+
+@app.post("/api/finance-studio/visualizations")
+async def api_visualizations(req: ConsolidationRequest) -> JSONResponse:
+    """Get data formatted for visualization dashboards."""
+    try:
+        result = get_visualization_data(
+            sources=req.sources,
+            filters=req.filters,
+        )
+        return JSONResponse(content=result)
+    except Exception as e:
+        LOGGER.error(f"Visualization data failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Visualization data failed: {str(e)}")
+
+
+@app.get("/api/finance-studio/drilldown")
+async def api_drilldown(
+    line_item: str = Query(..., alias="line_item"),
+    entity: Optional[str] = Query(None),
+    period: Optional[str] = Query(None),
+    statement_type: str = Query("pl", alias="statement_type"),
+    scenario: Optional[str] = Query(None),
+) -> JSONResponse:
+    """Get transaction-level detail for drill-down."""
+    try:
+        transactions = get_drilldown_transactions(
+            line_item=line_item,
+            entity=entity,
+            period=period,
+            statement_type=statement_type,
+            scenario=scenario,
+        )
+        return JSONResponse(content={"transactions": transactions})
+    except Exception as e:
+        LOGGER.error(f"Drilldown failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Drilldown failed: {str(e)}")
+
+
+@app.post("/api/finance-studio/export")
+async def api_export(req: ConsolidationRequest) -> JSONResponse:
+    """Export consolidated data."""
+    try:
+        result = consolidate_data(
+            sources=req.sources,
+            filters=req.filters,
+            view=req.view,
+        )
+        # Return data that can be exported
+        return JSONResponse(content={
+            "data": result.model_dump(),
+            "export_url": f"/api/finance-studio/consolidate",
+        })
+    except Exception as e:
+        LOGGER.error(f"Export failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
+
+# Finance Studio static file serving
+FINANCE_STUDIO_DIR = (FRONTEND_DIR / "finance-studio").resolve()
+
+@app.get("/finance-studio/{file_path:path}")
+async def serve_finance_studio_file(file_path: str):
+    """Serve Finance Studio static files."""
+    file_full_path = FINANCE_STUDIO_DIR / file_path
+    
+    # Security: ensure file is within finance-studio directory
+    try:
+        file_full_path.resolve().relative_to(FINANCE_STUDIO_DIR.resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if not file_full_path.exists() or not file_full_path.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+    
+    # Determine content type
+    content_type = "text/plain"
+    if file_path.endswith(".css"):
+        content_type = "text/css"
+    elif file_path.endswith(".js"):
+        content_type = "application/javascript"
+    elif file_path.endswith(".tsx") or file_path.endswith(".ts"):
+        content_type = "application/javascript"
+    elif file_path.endswith(".json"):
+        content_type = "application/json"
+    
+    with open(file_full_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+    )

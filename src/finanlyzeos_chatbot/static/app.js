@@ -10509,3 +10509,76 @@ document.addEventListener("DOMContentLoaded", () => {
 window.showCfiDenseDashboard = showCfiDenseDashboard;
 window.showCfiDashboard = showCfiDashboard;
 window.showCfiCompareDashboard = showCfiCompareDashboard;
+
+// Finance Studio navigation
+function setupFinanceStudioNavigation() {
+  const financeStudioView = document.getElementById('finance-studio-view');
+  const chatPanel = document.querySelector('.chat-panel');
+  const chatsView = document.getElementById('chats-view');
+  const utilityPanel = document.getElementById('utility-panel');
+
+  function showFinanceStudio() {
+    console.log('Showing Finance Studio');
+    
+    // Hide other views
+    if (chatPanel) chatPanel.classList.add('hidden');
+    if (chatsView) chatsView.classList.add('hidden');
+    if (utilityPanel) utilityPanel.classList.add('hidden');
+
+    // Show Finance Studio view
+    if (financeStudioView) {
+      financeStudioView.classList.remove('hidden');
+
+      // Load Finance Studio React app if available
+      if (typeof window.initFinanceStudio === 'function') {
+        window.initFinanceStudio();
+      } else {
+        // Fallback: show a message if React app isn't loaded
+        const root = document.getElementById('finance-studio-root');
+        if (root && !root.innerHTML.trim()) {
+          root.innerHTML = '<div style="padding: 2rem; text-align: center;"><p>Loading Finance Studio...</p><p style="color: #666; font-size: 0.875rem;">If this message persists, ensure the Finance Studio React app is properly built and loaded.</p></div>';
+        }
+      }
+    }
+  }
+
+  // Use event delegation for better reliability
+  document.addEventListener('click', (e) => {
+    // Check if clicked element or its parent is the finance studio button
+    const button = e.target.closest('#finance-studio-button') || 
+                   e.target.closest('[data-action="open-finance-studio"]') ||
+                   (e.target.id === 'finance-studio-button' ? e.target : null);
+    
+    if (button) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Finance Studio button clicked via delegation');
+      showFinanceStudio();
+      return;
+    }
+  });
+
+  // Also attach directly to button if it exists
+  const financeStudioButton = document.getElementById('finance-studio-button');
+  if (financeStudioButton) {
+    financeStudioButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Finance Studio button clicked directly');
+      showFinanceStudio();
+    });
+    console.log('Finance Studio button event listener attached');
+  } else {
+    console.warn('Finance Studio button not found, using event delegation only');
+  }
+}
+
+// Wait for DOM to be ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(setupFinanceStudioNavigation, 100);
+  });
+} else {
+  // DOM is already ready, but wait a bit for other scripts
+  setTimeout(setupFinanceStudioNavigation, 100);
+}
